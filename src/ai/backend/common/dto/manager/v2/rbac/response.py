@@ -35,6 +35,8 @@ __all__ = (
     "DeleteRolePayload",
     "EntityActionInfo",
     "EntityOperationCombinationInfo",
+    "MyAtomicBulkScopePermissionsPayload",
+    "MyScopePermissionsPayload",
     "OperationInfo",
     "PermissionNode",
     "PurgeRolePayload",
@@ -44,6 +46,7 @@ __all__ = (
     "RoleNode",
     "ScopeEntityCombinationInfo",
     "ScopeEntityOperationCombinationInfo",
+    "ScopeEntityPermission",
     "UpdateRolePayload",
 )
 
@@ -284,4 +287,29 @@ class ScopeEntityOperationCombinationInfo(BaseResponseModel):
     scope_type: EntityType = Field(description="Scope element type")
     entities: list[EntityActionInfo] = Field(
         description="Entities and their valid operations within this scope"
+    )
+
+
+class ScopeEntityPermission(BaseResponseModel):
+    """The bits the caller holds on one entity type within one scope."""
+
+    scope_type: str = Field(description="Type of the scope, echoed from the target.")
+    scope_id: UUID = Field(description="ID of the scope, echoed from the target.")
+    entity_type: str = Field(description="Entity type, echoed from the target.")
+    permissions: list[PermissionBitDTO] = Field(
+        description="The bits the caller holds, empty when it holds none."
+    )
+
+
+class MyScopePermissionsPayload(BaseResponseModel):
+    """Payload for the caller's permissions on one scope and entity type."""
+
+    item: ScopeEntityPermission = Field(description="The answer for the named target.")
+
+
+class MyAtomicBulkScopePermissionsPayload(BaseResponseModel):
+    """Payload for the caller's permissions on several scopes and entity types."""
+
+    items: list[ScopeEntityPermission] = Field(
+        description="One answer per target, in the order the targets were given."
     )

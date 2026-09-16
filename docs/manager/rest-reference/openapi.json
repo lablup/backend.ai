@@ -18917,8 +18917,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Allowed filter label keys",
+            "description": "Allowed filter label keys. Omit to leave unchanged.",
             "title": "Filter Labels"
           },
           "group_labels": {
@@ -18933,8 +18932,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Allowed group-by label keys",
+            "description": "Allowed group-by label keys. Omit to leave unchanged.",
             "title": "Group Labels"
           }
         },
@@ -18942,7 +18940,7 @@
         "type": "object"
       },
       "ModifyQueryDefinitionInput": {
-        "description": "Input for modifying a prometheus query definition.\n\nNullable DB columns (``time_window``, ``description``, ``category_id``) use the\n``Sentinel`` pattern so callers can distinguish \"leave unchanged\" from \"clear to null\".\nNon-nullable fields use ``None`` to mean \"do not update\".",
+        "description": "Input for modifying a prometheus query definition.\n\nEvery field defaults to ``Unset``; only fields the caller sends are updated.",
         "properties": {
           "name": {
             "anyOf": [
@@ -18953,8 +18951,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated human-readable name",
+            "description": "Updated human-readable name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -18963,14 +18960,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
@@ -18983,8 +18976,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated sort rank",
+            "description": "Updated sort rank. Omit to leave unchanged.",
             "title": "Rank"
           },
           "category_id": {
@@ -18994,14 +18986,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated category ID. Omit to leave unchanged; null clears.",
             "title": "Category Id"
           },
           "metric_name": {
@@ -19013,8 +19001,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated Prometheus metric name",
+            "description": "Updated Prometheus metric name. Omit to leave unchanged.",
             "title": "Metric Name"
           },
           "query_template": {
@@ -19026,8 +19013,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
+            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}}). Omit to leave unchanged.",
             "title": "Query Template"
           },
           "time_window": {
@@ -19036,14 +19022,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated default time window. Omit to leave unchanged; null clears.",
             "title": "Time Window"
           },
           "options": {
@@ -19055,8 +19037,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated query definition options"
+            "description": "Updated query definition options. Omit to leave unchanged.",
+            "title": "Options"
           }
         },
         "title": "ModifyQueryDefinitionInput",
@@ -19578,6 +19560,80 @@
           }
         },
         "title": "MappedScopeNestedFilter",
+        "type": "object"
+      },
+      "PermissionNestedFilter": {
+        "description": "Nested filter for permissions within a role assignment.",
+        "properties": {
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "PermissionNestedFilter",
         "type": "object"
       },
       "RoleFilter": {
@@ -20449,80 +20505,6 @@
         "title": "RevokeRoleInput",
         "type": "object"
       },
-      "PermissionNestedFilter": {
-        "description": "Nested filter for permissions within a role assignment.",
-        "properties": {
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "PermissionNestedFilter",
-        "type": "object"
-      },
       "RoleAssignmentFilter": {
         "description": "Filter for role assignments.",
         "properties": {
@@ -20677,6 +20659,17 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RoleStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "mapped_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MappedScopeNestedFilter"
               },
               {
                 "type": "null"
@@ -32179,8 +32172,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New username.",
+            "description": "New username. Omit to leave unchanged.",
             "title": "Username"
           },
           "password": {
@@ -32192,8 +32184,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New password.",
+            "description": "New password. Omit to leave unchanged.",
             "title": "Password"
           },
           "full_name": {
@@ -32202,14 +32193,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New full display name. Set to null to clear.",
+            "description": "Updated full display name. Omit to leave unchanged; null clears.",
             "title": "Full Name"
           },
           "description": {
@@ -32218,14 +32205,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New description. Set to null to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "status": {
@@ -32237,8 +32220,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New account status."
+            "description": "New account status. Omit to leave unchanged.",
+            "title": "Status"
           },
           "role": {
             "anyOf": [
@@ -32249,8 +32232,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New user role."
+            "description": "New user role. Omit to leave unchanged.",
+            "title": "Role"
           },
           "domain_name": {
             "anyOf": [
@@ -32261,8 +32244,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New domain assignment.",
+            "description": "New domain assignment. Omit to leave unchanged.",
             "title": "Domain Name"
           },
           "group_ids": {
@@ -32275,14 +32257,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New project (group) assignments. Replaces existing assignments. Set to null to clear.",
+            "description": "Updated project (group) assignments, replacing the existing ones. Omit to leave unchanged.",
             "title": "Group Ids"
           },
           "allowed_client_ip": {
@@ -32294,14 +32272,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New allowed client IP addresses or CIDR ranges. Set to null to allow all.",
+            "description": "Updated allowed client IP addresses or CIDR ranges. Omit to leave unchanged; null allows all.",
             "title": "Allowed Client Ip"
           },
           "need_password_change": {
@@ -32313,8 +32287,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Set password change requirement.",
+            "description": "Set password change requirement. Omit to leave unchanged.",
             "title": "Need Password Change"
           },
           "resource_policy": {
@@ -32326,8 +32299,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New user resource policy name.",
+            "description": "New user resource policy name. Omit to leave unchanged.",
             "title": "Resource Policy"
           },
           "sudo_session_enabled": {
@@ -32339,8 +32311,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Enable or disable sudo session capability.",
+            "description": "Enable or disable sudo session capability. Omit to leave unchanged.",
             "title": "Sudo Session Enabled"
           },
           "main_access_key": {
@@ -32349,14 +32320,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Set the primary API access key. It cannot be cleared; null is ignored.",
+            "description": "Updated primary API access key. Omit to leave unchanged; it cannot be cleared, so null is ignored.",
             "title": "Main Access Key"
           },
           "container_uid": {
@@ -32365,14 +32332,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New container user ID. Set to null to clear.",
+            "description": "Updated container user ID. Omit to leave unchanged; null clears.",
             "title": "Container Uid"
           },
           "container_main_gid": {
@@ -32381,14 +32344,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New container primary group ID. Set to null to clear.",
+            "description": "Updated container primary group ID. Omit to leave unchanged; null clears.",
             "title": "Container Main Gid"
           },
           "container_gids": {
@@ -32400,14 +32359,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New container supplementary group IDs. Set to null to clear.",
+            "description": "Updated container supplementary group IDs. Omit to leave unchanged; null clears.",
             "title": "Container Gids"
           },
           "integration_name": {
@@ -32416,14 +32371,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           }
         },
@@ -33176,6 +33127,7 @@
       },
       "VFolderPermissionField": {
         "enum": [
+          "none",
           "ro",
           "rw",
           "wd",
@@ -33305,6 +33257,27 @@
           }
         },
         "title": "PurgeVFolderInput",
+        "type": "object"
+      },
+      "SetVFolderMountPolicyInput": {
+        "description": "Input for setting the mount level one user gets on a virtual folder.",
+        "properties": {
+          "user_id": {
+            "description": "User the mount level is set for",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "description": "Mount level: none, ro or rw. wd is stored as rw."
+          }
+        },
+        "required": [
+          "user_id",
+          "permission"
+        ],
+        "title": "SetVFolderMountPolicyInput",
         "type": "object"
       },
       "DeployVFolderInput": {
@@ -51235,7 +51208,7 @@
           }
         ],
         "parameters": [],
-        "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/reservoir-registries": {
@@ -55723,6 +55696,108 @@
           }
         ],
         "description": "Permanently delete a vfolder, optionally cascading linked model cards.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/mount-policies": {
+      "put": {
+        "operationId": "v2/vfolders.set_mount_policy",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVFolderMountPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Set the mount level one user gets on the vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "get": {
+        "operationId": "v2/vfolders.list_mount_policies",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "The mount levels set on the vfolder, one row per user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/mount-policies/{user_id}": {
+      "delete": {
+        "operationId": "v2/vfolders.unset_mount_policy",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take back the mount level one user was given on the vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolders/{vfolder_id}/restore": {

@@ -18,13 +18,17 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -52,6 +56,10 @@ TABLES: Sequence[TableOrORM] = [
     EntityMembershipFieldRow,
     ScopeBindingRow,
     EntityLabelRow,
+    DomainRow,
+    UserResourcePolicyRow,
+    UserRow,
+    EntityShareRow,
 ]
 
 _ORM_CLUSTER = (AgentRow, ResourceGroupForDomainRow)

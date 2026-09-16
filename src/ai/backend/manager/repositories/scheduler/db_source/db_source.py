@@ -58,6 +58,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -71,8 +72,8 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -88,7 +89,8 @@ from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
-from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
+from ai.backend.manager.models.resource_group import ResourceGroupRow
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     KeyPairResourcePolicyRow,
@@ -136,7 +138,6 @@ from ai.backend.manager.repositories.scheduler.types.session import (
     SessionHistoryToCreate,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedResourceGroup,
     ComputeScheduleFetch,
     SessionSpecFetch,
     UserEnqueueFetch,
@@ -2228,36 +2229,53 @@ class ScheduleDBSource:
     async def pick_default_resource_group(
         self,
         *,
-        access_key: AccessKey,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
+        user_id: UserID,
     ) -> ResourceGroupID:
-        """Return the first resource group from the owner's allowlist."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            allowed_rgs = await self._query_allowed_resource_groups(
-                db_sess, domain_name, project_id, access_key
-            )
-        if not allowed_rgs:
+        """Return the first resource group, by name, the owner may schedule on."""
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=[project_id], user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        if not result.items:
             raise InvalidAPIParameters("No accessible resource group available")
-        return allowed_rgs[0].id
+        return result.items[0].id
 
     async def query_accessible_resource_group_ids(
         self,
         *,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
-        access_key: AccessKey,
+        user_id: UserID,
     ) -> frozenset[ResourceGroupID]:
         """Return the resource-group ids accessible to the given single-project scope.
 
         A pure DB read: the caller decides the scope and performs the
         accessibility rejection, so this method neither validates nor raises.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            allowed_rgs = await self._query_allowed_resource_groups(
-                db_sess, domain_name, project_id, access_key
-            )
-        return frozenset(rg.id for rg in allowed_rgs)
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=[project_id], user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return frozenset(rg.id for rg in result.items)
+
+    async def query_allowed_resource_groups(
+        self,
+        *,
+        domain_id: DomainID,
+        project_ids: Sequence[ProjectID],
+        user_id: UserID,
+    ) -> list[ResourceGroupData]:
+        """Return the active resource groups the user may schedule on, in name order."""
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=project_ids, user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return result.items
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -2376,44 +2394,6 @@ class ScheduleDBSource:
             main_gid=user_row.container_main_gid,
             supplementary_gids=user_row.container_gids or [],
         )
-
-    async def _query_allowed_resource_groups(
-        self,
-        db_sess: SASession,
-        domain_name: str,
-        group_id: ProjectID,
-        access_key: str,
-    ) -> list[AllowedResourceGroup]:
-        """
-        Query allowed resource groups for the given user/group.
-
-        Args:
-            db_sess: Database session
-            domain_name: Domain name
-            group_id: Project (group) ID
-            access_key: Access key
-
-        Returns:
-            List of AllowedScalingGroup objects
-        """
-        # query_allowed_sgroups expects AsyncConnection, get it from session
-        conn = await db_sess.connection()
-        allowed_sgroups = await query_allowed_sgroups(
-            conn,
-            domain_name,
-            group_id,
-            access_key,
-        )
-
-        return [
-            AllowedResourceGroup(
-                id=ResourceGroupID(sg.id),
-                name=ResourceGroupName(sg.name),
-                is_private=not sg.is_public,  # Convert is_public to is_private
-                scheduler_opts=sg.scheduler_opts,
-            )
-            for sg in allowed_sgroups
-        ]
 
     async def allocate_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
         """Reserve and assign sessions in the batch to their agents.
@@ -3892,7 +3872,7 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
             if row is None:
-                raise ObjectNotFound(object_name="network")
+                raise NetworkNotFound()
             return row.to_data()
 
     async def update_session_network_id(

@@ -5,6 +5,7 @@ from ai.backend.common.types import VFolderUsageMode
 
 
 class VFolderPermissionField(enum.StrEnum):
+    NONE = "none"
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"

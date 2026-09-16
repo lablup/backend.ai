@@ -7,8 +7,13 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.vfolder.types import OrderDirection, VFolderOrderField
 from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.models.user.queries import user_scope_shares
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 from .row import VFolderRow
 
@@ -65,6 +70,18 @@ class VFolderOrders:
         if ascending:
             return VFolderRow.host.asc()
         return VFolderRow.host.desc()
+
+    @staticmethod
+    def project_first(project_id: ProjectID) -> QueryOrder:
+        """The folders the project reaches, ahead of the rest."""
+        return scope_membership_exists(
+            ProjectEntityType(), project_id, VFolderEntityType(), VFolderRow.id
+        ).desc()
+
+    @staticmethod
+    def shared_last(user_id: UserID) -> QueryOrder:
+        """The folders shared to the user, behind the rest."""
+        return user_scope_shares(user_id, VFolderEntityType(), VFolderRow.id).asc()
 
 
 def resolve_order(field: VFolderOrderField, direction: OrderDirection) -> QueryOrder:

@@ -65,7 +65,7 @@ class TestAppConfigService:
 
     @pytest.fixture
     def service(self, mock_repository: MagicMock) -> AppConfigService:
-        return AppConfigService(mock_repository)
+        return AppConfigService(mock_repository, MagicMock())
 
     @pytest.fixture
     def found(self, mock_repository: MagicMock) -> Callable[[list[AppConfigFragmentData]], None]:

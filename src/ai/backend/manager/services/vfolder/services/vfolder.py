@@ -15,7 +15,9 @@ from aiohttp import hdrs, web
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnreachableError
@@ -25,9 +27,12 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectResourceInfo
@@ -35,14 +40,12 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreation,
     VFolderData,
-    VFolderMountPermission,
     VFolderUsageData,
 )
-from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
-    TooManyVFoldersFound,
     UnexpectedStorageProxyResponseError,
     VFolderAlreadyExists,
     VFolderBadRequest,
@@ -54,15 +57,13 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.project import ProjectType
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderCloneInfo,
     VFolderOperationStatus,
     VFolderOwnershipType,
-    VFolderPermission,
-    VFolderRow,
     VFolderStatusSet,
     is_unmanaged,
     verify_vfolder_name,
@@ -73,7 +74,12 @@ from ai.backend.manager.models.vfolder.creators import (
     UnmanagedVFolderMixin,
     VFolderBaseCreator,
 )
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderOperationScope,
+    UserVFolderOperationScope,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -86,8 +92,6 @@ from ai.backend.manager.services.vfolder.actions.base import (
     GetTaskLogsActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
-    ListVFolderAction,
-    ListVFolderActionResult,
     LookupAccessibleVFolderAction,
     LookupAccessibleVFolderActionResult,
     MoveToTrashVFolderAction,
@@ -102,6 +106,12 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
     GlobalBatchLoadVFoldersActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
 )
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
@@ -172,8 +182,6 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     PurgeVFolderV2ActionResult,
 )
 from ai.backend.manager.services.vfolder.types import (
-    VFolderBaseInfo,
-    VFolderOwnershipInfo,
     VFolderUsageInfo,
 )
 
@@ -203,6 +211,7 @@ class VFolderService:
     _vfolder_repository: VfolderRepository
     _user_repository: UserRepository
     _valkey_stat_client: ValkeyStatClient
+    _own_check: BulkOwnCheck
 
     def __init__(
         self,
@@ -213,6 +222,7 @@ class VFolderService:
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
         valkey_stat_client: ValkeyStatClient,
+        own_check: BulkOwnCheck,
     ) -> None:
         self._config_provider = config_provider
         self._etcd = etcd
@@ -221,6 +231,7 @@ class VFolderService:
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
         self._valkey_stat_client = valkey_stat_client
+        self._own_check = own_check
 
     async def batch_load_by_ids(
         self, action: GlobalBatchLoadVFoldersAction
@@ -231,6 +242,56 @@ class VFolderService:
         """
         data = await self._vfolder_repository.batch_load_by_ids(action.ids)
         return GlobalBatchLoadVFoldersActionResult(data=data)
+
+    async def bulk_load_permissions(
+        self, action: BulkLoadVFolderPermissionsAction
+    ) -> PartialBulkResult[Permission]:
+        held = await self._own_check.held(action.vfolder_ids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[Permission].succeeded(
+                    vid, held.get(vid, Permission.NONE), description="resolved"
+                )
+                for vid in action.vfolder_ids
+            ]
+        )
+
+    async def bulk_load_mount_levels(
+        self, action: BulkLoadVFolderMountLevelsAction
+    ) -> PartialBulkResult[VFolderMountPolicy]:
+        """The mount level the caller gets on each folder named: the folder's default,
+        their own policy row, and read-write on a personal folder they own."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        user_id = UserID(me.user_id)
+        held = await self._own_check.held(action.vfolder_ids)
+        folders = await self._vfolder_repository.batch_load_by_ids(list(action.vfolder_ids))
+        policies = await self._vfolder_repository.user_mount_policies_of(
+            user_id, action.vfolder_ids
+        )
+        items: list[PartialBulkEntityResult[VFolderMountPolicy]] = []
+        for vfolder_id, folder in zip(action.vfolder_ids, folders, strict=True):
+            if folder is None:
+                items.append(
+                    PartialBulkEntityResult[VFolderMountPolicy].nothing(
+                        vfolder_id, "no such folder"
+                    )
+                )
+                continue
+            level = resolve_mount_policy(
+                user_id,
+                owner_user_id=folder.user,
+                default_mount_permission=folder.default_mount_permission,
+                held=held.get(vfolder_id, Permission.NONE),
+                user_policy=policies.get(vfolder_id),
+            )
+            items.append(
+                PartialBulkEntityResult[VFolderMountPolicy].succeeded(
+                    vfolder_id, level, description="resolved"
+                )
+            )
+        return PartialBulkResult(items=items)
 
     async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
         """Resolve one vfolder name into its id.
@@ -293,78 +354,25 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        updater = action.updater
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-
-        # Get user info using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise ObjectNotFound(object_name="User")
-        user_role, user_domain_name = user_info
-
-        # Get all accessible vfolders to check for name conflicts
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-        )
-
-        if not vfolder_list_result.vfolders:
-            raise VFolderNotFound()
-
-        # Check for name conflicts if name is being updated
         try:
-            new_name = updater.name.value()
+            new_name = action.updater.name.value()
         except ValueError:
             pass
         else:
-            for access_info in vfolder_list_result.vfolders:
-                if access_info.vfolder_data.name == new_name:
-                    raise VFolderInvalidParameter(
-                        "One of your accessible vfolders already has the name you requested."
-                    )
+            vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+            if await self._vfolder_repository.check_vfolder_name_exists(
+                self._owning_scope(vfolder_data), new_name
+            ):
+                raise VFolderInvalidParameter(
+                    "One of your accessible vfolders already has the name you requested."
+                )
 
-        # Update the vfolder using repository
         await self._vfolder_repository.update_vfolder_attribute(action.updater)
 
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def get(self, action: GetVFolderAction) -> GetVFolderActionResult:
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-
-        # Get user info using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise ObjectNotFound(object_name="User")
-        user_role, user_domain_name = user_info
-
-        # Use repository to get accessible vfolders
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=(VFolderRow.id == action.vfolder_uuid),
-        )
-
-        if not vfolder_list_result.vfolders:
-            raise VFolderNotFound()
-
-        vfolder_access_info = vfolder_list_result.vfolders[0]
-        vfolder_data = vfolder_access_info.vfolder_data
-
-        if vfolder_access_info.effective_permission is None:
-            is_owner = True
-            permission = VFolderPermission.OWNER_PERM
-        else:
-            is_owner = vfolder_access_info.is_owner
-            permission = vfolder_access_info.effective_permission
-
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
@@ -379,77 +387,8 @@ class VFolderService:
         )
         return GetVFolderActionResult(
             user_uuid=action.user_uuid,
-            base_info=VFolderBaseInfo(
-                id=vfolder_data.id,
-                quota_scope_id=vfolder_data.quota_scope_id,
-                name=vfolder_data.name,
-                host=vfolder_data.host,
-                status=vfolder_data.status,
-                unmanaged_path=vfolder_data.unmanaged_path,
-                mount_permission=permission,
-                usage_mode=vfolder_data.usage_mode,
-                created_at=vfolder_data.created_at,
-                cloneable=vfolder_data.cloneable,
-            ),
-            ownership_info=VFolderOwnershipInfo(
-                creator_email=vfolder_data.creator,
-                ownership_type=vfolder_data.ownership_type,
-                is_owner=is_owner,
-                user_uuid=vfolder_data.user,
-                group_uuid=vfolder_data.group,
-            ),
+            vfolder=vfolder_data,
             usage_info=usage_info,
-        )
-
-    async def list(self, action: ListVFolderAction) -> ListVFolderActionResult:
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-
-        # Get user info using repository
-        user_info = await self._vfolder_repository.get_user_info(action.user_uuid)
-        if not user_info:
-            raise ObjectNotFound(object_name="User")
-        user_role, user_domain_name = user_info
-
-        # Use repository to get accessible vfolders
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-        )
-
-        vfolders = [
-            (
-                VFolderBaseInfo(
-                    id=access_info.vfolder_data.id,
-                    quota_scope_id=access_info.vfolder_data.quota_scope_id,
-                    name=access_info.vfolder_data.name,
-                    host=access_info.vfolder_data.host,
-                    status=access_info.vfolder_data.status,
-                    unmanaged_path=access_info.vfolder_data.unmanaged_path,
-                    # None means owner, who has full permissions
-                    mount_permission=access_info.effective_permission
-                    or VFolderMountPermission.RW_DELETE,
-                    usage_mode=access_info.vfolder_data.usage_mode,
-                    created_at=access_info.vfolder_data.created_at,
-                    cloneable=access_info.vfolder_data.cloneable,
-                ),
-                VFolderOwnershipInfo(
-                    creator_email=access_info.vfolder_data.creator,
-                    ownership_type=access_info.vfolder_data.ownership_type,
-                    is_owner=access_info.is_owner,
-                    user_uuid=access_info.vfolder_data.user,
-                    group_uuid=access_info.vfolder_data.group,
-                ),
-            )
-            for access_info in vfolder_list_result.vfolders
-        ]
-
-        return ListVFolderActionResult(
-            user_uuid=action.user_uuid,
-            vfolders=vfolders,
         )
 
     async def move_to_trash(
@@ -457,12 +396,7 @@ class VFolderService:
     ) -> MoveToTrashVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
         return MoveToTrashVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -471,12 +405,7 @@ class VFolderService:
     ) -> RestoreVFolderFromTrashActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -502,12 +431,7 @@ class VFolderService:
     ) -> DeleteForeverVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         result = await self._vfolder_repository.delete_vfolders_forever(
             [action.vfolder_uuid],
             cascade_model_card=action.cascade_model_card,
@@ -527,12 +451,7 @@ class VFolderService:
     ) -> ForceDeleteVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         # Explicit escape hatch: bypass the in-use / status guards.
         result = await self._vfolder_repository.delete_vfolders_forever(
             [action.vfolder_uuid], force=True
@@ -555,29 +474,11 @@ class VFolderService:
             raise VFolderInvalidParameter("No such user.")
         user_role, user_domain_name = user_info
 
-        # Get accessible vfolders to find the source folder
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.requester_user_uuid,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=(VFolderRow.id == action.source_vfolder_uuid),
-        )
-
-        if not vfolder_list_result.vfolders:
-            raise VFolderInvalidParameter("No such vfolder.")
-
-        source_vfolder_access_info = vfolder_list_result.vfolders[0]
-        source_vfolder_data = source_vfolder_access_info.vfolder_data
+        source_vfolder_data = await self._vfolder_repository.get_by_id(action.source_vfolder_uuid)
 
         # Check if the source vfolder is allowed to be cloned
         if not source_vfolder_data.cloneable:
             raise Forbidden("The source vfolder is not permitted to be cloned.")
-
-        if action.target_name.startswith("."):
-            for entry in vfolder_list_result.vfolders:
-                if entry.vfolder_data.name == action.target_name:
-                    raise VFolderAlreadyExists
 
         # Get target host
         target_folder_host = (
@@ -598,11 +499,8 @@ class VFolderService:
 
         # Check for duplicate vfolder names
         duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
+            UserVFolderOperationScope(user_id=UserID(action.requester_user_uuid)),
             action.target_name,
-            action.requester_user_uuid,
-            user_role,
-            user_domain_name,
-            list(allowed_vfolder_types),
         )
 
         if duplication_exists:
@@ -708,20 +606,9 @@ class VFolderService:
         )
 
     async def get_task_logs(self, action: GetTaskLogsAction) -> GetTaskLogsActionResult:
-        user_uuid = action.user_id
-        user_role = action.user_role
         kernel_id_str = action.kernel_id.hex
 
-        # Get user info using repository
-        user_info = await self._vfolder_repository.get_user_info(user_uuid)
-        if not user_info:
-            raise UserNotFound(object_name="User")
-        user_role, user_domain_name = user_info
-
-        # Get the .logs vfolder using repository
-        log_vfolder_data = await self._vfolder_repository.get_logs_vfolder(
-            user_uuid, user_role, user_domain_name
-        )
+        log_vfolder_data = await self._vfolder_repository.get_logs_vfolder(UserID(action.user_id))
         if not log_vfolder_data:
             raise VFolderNotFound(
                 extra_data={"vfolder_name": ".logs"},
@@ -943,19 +830,6 @@ class VFolderService:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             action.folder_host, is_unmanaged(action.unmanaged_path)
         )
-
-        if action.user_role != UserRole.SUPERADMIN:
-            allowed_vfolder_types = (
-                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-            await self._vfolder_repository.check_vfolder_accessible(
-                vfolder_id=action.vfolder_uuid,
-                user_uuid=action.user_uuid,
-                user_role=action.user_role,
-                domain_name=action.domain_name,
-                allowed_vfolder_types=list(allowed_vfolder_types),
-            )
-
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
         storage_reply = await manager_client.get_volume_quota(volume_name, action.vfid)
         return GetQuotaActionResult(data=dict(storage_reply))
@@ -977,13 +851,6 @@ class VFolderService:
                 user_uuid=action.user_uuid,
                 resource_policy=action.resource_policy,
                 domain_name=action.domain_name,
-            )
-            await self._vfolder_repository.check_vfolder_accessible(
-                vfolder_id=action.vfolder_uuid,
-                user_uuid=action.user_uuid,
-                user_role=action.user_role,
-                domain_name=action.domain_name,
-                allowed_vfolder_types=list(allowed_vfolder_types),
             )
 
         max_quota_scope_size = action.resource_policy.get("max_quota_scope_size", 0)
@@ -1279,27 +1146,29 @@ class VFolderService:
     async def get_accessible_vfolder(
         self, action: LookupAccessibleVFolderAction
     ) -> LookupAccessibleVFolderActionResult:
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-        entries = await self._vfolder_repository.get_accessible_rows(
-            user_uuid=action.user_uuid,
-            user_role=action.user_role,
-            domain_name=action.domain_name,
-            is_admin=action.is_admin,
-            allowed_vfolder_types=allowed_vfolder_types,
-            perm=action.perm,
-            folder_id_or_name=action.folder_id_or_name,
-            allow_privileged_access=action.allow_privileged_access,
-        )
-        if len(entries) == 0:
-            raise VFolderNotFound(extra_data=action.folder_id_or_name)
-        if len(entries) > 1:
-            raise TooManyVFoldersFound(entries)
-        row = entries[0]
+        if isinstance(action.folder_id_or_name, uuid.UUID):
+            vfolder_id = VFolderUUID(action.folder_id_or_name)
+        else:
+            user_id = UserID(action.user_uuid)
+            project_ids = await self._vfolder_repository.get_joined_project_ids(user_id)
+            scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
+            scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
+            vfolder_id = await self._vfolder_repository.resolve_vfolder_id_by_name(
+                scopes, action.folder_id_or_name
+            )
+        row = await self._vfolder_repository.get_row_by_id(vfolder_id)
         if action.required_status is not None:
             await _check_vfolder_status(row["status"], action.required_status)
         return LookupAccessibleVFolderActionResult(row=row)
+
+    def _owning_scope(self, vfolder: VFolderData) -> OperationScope:
+        """The scope a vfolder's name is unique within."""
+        match vfolder.ownership_type:
+            case VFolderOwnershipType.GROUP if vfolder.group is not None:
+                return ProjectVFolderOperationScope(project_id=vfolder.group)
+            case VFolderOwnershipType.USER if vfolder.user is not None:
+                return UserVFolderOperationScope(user_id=UserID(vfolder.user))
+        raise UnreachableError(f"VFolder {vfolder.id} names no owner")
 
     async def _check_ownership_allowed(self, ownership_type: str) -> Sequence[str]:
         """Ensure the cluster allows this ownership_type. Returns the allowed list."""
@@ -1311,21 +1180,6 @@ class VFolderService:
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
             )
         return list(allowed_vfolder_types)
-
-    async def _check_name_uniqueness(
-        self,
-        name: str,
-        user_uuid: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        allowed_types: Sequence[str],
-    ) -> None:
-        """Raise VFolderAlreadyExists if the user already owns a vfolder with this name."""
-        name_exists = await self._vfolder_repository.check_vfolder_name_exists(
-            name, user_uuid, user_role, domain_name, list(allowed_types)
-        )
-        if name_exists:
-            raise VFolderAlreadyExists(f"VFolder with the given name already exists. ({name})")
 
     async def _resolve_host(self, requested_host: str | None) -> str:
         """Return the target storage host, falling back to the configured default."""
@@ -1365,12 +1219,7 @@ class VFolderService:
         self, action: CreateUploadSessionV2Action
     ) -> CreateUploadSessionV2ActionResult:
         """Create an upload session (v2). Resolves policy internally from user_id."""
-        user = await self._user_repository.get_user_by_uuid(action.user_id)
-        if user.domain_name is None:
-            raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         # Host permission check — resolved from user_id
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
@@ -1486,29 +1335,11 @@ class VFolderService:
             raise VFolderInvalidParameter("No such user.")
         user_role, user_domain_name = user_info
 
-        # Get accessible vfolders to find the source folder
-        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
-            user_id=action.user_id,
-            user_role=user_role,
-            domain_name=user_domain_name,
-            allowed_vfolder_types=list(allowed_vfolder_types),
-            extra_conditions=(VFolderRow.id == action.vfolder_uuid),
-        )
-
-        if not vfolder_list_result.vfolders:
-            raise VFolderInvalidParameter("No such vfolder.")
-
-        source_vfolder_access_info = vfolder_list_result.vfolders[0]
-        source_vfolder_data = source_vfolder_access_info.vfolder_data
+        source_vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         # Check if the source vfolder is allowed to be cloned
         if not source_vfolder_data.cloneable:
             raise Forbidden("The source vfolder is not permitted to be cloned.")
-
-        if action.target_name.startswith("."):
-            for entry in vfolder_list_result.vfolders:
-                if entry.vfolder_data.name == action.target_name:
-                    raise VFolderAlreadyExists
 
         # Get target host
         target_folder_host = (
@@ -1529,11 +1360,8 @@ class VFolderService:
 
         # Check for duplicate vfolder names
         duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
+            UserVFolderOperationScope(user_id=UserID(action.user_id)),
             action.target_name,
-            action.user_id,
-            user_role,
-            user_domain_name,
-            list(allowed_vfolder_types),
         )
 
         if duplication_exists:
@@ -1572,7 +1400,7 @@ class VFolderService:
 
         # Parse usage_mode and permission from action strings
         usage_mode = VFolderUsageMode(action.usage_mode)
-        mount_permission = VFolderPermission(action.permission)
+        mount_permission = VFolderMountPolicy(action.permission)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(

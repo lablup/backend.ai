@@ -22,6 +22,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 __all__ = (
     "UuidExpr",
     "scope_membership_exists",
+    "scope_share_exists",
     "user_scope_membership_exists",
     "user_scope_membership_query",
 )
@@ -78,9 +79,32 @@ def scope_membership_exists(
     Either id accepts a literal UUID or a column expression, so the predicate works
     both as a direct filter and as a correlated condition inside a larger query.
     """
+    return sa.exists(_scope_membership_select(scope_type, scope_id, member_type, member_id))
+
+
+def scope_share_exists(
+    scope_type: EntityType,
+    scope_id: UuidExpr,
+    member_type: EntityType,
+    member_id: UuidExpr,
+) -> sa.ColumnElement[bool]:
+    """EXISTS predicate: the scope reaches the named member through a share."""
+    return sa.exists(
+        _scope_membership_select(scope_type, scope_id, member_type, member_id).where(
+            EntityMembershipRow.capped.is_(True)
+        )
+    )
+
+
+def _scope_membership_select(
+    scope_type: EntityType,
+    scope_id: UuidExpr,
+    member_type: EntityType,
+    member_id: UuidExpr,
+) -> sa.Select[tuple[int]]:
     member = aliased(VirtualEntityRow, name="member_virtual_entity")
     governor = aliased(VirtualEntityRow, name="governor_virtual_entity")
-    return sa.exists(
+    return (
         sa.select(sa.literal(1))
         .select_from(EntityMembershipRow)
         .join(member, EntityMembershipRow.member_entity_id == member.id)

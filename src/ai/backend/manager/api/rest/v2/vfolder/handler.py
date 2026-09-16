@@ -22,8 +22,14 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
+    SetVFolderMountPolicyInput,
+    UnsetVFolderMountPolicyInput,
 )
-from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
+from ai.backend.manager.api.rest.v2.path_params import (
+    ProjectIdPathParam,
+    VFolderIdPathParam,
+    VFolderUserPathParam,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -91,6 +97,33 @@ class V2VFolderHandler:
     ) -> APIResponse:
         """Get a vfolder by ID."""
         result = await self._adapter.get(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def set_mount_policy(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[SetVFolderMountPolicyInput],
+    ) -> APIResponse:
+        """Set the mount level one user gets on the vfolder."""
+        result = await self._adapter.set_mount_policy(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def unset_mount_policy(
+        self,
+        path: PathParam[VFolderUserPathParam],
+    ) -> APIResponse:
+        """Take back the mount level one user was given on the vfolder."""
+        result = await self._adapter.unset_mount_policy(
+            path.parsed.vfolder_id, UnsetVFolderMountPolicyInput(user_id=path.parsed.user_id)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def list_mount_policies(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """The mount levels set on the vfolder, one row per user."""
+        result = await self._adapter.list_mount_policies(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def delete(

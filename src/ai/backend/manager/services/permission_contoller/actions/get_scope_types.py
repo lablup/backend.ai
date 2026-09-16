@@ -10,7 +10,7 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass(frozen=True)
-class GlobalGetScopeTypesAction(BaseGlobalAction):
+class PublicGetScopeTypesAction(BaseGlobalAction):
     """The scope types a role may be created in."""
 
     @override
@@ -26,9 +26,9 @@ class GlobalGetScopeTypesAction(BaseGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_get_scope_types"
+        return "public_get_scope_types"
 
 
 @dataclass(frozen=True)
-class GlobalGetScopeTypesActionResult:
+class PublicGetScopeTypesActionResult:
     entity_types: list[EntityType]

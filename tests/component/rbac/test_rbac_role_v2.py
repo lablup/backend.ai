@@ -35,9 +35,14 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.rbac.handler import V2RBACHandler
 from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
+)
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
@@ -56,9 +61,16 @@ if TYPE_CHECKING:
 def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
+    config_provider: ManagerConfigProvider,
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
-    service = PermissionControllerService(repo, action_registry=processor_registry)
+    service = PermissionControllerService(
+        repo,
+        permission_check=RbacPermissionCheckRepository(
+            PermissionOpsProvider(database_engine), config_provider
+        ),
+        action_registry=processor_registry,
+    )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(RoleEntityType())),
         processor_registry.group(GroupMeta(UserEntityType())),

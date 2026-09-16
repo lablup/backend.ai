@@ -579,3 +579,65 @@ def bulk_purge(ids: tuple[UUID, ...], force: bool) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@vfolder.command(name="mount-policy-set")
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("user_id", type=click.UUID)
+@click.argument("permission", type=click.Choice(["none", "ro", "rw"]))
+def mount_policy_set(vfolder_id: UUID, user_id: UUID, permission: str) -> None:
+    """Set the mount level one user gets on a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import SetVFolderMountPolicyInput
+    from ai.backend.common.dto.manager.v2.vfolder.types import VFolderPermissionField
+
+    input_dto = SetVFolderMountPolicyInput(
+        user_id=user_id, permission=VFolderPermissionField(permission)
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.set_mount_policy(vfolder_id, input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="mount-policy-unset")
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("user_id", type=click.UUID)
+def mount_policy_unset(vfolder_id: UUID, user_id: UUID) -> None:
+    """Take back the mount level one user was given on a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import UnsetVFolderMountPolicyInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.unset_mount_policy(
+                vfolder_id, UnsetVFolderMountPolicyInput(user_id=user_id)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="mount-policies")
+@click.argument("vfolder_id", type=click.UUID)
+def mount_policies(vfolder_id: UUID) -> None:
+    """List the mount levels set on a vfolder."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.list_mount_policies(vfolder_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

@@ -25,15 +25,15 @@ from ai.backend.common.dto.manager.vfolder import (
     UpdateVFolderSharingStatusReq,
     UserPermMapping,
 )
-from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
-    VFolderOwnershipType,
-)
+from ai.backend.common.types import VFolderMountPolicy
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.vfolder import vfolder_permissions
+from ai.backend.manager.models.vfolder import VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+
+mount_policies = VFolderUserMountPolicyRow.__table__
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -60,7 +60,7 @@ class TestVFolderSharingFlow:
 
         # Step 1: Share the GROUP vfolder with the regular user
         share_result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[user_email],
@@ -75,7 +75,7 @@ class TestVFolderSharingFlow:
 
         # Step 3: Unshare the vfolder
         unshare_result = await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[user_email]),
         )
         assert isinstance(unshare_result, UnshareVFolderResponse)
@@ -86,7 +86,7 @@ class TestGroupFolderDirectPermissionSharing:
     """Direct permission sharing for GROUP vfolders via the share API.
     Each test shares a GROUP vfolder at a specific permission level and verifies
     the shared_emails response. The DB row test additionally checks that the
-    vfolder_permissions table reflects the correct permission."""
+    mount policy row reflects the correct level."""
 
     async def test_share_group_folder_with_read_only(
         self,
@@ -102,7 +102,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -125,7 +125,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_WRITE,
                 emails=[regular_user_fixture.email],
@@ -148,7 +148,7 @@ class TestGroupFolderDirectPermissionSharing:
             group=str(group_fixture),
         )
         result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.RW_DELETE,
                 emails=[regular_user_fixture.email],
@@ -166,14 +166,14 @@ class TestGroupFolderDirectPermissionSharing:
         db_engine: Any,
     ) -> None:
         """Scenario: After sharing a GROUP vfolder with READ_ONLY, directly query
-        the vfolder_permissions table and verify a row exists with the correct
+        the mount policy table and verify a row exists with the correct
         vfolder ID, user UUID, and READ_ONLY permission level."""
         group_vf = await vfolder_factory(
             ownership_type=VFolderOwnershipType.GROUP,
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -182,14 +182,14 @@ class TestGroupFolderDirectPermissionSharing:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_permissions).where(
-                        (vfolder_permissions.c.vfolder == group_vf["id"])
-                        & (vfolder_permissions.c.user == regular_user_fixture.user_uuid)
+                    sa.select(mount_policies).where(
+                        (mount_policies.c.vfolder_id == group_vf["id"])
+                        & (mount_policies.c.user_id == regular_user_fixture.user_uuid)
                     )
                 )
             ).first()
             assert row is not None
-            assert row.permission == VFolderMountPermission.READ_ONLY
+            assert row.permission == VFolderMountPolicy.READ_ONLY
 
 
 class TestShareUnshareFlow:
@@ -215,7 +215,7 @@ class TestShareUnshareFlow:
 
         # Share
         share_result = await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[user_email],
@@ -225,7 +225,7 @@ class TestShareUnshareFlow:
 
         # Unshare
         unshare_result = await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[user_email]),
         )
         assert isinstance(unshare_result, UnshareVFolderResponse)
@@ -239,9 +239,8 @@ class TestShareUnshareFlow:
         group_fixture: uuid.UUID,
         db_engine: Any,
     ) -> None:
-        """Scenario: After share → unshare, directly query the vfolder_permissions
-        table and verify the permission row has been completely removed (not just
-        soft-deleted). Ensures unshare performs a hard delete on the DB row."""
+        """Scenario: After share → unshare, the share cap is gone while the mount
+        policy row stays for the next time the folder is lent."""
         group_vf = await vfolder_factory(
             ownership_type=VFolderOwnershipType.GROUP,
             group=str(group_fixture),
@@ -249,27 +248,28 @@ class TestShareUnshareFlow:
         user_email = regular_user_fixture.email
 
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[user_email],
             ),
         )
         await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[user_email]),
         )
 
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_permissions).where(
-                        (vfolder_permissions.c.vfolder == group_vf["id"])
-                        & (vfolder_permissions.c.user == regular_user_fixture.user_uuid)
+                    sa.select(mount_policies).where(
+                        (mount_policies.c.vfolder_id == group_vf["id"])
+                        & (mount_policies.c.user_id == regular_user_fixture.user_uuid)
                     )
                 )
             ).first()
-            assert row is None
+            assert row is not None
+        assert await _share_caps(db_engine, uuid.UUID(str(group_vf["id"]))) == {}
 
     async def test_list_shared_after_sharing(
         self,
@@ -286,7 +286,7 @@ class TestShareUnshareFlow:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -312,7 +312,7 @@ class TestShareUnshareFlow:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -358,13 +358,13 @@ class TestSharePermissionUpdate:
     ) -> None:
         """Scenario: Admin shares a GROUP vfolder with READ_ONLY, then calls
         update_shared to escalate the permission to READ_WRITE. Verifies the API
-        returns success and the vfolder_permissions DB row reflects READ_WRITE."""
+        returns success and the mount policy row reflects READ_WRITE."""
         group_vf = await vfolder_factory(
             ownership_type=VFolderOwnershipType.GROUP,
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -383,14 +383,14 @@ class TestSharePermissionUpdate:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_permissions.c.permission).where(
-                        (vfolder_permissions.c.vfolder == group_vf["id"])
-                        & (vfolder_permissions.c.user == regular_user_fixture.user_uuid)
+                    sa.select(mount_policies.c.permission).where(
+                        (mount_policies.c.vfolder_id == group_vf["id"])
+                        & (mount_policies.c.user_id == regular_user_fixture.user_uuid)
                     )
                 )
             ).first()
             assert row is not None
-            assert row.permission == VFolderMountPermission.READ_WRITE
+            assert row.permission == VFolderMountPolicy.READ_WRITE
 
     @pytest.mark.xfail(
         strict=False,
@@ -406,7 +406,7 @@ class TestSharePermissionUpdate:
     ) -> None:
         """Scenario: Admin shares a GROUP vfolder with READ_ONLY, then calls
         update_sharing_status (batch API) to escalate the user's permission to
-        RW_DELETE. Verifies the vfolder_permissions DB row is updated.
+        RW_DELETE, stored as READ_WRITE. Verifies the mount policy row is updated.
         Marked xfail: server returns 201 with null body but SDK expects
         MessageResponse, causing a parse error."""
         group_vf = await vfolder_factory(
@@ -414,7 +414,7 @@ class TestSharePermissionUpdate:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -437,14 +437,14 @@ class TestSharePermissionUpdate:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_permissions.c.permission).where(
-                        (vfolder_permissions.c.vfolder == group_vf["id"])
-                        & (vfolder_permissions.c.user == regular_user_fixture.user_uuid)
+                    sa.select(mount_policies.c.permission).where(
+                        (mount_policies.c.vfolder_id == group_vf["id"])
+                        & (mount_policies.c.user_id == regular_user_fixture.user_uuid)
                     )
                 )
             ).first()
             assert row is not None
-            assert row.permission == VFolderMountPermission.RW_DELETE
+            assert row.permission == VFolderMountPolicy.READ_WRITE
 
     @pytest.mark.xfail(
         strict=False,
@@ -460,14 +460,14 @@ class TestSharePermissionUpdate:
     ) -> None:
         """Scenario: Admin shares a GROUP vfolder with READ_ONLY, then calls
         update_sharing_status with perm=None for that user. This should remove the
-        permission entirely. Verifies the vfolder_permissions DB row is deleted.
+        permission entirely. Verifies the share is taken back while the policy row stays.
         Marked xfail: same SDK parse issue as test_batch_update_sharing_status."""
         group_vf = await vfolder_factory(
             ownership_type=VFolderOwnershipType.GROUP,
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -486,17 +486,18 @@ class TestSharePermissionUpdate:
         )
         assert isinstance(result, MessageResponse)
 
-        # Verify permission row removed
+        # Verify the share is taken back; the policy row stays
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_permissions).where(
-                        (vfolder_permissions.c.vfolder == group_vf["id"])
-                        & (vfolder_permissions.c.user == regular_user_fixture.user_uuid)
+                    sa.select(mount_policies).where(
+                        (mount_policies.c.vfolder_id == group_vf["id"])
+                        & (mount_policies.c.user_id == regular_user_fixture.user_uuid)
                     )
                 )
             ).first()
-            assert row is None
+            assert row is not None
+        assert await _share_caps(db_engine, uuid.UUID(str(group_vf["id"]))) == {}
 
 
 class TestHostPermissionValidation:
@@ -537,7 +538,7 @@ class TestHostPermissionValidation:
         )
         with pytest.raises(BackendAPIError):
             await user_registry.vfolder.share(
-                group_vf["name"],
+                str(group_vf["id"]),
                 ShareVFolderReq(
                     permission=VFolderPermissionField.READ_ONLY,
                     emails=[admin_user_fixture.email],
@@ -559,7 +560,7 @@ class TestHostPermissionValidation:
         )
         with pytest.raises(BackendAPIError):
             await admin_registry.vfolder.share(
-                group_vf["name"],
+                str(group_vf["id"]),
                 ShareVFolderReq(
                     permission=VFolderPermissionField.READ_ONLY,
                     emails=["nonexistent-user@no-domain.test"],
@@ -581,24 +582,24 @@ class TestHostPermissionValidation:
         )
         with pytest.raises(BackendAPIError):
             await admin_registry.vfolder.unshare(
-                group_vf["name"],
+                str(group_vf["id"]),
                 UnshareVFolderReq(emails=["nonexistent-user@no-domain.test"]),
             )
 
 
-async def _legacy_mount_permissions(
+async def _mount_policies(
     db_engine: Any, vfolder_id: uuid.UUID
-) -> dict[uuid.UUID, VFolderMountPermission]:
-    """What ``vfolder_permissions`` says each user holds on the folder."""
+) -> dict[uuid.UUID, VFolderMountPolicy]:
+    """The mount level each user is set to get on the folder."""
     async with db_engine.begin() as conn:
         rows = (
             await conn.execute(
-                sa.select(vfolder_permissions.c.user, vfolder_permissions.c.permission).where(
-                    vfolder_permissions.c.vfolder == vfolder_id
+                sa.select(mount_policies.c.user_id, mount_policies.c.permission).where(
+                    mount_policies.c.vfolder_id == vfolder_id
                 )
             )
         ).fetchall()
-    return {row.user: VFolderMountPermission(row.permission) for row in rows}
+    return {row.user_id: VFolderMountPolicy(row.permission) for row in rows}
 
 
 async def _share_caps(db_engine: Any, vfolder_id: uuid.UUID) -> dict[uuid.UUID, Permission]:
@@ -643,27 +644,27 @@ async def _share_caps(db_engine: Any, vfolder_id: uuid.UUID) -> dict[uuid.UUID, 
 
 
 _WRITABLE_CAP = Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
-_EXPECTED_CAP: dict[VFolderMountPermission, Permission] = {
-    VFolderMountPermission.READ_ONLY: Permission.READ,
-    VFolderMountPermission.READ_WRITE: _WRITABLE_CAP,
-    VFolderMountPermission.RW_DELETE: _WRITABLE_CAP,
+_EXPECTED_CAP: dict[VFolderMountPolicy, Permission] = {
+    VFolderMountPolicy.NONE: Permission.READ,
+    VFolderMountPolicy.READ_ONLY: Permission.READ,
+    VFolderMountPolicy.READ_WRITE: _WRITABLE_CAP,
 }
 
 
 async def _assert_tables_agree(db_engine: Any, vfolder_id: uuid.UUID) -> None:
-    """The legacy mount rows and the share caps name the same people, bit for bit."""
-    legacy = await _legacy_mount_permissions(db_engine, vfolder_id)
+    """The mount policy rows and the share caps name the same people, bit for bit."""
+    policies = await _mount_policies(db_engine, vfolder_id)
     caps = await _share_caps(db_engine, vfolder_id)
-    assert caps.keys() == legacy.keys()
-    for user_id, permission in legacy.items():
+    assert caps.keys() == policies.keys()
+    for user_id, permission in policies.items():
         assert caps[user_id] == _EXPECTED_CAP[permission]
 
 
 class TestSharingWritesBothTables:
-    """Every sharing write puts a share cap beside the legacy mount row (BA-7665).
+    """Every sharing write puts a share cap beside the mount policy row.
 
-    Reads still go through ``vfolder_permissions``, so the two are kept in step
-    rather than one replacing the other.
+    Access comes from the cap and the mount level from the policy row, so a share
+    writes both.
     """
 
     async def test_share_writes_the_cap_beside_the_mount_row(
@@ -681,7 +682,7 @@ class TestSharingWritesBothTables:
             group=str(group_fixture),
         )
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -707,7 +708,7 @@ class TestSharingWritesBothTables:
         )
         vfolder_id = uuid.UUID(str(group_vf["id"]))
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
@@ -716,7 +717,7 @@ class TestSharingWritesBothTables:
         read_only_cap = (await _share_caps(db_engine, vfolder_id))[regular_user_fixture.user_uuid]
 
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_WRITE,
                 emails=[regular_user_fixture.email],
@@ -729,7 +730,7 @@ class TestSharingWritesBothTables:
         assert read_only_cap != read_write_cap
         await _assert_tables_agree(db_engine, vfolder_id)
 
-    async def test_unshare_takes_the_cap_back_with_the_mount_row(
+    async def test_unshare_takes_the_cap_back_and_leaves_the_policy(
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
@@ -737,22 +738,24 @@ class TestSharingWritesBothTables:
         group_fixture: uuid.UUID,
         db_engine: Any,
     ) -> None:
-        """Scenario: unsharing leaves neither table holding anything for the user."""
+        """Scenario: unsharing takes the cap back; the mount policy row stays."""
         group_vf = await vfolder_factory(
             ownership_type=VFolderOwnershipType.GROUP,
             group=str(group_fixture),
         )
         vfolder_id = uuid.UUID(str(group_vf["id"]))
         await admin_registry.vfolder.share(
-            group_vf["name"],
+            str(group_vf["id"]),
             ShareVFolderReq(
                 permission=VFolderPermissionField.READ_WRITE,
                 emails=[regular_user_fixture.email],
             ),
         )
         await admin_registry.vfolder.unshare(
-            group_vf["name"],
+            str(group_vf["id"]),
             UnshareVFolderReq(emails=[regular_user_fixture.email]),
         )
-        assert await _legacy_mount_permissions(db_engine, vfolder_id) == {}
+        assert await _mount_policies(db_engine, vfolder_id) == {
+            regular_user_fixture.user_uuid: VFolderMountPolicy.READ_WRITE
+        }
         assert await _share_caps(db_engine, vfolder_id) == {}

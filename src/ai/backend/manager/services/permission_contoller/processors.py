@@ -41,16 +41,20 @@ from .actions.bulk_get_permissions import BulkGetPermissionsAction
 from .actions.bulk_get_roles import BulkGetRolesAction
 from .actions.delete_permission import DeletePermissionAction
 from .actions.get_entity_types import (
-    GlobalGetEntityTypesAction,
-    GlobalGetEntityTypesActionResult,
+    PublicGetEntityTypesAction,
+    PublicGetEntityTypesActionResult,
+)
+from .actions.get_held_permissions import (
+    ScopedGetHeldPermissionsAction,
+    ScopedGetHeldPermissionsActionResult,
 )
 from .actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
     PublicGetPermissionMatrixActionResult,
 )
 from .actions.get_scope_types import (
-    GlobalGetScopeTypesAction,
-    GlobalGetScopeTypesActionResult,
+    PublicGetScopeTypesAction,
+    PublicGetScopeTypesActionResult,
 )
 from .actions.lookup_permission_owner import (
     LookupBulkRolePermissionOwnerAction,
@@ -111,14 +115,17 @@ class PermissionControllerProcessors:
     global_search_scopes: GlobalActionProcessor[
         GlobalSearchScopesAction, GlobalSearchScopesActionResult
     ]
-    global_get_scope_types: GlobalActionProcessor[
-        GlobalGetScopeTypesAction, GlobalGetScopeTypesActionResult
+    public_get_scope_types: PublicActionProcessor[
+        PublicGetScopeTypesAction, PublicGetScopeTypesActionResult
     ]
-    global_get_entity_types: GlobalActionProcessor[
-        GlobalGetEntityTypesAction, GlobalGetEntityTypesActionResult
+    public_get_entity_types: PublicActionProcessor[
+        PublicGetEntityTypesAction, PublicGetEntityTypesActionResult
     ]
     public_get_permission_matrix: PublicActionProcessor[
         PublicGetPermissionMatrixAction, PublicGetPermissionMatrixActionResult
+    ]
+    scoped_get_held_permissions: ScopeActionProcessor[
+        ScopedGetHeldPermissionsAction, ScopedGetHeldPermissionsActionResult
     ]
     bulk_get_permissions: PartialBulkFieldActionProcessor[BulkGetPermissionsAction, PermissionData]
     search_role_permissions: BulkActionProcessor[
@@ -176,14 +183,17 @@ class PermissionControllerProcessors:
         self.global_search_scopes = role_group.global_scope(
             GlobalSearchScopesAction, service.search_scopes
         )
-        self.global_get_scope_types = role_group.global_scope(
-            GlobalGetScopeTypesAction, service.get_scope_types
+        self.public_get_scope_types = role_group.public(
+            PublicGetScopeTypesAction, service.get_scope_types
         )
-        self.global_get_entity_types = role_group.global_scope(
-            GlobalGetEntityTypesAction, service.get_entity_types
+        self.public_get_entity_types = role_group.public(
+            PublicGetEntityTypesAction, service.get_entity_types
         )
         self.public_get_permission_matrix = role_group.public(
             PublicGetPermissionMatrixAction, service.get_permission_matrix
+        )
+        self.scoped_get_held_permissions = role_group.scope(
+            ScopedGetHeldPermissionsAction, service.get_held_permissions
         )
         self.bulk_get_permissions = permissions.partial_bulk_get_ops(BulkGetPermissionsAction)
         self.search_role_permissions = permissions.atomic_bulk_scoped_search_ops(

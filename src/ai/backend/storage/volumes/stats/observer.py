@@ -82,11 +82,11 @@ class VolumeStatsObserver(AbstractObserver):
         now = datetime.now(UTC)
 
         try:
-            async with self._volume_pool.get_volume_by_name(volume_name) as volume:
-                metric = await asyncio.wait_for(
-                    volume.get_performance_metric(),
-                    timeout=self._options.timeout_per_volume,
-                )
+            volume = self._volume_pool.get_volume_by_name(volume_name)
+            metric = await asyncio.wait_for(
+                volume.get_performance_metric(),
+                timeout=self._options.timeout_per_volume,
+            )
 
             cached = CachedFSPerfMetricData.from_metric(
                 volume_name=volume_name,

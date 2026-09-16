@@ -25,6 +25,7 @@ from .types import (
 )
 
 __all__ = (
+    "MAX_SCOPE_PERMISSION_TARGETS",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -37,9 +38,14 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
+    "EntityFilter",
+    "EntityOrderBy",
+    "MyAtomicBulkScopePermissionsInput",
+    "MyScopePermissionsInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
+    "PermissionTarget",
     "PurgeRoleInput",
     "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
@@ -276,6 +282,19 @@ class MappedScopeNestedFilter(BaseRequestModel):
 MappedScopeNestedFilter.model_rebuild()
 
 
+class PermissionNestedFilter(BaseRequestModel):
+    """Nested filter for permissions within a role assignment."""
+
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = None
+    AND: list[PermissionNestedFilter] | None = None
+    OR: list[PermissionNestedFilter] | None = None
+    NOT: list[PermissionNestedFilter] | None = None
+
+
+PermissionNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
@@ -284,6 +303,7 @@ class RoleFilter(BaseRequestModel):
     status: RoleStatusFilter | None = None
     assigned_user: UserNestedFilter | None = None
     mapped_scope: MappedScopeNestedFilter | None = None
+    permission: PermissionNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -298,25 +318,13 @@ class RoleNestedFilter(BaseRequestModel):
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    mapped_scope: MappedScopeNestedFilter | None = None
     AND: list[RoleNestedFilter] | None = None
     OR: list[RoleNestedFilter] | None = None
     NOT: list[RoleNestedFilter] | None = None
 
 
 RoleNestedFilter.model_rebuild()
-
-
-class PermissionNestedFilter(BaseRequestModel):
-    """Nested filter for permissions within a role assignment."""
-
-    entity_type: StringFilter | None = None
-    permission: PermissionBitFilter | None = None
-    AND: list[PermissionNestedFilter] | None = None
-    OR: list[PermissionNestedFilter] | None = None
-    NOT: list[PermissionNestedFilter] | None = None
-
-
-PermissionNestedFilter.model_rebuild()
 
 
 class RoleAssignmentFilter(BaseRequestModel):
@@ -333,6 +341,21 @@ class RoleAssignmentFilter(BaseRequestModel):
 
 
 RoleAssignmentFilter.model_rebuild()
+
+
+class EntityFilter(BaseRequestModel):
+    """Filter for the deprecated `Role.scopes` connection. Accepted and ignored."""
+
+    entity_type: StringFilter | None = None
+    entity_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: StringFilter | None = None
+    AND: list[EntityFilter] | None = None
+    OR: list[EntityFilter] | None = None
+    NOT: list[EntityFilter] | None = None
+
+
+EntityFilter.model_rebuild()
 
 
 class PermissionFilter(BaseRequestModel):
@@ -358,6 +381,13 @@ class RoleOrderBy(BaseRequestModel):
 
 class RoleAssignmentOrderBy(BaseRequestModel):
     """Order by specification for role assignments."""
+
+    field: str
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class EntityOrderBy(BaseRequestModel):
+    """Order of the deprecated `Role.scopes` connection. Accepted and ignored."""
 
     field: str
     direction: OrderDirection = OrderDirection.DESC
@@ -407,3 +437,31 @@ class SearchRoleAssignmentsInput(BaseRequestModel):
     before: str | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+MAX_SCOPE_PERMISSION_TARGETS = 100
+
+
+class PermissionTarget(BaseRequestModel):
+    """One scope and entity type to answer the caller's permissions for."""
+
+    scope_type: str = Field(description="Type of the scope, e.g. 'project'.")
+    scope_id: UUID = Field(description="ID of the scope.")
+    entity_type: str = Field(description="Entity type the permissions are asked about.")
+
+
+class MyScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on one scope and entity type."""
+
+    target: PermissionTarget = Field(description="The scope and entity type to answer for.")
+
+
+class MyAtomicBulkScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on several scopes and entity types."""
+
+    targets: list[PermissionTarget] = Field(
+        max_length=MAX_SCOPE_PERMISSION_TARGETS,
+        description=(
+            f"The scopes and entity types to answer for, at most {MAX_SCOPE_PERMISSION_TARGETS}."
+        ),
+    )

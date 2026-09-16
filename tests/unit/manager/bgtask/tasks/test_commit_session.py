@@ -134,12 +134,12 @@ class TestCommitSessionExecute:
         session_repository = AsyncMock()
         session_repository.get_session_by_id.return_value = session
         session_repository.get_container_registry.return_value = MagicMock()
-        # Stop right after resolve_image to keep the test focused.
-        session_repository.resolve_image.side_effect = RuntimeError("stop here")
+        # Stop right after the base image lookup to keep the test focused.
+        session_repository.resolve_image_by_canonical.side_effect = RuntimeError("stop here")
         handler = self._make_handler(session_repository)
 
         with pytest.raises(RuntimeError):
             await handler.execute(sample_manifest)
 
-        _, kwargs = session_repository.resolve_image.call_args
+        _, kwargs = session_repository.resolve_image_by_canonical.call_args
         assert kwargs["alive_only"] is False

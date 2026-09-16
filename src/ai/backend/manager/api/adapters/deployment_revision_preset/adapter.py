@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -92,6 +93,9 @@ from ai.backend.manager.models.resource_slot.orders import (
 )
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
+    BulkGetDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.create import (
     CreateDeploymentPresetAction,
@@ -243,6 +247,22 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def batch_load_by_ids(
+        self, preset_ids: Sequence[DeploymentPresetID]
+    ) -> list[DeploymentRevisionPresetNode | Exception | None]:
+        """Batch load presets by their IDs for DataLoader use, checked per preset."""
+        if not preset_ids:
+            return []
+        result = await self._deployment_revision_preset.bulk_get.run(
+            BulkGetDeploymentPresetsAction(ids=list(preset_ids))
+        )
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def get(self, preset_id: UUID) -> DeploymentRevisionPresetNode:
         result = await self._deployment_revision_preset.get.run(

@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.base import UserEntityAction
 
 
 @dataclass(frozen=True)
-class PublicGetRoleAction(AuthGlobalAction):
+class GetRoleAction(UserEntityAction):
     group_id: uuid.UUID | None
 
     @override
@@ -18,11 +18,11 @@ class PublicGetRoleAction(AuthGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_get_role"
+        return "get_role"
 
 
 @dataclass(frozen=True)
-class PublicGetRoleActionResult:
+class GetRoleActionResult:
     global_role: str
     domain_role: str
     group_role: str | None

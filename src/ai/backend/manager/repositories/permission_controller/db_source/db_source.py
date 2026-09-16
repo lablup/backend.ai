@@ -1,6 +1,6 @@
 import logging
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -10,13 +10,13 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
-    AssignedUserData,
     AssignedUserListResult,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
@@ -29,16 +29,11 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    Permission,
     ScopeData,
     ScopeListResult,
 )
-from ai.backend.manager.data.permission.virtual_entity import (
-    GovernCheckKey,
-    OwnCheckKey,
-)
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import (
+    PermissionNotFound,
     RoleAlreadyAssigned,
     RoleNotAssigned,
     RoleNotFound,
@@ -52,6 +47,7 @@ from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOp
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user import UserRow
@@ -91,13 +87,14 @@ class PermissionDBSource:
         Delete a permission entry.
 
         Raises:
-            ObjectNotFound: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
             if data is None:
-                raise ObjectNotFound(
-                    f"Permission with ID {purger.target_id_value()} does not exist."
+                raise PermissionNotFound(
+                    f"Permission with ID {purger.target_id_value()} does not exist.",
+                    operation=ActionOperationType.PURGE,
                 )
             return data
 
@@ -109,13 +106,14 @@ class PermissionDBSource:
         Update a permission entry.
 
         Raises:
-            ObjectNotFound: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise ObjectNotFound(
-                    f"Permission with ID {updater.target_id_value()} does not exist."
+                raise PermissionNotFound(
+                    f"Permission with ID {updater.target_id_value()} does not exist.",
+                    operation=ActionOperationType.UPDATE,
                 )
             return data
 
@@ -318,42 +316,34 @@ class PermissionDBSource:
                 raise RoleNotFound(f"Role with ID {role_id} does not exist.")
             return role_row
 
-    async def search_users_assigned_to_role(
+    async def search_role_assignments_in_global(
         self,
-        querier: BatchQuerier,
+        searcher: RoleAssignmentSearcher,
     ) -> AssignedUserListResult:
-        """Searches users assigned to a specific role with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserRow, UserRoleRow).select_from(
-                sa.join(
-                    UserRow,
-                    UserRoleRow,
-                    UserRoleRow.user_id == UserRow.uuid,
-                )
-            )
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
+        """Search every assignment row, with no scope filter."""
+        async with self._ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return AssignedUserListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
-            items = [
-                AssignedUserData(
-                    id=row.UserRoleRow.id,
-                    user_id=row.UserRow.uuid,
-                    role_id=row.UserRoleRow.role_id,
-                    granted_by=row.UserRoleRow.granted_by,
-                    granted_at=row.UserRoleRow.granted_at,
-                )
-                for row in result.rows
-            ]
-
-            return AssignedUserListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+    async def search_role_assignments_in_scope(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: RoleAssignmentSearcher,
+    ) -> AssignedUserListResult:
+        """Search the assignment rows the named scopes reach, combined with OR."""
+        async with self._ops.read_ops() as r:
+            result = await r.search_with_scopes(scopes, searcher)
+        return AssignedUserListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_domain_scopes(
         self,
@@ -441,28 +431,6 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    # ------------------------------------------------ virtual-entity-chain checks
-
-    async def owned_permissions(
-        self,
-        keys: Collection[OwnCheckKey],
-    ) -> Mapping[OwnCheckKey, Permission]:
-        """The bits each user holds on each entity; the walk is
-        :meth:`PermissionReadOps.owned_permissions`."""
-        if not keys:
-            return {}
-        async with self._ops.read_ops() as r:
-            return await r.owned_permissions(keys)
-
-    async def governed_permissions(
-        self,
-        keys: Collection[GovernCheckKey],
-    ) -> Mapping[GovernCheckKey, Permission]:
-        if not keys:
-            return {}
-        async with self._ops.read_ops() as r:
-            return await r.governed_permissions(keys)
 
     async def bulk_assign_role(
         self,

@@ -22,5 +22,7 @@ class RbacRepositories:
         return cls(
             relation=RbacRelationRepository(args.relation_ops_provider),
             roster=RbacRosterRepository(RosterOpsProvider(args.db)),
-            permission_check=RbacPermissionCheckRepository(PermissionOpsProvider(args.db)),
+            permission_check=RbacPermissionCheckRepository(
+                PermissionOpsProvider(args.db), args.config_provider
+            ),
         )

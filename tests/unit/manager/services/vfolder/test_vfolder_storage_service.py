@@ -134,6 +134,7 @@ def vfolder_service(
         vfolder_repository=mock_vfolder_repository,
         user_repository=MagicMock(),
         valkey_stat_client=mock_valkey_stat_client,
+        own_check=MagicMock(),
     )
 
 
@@ -332,54 +333,6 @@ class TestGetQuotaAction:
 
         assert isinstance(result, GetQuotaActionResult)
         assert result.data["quota_bytes"] == 1073741824
-
-    async def test_non_admin_checks_accessibility(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        vfolder_uuid: uuid.UUID,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.check_vfolder_accessible = AsyncMock()
-        action = GetQuotaAction(
-            folder_host="proxy1:volume1",
-            vfid="vfid-123",
-            vfolder_uuid=VFolderUUID(vfolder_uuid),
-            unmanaged_path=None,
-            user_role=UserRole.USER,
-            user_uuid=user_uuid,
-            domain_name="default",
-        )
-        await vfolder_service.get_quota(action)
-
-        mock_vfolder_repository.check_vfolder_accessible.assert_awaited_once_with(
-            vfolder_id=vfolder_uuid,
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            domain_name="default",
-            allowed_vfolder_types=["user", "group"],
-        )
-
-    async def test_superadmin_skips_accessibility_check(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        vfolder_uuid: uuid.UUID,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.check_vfolder_accessible = AsyncMock()
-        action = GetQuotaAction(
-            folder_host="proxy1:volume1",
-            vfid="vfid-123",
-            vfolder_uuid=VFolderUUID(vfolder_uuid),
-            unmanaged_path=None,
-            user_role=UserRole.SUPERADMIN,
-            user_uuid=user_uuid,
-            domain_name="default",
-        )
-        await vfolder_service.get_quota(action)
-
-        mock_vfolder_repository.check_vfolder_accessible.assert_not_awaited()
 
 
 class TestUpdateQuotaAction:

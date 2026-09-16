@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar, override
 
 import sqlalchemy as sa
@@ -83,10 +83,13 @@ class NoPagination(QueryPagination):
     Useful for internal operations like scheduler batch processing.
     """
 
+    priority_orders: list[QueryOrder] = field(default_factory=list)
+    """Orders placed ahead of every other order of the search."""
+
     @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
-        """No pagination applied - returns query unchanged."""
-        return query
+        """Apply the priority orders only."""
+        return query.order_by(*self.priority_orders)
 
     @override
     def compute_page_info(
@@ -126,10 +129,15 @@ class OffsetPagination(QueryPagination):
     offset: int = 0
     """Number of items to skip from the beginning (must be non-negative)."""
 
+    priority_orders: list[QueryOrder] = field(default_factory=list)
+    """Orders placed ahead of every other order of the search."""
+
     @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
-        """Apply offset-based pagination to query."""
+        """Apply the priority orders, then offset-based pagination."""
 
+        if self.priority_orders:
+            query = query.order_by(*self.priority_orders)
         query = query.limit(self.limit)
         if self.offset > 0:
             query = query.offset(self.offset)

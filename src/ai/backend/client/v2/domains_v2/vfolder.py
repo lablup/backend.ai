@@ -20,6 +20,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput,
     PurgeVFolderInput,
     SearchVFoldersInput,
+    SetVFolderMountPolicyInput,
+    UnsetVFolderMountPolicyInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload,
@@ -37,6 +39,9 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     PurgeVFolderPayload,
     RestoreVFolderPayload,
     SearchVFoldersPayload,
+    SetVFolderMountPolicyPayload,
+    UnsetVFolderMountPolicyPayload,
+    VFolderMountPoliciesPayload,
     VFolderNode,
 )
 
@@ -155,6 +160,35 @@ class V2VFolderClient(BaseDomainClient):
             "POST",
             f"{_PATH}/{vfolder_id}/restore",
             response_model=RestoreVFolderPayload,
+        )
+
+    async def set_mount_policy(
+        self, vfolder_id: UUID, request: SetVFolderMountPolicyInput
+    ) -> SetVFolderMountPolicyPayload:
+        """Set the mount level one user gets on the vfolder."""
+        return await self._client.typed_request(
+            "PUT",
+            f"{_PATH}/{vfolder_id}/mount-policies",
+            request=request,
+            response_model=SetVFolderMountPolicyPayload,
+        )
+
+    async def unset_mount_policy(
+        self, vfolder_id: UUID, request: UnsetVFolderMountPolicyInput
+    ) -> UnsetVFolderMountPolicyPayload:
+        """Take back the mount level one user was given on the vfolder."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{vfolder_id}/mount-policies/{request.user_id}",
+            response_model=UnsetVFolderMountPolicyPayload,
+        )
+
+    async def list_mount_policies(self, vfolder_id: UUID) -> VFolderMountPoliciesPayload:
+        """The mount levels set on the vfolder, one row per user."""
+        return await self._client.typed_request(
+            "GET",
+            f"{_PATH}/{vfolder_id}/mount-policies",
+            response_model=VFolderMountPoliciesPayload,
         )
 
     async def deploy(

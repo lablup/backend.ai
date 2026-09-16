@@ -15,6 +15,9 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    MAX_SCOPE_PERMISSION_TARGETS,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     BulkAddRolePermissionsInput as BulkAddRolePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -27,6 +30,12 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeletePermissionInput as DeletePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    MyAtomicBulkScopePermissionsInput as MyAtomicBulkScopePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    MyScopePermissionsInput as MyScopePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -34,6 +43,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionTarget as PermissionTargetDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     ReplaceRolePermissionsInput as ReplaceRolePermissionsInputDTO,
@@ -64,6 +76,12 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ScopeEntityOperationCombinationInfo,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    MyAtomicBulkScopePermissionsPayload as MyAtomicBulkScopePermissionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    MyScopePermissionsPayload as MyScopePermissionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode as PermissionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -71,6 +89,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     ReplaceRolePermissionsPayload as ReplaceRolePermissionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    ScopeEntityPermission as ScopeEntityPermissionDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionBitFilter as PermissionBitFilterDTO,
@@ -490,3 +511,98 @@ class PermissionConnection(Connection[PermissionGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# ==================== Held-permission Types ====================
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="One scope and entity type to answer the caller's permissions for.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="PermissionTarget",
+)
+class PermissionTargetGQL(PydanticInputMixin[PermissionTargetDTO]):
+    scope_type: str = gql_field(description="Type of the scope, e.g. `project`.")
+    scope_id: UUID = gql_field(description="ID of the scope.")
+    entity_type: str = gql_field(description="Entity type the permissions are asked about.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for the caller's permissions on one scope and entity type.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="MyScopePermissionsInput",
+)
+class MyScopePermissionsInputGQL(PydanticInputMixin[MyScopePermissionsInputDTO]):
+    target: PermissionTargetGQL = gql_field(description="The scope and entity type to answer for.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for the caller's permissions on several scopes and entity types.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="MyAtomicBulkScopePermissionsInput",
+)
+class MyAtomicBulkScopePermissionsInputGQL(
+    PydanticInputMixin[MyAtomicBulkScopePermissionsInputDTO],
+):
+    targets: list[PermissionTargetGQL] = gql_field(
+        description=(
+            "The scopes and entity types to answer for, at most "
+            f"{MAX_SCOPE_PERMISSION_TARGETS}. A longer list is refused."
+        )
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The bits the caller holds on one entity type within one scope.",
+    ),
+    model=ScopeEntityPermissionDTO,
+    name="ScopeEntityPermission",
+)
+class ScopeEntityPermissionGQL(PydanticOutputMixin[ScopeEntityPermissionDTO]):
+    scope_type: str = gql_field(description="Type of the scope, echoed from the target.")
+    scope_id: UUID = gql_field(description="ID of the scope, echoed from the target.")
+    entity_type: str = gql_field(description="Entity type, echoed from the target.")
+    permissions: list[PermissionBitGQL] = gql_field(
+        description=(
+            "The bits the caller holds. Empty when it holds none, which is also the answer"
+            " for a scope that does not exist and for an entity type this build does not"
+            " declare: the two are not told apart, so the answer cannot reveal whether a"
+            " scope exists."
+        )
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for the caller's permissions on one scope and entity type.",
+    ),
+    model=MyScopePermissionsPayloadDTO,
+    name="MyScopePermissionsPayload",
+)
+class MyScopePermissionsPayloadGQL(PydanticOutputMixin[MyScopePermissionsPayloadDTO]):
+    item: ScopeEntityPermissionGQL = gql_field(description="The answer for the named target.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for the caller's permissions on several scopes and entity types.",
+    ),
+    model=MyAtomicBulkScopePermissionsPayloadDTO,
+    name="MyAtomicBulkScopePermissionsPayload",
+)
+class MyAtomicBulkScopePermissionsPayloadGQL(
+    PydanticOutputMixin[MyAtomicBulkScopePermissionsPayloadDTO],
+):
+    items: list[ScopeEntityPermissionGQL] = gql_field(
+        description="One answer per target, in the order the targets were given."
+    )

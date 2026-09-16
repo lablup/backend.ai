@@ -10,15 +10,18 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.field import (
     VFolderItemField,
     VFolderOperationStatusField,
@@ -102,7 +105,9 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VFolderSharedInfoDTO,
     VolumeInfoDTO,
 )
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID
+from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
+from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import (
     RequestCtx,
@@ -111,21 +116,24 @@ from ai.backend.manager.dto.context import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderInvalidParameter,
 )
+from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import (
     UserRole,
 )
 from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
-    VFolderPermission,
-    VFolderPermissionSetAlias,
     VFolderStatusSet,
+    vfolder_status_map,
 )
+from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -133,21 +141,26 @@ from ai.backend.manager.models.vfolder.creators import (
     UnmanagedProjectVFolderCreator,
     VFolderBaseCreator,
 )
+from ai.backend.manager.models.vfolder.orders import VFolderOrders
+from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
-from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    PublicResolveUserScopeAction,
-)
+from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     DeleteForeverVFolderAction,
     ForceDeleteVFolderAction,
     GetVFolderAction,
-    ListVFolderAction,
     LookupAccessibleVFolderAction,
     MoveToTrashVFolderAction,
     PurgeVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
 )
 from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file import (
@@ -171,6 +184,12 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     RevokeInvitedVFolderAction,
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
+)
+from ai.backend.manager.services.vfolder.actions.scoped_search import (
+    ProjectVFolderScopeItem,
+    ScopedSearchVFoldersAction,
+    UserVFolderScopeItem,
+    VFolderScopeItem,
 )
 from ai.backend.manager.services.vfolder.actions.sharing import (
     GlobalListSharedVFoldersAction,
@@ -199,6 +218,7 @@ from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.auth.processors import AuthProcessors
+    from ai.backend.manager.services.user.processors import UserProcessors
     from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
     from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
     from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
@@ -214,12 +234,14 @@ class VFolderHandler:
         self,
         *,
         auth: AuthProcessors,
+        user: UserProcessors,
         vfolder: VFolderProcessors,
         vfolder_file: VFolderFileProcessors,
         vfolder_invite: VFolderInviteProcessors,
         vfolder_sharing: VFolderSharingProcessors,
     ) -> None:
         self._auth = auth
+        self._user = user
         self._vfolder = vfolder
         self._vfolder_file = vfolder_file
         self._vfolder_invite = vfolder_invite
@@ -243,7 +265,7 @@ class VFolderHandler:
         creator: VFolderBaseCreator
         if params.unmanaged_path and ctx.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise Forbidden("Insufficient permission")
-        mount_permission = VFolderPermission(params.permission.value)
+        mount_permission = VFolderMountPolicy(params.permission.value)
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
             project_quota_scope = str(QuotaScopeID(QuotaScopeType.PROJECT, project_id))
@@ -256,7 +278,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     project=project_id,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                     unmanaged_path=params.unmanaged_path,
                 )
@@ -269,7 +291,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     project=project_id,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                 )
         else:
@@ -284,7 +306,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     user=owner,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                     unmanaged_path=params.unmanaged_path,
                 )
@@ -297,7 +319,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     user=owner,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                 )
 
@@ -318,9 +340,7 @@ class VFolderHandler:
             quota_scope_id=str(vfolder.quota_scope_id),
             host=vfolder.host,
             usage_mode=vfolder.usage_mode,
-            permission=VFolderPermissionField(
-                (vfolder.permission or VFolderPermission.READ_WRITE).value
-            ),
+            permission=VFolderPermissionField(vfolder.default_mount_permission.value),
             max_size=0,
             creator=vfolder.creator or ctx.user_email,
             ownership_type=VFolderOwnershipTypeField(vfolder.ownership_type.value),
@@ -340,6 +360,21 @@ class VFolderHandler:
     # 2. list_folders (GET /)
     # ------------------------------------------------------------------
 
+    async def _list_owner(self, owner_user_email: str | None) -> uuid.UUID:
+        """The user whose folders to list: the caller, or the user a superadmin names."""
+        user = current_user()
+        if user is None:
+            raise UnreachableError("authenticated user missing from request context")
+        if owner_user_email is None:
+            return user.user_id
+        if not user.is_superadmin:
+            raise InvalidUserScope("Only superadmins may have user scopes.")
+        try:
+            result = await self._user.lookup.run(LookupUserAction(email=owner_user_email))
+        except NotFoundError as e:
+            raise InvalidUserScope(str(e)) from e
+        return result.entity_id()
+
     async def list_folders(
         self,
         query: QueryParam[ListVFoldersQuery],
@@ -347,38 +382,56 @@ class VFolderHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        user_scope = await self._auth.public_resolve_user_scope.run(
-            PublicResolveUserScopeAction(owner_user_email=params.owner_user_email)
-        )
-        owner_user_uuid = user_scope.owner_uuid
-        group_id = params.group_id
-        scope: EntityIdentifier = (
-            ProjectID(group_id) if group_id is not None else UserID(owner_user_uuid)
-        )
-        result = await self._vfolder.list_vfolder.run(
-            ListVFolderAction(
-                user_uuid=owner_user_uuid,
-                scope=scope,
+        owner_user_uuid = await self._list_owner(params.owner_user_email)
+        scope_items: list[VFolderScopeItem] = [
+            UserVFolderScopeItem(user_id=UserID(owner_user_uuid))
+        ]
+        orders: list[QueryOrder] = []
+        if params.group_id is not None:
+            project_id = ProjectID(params.group_id)
+            scope_items.insert(0, ProjectVFolderScopeItem(project_id=project_id))
+            orders.append(VFolderOrders.project_first(project_id))
+        orders.append(VFolderOrders.shared_last(UserID(owner_user_uuid)))
+        result = await self._vfolder.scoped_search.run(
+            ScopedSearchVFoldersAction(
+                items=scope_items,
+                searcher=VFolderSearcher(
+                    pagination=NoPagination(),
+                    orders=orders,
+                    conditions=[
+                        VFolderConditions.by_status_not_in(
+                            vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
+                        )
+                    ],
+                ),
             )
         )
+        vfolder_ids = [vfolder.id for vfolder in result.items]
+        held = await self._held_permissions(vfolder_ids)
+        levels = await self._mount_levels(vfolder_ids)
         items: list[VFolderItemField] = []
-        for base_info, ownership_info in result.vfolders:
+        for vfolder in result.items:
+            bits = held.get(vfolder.id, Permission.NONE)
+            if not bits.covers(Permission.READ):
+                continue
             items.append(
                 VFolderItemField(
-                    name=base_info.name,
-                    id=base_info.id.hex,
-                    quota_scope_id=str(base_info.quota_scope_id),
-                    host=base_info.host,
-                    status=VFolderOperationStatusField(base_info.status.value),
-                    usage_mode=base_info.usage_mode,
-                    created_at=str(base_info.created_at),
-                    is_owner=ownership_info.is_owner,
-                    permission=VFolderPermissionField(base_info.mount_permission.value),
-                    user=str(ownership_info.user_uuid) if ownership_info.user_uuid else None,
-                    group=str(ownership_info.group_uuid) if ownership_info.group_uuid else None,
-                    creator=ownership_info.creator_email or "",
-                    ownership_type=VFolderOwnershipTypeField(ownership_info.ownership_type.value),
-                    cloneable=base_info.cloneable,
+                    name=vfolder.name,
+                    id=vfolder.id.hex,
+                    quota_scope_id=str(vfolder.quota_scope_id),
+                    host=vfolder.host,
+                    status=VFolderOperationStatusField(vfolder.status.value),
+                    usage_mode=vfolder.usage_mode,
+                    created_at=str(vfolder.created_at),
+                    is_owner=bits.covers(Permission.HARD_DELETE),
+                    permission=VFolderPermissionField(
+                        levels.get(vfolder.id, VFolderMountPolicy.NONE).value
+                    ),
+                    user=str(vfolder.user) if vfolder.user else None,
+                    group=str(vfolder.group) if vfolder.group else None,
+                    creator=vfolder.creator or "",
+                    ownership_type=VFolderOwnershipTypeField(vfolder.ownership_type.value),
+                    cloneable=vfolder.cloneable,
                 )
             )
         resp = VFolderListResponse(items)
@@ -488,30 +541,54 @@ class VFolderHandler:
                 user_uuid=vfctx.user_uuid,
             )
         )
+        vfolder = result.vfolder
+        held = await self._held_permissions([vfolder.id])
+        levels = await self._mount_levels([vfolder.id])
+        bits = held.get(vfolder.id, Permission.READ)
         dto = VFolderInfoDTO(
-            name=result.base_info.name,
-            id=result.base_info.id.hex,
-            quota_scope_id=str(result.base_info.quota_scope_id),
-            host=result.base_info.host,
-            status=VFolderOperationStatusField(result.base_info.status.value),
+            name=vfolder.name,
+            id=vfolder.id.hex,
+            quota_scope_id=str(vfolder.quota_scope_id),
+            host=vfolder.host,
+            status=VFolderOperationStatusField(vfolder.status.value),
             num_files=result.usage_info.num_files,
             used_bytes=result.usage_info.used_bytes,
-            created_at=str(result.base_info.created_at),
-            last_used=str(result.base_info.created_at),
-            user=(
-                str(result.ownership_info.user_uuid) if result.ownership_info.user_uuid else None
+            created_at=str(vfolder.created_at),
+            last_used=str(vfolder.created_at),
+            user=str(vfolder.user) if vfolder.user else None,
+            group=str(vfolder.group) if vfolder.group else None,
+            type="user" if vfolder.user else "group",
+            is_owner=bits.covers(Permission.HARD_DELETE),
+            permission=VFolderPermissionField(
+                levels.get(vfolder.id, VFolderMountPolicy.NONE).value
             ),
-            group=(
-                str(result.ownership_info.group_uuid) if result.ownership_info.group_uuid else None
-            ),
-            type="user" if result.ownership_info.user_uuid else "group",
-            is_owner=result.ownership_info.is_owner,
-            permission=VFolderPermissionField(result.base_info.mount_permission.value),
-            usage_mode=result.base_info.usage_mode,
-            cloneable=result.base_info.cloneable,
+            usage_mode=vfolder.usage_mode,
+            cloneable=vfolder.cloneable,
         )
         resp = VFolderGetInfoResponse(dto)
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    async def _held_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> Mapping[EntityIdentifier, Permission]:
+        """The RBAC bits the caller holds on each named vfolder."""
+        if not vfolder_ids:
+            return {}
+        result = await self._vfolder.bulk_load_permissions.run(
+            BulkLoadVFolderPermissionsAction(vfolder_ids=vfolder_ids)
+        )
+        return result.values()
+
+    async def _mount_levels(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> Mapping[EntityIdentifier, VFolderMountPolicy]:
+        """The mount level the caller gets on each named vfolder."""
+        if not vfolder_ids:
+            return {}
+        result = await self._vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(vfolder_ids=vfolder_ids)
+        )
+        return result.values()
 
     # ------------------------------------------------------------------
     # 8. get_quota (GET /_/quota)
@@ -527,10 +604,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -567,10 +640,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -611,10 +680,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -645,10 +710,6 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=params.id,
                 required_status=VFolderStatusSet.READABLE,
             )
@@ -725,9 +786,9 @@ class VFolderHandler:
             else OptionalState[bool].nop()
         )
         mount_permission = (
-            OptionalState[VFolderPermission].update(VFolderPermission(params.permission.value))
+            OptionalState[VFolderMountPolicy].update(VFolderMountPolicy(params.permission.value))
             if params.permission is not None
-            else OptionalState[VFolderPermission].nop()
+            else OptionalState[VFolderMountPolicy].nop()
         )
         await self._vfolder.update_vfolder_attribute.run(
             UpdateVFolderAttributeAction(
@@ -1074,9 +1135,9 @@ class VFolderHandler:
         inv_id = req.request.match_info["inv_id"]
         await self._vfolder_invite.update_invitation.run(
             UpdateInvitationAction(
-                invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
+                invitation_id=EntityShareID(uuid.UUID(inv_id)),
                 requester_user_uuid=ctx.user_uuid,
-                mount_permission=VFolderPermission(params.permission.value),
+                mount_permission=VFolderMountPolicy(params.permission.value),
             )
         )
         resp = MessageResponse(msg=f"vfolder invitation updated: {inv_id}.")
@@ -1094,7 +1155,7 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        perm = VFolderPermission(params.permission.value)
+        perm = VFolderMountPolicy(params.permission.value)
         invitee_emails = params.emails
         log.debug(
             "VFOLDER.INVITE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), inv.users:{})",
@@ -1162,7 +1223,8 @@ class VFolderHandler:
         inv_id = params.inv_id
         await self._vfolder_invite.accept_invitation.run(
             AcceptInvitationAction(
-                invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
+                invitation_id=EntityShareID(uuid.UUID(inv_id)),
+                requester_user_uuid=ctx.user_uuid,
             )
         )
         resp = MessageResponse(msg="")
@@ -1182,7 +1244,7 @@ class VFolderHandler:
         inv_id = params.inv_id
         await self._vfolder_invite.reject_invitation.run(
             RejectInvitationAction(
-                invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
+                invitation_id=EntityShareID(uuid.UUID(inv_id)),
                 requester_user_uuid=ctx.user_uuid,
             )
         )
@@ -1214,7 +1276,7 @@ class VFolderHandler:
             ShareVFolderAction(
                 vfolder_uuid=VFolderUUID(row["id"]),
                 resource_policy=req.request["keypair"]["resource_policy"],
-                permission=VFolderPermission(params.permission.value),
+                permission=VFolderMountPolicy(params.permission.value),
                 emails=params.emails,
             )
         )
@@ -1293,12 +1355,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=folder_name,
-                allow_privileged_access=True,
             )
         )
         row = resolved.row
@@ -1336,12 +1393,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.run(
             LookupAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
-                domain_name=ctx.user_domain,
-                is_admin=req.request["is_admin"],
-                perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=folder_name,
-                allow_privileged_access=True,
             )
         )
         row = resolved.row
@@ -1531,7 +1583,7 @@ class VFolderHandler:
                 target_quota_scope_id=params.target_quota_scope_id,
                 cloneable=params.cloneable,
                 usage_mode=params.usage_mode,
-                mount_permission=VFolderPermission(params.permission.value),
+                mount_permission=VFolderMountPolicy(params.permission.value),
             )
         )
         dto = VFolderCloneInfoDTO(
@@ -1607,7 +1659,9 @@ class VFolderHandler:
         params = body.parsed
         vfolder_id = params.vfolder
         user_uuid = params.user
-        perm = VFolderPermission(params.permission.value) if params.permission is not None else None
+        perm = (
+            VFolderMountPolicy(params.permission.value) if params.permission is not None else None
+        )
         if perm is not None:
             await self._vfolder_invite.update_invited_vfolder_mount_permission.run(
                 UpdateInvitedVFolderMountPermissionAction(
@@ -1639,12 +1693,12 @@ class VFolderHandler:
         user_perm_list = params.user_perm_list
 
         to_delete: list[uuid.UUID] = []
-        to_update: list[tuple[uuid.UUID, VFolderPermission]] = []
+        to_update: list[tuple[uuid.UUID, VFolderMountPolicy]] = []
         for mapping in user_perm_list:
             if mapping.perm is None:
                 to_delete.append(mapping.user_id)
             else:
-                to_update.append((mapping.user_id, VFolderPermission(mapping.perm.value)))
+                to_update.append((mapping.user_id, VFolderMountPolicy(mapping.perm.value)))
 
         await self._vfolder_sharing.update_sharing_status.run(
             UpdateVFolderSharingStatusAction(

@@ -315,6 +315,7 @@ class TestDeploymentScopedSearch:
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),
             valkey_schedule=AsyncMock(),
+            permission_check=AsyncMock(),
         )
 
     @pytest.fixture

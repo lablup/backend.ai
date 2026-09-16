@@ -99,17 +99,22 @@ class ProjectUserOperationScope(OperationScope):
 
 @dataclass(frozen=True)
 class RoleUserOperationScope(OperationScope):
-    """Users assigned to one role."""
+    """Required scope for searching the users a role is assigned to."""
 
     role_id: RoleID
+    """Required. The role whose holders to search."""
 
     @override
     def to_condition(self) -> QueryCondition:
+        """Assignment predicate: the user holds the role."""
         role_id = self.role_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.uuid.in_(
-                sa.select(UserRoleRow.user_id).where(UserRoleRow.role_id == role_id)
+            return sa.exists().where(
+                sa.and_(
+                    UserRoleRow.role_id == role_id,
+                    UserRoleRow.user_id == UserRow.uuid,
+                )
             )
 
         return inner
@@ -117,6 +122,7 @@ class RoleUserOperationScope(OperationScope):
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[RoleID]]:
+        """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
                 column=RoleRow.id,

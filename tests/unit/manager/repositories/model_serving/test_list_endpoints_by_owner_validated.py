@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -383,7 +384,9 @@ async def listed_endpoint(
 @pytest.fixture
 def repository(db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository:
     return ModelServingRepository(
-        db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        db=db_with_cleanup,
+        v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+        permission_check=MagicMock(),
     )
 
 

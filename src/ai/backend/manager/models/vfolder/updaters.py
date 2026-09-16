@@ -10,19 +10,17 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
-    VFolderPermissionData,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderFilterStatusFailed
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.types import OptionalState
 
 
@@ -34,8 +32,8 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
     vfolder_id: VFolderUUID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     cloneable: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-    mount_permission: OptionalState[VFolderMountPermission] = field(
-        default_factory=OptionalState[VFolderMountPermission].nop
+    mount_permission: OptionalState[VFolderMountPolicy] = field(
+        default_factory=OptionalState[VFolderMountPolicy].nop
     )
 
     @property
@@ -70,7 +68,7 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
         self.cloneable.update_dict(to_update, "cloneable")
-        self.mount_permission.update_dict(to_update, "permission")
+        self.mount_permission.update_dict(to_update, "default_mount_permission")
         return to_update
 
     @override
@@ -213,46 +211,3 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
         return row.to_data()
-
-
-@dataclass
-class VFolderMountPermissionUpdater(DataUpdater[VFolderPermissionRow, VFolderPermissionData]):
-    """Sets what the named mount permission row grants.
-
-    Callers hold the folder and the user rather than this row's id, which
-    ``VFolderMountPermissionLookup`` turns into one.
-    """
-
-    permission_id: VFolderPermissionID
-    permission: VFolderMountPermission
-
-    @property
-    @override
-    def row_class(self) -> type[VFolderPermissionRow]:
-        return VFolderPermissionRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return VFolderPermissionRow.id
-
-    @override
-    def target_id_value(self) -> VFolderPermissionID:
-        return self.permission_id
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"permission": self.permission}
-
-    @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionData:
-        return VFolderPermissionData(
-            id=VFolderPermissionID(row.id),
-            vfolder=row.vfolder,
-            user=row.user,
-            permission=row.permission or VFolderMountPermission.READ_WRITE,
-        )

@@ -23,7 +23,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.user.queries import user_scope_reaches
+from ai.backend.manager.models.user.queries import user_scope_reaches, user_scope_shares
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -188,3 +188,57 @@ class TestUserScopeReaches:
                 )
             )
         assert not await self._reaches(db_with_cleanup, user_id, vfolder_id)
+
+    async def _shared(
+        self, db: ExtendedAsyncSAEngine, user_id: UserID, vfolder_id: uuid.UUID
+    ) -> bool:
+        async with db.begin_readonly_session() as sess:
+            return bool(
+                await sess.scalar(
+                    sa.select(user_scope_shares(user_id, VFolderEntityType(), vfolder_id))
+                )
+            )
+
+    async def test_a_folder_shared_to_the_user_is_shared(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: tuple[str, uuid.UUID]
+    ) -> None:
+        user_id, vfolder_id = UserID(uuid.uuid4()), uuid.uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            await self._seed_user(sess, user_id, domain)
+            user = await self._node(sess, UserEntityType(), user_id)
+            vfolder = await self._node(sess, VFolderEntityType(), vfolder_id)
+            sess.add(
+                EntityMembershipRow(virtual_entity_id=user, member_entity_id=vfolder, capped=True)
+            )
+        assert await self._shared(db_with_cleanup, user_id, vfolder_id)
+
+    async def test_a_personal_project_folder_is_not_shared(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: tuple[str, uuid.UUID]
+    ) -> None:
+        user_id, project_id, vfolder_id = UserID(uuid.uuid4()), uuid.uuid4(), uuid.uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            await self._seed_user(sess, user_id, domain)
+            sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"p-{uuid.uuid4().hex[:8]}",
+                    domain_name=domain[0],
+                    type=ProjectType.PERSONAL,
+                    creator_id=user_id,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy="default",
+                )
+            )
+            await sess.flush()
+            await self._node(sess, UserEntityType(), user_id)
+            project = await self._node(sess, ProjectEntityType(), project_id)
+            vfolder = await self._node(sess, VFolderEntityType(), vfolder_id)
+            sess.add(
+                EntityMembershipRow(
+                    virtual_entity_id=project, member_entity_id=vfolder, capped=False
+                )
+            )
+        assert await self._reaches(db_with_cleanup, user_id, vfolder_id)
+        assert not await self._shared(db_with_cleanup, user_id, vfolder_id)
