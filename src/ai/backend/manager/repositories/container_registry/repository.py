@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -13,16 +14,26 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
     ContainerRegistrySearchResult,
+    RegistryProjectChange,
 )
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import (
+    ContainerRegistryGroupsAssociationNotFound,
+    ContainerRegistryNotFound,
+)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryProjectCreator,
+)
+from ai.backend.manager.models.container_registry.purgers import (
+    ContainerRegistryProjectPurger,
+    ContainerRegistryPurger,
+)
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -31,6 +42,7 @@ from ai.backend.manager.repositories.base.querier import (
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -70,7 +82,10 @@ class ContainerRegistryRepository:
     async def modify_registry(
         self,
         updater: ContainerRegistryUpdater,
+        links: RegistryProjectChange | None = None,
     ) -> ContainerRegistryData:
+        """Update the registry and the projects allowed on it in one transaction, so a
+        refusal of either leaves both as they were."""
         registry_id = updater.registry_id
         async with self._ops_provider.write_ops() as w:
             data = await w.update_data(updater)
@@ -84,7 +99,32 @@ class ContainerRegistryRepository:
                         url=data.url,
                     )
                 ).validate()
+            if links is not None:
+                await self._apply_links(w, ContainerRegistryID(data.id), links)
             return data
+
+    @staticmethod
+    async def _apply_links(
+        w: V2RelationWriteOps,
+        target: ContainerRegistryID,
+        links: RegistryProjectChange,
+    ) -> None:
+        """A pair already linked is left as it stands; unlinking is refused only when
+        none of the named pairs was linked."""
+        if links.add:
+            await w.create_relations(
+                ContainerRegistryProjectCreator(), [(scope, target) for scope in links.add]
+            )
+        if not links.remove:
+            return
+        unlinked = await w.purge_relations(
+            ContainerRegistryProjectPurger(), [(scope, target) for scope in links.remove]
+        )
+        if not any(unlinked):
+            raise ContainerRegistryGroupsAssociationNotFound(
+                f"Tried to remove non-existing associations for registry_id: {target}, "
+                f"group_ids: {list(links.remove)}"
+            )
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:
         """Delete a container registry with the graph it left; its project relations go

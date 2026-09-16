@@ -107,7 +107,9 @@ class ContainerRegistryService:
     async def update_container_registry(
         self, action: UpdateContainerRegistryAction
     ) -> UpdateContainerRegistryActionResult:
-        data = await self._container_registry_repository.modify_registry(action.updater)
+        data = await self._container_registry_repository.modify_registry(
+            action.updater, action.links
+        )
         return UpdateContainerRegistryActionResult(data=data)
 
     async def delete_container_registry(
