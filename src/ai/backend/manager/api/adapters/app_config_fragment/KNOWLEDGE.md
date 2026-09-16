@@ -1,7 +1,7 @@
 ---
 name: app-config-fragment-adapter-scenarios
 type: reference
-description: what the app config fragment adapter guarantees, as scenarios; a fragment is the value one owner holds for one name, written and read at the owner's scope, the public fragment written behind the superadmin role and read by anyone signed in, and the allow-list entry as the write gate; the tests in tests/scenario/bai_scenario/manager/app_config_fragment match these one for one
+description: what the app config fragment adapter guarantees, as scenarios; one config name holds a fragment per scope (public, each domain, each user) that the app_config adapter merges by allow-list rank, and this adapter writes, reads, searches and purges those fragments one by one at their owner's scope, the public fragment written behind the superadmin role and read by anyone signed in, and the allow-list entry as the write gate; the tests in tests/scenario/bai_scenario/manager/app_config_fragment match these one for one
 scope: src/ai/backend/manager/api/adapters/app_config_fragment
 keywords: [app config fragment, scenario, adapter, upsert, scope, public, rbac]
 generated:
@@ -14,9 +14,11 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
 의심한다.
 
-설정 조각은 소유자 하나가 설정 이름 하나에 저장해 둔 값이다. 소유자는 도메인이거나 사용자이고,
-소유자가 없으면 공개 조각이다. 스코프 종류는 소유자의 종류에서 결정되므로 따로 저장하지 않는다.
-한 소유자는 한 이름에 조각을 하나만 갖고, 다시 쓰면 그 조각이 바뀐다.
+설정 이름 하나에는 스코프마다 조각이 있다. 공개 조각 하나, 도메인마다 하나, 사용자마다 하나가
+같은 이름 아래 함께 있고, 설정을 읽는 app_config 어댑터는 그 조각들을 허용 목록 항목의 순위 순으로
+병합한 값을 반환한다. 이 어댑터는 병합 전의 조각 하나하나를 쓰고 조회하고 검색하고 삭제한다.
+소유자는 도메인이거나 사용자이고, 소유자가 없으면 공개 조각이다. 스코프 종류는 소유자의 종류에서
+결정되므로 따로 저장하지 않는다. 한 스코프에서 같은 이름을 다시 쓰면 그 스코프의 조각이 바뀐다.
 
 허용 목록 항목이 쓰기의 전제 조건이다. 그 이름을 그 스코프 종류에 허용하는 항목이 있어야 쓸 수
 있고, 항목이 사라지면 조각도 함께 사라진다. 그래서 허용되지 않은 조각이 남아 있는 상황은 생기지
