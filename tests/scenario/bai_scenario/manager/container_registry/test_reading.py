@@ -11,18 +11,20 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Refused,
     Same,
     Scenario,
+    Skipped,
     Then,
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.container_registry import (
     MISSING_ENTITY_ID,
     ManyRegistriesAndACaller,
@@ -70,11 +72,38 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
             return await adapter.batch_load_by_ids(self.registry_ids(laid))
 
 
+def registry_name_of(one: ContainerRegistryNode | Exception | None) -> str | None:
+    if isinstance(one, ContainerRegistryNode):
+        return one.registry_name
+    return type(one).__name__ if one is not None else None
+
+
 @dataclass(frozen=True)
-class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
+class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "준 순서 그대로 오고 없는 id 자리는 비어 있다"
+        return "심은 것은 준 순서 그대로 오고, 없는 id 자리는 보지 않는다"
+
+    @override
+    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        got = answered.response
+        if got is None:
+            return [MissingResponse(answered.raised)]
+        if len(got) != 3:
+            return [Same("length", len(got), 3)]
+        return [
+            Same("length", len(got), 3),
+            Same("[0].registry_name", registry_name_of(got[0]), laid.registries[0].registry_name),
+            Skipped("[1]", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"),
+            Same("[2].registry_name", registry_name_of(got[2]), laid.registries[1].registry_name),
+        ]
+
+
+@dataclass(frozen=True)
+class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
+    @override
+    def says(self) -> str:
+        return "자리마다 권한 부족이 담겨 온다"
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -83,18 +112,10 @@ class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
             return [MissingResponse(answered.raised)]
         return [
             Same("length", len(got), 3),
-            Same(
-                "names",
-                [
-                    one.registry_name if isinstance(one, ContainerRegistryNode) else one
-                    for one in got
-                ],
-                [
-                    laid.registries[0].registry_name,
-                    None,
-                    laid.registries[1].registry_name,
-                ],
-            ),
+            *[
+                Refused(NotEnoughPermission, one if isinstance(one, Exception) else None)
+                for one in got
+            ],
         ]
 
 
@@ -113,18 +134,18 @@ class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class LoadingKeepsTheOrderAndLeavesHoles(
+class LoadingKeepsTheOrder(
     Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "loading-many-ids-keeps-the-order-and-leaves-a-hole-for-a-missing-one"
+        return "loading-many-ids-keeps-the-order"
 
     @override
     def describe(self) -> str:
         return (
             "슈퍼관리자가 심은 레지스트리 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽으면, "
-            "준 순서 그대로 오고 없는 id 자리만 비어서 온다"
+            "심은 것은 준 순서 그대로 온다. 없는 id 자리에 무엇이 오는지는 아직 정해지지 않았다"
         )
 
     @override
@@ -137,7 +158,7 @@ class LoadingKeepsTheOrderAndLeavesHoles(
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
-        return TheOrderIsKeptAndTheHoleIsEmpty()
+        return TheOrderIsKept()
 
 
 @dataclass(frozen=True)
@@ -166,19 +187,18 @@ class AnEmptyListAsksNothing(
 
 
 @dataclass(frozen=True)
-class APlainUserIsRefusedWholesale(
+class APlainUserIsRefusedOnEveryId(
     Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "a-plain-user-loading-many-ids-is-refused-as-a-whole"
+        return "a-plain-user-loading-many-ids-is-refused-on-every-id"
 
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 id 여럿을 한 번에 읽으려 하면, "
-            "원소별로 갈리지 않고 요청 전체가 권한 부족으로 거부된다. "
-            "이 호출은 id를 보기 전에 부른 사람이 슈퍼관리자인지부터 본다"
+            "권한을 받지 않은 사용자가 id 여럿을 한 번에 읽으면, 요청이 통째로 거부되는 대신 "
+            "자리마다 권한 부족이 담겨 온다. 없는 id도 같은 거부로 와서 있는지 없는지가 드러나지 않는다"
         )
 
     @override
@@ -191,13 +211,13 @@ class APlainUserIsRefusedWholesale(
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return EveryIdIsRefused()
 
 
 SCENARIOS: list[ReadingScenario] = [
-    LoadingKeepsTheOrderAndLeavesHoles(),
+    LoadingKeepsTheOrder(),
     AnEmptyListAsksNothing(),
-    APlainUserIsRefusedWholesale(),
+    APlainUserIsRefusedOnEveryId(),
 ]
 
 

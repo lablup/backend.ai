@@ -713,9 +713,9 @@ Then
 
 ### reading
 
-#### [a-plain-user-loading-many-ids-is-refused-as-a-whole](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
+#### [a-plain-user-loading-many-ids-is-refused-on-every-id](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
-슈퍼관리자가 아닌 사용자가 id 여럿을 한 번에 읽으려 하면, 원소별로 갈리지 않고 요청 전체가 권한 부족으로 거부된다. 이 호출은 id를 보기 전에 부른 사람이 슈퍼관리자인지부터 본다
+권한을 받지 않은 사용자가 id 여럿을 한 번에 읽으면, 요청이 통째로 거부되는 대신 자리마다 권한 부족이 담겨 온다. 없는 id도 같은 거부로 와서 있는지 없는지가 드러나지 않는다
 
 Given
 
@@ -735,8 +735,11 @@ When
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 자리마다 권한 부족이 담겨 온다
+  - length = 3
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
 
 #### [an-empty-id-list-answers-empty-without-calling-the-wiring](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
@@ -763,9 +766,9 @@ Then
 - 빈 답이 온다
   - items = []
 
-#### [loading-many-ids-keeps-the-order-and-leaves-a-hole-for-a-missing-one](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
+#### [loading-many-ids-keeps-the-order](/tests/scenario/bai_scenario/manager/container_registry/test_reading.py) — pass
 
-슈퍼관리자가 심은 레지스트리 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽으면, 준 순서 그대로 오고 없는 id 자리만 비어서 온다
+슈퍼관리자가 심은 레지스트리 둘과 아무것도 갖지 않은 id 하나를 한 번에 읽으면, 심은 것은 준 순서 그대로 온다. 없는 id 자리에 무엇이 오는지는 아직 정해지지 않았다
 
 Given
 
@@ -785,9 +788,11 @@ When
 
 Then
 
-- 준 순서 그대로 오고 없는 id 자리는 비어 있다
+- 심은 것은 준 순서 그대로 오고, 없는 id 자리는 보지 않는다
   - length = 3
-  - names = ['wanted-1', None, 'other-1']
+  - [0].registry_name = 'wanted-1'
+  - [1]: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - [2].registry_name = 'other-1'
 
 ### retiring
 

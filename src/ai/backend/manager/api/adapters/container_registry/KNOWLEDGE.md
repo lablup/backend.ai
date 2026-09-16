@@ -1,7 +1,7 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter scenario guarantees; superadmin-gated management calls, missing scoped search, RBAC project relations, legacy is_global image visibility, update-only URL validation
+description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, legacy is_global image visibility, update-only URL validation
 scope: src/ai/backend/manager/api/adapters/container_registry
 keywords: [container registry, scenario, adapter, superadmin, scoped_search, operation scope, RBAC, allowed groups, is_global, image visibility]
 sources:
@@ -28,10 +28,11 @@ status: draft
 ## 대부분의 호출은 슈퍼관리자만 실행할 수 있다
 
 - 각 레지스트리는 상위 스코프에 소유되지 않는 RBAC 엔티티로 생성된다.
-- 허용 프로젝트 변경을 제외한 관리 호출은 global action으로 처리되며, 엔티티별 RBAC 권한이
-  아니라 슈퍼관리자 여부로 접근을 제어한다.
+- 허용 프로젝트 변경과 여러 ID 조회를 제외한 관리 호출은 global action으로 처리되며, 엔티티별
+  RBAC 권한이 아니라 슈퍼관리자 여부로 접근을 제어한다.
 - 허용 프로젝트 추가와 제거는 RBAC 관계 작업을 사용하므로 레지스트리와 프로젝트 양쪽의 권한을
   검사하며, 엔티티 권한 검사 설정의 영향을 받는다.
+- 여러 ID 조회는 ID마다 엔티티 권한을 검사하고 결과를 ID별로 답한다.
 
 ## 프로젝트 관계는 권한 그래프에 기록되지만 검색에는 아직 쓰이지 않는다
 
@@ -89,16 +90,21 @@ status: draft
 필터 결합(`AND`/`OR`/`NOT`), 정렬, 커서·오프셋 페이지네이션은 모든 엔티티가 공유하는 검색
 프레임워크의 동작이므로 이 어댑터의 시나리오에 포함하지 않는다.
 
-## 여러 ID를 요청 순서대로 조회한다
+## 여러 ID를 요청 순서대로 ID별로 답한다
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 레지스트리가 두 개 있고 호출자가 슈퍼관리자임 | 세 ID를 한 번에 조회 | 요청 순서를 유지하고 존재하지 않는 ID 위치에는 빈 값이 반환됨 |
-| 빈 ID 목록을 조회한다 | 레지스트리가 하나 있고 호출자가 슈퍼관리자임 | 빈 ID 목록 조회 | 실제 조회를 실행하지 않고 빈 목록을 반환함 |
-| 일반 사용자가 여러 ID를 조회한다 | 호출자가 슈퍼관리자가 아님 | 두 ID를 한 번에 조회 | 요청 전체가 슈퍼관리자 전용 작업이라는 오류로 거부됨 |
+| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 레지스트리가 두 개 있고 호출자가 슈퍼관리자임 | 세 ID를 한 번에 조회 | 존재하는 레지스트리는 요청 순서대로 반환됨. 존재하지 않는 ID 자리의 답은 아직 정해지지 않았음 |
+| 빈 ID 목록을 조회한다 | 레지스트리가 두 개 있고 호출자가 슈퍼관리자임 | 빈 ID 목록 조회 | 실제 조회를 실행하지 않고 빈 목록을 반환함 |
+| 권한이 없는 사용자가 여러 ID를 조회한다 | 호출자가 어떤 레지스트리에도 권한이 없음 | 세 ID를 한 번에 조회 | 요청 전체가 거부되는 대신 ID마다 권한 부족이 담겨 반환됨. 존재하지 않는 ID도 같은 거부로 반환됨 |
 
-여러 ID를 조회하는 호출은 내부적으로 전역 조회를 한 번 실행한다. 따라서 호출자에게 권한이 없으면
-ID별로 결과를 나누지 않고 요청 전체를 거부한다.
+- 여러 ID 조회는 ID마다 읽기 권한을 검사한다. 권한이 없는 ID는 거부로, 존재하지 않는 ID는
+  거부와 구분되는 빈 값으로 답하도록 설계되어 있다.
+- 권한 검사가 존재 여부보다 먼저 이뤄지므로, 권한이 없는 사용자에게는 존재하지 않는 ID도 거부로
+  답한다. 대상이 있는지 없는지가 드러나지 않는다.
+- ID별 권한 검사에는 슈퍼관리자 단축 경로가 없다. 슈퍼관리자도 권한 그래프로 판정되므로 노드가
+  없는 ID는 빈 값이 아니라 권한 부족으로 답한다. 단건 조회의 권한 검사는 슈퍼관리자를 먼저
+  통과시키므로 두 경로가 어긋나며, 어느 쪽으로 맞출지는 아직 결정되지 않았다.
 
 ## 수정 후 레지스트리 주소와 유형을 검증한다
 
