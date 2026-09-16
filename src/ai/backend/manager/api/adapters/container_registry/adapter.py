@@ -190,12 +190,16 @@ class ContainerRegistryAdapter(BaseAdapter):
             extra=(TriState.update(input.extra) if input.extra is not None else TriState.nop()),
         )
         result = await self._container_registry.update_container_registry.run(
-            UpdateContainerRegistryAction(updater=updater, links=self._links(input.allowed_groups))
+            UpdateContainerRegistryAction(
+                updater=updater, links=self._input_to_allowed_projects_change(input.allowed_groups)
+            )
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
     @staticmethod
-    def _links(asked: AllowedGroupsInput | None) -> AllowedProjectsChange | None:
+    def _input_to_allowed_projects_change(
+        asked: AllowedGroupsInput | None,
+    ) -> AllowedProjectsChange | None:
         if asked is None:
             return None
         return AllowedProjectsChange(
