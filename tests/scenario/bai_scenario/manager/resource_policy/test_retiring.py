@@ -10,17 +10,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.resource_policy import (
-    FAMILIES,
-    AHeldPolicyAndSomeone,
-    APolicyAndACaller,
-    APolicyAndSomeone,
-    Family,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
@@ -38,6 +27,17 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_policy import (
+    FAMILIES,
+    AHeldPolicyAndSomeone,
+    APolicyAndACaller,
+    APolicyAndSomeone,
+    Family,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 NOBODY = "nobody"
 
@@ -187,20 +187,20 @@ class AUserGrantedNothingMayNotPurge(
 
 
 @dataclass(frozen=True)
-class ANameNothingAnswersToIsUnresolvable(
+class ANameNothingAnswersToIsNotFound(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
     @override
     def summary(self) -> str:
-        return f"purging-a-{self.family.label}-name-nothing-answers-to-is-unresolvable"
+        return f"purging-a-{self.family.label}-name-nothing-answers-to-is-not-found"
 
     @override
     def describe(self) -> str:
         return (
             f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름을 삭제하려 하면, "
-            "정책을 찾을 수 없다는 이유로 거부된다"
+            "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
         )
 
     @override
@@ -213,14 +213,14 @@ class ANameNothingAnswersToIsUnresolvable(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Purged]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 SCENARIOS: list[RetiringStep] = [
     *(TheSuperadminPurgesAnUnusedPolicy(family) for family in FAMILIES),
     *(APolicyStillHeldIsRefused(family) for family in FAMILIES),
     *(AUserGrantedNothingMayNotPurge(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsUnresolvable(family) for family in FAMILIES),
+    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
 ]
 
 

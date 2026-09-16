@@ -252,9 +252,9 @@ Then
   - max_session_count_per_model_session = 10
   - max_customized_image_count = 3
 
-#### [editing-a-user-policy-name-nothing-answers-to-is-unresolvable](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [editing-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
 
-슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 정책을 찾을 수 없다는 이유로 거부된다
+슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
 Given
 
@@ -274,7 +274,7 @@ When
 Then
 
 - 거부된다
-  - 거부: GenericBadRequest
+  - 거부: EntityNotFoundError
 
 #### [giving-no-value-changes-nothing-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
 
@@ -364,9 +364,9 @@ Then
 - 거부된다
   - 거부: GenericBadRequest
 
-#### [a-user-policy-name-nothing-answers-to-is-unresolvable-even-for-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [reading-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
 
-슈퍼관리자가 어느 사용자 정책에도 없는 이름으로 조회하면, 권한 없음과 구분되지 않는 '정책을 찾을 수 없음'으로 거부된다. 거부 응답은 그 이름이 존재하는지 알려 주지 않는다
+슈퍼관리자가 어느 사용자 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
 Given
 
@@ -386,7 +386,7 @@ When
 Then
 
 - 거부된다
-  - 거부: GenericBadRequest
+  - 거부: EntityNotFoundError
 
 #### [the-superadmin-reads-a-user-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
 
@@ -565,9 +565,9 @@ Then
 - 거부된다
   - 거부: GenericBadRequest
 
-#### [purging-a-user-policy-name-nothing-answers-to-is-unresolvable](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
 
-슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 정책을 찾을 수 없다는 이유로 거부된다
+슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
 Given
 
@@ -587,7 +587,7 @@ When
 Then
 
 - 거부된다
-  - 거부: GenericBadRequest
+  - 거부: EntityNotFoundError
 
 #### [purging-a-user-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
 

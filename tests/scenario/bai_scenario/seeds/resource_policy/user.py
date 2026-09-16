@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRow
-
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import UserResourcePolicyCreator
+from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)

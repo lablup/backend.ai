@@ -12,19 +12,6 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.resource_policy import (
-    FAMILIES,
-    OWN_FAMILIES,
-    APolicyAndACaller,
-    APolicyAndSomeone,
-    Ask,
-    Family,
-    TheNewPolicyNode,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
@@ -38,6 +25,19 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_policy import (
+    FAMILIES,
+    OWN_FAMILIES,
+    APolicyAndACaller,
+    APolicyAndSomeone,
+    Ask,
+    Family,
+    TheNewPolicyNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 FRESH = "fresh-policy"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
