@@ -23,7 +23,6 @@ ORDER_FIELD_MAP: dict[AgentOrderField, _OrderColumn] = {
 }
 
 DEFAULT_FORWARD_ORDER: QueryOrder = AgentRow.first_contact.desc()
-DEFAULT_BACKWARD_ORDER: QueryOrder = AgentRow.first_contact.asc()
 TIEBREAKER_ORDER: QueryOrder = AgentRow.id.asc()
 
 

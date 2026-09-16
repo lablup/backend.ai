@@ -40,7 +40,6 @@ from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
-    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
@@ -73,9 +72,6 @@ from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPol
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEFAULT_FORWARD_ORDER,
-    backward_order=DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=AgentConditions.by_cursor_forward,
-    backward_condition_factory=AgentConditions.by_cursor_backward,
     tiebreaker_order=TIEBREAKER_ORDER,
 )
 

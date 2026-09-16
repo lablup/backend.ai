@@ -28,7 +28,6 @@ ORDER_FIELD_MAP: dict[VFolderOrderField, _OrderColumn] = {
 }
 
 DEFAULT_FORWARD_ORDER: QueryOrder = VFolderRow.created_at.desc()
-DEFAULT_BACKWARD_ORDER: QueryOrder = VFolderRow.created_at.asc()
 TIEBREAKER_ORDER: QueryOrder = VFolderRow.id.asc()
 
 

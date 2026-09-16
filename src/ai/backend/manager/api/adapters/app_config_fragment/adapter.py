@@ -92,9 +92,6 @@ from ai.backend.manager.services.app_config.processors import AppConfigProcessor
 def _get_app_config_fragment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigFragmentOrders.created_at(ascending=False),
-        backward_order=AppConfigFragmentOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigFragmentConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigFragmentConditions.by_cursor_backward,
         tiebreaker_order=AppConfigFragmentOrders.id(ascending=True),
     )
 

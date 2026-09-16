@@ -34,7 +34,6 @@ SLOT_TYPE_ORDER_FIELD_MAP: dict[ResourceSlotTypeOrderField, _OrderColumn] = {
 }
 
 SLOT_TYPE_DEFAULT_FORWARD_ORDER: QueryOrder = ResourceSlotTypeRow.slot_name.asc()
-SLOT_TYPE_DEFAULT_BACKWARD_ORDER: QueryOrder = ResourceSlotTypeRow.slot_name.desc()
 SLOT_TYPE_TIEBREAKER_ORDER: QueryOrder = ResourceSlotTypeRow.slot_name.asc()
 
 
@@ -78,7 +77,6 @@ AGENT_RESOURCE_ORDER_FIELD_MAP: dict[AgentResourceOrderField, _OrderColumn] = {
 }
 
 AGENT_RESOURCE_DEFAULT_FORWARD_ORDER: QueryOrder = AgentResourceRow.slot_name.asc()
-AGENT_RESOURCE_DEFAULT_BACKWARD_ORDER: QueryOrder = AgentResourceRow.slot_name.desc()
 AGENT_RESOURCE_TIEBREAKER_ORDER: QueryOrder = AgentResourceRow.slot_name.asc()
 
 
@@ -122,7 +120,6 @@ RESOURCE_ALLOCATION_ORDER_FIELD_MAP: dict[ResourceAllocationOrderField, _OrderCo
 }
 
 RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER: QueryOrder = ResourceAllocationRow.slot_name.asc()
-RESOURCE_ALLOCATION_DEFAULT_BACKWARD_ORDER: QueryOrder = ResourceAllocationRow.slot_name.desc()
 RESOURCE_ALLOCATION_TIEBREAKER_ORDER: QueryOrder = ResourceAllocationRow.slot_name.asc()
 
 
@@ -173,7 +170,6 @@ ALLOCATED_SLOT_PRESET_ORDER_FIELD_MAP: dict[AllocatedResourceSlotOrderField, _Or
 }
 
 ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER: QueryOrder = ResourceSlotTypeRow.rank.asc()
-ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER: QueryOrder = ResourceSlotTypeRow.rank.desc()
 ALLOCATED_SLOT_REVISION_TIEBREAKER: QueryOrder = DeploymentRevisionResourceSlotRow.slot_name.asc()
 ALLOCATED_SLOT_PRESET_TIEBREAKER: QueryOrder = PresetResourceSlotRow.slot_name.asc()
 

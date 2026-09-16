@@ -46,9 +46,6 @@ from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 
 _AUDIT_LOG_PAGINATION_SPEC = PaginationSpec(
     forward_order=AuditLogOrders.created_at(ascending=False),
-    backward_order=AuditLogOrders.created_at(ascending=True),
-    forward_condition_factory=AuditLogConditions.by_cursor_forward,
-    backward_condition_factory=AuditLogConditions.by_cursor_backward,
     tiebreaker_order=AuditLogRow.id.asc(),
 )
 

@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
     AppConfigDefinitionData,
@@ -346,6 +347,12 @@ class TestPurge:
         assert remaining_fragments == 0
 
 
+_PAGINATION_SPEC = PaginationSpec(
+    forward_order=AppConfigAllowListOrders.created_at(ascending=False),
+    tiebreaker_order=AppConfigAllowListRow.id.asc(),
+)
+
+
 class TestAdminSearch:
     async def test_admin_search_returns_all_with_total_count(
         self,
@@ -506,7 +513,7 @@ class TestAdminSearch:
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigAllowListOrders.created_at(ascending=False),
-                    cursor_condition=AppConfigAllowListConditions.by_cursor_forward(str(cursor)),
+                    cursor_condition=_PAGINATION_SPEC.build_cursor_condition(str(cursor)),
                 )
             )
         )
@@ -524,7 +531,9 @@ class TestAdminSearch:
                 pagination=CursorBackwardPagination(
                     last=10,
                     cursor_order=AppConfigAllowListOrders.created_at(ascending=True),
-                    cursor_condition=AppConfigAllowListConditions.by_cursor_backward(str(cursor)),
+                    cursor_condition=_PAGINATION_SPEC.build_cursor_condition(
+                        str(cursor), backward=True
+                    ),
                 )
             )
         )

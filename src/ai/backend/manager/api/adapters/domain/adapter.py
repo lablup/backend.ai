@@ -66,9 +66,6 @@ from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
     forward_order=DomainOrders.created_at(ascending=False),
-    backward_order=DomainOrders.created_at(ascending=True),
-    forward_condition_factory=DomainConditions.by_cursor_forward,
-    backward_condition_factory=DomainConditions.by_cursor_backward,
     tiebreaker_order=DomainRow.name.asc(),
 )
 

@@ -20,6 +20,7 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
@@ -980,6 +981,12 @@ class TestNotificationOptions:
         assert rules.total_count == 0
 
 
+_CHANNEL_PAGINATION_SPEC = PaginationSpec(
+    forward_order=NotificationChannelOrders.created_at(ascending=False),
+    tiebreaker_order=NotificationChannelRow.id.asc(),
+)
+
+
 class TestNotificationCursorPagination:
     """Test cases for cursor-based pagination with notification channels.
 
@@ -1208,8 +1215,7 @@ class TestNotificationCursorPagination:
             )
             channel_3_id = db_result.scalar_one()
 
-        # Forward cursor condition: created_at < cursor's created_at
-        cursor_condition = NotificationChannelConditions.by_cursor_forward(str(channel_3_id))
+        cursor_condition = _CHANNEL_PAGINATION_SPEC.build_cursor_condition(str(channel_3_id))
 
         searcher = NotificationChannelSearcher(
             pagination=CursorForwardPagination(
@@ -1275,8 +1281,9 @@ class TestNotificationCursorPagination:
             )
             channel_3_id = db_result.scalar_one()
 
-        # Backward cursor condition: created_at > cursor's created_at
-        cursor_condition = NotificationChannelConditions.by_cursor_backward(str(channel_3_id))
+        cursor_condition = _CHANNEL_PAGINATION_SPEC.build_cursor_condition(
+            str(channel_3_id), backward=True
+        )
 
         searcher = NotificationChannelSearcher(
             pagination=CursorBackwardPagination(

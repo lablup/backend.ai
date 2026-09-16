@@ -179,17 +179,11 @@ from ai.backend.manager.services.user.processors import UserProcessors
 
 _USER_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserOrders.created_at(ascending=False),
-    backward_order=UserOrders.created_at(ascending=True),
-    forward_condition_factory=UserConditions.by_cursor_forward,
-    backward_condition_factory=UserConditions.by_cursor_backward,
     tiebreaker_order=UserRow.uuid.asc(),
 )
 
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairOrders.created_at(ascending=False),
-    backward_order=KeypairOrders.created_at(ascending=True),
-    forward_condition_factory=KeypairConditions.by_cursor_forward,
-    backward_condition_factory=KeypairConditions.by_cursor_backward,
     tiebreaker_order=KeyPairRow.access_key.asc(),
 )
 

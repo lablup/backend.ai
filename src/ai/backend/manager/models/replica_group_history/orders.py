@@ -27,7 +27,6 @@ REPLICA_GROUP_ORDER_FIELD_MAP: dict[ReplicaGroupHistoryOrderField, _OrderColumn]
 }
 
 REPLICA_GROUP_DEFAULT_FORWARD_ORDER: QueryOrder = ReplicaGroupHistoryRow.created_at.desc()
-REPLICA_GROUP_DEFAULT_BACKWARD_ORDER: QueryOrder = ReplicaGroupHistoryRow.created_at.asc()
 REPLICA_GROUP_TIEBREAKER_ORDER: QueryOrder = ReplicaGroupHistoryRow.id.asc()
 
 

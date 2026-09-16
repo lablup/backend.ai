@@ -53,9 +53,6 @@ from ai.backend.manager.types import OptionalState
 def _retention_policy_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RetentionPolicyOrders.category(ascending=True),
-        backward_order=RetentionPolicyOrders.category(ascending=False),
-        forward_condition_factory=RetentionPolicyConditions.by_cursor_forward,
-        backward_condition_factory=RetentionPolicyConditions.by_cursor_backward,
         tiebreaker_order=RetentionPolicyRow.id.asc(),
     )
 

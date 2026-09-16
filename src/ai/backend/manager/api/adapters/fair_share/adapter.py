@@ -120,9 +120,6 @@ from ai.backend.manager.services.resource_group.processors import ResourceGroupP
 def _domain_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DomainFairShareOrders.by_created_at(ascending=False),
-        backward_order=DomainFairShareOrders.by_created_at(ascending=True),
-        forward_condition_factory=DomainFairShareConditions.by_cursor_forward,
-        backward_condition_factory=DomainFairShareConditions.by_cursor_backward,
         tiebreaker_order=DomainFairShareRow.id.asc(),
     )
 
@@ -130,9 +127,6 @@ def _domain_fair_share_pagination_spec() -> PaginationSpec:
 def _project_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ProjectFairShareOrders.by_created_at(ascending=False),
-        backward_order=ProjectFairShareOrders.by_created_at(ascending=True),
-        forward_condition_factory=ProjectFairShareConditions.by_cursor_forward,
-        backward_condition_factory=ProjectFairShareConditions.by_cursor_backward,
         tiebreaker_order=ProjectFairShareRow.id.asc(),
     )
 
@@ -140,9 +134,6 @@ def _project_fair_share_pagination_spec() -> PaginationSpec:
 def _user_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=UserFairShareOrders.by_created_at(ascending=False),
-        backward_order=UserFairShareOrders.by_created_at(ascending=True),
-        forward_condition_factory=UserFairShareConditions.by_cursor_forward,
-        backward_condition_factory=UserFairShareConditions.by_cursor_backward,
         tiebreaker_order=UserFairShareRow.id.asc(),
     )
 

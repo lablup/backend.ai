@@ -80,9 +80,6 @@ from ai.backend.manager.types import OptionalState
 def _get_app_config_allow_list_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigAllowListOrders.created_at(ascending=False),
-        backward_order=AppConfigAllowListOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigAllowListConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigAllowListConditions.by_cursor_backward,
         tiebreaker_order=AppConfigAllowListOrders.id(ascending=True),
     )
 

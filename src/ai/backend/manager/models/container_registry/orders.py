@@ -25,7 +25,6 @@ ORDER_FIELD_MAP: dict[ContainerRegistryOrderField, _OrderColumn] = {
 }
 
 DEFAULT_FORWARD_ORDER: QueryOrder = ContainerRegistryRow.id.desc()
-DEFAULT_BACKWARD_ORDER: QueryOrder = ContainerRegistryRow.id.asc()
 TIEBREAKER_ORDER: QueryOrder = ContainerRegistryRow.id.asc()
 
 

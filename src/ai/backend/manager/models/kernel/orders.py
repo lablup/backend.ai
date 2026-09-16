@@ -24,7 +24,6 @@ ORDER_FIELD_MAP: dict[KernelOrderField, _OrderColumn] = {
 }
 
 DEFAULT_FORWARD_ORDER: QueryOrder = KernelRow.created_at.desc()
-DEFAULT_BACKWARD_ORDER: QueryOrder = KernelRow.created_at.asc()
 TIEBREAKER_ORDER: QueryOrder = KernelRow.id.asc()
 
 

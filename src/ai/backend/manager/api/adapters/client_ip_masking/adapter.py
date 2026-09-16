@@ -48,9 +48,6 @@ from ai.backend.manager.services.client_ip_masking.processors import ClientIPMas
 def _pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ClientIPMaskingPolicyOrders.target_type(ascending=True),
-        backward_order=ClientIPMaskingPolicyOrders.target_type(ascending=False),
-        forward_condition_factory=ClientIPMaskingPolicyConditions.by_cursor_forward,
-        backward_condition_factory=ClientIPMaskingPolicyConditions.by_cursor_backward,
         tiebreaker_order=ClientIPMaskingPolicyRow.id.asc(),
     )
 

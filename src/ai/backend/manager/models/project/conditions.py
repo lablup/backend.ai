@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
-from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -283,38 +282,6 @@ class ProjectConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectRow.updated_at == dt
-
-        return inner
-
-    # ==================== Cursor Pagination ====================
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: UUID) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ProjectRow.created_at).where(ProjectRow.id == cursor_id).scalar_subquery()
-            )
-            return ProjectRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: UUID) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ProjectRow.created_at).where(ProjectRow.id == cursor_id).scalar_subquery()
-            )
-            return ProjectRow.created_at > subquery
 
         return inner
 
