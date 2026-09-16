@@ -8,16 +8,6 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.login_client_type import (
-    ATypeAndACaller,
-    ATypeAndSomeone,
-    TheDeletedTypeId,
-)
-from bai_scenario.components.system import ENFORCEMENT
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
@@ -28,6 +18,16 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.login_client_type import (
+    ATypeAndACaller,
+    ATypeAndSomeone,
+    TheDeletedTypeId,
+)
+from bai_scenario.components.system import ENFORCEMENT
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteLoginClientTypePayload
 type RetiringStep = Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]

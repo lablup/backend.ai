@@ -6,16 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.login_client_type import (
-    EveryLaidTypeIsCounted,
-    ManyTypesAndACaller,
-    ManyTypesAndSomeone,
-    OnlyTheNamedTypeIsLeft,
-    TheFirstPageOfTypes,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
@@ -28,6 +18,16 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.login_client_type import (
+    EveryLaidTypeIsCounted,
+    ManyTypesAndACaller,
+    ManyTypesAndSomeone,
+    OnlyTheNamedTypeIsLeft,
+    TheFirstPageOfTypes,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 50
 

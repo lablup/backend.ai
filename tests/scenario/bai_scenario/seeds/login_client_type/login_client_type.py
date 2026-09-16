@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRow
-
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
+from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)

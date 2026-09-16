@@ -8,6 +8,12 @@ from typing import override
 from uuid import uuid4
 
 import pytest
+
+from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
+from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -17,12 +23,6 @@ from bai_scenario.components.login_client_type import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
-from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 type ReadingStep = Scenario[
     SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode

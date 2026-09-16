@@ -11,10 +11,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.login_client_type.login_client_type import SeedLoginClientType
-
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     DeleteLoginClientTypePayload,
@@ -35,6 +31,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.seeds.login_client_type.login_client_type import SeedLoginClientType
 
 DESCRIBED = "미리 만들어 둔 로그인 클라이언트 종류"
 """시드가 미리 만들어 두는 종류의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""

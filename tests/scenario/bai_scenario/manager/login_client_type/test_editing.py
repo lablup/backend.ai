@@ -12,6 +12,17 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.login_client_type.request import UpdateLoginClientTypeInput
+from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
+from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -25,17 +36,6 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.login_client_type.request import UpdateLoginClientTypeInput
-from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
-from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
-
 RENAMED = "renamed"
 
 type EditingStep = Scenario[SeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
@@ -46,7 +46,7 @@ class Editing(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
     """미리 만들어 둔 종류를 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str | None = None
-    described: str | Sentinel | None = SENTINEL
+    described: str | Unset | None = UNSET
     unknown: bool = False
 
     @override
@@ -59,7 +59,7 @@ class Editing(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
         changing = []
         if self.named is not None:
             changing.append("이름")
-        if not isinstance(self.described, Sentinel):
+        if not isinstance(self.described, Unset):
             changing.append("설명")
         return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
 
