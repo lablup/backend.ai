@@ -231,7 +231,7 @@ class PresetsInTwoCategories(Given[Any, ManyPresetsAndACaller]):
     """두 카테고리에 나뉜 프리셋들과, 호출자 한 명.
 
     반환하는 ``laid``는 ``category``에 속한 것뿐이다. 다른 카테고리의 프리셋은 만들어 두기만
-    하고 반환하지 않으므로, 필터 검색 결과에 섞여 나오면 그 자리에서 불일치가 드러난다.
+    하고 반환하지 않으므로, 필터 검색 결과에 섞여 나오면 바로 불일치가 드러난다.
     """
 
     role: UserRole = UserRole.USER
@@ -450,7 +450,7 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
+        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
 
     @override
     def look(
