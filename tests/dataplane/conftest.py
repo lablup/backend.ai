@@ -20,6 +20,8 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput, AgentFilter
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.dataplane.agent_control import AgentControlConfig, AgentController
@@ -378,8 +380,8 @@ async def leak_guard(
 
 
 @pytest.fixture
-async def session_driver(dataplane_config: DataplaneConfig) -> AsyncIterator[SessionDriver]:
-    """A driver bound to a keypair reserved for this suite.
+async def client_registry(dataplane_config: DataplaneConfig) -> AsyncIterator[V2ClientRegistry]:
+    """The manager client, on a keypair reserved for this suite.
 
     Reserved, not shared: concurrent sessions are capped per keypair, so borrowing the developer's
     keypair means their running sessions decide whether the suite can start — which is how the
@@ -400,11 +402,36 @@ async def session_driver(dataplane_config: DataplaneConfig) -> AsyncIterator[Ses
         ),
     )
     try:
-        # Tagged with this process: pytest batches run in parallel, and two files that both name
-        # their session for the scenario it belongs to would otherwise collide in the manager.
-        yield SessionDriver(registry.session, run_tag=f"{os.getpid():x}")
+        yield registry
     finally:
         await registry.close()
+
+
+@pytest.fixture
+async def session_driver(client_registry: V2ClientRegistry) -> SessionDriver:
+    # Tagged with this process: pytest batches run in parallel, and two files that both name
+    # their session for the scenario it belongs to would otherwise collide in the manager.
+    return SessionDriver(client_registry.session, run_tag=f"{os.getpid():x}")
+
+
+@pytest.fixture
+def agent_status(client_registry: V2ClientRegistry) -> Callable[[str], Awaitable[str]]:
+    """What the manager currently believes an agent's status is (``ALIVE``, ``RESTARTING``...).
+
+    The manager's belief, not the node's: whether a node is offered work is decided from this
+    record and nothing else, so a scenario about a node taking itself out of service asserts here.
+    """
+
+    async def status(agent_id: str) -> str:
+        found = await client_registry.agent.admin_search(
+            AdminSearchAgentsInput(filter=AgentFilter(id=StringFilter(equals=agent_id)))
+        )
+        for item in found.items:
+            if item.id == agent_id:
+                return item.status_info.status
+        raise LookupError(f"the manager has no agent {agent_id!r}")
+
+    return status
 
 
 @pytest.fixture
@@ -489,6 +516,36 @@ def privnet_control(
             "bring it back"
         )
     return PrivnetController(raw_nodes[0], config)
+
+
+@pytest.fixture
+def node_controls(
+    raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig
+) -> Sequence[tuple[AgentController, PrivnetController]]:
+    """Restart control for EVERY node's agent and privnet, in `BAI_DATAPLANE_NODES` order.
+
+    For the scenario that updates the whole rig one node at a time. Built like `agent_control` and
+    `privnet_control` -- on the unsudo'd nodes, for the same reasons -- and skipped under the same
+    conditions.
+    """
+    agent_config = AgentControlConfig(
+        start_cmd=dataplane_config.agent_start_cmd or None,
+        stop_cmd=dataplane_config.agent_stop_cmd or None,
+        rpc_port=dataplane_config.agent_rpc_port,
+    )
+    privnet_config = PrivnetControlConfig(
+        start_cmd=dataplane_config.privnet_start_cmd,
+        socket_path=dataplane_config.privnet_socket,
+    )
+    if not (agent_config.configured and privnet_config.configured):
+        _unavailable(
+            "BAI_DATAPLANE_AGENT_START_CMD and BAI_DATAPLANE_PRIVNET_START_CMD are both needed to"
+            " update a node"
+        )
+    return [
+        (AgentController(node, agent_config), PrivnetController(node, privnet_config))
+        for node in raw_nodes
+    ]
 
 
 @pytest.fixture
