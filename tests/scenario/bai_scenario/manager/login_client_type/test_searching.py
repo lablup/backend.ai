@@ -76,6 +76,26 @@ class SearchingByName(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched
 
 
 @dataclass(frozen=True)
+class SearchingTheFirst(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
+    """크기와 건너뛸 수 없이, 커서 쪽 개수만 지정해 앞에서부터 검색한다."""
+
+    first: int
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: ManyTypesAndACaller) -> str:
+        return f"{laid.caller.username}이 앞에서 {self.first}건만 조회"
+
+    @override
+    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.search(SearchLoginClientTypesInput(first=self.first))
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryType(
     Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
 ):
@@ -153,10 +173,38 @@ class OmittingThePageSizeGivesFifty(
         return TheFirstPageOfTypes(size=DEFAULT_PAGE)
 
 
+@dataclass(frozen=True)
+class AskingForTheFirstTwoGivesTwo(
+    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "asking-for-the-first-two-login-client-types-answers-two-and-a-next-page"
+
+    @override
+    def describe(self) -> str:
+        return "종류 셋이 있을 때 앞에서 두 건만 조회하면 두 건이 반환되고 다음 페이지가 있다고 응답한다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
+        return ManyTypesAndSomeone(besides=2)
+
+    @override
+    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
+        return SearchingTheFirst(first=2)
+
+    @override
+    def then(self) -> Then[ManyTypesAndACaller, Searched]:
+        return TheFirstPageOfTypes(size=2)
+
+
 SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEveryType(),
     ANameFilterNarrows(),
     OmittingThePageSizeGivesFifty(),
+    # TODO(BA-7927): the adapter reads only `limit` and `offset`, so a `first`-only request
+    # is answered with the whole first page; list this row once it reads the cursor.
+    # AskingForTheFirstTwoGivesTwo(),
 ]
 
 
