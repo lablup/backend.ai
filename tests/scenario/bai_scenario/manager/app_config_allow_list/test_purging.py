@@ -1,4 +1,4 @@
-"""허용 목록 항목 영구 삭제 — 권한 검사와 종속 설정 조각의 처리를 확인한다.
+"""allow_list 영구 삭제 — 권한 검사와 종속 설정 조각의 처리를 확인한다.
 
 설정 조각은 데이터베이스가 함께 삭제한다. 이 어댑터에는 soft delete가 없다.
 """
@@ -48,7 +48,7 @@ type PurgingStep = Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowLis
 
 @dataclass(frozen=True)
 class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
-    """항목 하나를 영구 삭제한다. ID를 지정하지 않으면 준비한 항목을 삭제한다."""
+    """allow_list 하나를 영구 삭제한다. ID를 지정하지 않으면 준비한 allow_list를 삭제한다."""
 
     other: UUID | None = None
 
@@ -58,7 +58,7 @@ class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 항목"
+        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 allow_list"
         return f"{laid.caller.username}이 {called} 영구 삭제"
 
     @override
@@ -75,11 +75,11 @@ class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
 
 @dataclass(frozen=True)
 class ThePurgedOneIsNamed(Then[AnEntryAndACaller, Purged]):
-    """영구 삭제한 항목의 ID를 반환한다."""
+    """영구 삭제한 allow_list의 ID를 반환한다."""
 
     @override
     def says(self) -> str:
-        return "영구 삭제한 허용 목록 항목의 ID가 반환된다"
+        return "영구 삭제한 allow_list의 ID가 반환된다"
 
     @override
     def look(self, laid: AnEntryAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -99,7 +99,7 @@ class TheSuperadminPurgesIt(
 
     @override
     def describe(self) -> str:
-        return "설정 조각이 없는 항목을 슈퍼관리자가 영구 삭제하면, 삭제한 항목의 ID가 반환된다"
+        return "설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -124,7 +124,7 @@ class AFragmentDoesNotBlockIt(
 
     @override
     def describe(self) -> str:
-        return "설정 조각이 있는 항목을 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 항목의 ID가 반환된다"
+        return "설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -149,9 +149,7 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 항목을 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다"
-        )
+        return "같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:

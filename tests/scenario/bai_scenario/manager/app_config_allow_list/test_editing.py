@@ -1,6 +1,6 @@
-"""허용 목록 항목 수정 — 순위와 개별 엔티티 권한을 확인한다.
+"""allow_list 수정 — 순위와 개별 엔티티 권한을 확인한다.
 
-설정 이름과 스코프 유형은 항목의 정체성이므로 요청 타입이 받지 않는다. 순위를 바꾼 뒤 병합의 우선순위가
+설정 이름과 스코프 유형은 allow_list의 정체성이므로 요청 타입이 받지 않는다. 순위를 바꾼 뒤 병합의 우선순위가
 뒤바뀌는 것은 병합 조회 시나리오가 순위를 처음부터 뒤집어 만들어 두고 확인한다.
 """
 
@@ -45,7 +45,7 @@ type EditingStep = Scenario[
 
 @dataclass(frozen=True)
 class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
-    """순위를 수정한다. ID를 지정하지 않으면 준비한 항목을 수정한다."""
+    """순위를 수정한다. ID를 지정하지 않으면 준비한 allow_list를 수정한다."""
 
     rank: int | None = None
     other: UUID | None = None
@@ -56,7 +56,7 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 항목"
+        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 allow_list"
         how = f"순위 {self.rank}(으)로 변경" if self.rank is not None else "빈 요청"
         return f"{laid.caller.username}이 {called} 수정 ({how})"
 
@@ -89,7 +89,7 @@ class TheSuperadminChangesTheRank(
 
     @override
     def describe(self) -> str:
-        return "항목 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다"
+        return "allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -141,7 +141,9 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "같은 항목을 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다"
+        return (
+            "같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:

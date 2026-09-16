@@ -1,4 +1,4 @@
-"""여러 ID로 허용 목록 항목 조회 — 입력 위치마다 응답한다.
+"""여러 ID로 allow_list 조회 — 입력 위치마다 응답한다.
 
 권한이 없는 ID가 있어도 요청 전체가 실패하지 않는다. 각 입력 위치에는 노드, ``None``, 또는
 해당 ID의 권한 오류가 반환된다.
@@ -62,8 +62,8 @@ class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
         if self.nothing:
             return f"{laid.caller.username}이 빈 ID 목록으로 조회"
         if self.duplicate_first:
-            return f"{laid.caller.username}이 첫 번째 허용 목록 항목의 ID를 두 번 조회"
-        return f"{laid.caller.username}이 항목 둘과 존재하지 않는 ID를 한 번에 조회"
+            return f"{laid.caller.username}이 첫 번째 allow_list의 ID를 두 번 조회"
+        return f"{laid.caller.username}이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회"
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Loaded:
@@ -156,7 +156,7 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "중복 ID의 두 위치에 같은 허용 목록 항목이 반환된다"
+        return "중복 ID의 두 위치에 같은 allow_list가 반환된다"
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -192,7 +192,7 @@ class APlainUserIsRefusedPerId(
     @override
     def describe(self) -> str:
         return (
-            "권한이 없는 일반 사용자가 항목 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 "
+            "권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 "
             "엔티티 읽기 권한 오류가 반환된다"
         )
 
@@ -220,7 +220,7 @@ class TheSuperadminSeesBoth(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 항목 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 "
+            "슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 "
             "None이 반환된다"
         )
 
@@ -247,9 +247,7 @@ class DuplicateIdsKeepTheirPositions(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 같은 허용 목록 항목의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다"
-        )
+        return "슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:

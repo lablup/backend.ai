@@ -1,4 +1,4 @@
-"""앱 설정 허용 목록 어댑터의 시나리오 구성 요소."""
+"""app_config_allow_list 어댑터의 시나리오 구성 요소."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def _who(role: UserRole) -> str:
 
 @dataclass(frozen=True)
 class AnEntryAndACaller:
-    """설정 이름, 선택적인 허용 목록 항목, 호출자."""
+    """설정 이름, 선택적인 allow_list, 호출자."""
 
     domain: DomainData
     caller: UserData
@@ -52,10 +52,10 @@ class AnEntryAndACaller:
 
 @dataclass(frozen=True)
 class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
-    """설정 정의와 허용 목록 항목을 만들고 호출자를 준비한다.
+    """설정 정의와 allow_list를 만들고 호출자를 준비한다.
 
     ``opened``가 없으면 정의만 만들고, ``defined``가 거짓이면 정의도 만들지 않는다.
-    ``with_fragment``가 참이면 PUBLIC 항목 아래에 설정 조각도 만든다.
+    ``with_fragment``가 참이면 PUBLIC allow_list 아래에 설정 조각도 만든다.
     """
 
     opened: AppConfigScopeType | None = AppConfigScopeType.PUBLIC
@@ -69,8 +69,8 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
         if not self.defined:
             return f"등록되지 않은 설정 이름과 {who}"
         if self.opened is None:
-            return f"허용 목록 항목이 없는 설정 정의 하나와 {who}"
-        what = f"{SCOPE_NAMES[self.opened]} 스코프 유형의 허용 목록 항목 하나"
+            return f"allow_list가 없는 설정 정의 하나와 {who}"
+        what = f"{SCOPE_NAMES[self.opened]} 스코프 유형의 allow_list 하나"
         if self.with_fragment:
             what = f"설정 조각이 있는 {what}"
         return f"{what}와 {who}"
@@ -101,7 +101,7 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
 
 @dataclass(frozen=True)
 class ManyEntriesAndACaller:
-    """검색할 허용 목록 항목과 호출자."""
+    """검색할 allow_list와 호출자."""
 
     caller: UserData
     laid: tuple[AppConfigAllowListData, ...]
@@ -109,7 +109,7 @@ class ManyEntriesAndACaller:
 
 @dataclass(frozen=True)
 class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
-    """설정 이름마다 지정한 스코프 유형의 허용 목록 항목을 만든다."""
+    """설정 이름마다 지정한 스코프 유형의 allow_list를 만든다."""
 
     names: int = 1
     kinds: tuple[AppConfigScopeType, ...] = (AppConfigScopeType.PUBLIC,)
@@ -118,7 +118,9 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
     @override
     def describe(self) -> str:
         kinds = "·".join(SCOPE_NAMES[one] for one in self.kinds)
-        return f"설정 이름 {self.names}개에 각각 {kinds} 스코프 유형의 허용 목록 항목과 {_who(self.role)}"
+        return (
+            f"설정 이름 {self.names}개에 각각 {kinds} 스코프 유형의 allow_list와 {_who(self.role)}"
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyEntriesAndACaller:
@@ -139,7 +141,7 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
 
 @dataclass(frozen=True)
 class TwoEntriesAndACaller:
-    """ID로 함께 조회할 허용 목록 항목 둘과 호출자."""
+    """ID로 함께 조회할 allow_list 둘과 호출자."""
 
     caller: UserData
     first: AppConfigAllowListData
@@ -148,13 +150,13 @@ class TwoEntriesAndACaller:
 
 @dataclass(frozen=True)
 class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
-    """한 설정 이름에 속한 허용 목록 항목 둘과 호출자를 준비한다."""
+    """한 설정 이름에 속한 allow_list 둘과 호출자를 준비한다."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"한 설정 이름의 PUBLIC·USER 허용 목록 항목과 {_who(self.role)}"
+        return f"한 설정 이름의 PUBLIC·USER allow_list와 {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> TwoEntriesAndACaller:
@@ -174,14 +176,14 @@ class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
 
 @dataclass(frozen=True)
 class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
-    """준비한 항목의 모든 필드가 반환된다."""
+    """준비한 allow_list의 모든 필드가 반환된다."""
 
     started: datetime
     rank: int | None = None
 
     @override
     def says(self) -> str:
-        return "준비한 허용 목록 항목의 모든 필드가 반환된다"
+        return "준비한 allow_list의 모든 필드가 반환된다"
 
     @override
     def look(
@@ -203,7 +205,7 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
 @dataclass(frozen=True)
 class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
-    """생성한 항목의 모든 필드가 반환된다."""
+    """생성한 allow_list의 모든 필드가 반환된다."""
 
     started: datetime
     scope_type: AppConfigScopeType
@@ -211,7 +213,7 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 허용 목록 항목의 모든 필드가 반환된다"
+        return "생성한 allow_list의 모든 필드가 반환된다"
 
     @override
     def look(
@@ -233,11 +235,11 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
 @dataclass(frozen=True)
 class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """준비한 항목만 모두 반환된다."""
+    """준비한 allow_list만 모두 반환된다."""
 
     @override
     def says(self) -> str:
-        return "준비한 허용 목록 항목만 모두 반환된다"
+        return "준비한 allow_list만 모두 반환된다"
 
     @override
     def look(

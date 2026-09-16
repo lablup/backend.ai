@@ -1,4 +1,4 @@
-"""허용 목록 항목 검색 — 슈퍼관리자 검사를 확인한다."""
+"""allow_list 검색 — 슈퍼관리자 검사를 확인한다."""
 
 from __future__ import annotations
 
@@ -67,9 +67,7 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "설정 이름 둘에 항목 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 항목이 모두 반환된다"
-        )
+        return "설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
@@ -98,7 +96,7 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "일반 사용자가 허용 목록을 검색하면, 슈퍼관리자 권한이 없어 거부된다"
+        return "일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:

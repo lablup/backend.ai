@@ -56,7 +56,7 @@ UNREGISTERED = "unregistered"
 ENTITY_NAMES: Mapping[EntityType, str] = {
     AppConfigEntityType(): "설정",
     AppConfigDefinitionEntityType(): "설정 정의",
-    AppConfigAllowListEntityType(): "허용 목록 항목",
+    AppConfigAllowListEntityType(): "allow_list",
     AppConfigFragmentEntityType(): "설정 조각",
 }
 """레포트에서 권한 대상 엔티티 종류를 가리키는 이름."""
@@ -132,7 +132,7 @@ class SomeoneGrantedOn[Seat](SeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class LaidDesign:
-    """설정 정의 하나와, 그 이름을 허용하는 허용 목록 항목들의 참조."""
+    """설정 정의 하나와, 그 이름을 허용하는 allow_list들의 참조."""
 
     definition: Laid[AppConfigDefinitionData]
     entries: Mapping[AppConfigScopeType, Laid[AppConfigAllowListData]]
@@ -140,7 +140,7 @@ class LaidDesign:
 
 @dataclass(frozen=True)
 class ADesignOf(SeedNest[LaidDesign]):
-    """설정 이름 하나를 등록하고, 지정한 스코프 종류마다 허용 목록 항목을 만든다.
+    """설정 이름 하나를 등록하고, 지정한 스코프 종류마다 allow_list를 만든다.
 
     ``ranks``에 없는 종류는 그 종류의 기본 순위를 받는다.
     """
@@ -191,7 +191,7 @@ class AMergeAndACaller:
 class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
     """설정 이름 하나에 세 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
 
-    값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 허용 목록 항목은 조각과 함께
+    값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 allow_list는 조각과 함께
     만들어진다. 다른 사용자와 다른 도메인의 조각은 같은 이름에 만들어 두되 반환하지 않으므로,
     병합에 섞이면 그 자리에서 불일치가 드러난다.
     """

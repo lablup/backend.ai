@@ -35,7 +35,7 @@ class SeedAllowListEntry(SeedRowFrom[AppConfigDefinitionData, AppConfigAllowList
 
     @override
     def kind(self) -> str:
-        return "허용 목록 항목"
+        return "allow_list"
 
     @override
     def detail(self) -> str:

@@ -1,6 +1,6 @@
-"""허용 목록 항목 조회 — 개별 엔티티 권한 검사를 확인한다.
+"""allow_list 조회 — 개별 엔티티 권한 검사를 확인한다.
 
-허용 목록 항목은 도메인·프로젝트·사용자 스코프에 자동 귀속되지 않는다. 따라서 현재 기본
+allow_list는 도메인·프로젝트·사용자 스코프에 자동 귀속되지 않는다. 따라서 현재 기본
 역할로는 도달할 수 없으며, 슈퍼관리자만 조회할 수 있다.
 """
 
@@ -45,7 +45,7 @@ type ReadingStep = Scenario[
 
 @dataclass(frozen=True)
 class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
-    """ID로 조회한다. ID를 지정하지 않으면 준비한 항목의 ID를 쓴다."""
+    """ID로 조회한다. ID를 지정하지 않으면 준비한 allow_list의 ID를 쓴다."""
 
     other: UUID | None = None
 
@@ -55,7 +55,7 @@ class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAl
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 항목"
+        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 allow_list"
         return f"{laid.caller.username}이 {called} 조회"
 
     @override
@@ -84,7 +84,7 @@ class TheSuperadminReadsIt(
 
     @override
     def describe(self) -> str:
-        return "항목 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 항목의 모든 필드가 반환된다"
+        return "allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -109,7 +109,9 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "같은 항목을 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다"
+        return (
+            "같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -165,7 +167,7 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return "RBAC 강제를 끄면 권한이 없는 일반 사용자도 허용 목록 항목을 조회할 수 있다"
+        return "RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

@@ -1,4 +1,4 @@
-"""허용 목록 항목 생성 — 슈퍼관리자 검사와 기본 순위를 확인한다.
+"""allow_list 생성 — 슈퍼관리자 검사와 기본 순위를 확인한다.
 
 순위 생략을 세 시나리오로 두는 이유는, 생략했을 때의 값이 스코프 유형마다 다르고 그 값이
 병합의 기본 순서이기 때문이다.
@@ -48,7 +48,7 @@ type CreatingStep = Scenario[
 
 @dataclass(frozen=True)
 class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
-    """준비한 설정 이름으로 한 스코프 유형의 허용 목록 항목을 생성한다."""
+    """준비한 설정 이름으로 한 스코프 유형의 allow_list를 생성한다."""
 
     scope_type: AppConfigScopeType
     rank: int | None = None
@@ -62,7 +62,7 @@ class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowL
         how = f"순위 {self.rank}" if self.rank is not None else "순위 생략"
         return (
             f"{laid.caller.username}이 {laid.name}의 {SCOPE_NAMES[self.scope_type]} "
-            f"허용 목록 항목 생성 ({how})"
+            f"allow_list 생성 ({how})"
         )
 
     @override
@@ -92,8 +92,8 @@ class LeavingTheRankOutTakesTheDefault(
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 순위를 생략하고 {SCOPE_NAMES[self.scope_type]} 스코프 유형의 허용 목록 "
-            f"항목을 생성하면, 순위 {self.scope_type.default_rank()}이 적용된다"
+            f"슈퍼관리자가 순위를 생략하고 {SCOPE_NAMES[self.scope_type]} 스코프 유형의 allow_list를 "
+            f"생성하면, 순위 {self.scope_type.default_rank()}이 적용된다"
         )
 
     @override
@@ -123,7 +123,7 @@ class AGivenRankIsKept(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 순위를 지정해 허용 목록 항목을 생성하면, 지정한 값이 그대로 저장된다"
+        return "슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -148,7 +148,7 @@ class AnUnregisteredNameIsRefused(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 등록되지 않은 설정 이름으로 허용 목록 항목을 생성하면, 정의 없음 오류가 반환된다"
+        return "슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -174,7 +174,7 @@ class OpeningTheSameKindTwiceIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 같은 설정 이름과 스코프 유형으로 항목을 다시 생성하면, "
+            "슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, "
             "데이터베이스의 고유 제약 오류가 반환된다"
         )
 
@@ -201,7 +201,7 @@ class APlainUserMayNotOpen(
 
     @override
     def describe(self) -> str:
-        return "일반 사용자가 허용 목록 항목을 생성하면, 슈퍼관리자 권한이 없어 거부된다"
+        return "일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
@@ -227,7 +227,7 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "RBAC 강제를 꺼도 일반 사용자의 허용 목록 항목 생성은 거부된다"
+        return "RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다"
 
     @override
     def config(self) -> Mapping[str, Any]:
