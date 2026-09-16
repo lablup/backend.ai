@@ -56,6 +56,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
+    VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -150,6 +151,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 AgentRow,
                 VFolderRow,
                 VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,

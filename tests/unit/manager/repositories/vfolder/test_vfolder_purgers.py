@@ -44,6 +44,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,
+    VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -82,6 +83,7 @@ class TestVFolderPurgersIntegration:
                 VFolderRow,
                 VFolderInvitationRow,
                 VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 # An entity batch purge tears the graph down with each row.
                 VirtualEntityRow,
                 EntityMembershipRow,

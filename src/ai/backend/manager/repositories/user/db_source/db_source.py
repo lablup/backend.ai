@@ -761,7 +761,7 @@ class UserDBSource:
         user_id = UserID(user_uuid)
         if vfolder_ids is not None and not vfolder_ids:
             return
-        held = sa.select(EntityShareRow.id).where(
+        held = sa.select(EntityShareRow.id, EntityShareRow.target_entity_id).where(
             EntityShareRow.target_entity_type == VFolderEntityType(),
             EntityShareRow.status == EntityShareStatus.ACCEPTED,
             EntityShareRow.recipient_entity_type == UserEntityType(),
@@ -770,7 +770,10 @@ class UserDBSource:
         if vfolder_ids is not None:
             held = held.where(EntityShareRow.target_entity_id.in_(vfolder_ids))
         async with self._db.begin_readonly_session() as session:
-            share_ids = [EntityShareID(share_id) for share_id in await session.scalars(held)]
+            shares = [
+                (EntityShareID(row.id), VFolderUUID(row.target_entity_id))
+                for row in (await session.execute(held)).all()
+            ]
         async with self._share_ops.write_ops() as w:
             if vfolder_ids is None:
                 taken = await w.batch_purge_field_entities(user_id, UserVFolderPermissionPurger())
@@ -782,8 +785,10 @@ class UserDBSource:
                         VFolderUserPermissionBatchPurger(user_id=user_uuid),
                     )
                     taken.append(VFolderUUID(vfolder_id))
-            for share_id in share_ids:
+            for share_id, target in shares:
                 await w.revoke_share(EntityShareRevokeUpdater(share_id=share_id))
+                if target not in taken:
+                    taken.append(target)
             if not taken:
                 return
             personal_project = await w.lookup_entity_id(

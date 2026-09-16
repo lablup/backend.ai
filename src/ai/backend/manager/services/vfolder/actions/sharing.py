@@ -5,8 +5,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.vfolder import VFolderOperationStatus, VFolderPermission
+from ai.backend.manager.models.vfolder import VFolderOperationStatus
 
 from .base import VFolderAction, VFolderGlobalAction
 
@@ -22,7 +23,7 @@ class VFolderSharedInfo:
     folder_type: str  # "project" or "user"
     shared_user_uuid: uuid.UUID
     shared_user_email: str
-    permission: VFolderPermission
+    permission: VFolderMountPolicy
 
 
 @dataclass
@@ -30,7 +31,7 @@ class ShareVFolderAction(VFolderAction):
     """Share a group vfolder with users by granting permissions directly."""
 
     resource_policy: Mapping[str, Any]
-    permission: VFolderPermission
+    permission: VFolderMountPolicy
     emails: list[str] = field(default_factory=list)
 
     @override
@@ -97,7 +98,7 @@ class UpdateVFolderSharingStatusAction(VFolderAction):
     """Batch update or delete sharing permissions."""
 
     to_delete: list[uuid.UUID] = field(default_factory=list)
-    to_update: list[tuple[uuid.UUID, VFolderPermission]] = field(default_factory=list)
+    to_update: list[tuple[uuid.UUID, VFolderMountPolicy]] = field(default_factory=list)
 
     @override
     @classmethod

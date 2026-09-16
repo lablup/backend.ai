@@ -131,7 +131,6 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
-    VFolderPermission,
     VFolderStatusSet,
     vfolder_status_map,
 )
@@ -1118,7 +1117,7 @@ class VFolderHandler:
             UpdateInvitationAction(
                 invitation_id=VFolderInvitationID(uuid.UUID(inv_id)),
                 requester_user_uuid=ctx.user_uuid,
-                mount_permission=VFolderPermission(params.permission.value),
+                mount_permission=VFolderMountPolicy(params.permission.value),
             )
         )
         resp = MessageResponse(msg=f"vfolder invitation updated: {inv_id}.")
@@ -1136,7 +1135,7 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        perm = VFolderPermission(params.permission.value)
+        perm = VFolderMountPolicy(params.permission.value)
         invitee_emails = params.emails
         log.debug(
             "VFOLDER.INVITE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), inv.users:{})",
@@ -1256,7 +1255,7 @@ class VFolderHandler:
             ShareVFolderAction(
                 vfolder_uuid=VFolderUUID(row["id"]),
                 resource_policy=req.request["keypair"]["resource_policy"],
-                permission=VFolderPermission(params.permission.value),
+                permission=VFolderMountPolicy(params.permission.value),
                 emails=params.emails,
             )
         )
@@ -1639,7 +1638,9 @@ class VFolderHandler:
         params = body.parsed
         vfolder_id = params.vfolder
         user_uuid = params.user
-        perm = VFolderPermission(params.permission.value) if params.permission is not None else None
+        perm = (
+            VFolderMountPolicy(params.permission.value) if params.permission is not None else None
+        )
         if perm is not None:
             await self._vfolder_invite.update_invited_vfolder_mount_permission.run(
                 UpdateInvitedVFolderMountPermissionAction(
@@ -1671,12 +1672,12 @@ class VFolderHandler:
         user_perm_list = params.user_perm_list
 
         to_delete: list[uuid.UUID] = []
-        to_update: list[tuple[uuid.UUID, VFolderPermission]] = []
+        to_update: list[tuple[uuid.UUID, VFolderMountPolicy]] = []
         for mapping in user_perm_list:
             if mapping.perm is None:
                 to_delete.append(mapping.user_id)
             else:
-                to_update.append((mapping.user_id, VFolderPermission(mapping.perm.value)))
+                to_update.append((mapping.user_id, VFolderMountPolicy(mapping.perm.value)))
 
         await self._vfolder_sharing.update_sharing_status.run(
             UpdateVFolderSharingStatusAction(

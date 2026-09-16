@@ -88,10 +88,11 @@ class VFolderInviteService:
         # Create invitations; an offer already open to an address is restated instead
         invited_ids: list[str] = []
 
-        for _, user_email in invitee_users:
+        for user_id, user_email in invitee_users:
             result = await self._vfolder_repository.create_vfolder_invitation(
                 action.vfolder_uuid,
                 UserID(action.user_uuid),
+                UserID(user_id),
                 user_email,
                 action.mount_permission,
             )

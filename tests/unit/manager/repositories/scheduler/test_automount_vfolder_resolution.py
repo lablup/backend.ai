@@ -77,7 +77,11 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import (
+    VFolderPermissionRow,
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+)
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -137,6 +141,7 @@ class TestAutoMountVFolderResolution:
                 AgentRow,
                 VFolderRow,
                 VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,

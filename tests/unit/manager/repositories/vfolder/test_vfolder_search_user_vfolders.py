@@ -41,7 +41,11 @@ from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import (
+    VFolderPermissionRow,
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+)
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
@@ -92,6 +96,7 @@ class TestVfolderSearchUserVfolders:
                 ImageRow,
                 VFolderRow,
                 VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,

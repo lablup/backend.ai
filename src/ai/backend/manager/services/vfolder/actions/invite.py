@@ -10,10 +10,10 @@ from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderAction,
     VFolderScopeActionResult,
@@ -60,7 +60,7 @@ class InviteVFolderAction(VFolderAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
     invitee_emails: list[str]
 
     @override
@@ -121,7 +121,7 @@ class RejectInvitationActionResult:
 @dataclass
 class UpdateInvitationAction(VFolderInvitationAction):
     requester_user_uuid: uuid.UUID
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
 
     @override
     @classmethod
@@ -214,7 +214,7 @@ class RevokeInvitedVFolderActionResult:
 @dataclass
 class UpdateInvitedVFolderMountPermissionAction(VFolderAction):
     user_id: uuid.UUID
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
 
     @override
     @classmethod
@@ -231,7 +231,7 @@ class UpdateInvitedVFolderMountPermissionAction(VFolderAction):
 class UpdateInvitedVFolderMountPermissionActionResult:
     vfolder_id: uuid.UUID
     user_id: uuid.UUID
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
 
 
 @dataclass

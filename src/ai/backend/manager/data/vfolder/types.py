@@ -289,7 +289,7 @@ class VFolderInvitationData:
     inviter: str  # email
     inviter_username: str | None
     invitee: str  # email
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
     created_at: datetime
     modified_at: datetime | None
 

@@ -17,11 +17,11 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.user.types import UserData as ContextUserData
 from ai.backend.common.data.user.types import UserRole as ContextUserRole
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -186,7 +186,7 @@ class TestShareVFolderAction:
         action = ShareVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
-            permission=VFolderMountPermission.READ_WRITE,
+            permission=VFolderMountPolicy.READ_WRITE,
             emails=emails,
         )
         result = await sharing_service.share(action)
@@ -210,7 +210,7 @@ class TestShareVFolderAction:
         action = ShareVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
-            permission=VFolderMountPermission.READ_WRITE,
+            permission=VFolderMountPolicy.READ_WRITE,
             emails=["a@test.com"],
         )
 
@@ -231,7 +231,7 @@ class TestShareVFolderAction:
         action = ShareVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
-            permission=VFolderMountPermission.READ_WRITE,
+            permission=VFolderMountPolicy.READ_WRITE,
             emails=["a@test.com"],
         )
 
@@ -252,7 +252,7 @@ class TestShareVFolderAction:
         action = ShareVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
-            permission=VFolderMountPermission.READ_WRITE,
+            permission=VFolderMountPolicy.READ_WRITE,
             emails=["a@test.com"],
         )
 
@@ -335,7 +335,7 @@ class TestListSharedVFoldersAction:
                     "vfolder_user": None,
                     "user": shared_user_uuid,
                     "email": "shared@test.com",
-                    "permission": VFolderMountPermission.READ_ONLY,
+                    "permission": VFolderMountPolicy.READ_ONLY,
                 }
             ]
         )
@@ -347,7 +347,7 @@ class TestListSharedVFoldersAction:
         info = result.shared[0]
         assert info.vfolder_id == vfolder_uuid
         assert info.shared_user_email == "shared@test.com"
-        assert info.permission == VFolderMountPermission.READ_ONLY
+        assert info.permission == VFolderMountPolicy.READ_ONLY
         assert info.folder_type == "project"
 
     async def test_filters_by_vfolder_id(
@@ -418,7 +418,7 @@ class TestListSharedVFoldersWithoutTarget:
                     "vfolder_user": owner_uuid,
                     "user": shared_user_uuid,
                     "email": "shared@test.com",
-                    "permission": VFolderMountPermission.READ_ONLY,
+                    "permission": VFolderMountPolicy.READ_ONLY,
                 }
             ]
         )
@@ -450,7 +450,7 @@ class TestUpdateVFolderSharingStatusAction:
 
         action = UpdateVFolderSharingStatusAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            to_update=[(user_id, VFolderMountPermission.READ_WRITE)],
+            to_update=[(user_id, VFolderMountPolicy.READ_WRITE)],
             to_delete=[],
         )
         await sharing_service.update_sharing_status(action)
@@ -458,7 +458,7 @@ class TestUpdateVFolderSharingStatusAction:
         mock_vfolder_repo.update_vfolder_sharing_status.assert_called_once_with(
             vfolder_uuid,
             [],
-            [(user_id, VFolderMountPermission.READ_WRITE)],
+            [(user_id, VFolderMountPolicy.READ_WRITE)],
             sharer_id=user_uuid,
         )
 
@@ -496,7 +496,7 @@ class TestUpdateVFolderSharingStatusAction:
 
         action = UpdateVFolderSharingStatusAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            to_update=[(update_user, VFolderMountPermission.READ_WRITE)],
+            to_update=[(update_user, VFolderMountPolicy.READ_WRITE)],
             to_delete=[delete_user],
         )
         await sharing_service.update_sharing_status(action)
@@ -504,7 +504,7 @@ class TestUpdateVFolderSharingStatusAction:
         mock_vfolder_repo.update_vfolder_sharing_status.assert_called_once_with(
             vfolder_uuid,
             [delete_user],
-            [(update_user, VFolderMountPermission.READ_WRITE)],
+            [(update_user, VFolderMountPolicy.READ_WRITE)],
             sharer_id=user_uuid,
         )
 
@@ -539,7 +539,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            mount_permission=VFolderMountPermission.READ_ONLY,
+            mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
         result = await invite_service.invite(action)
@@ -564,7 +564,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            mount_permission=VFolderMountPermission.READ_ONLY,
+            mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
 
@@ -588,7 +588,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            mount_permission=VFolderMountPermission.READ_ONLY,
+            mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["nobody@test.com"],
         )
 
@@ -615,7 +615,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            mount_permission=VFolderMountPermission.READ_ONLY,
+            mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
 
@@ -642,7 +642,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            mount_permission=VFolderMountPermission.READ_ONLY,
+            mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
         result = await invite_service.invite(action)
@@ -668,7 +668,7 @@ class TestAcceptInvitationAction:
         invitation_data = MagicMock(spec=VFolderInvitationData)
         invitation_data.vfolder = vfolder_uuid
         invitation_data.invitee = "invitee@test.com"
-        invitation_data.permission = VFolderMountPermission.READ_ONLY.value
+        invitation_data.permission = VFolderMountPolicy.READ_ONLY.value
 
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=invitation_data)
         mock_vfolder_repo.get_user_by_email = AsyncMock(
@@ -837,13 +837,13 @@ class TestUpdateInvitationAction:
         action = UpdateInvitationAction(
             invitation_id=VFolderInvitationID(invitation_id),
             requester_user_uuid=inviter_uuid,
-            mount_permission=VFolderMountPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
         result = await invite_service.update_invitation(action)
 
         assert result.invitation_id == invitation_id
         mock_vfolder_repo.update_invitation_permission.assert_called_once_with(
-            invitation_id, inviter_uuid, VFolderMountPermission.READ_WRITE
+            invitation_id, inviter_uuid, VFolderMountPolicy.READ_WRITE
         )
 
 
@@ -869,7 +869,7 @@ class TestListInvitationAction:
         invitation_data.invitee = "user@test.com"
         invitation_data.inviter = "inviter@test.com"
         invitation_data.inviter_username = "inviter-user"
-        invitation_data.permission = VFolderMountPermission.READ_ONLY
+        invitation_data.permission = VFolderMountPolicy.READ_ONLY
         invitation_data.created_at = now
         invitation_data.modified_at = None
 
@@ -888,7 +888,7 @@ class TestListInvitationAction:
         assert info.vfolder_id == vfolder_uuid
         assert info.vfolder_name == "shared-folder"
         assert info.inviter_user_email == "inviter@test.com"
-        assert info.mount_permission == VFolderMountPermission.READ_ONLY
+        assert info.mount_permission == VFolderMountPolicy.READ_ONLY
         assert info.status == VFolderInvitationState.PENDING
 
     async def test_no_invitations_returns_empty_list(
@@ -1080,15 +1080,15 @@ class TestUpdateInvitedVFolderMountPermissionAction:
         action = UpdateInvitedVFolderMountPermissionAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             user_id=user_id,
-            permission=VFolderMountPermission.RW_DELETE,
+            permission=VFolderMountPolicy.READ_WRITE,
         )
         result = await invite_service.update_invited_vfolder_mount_permission(action)
 
         assert result.vfolder_id == vfolder_uuid
         assert result.user_id == user_id
-        assert result.permission == VFolderMountPermission.RW_DELETE
+        assert result.permission == VFolderMountPolicy.READ_WRITE
         mock_vfolder_repo.update_invited_vfolder_mount_permission.assert_called_once_with(
-            vfolder_uuid, user_id, VFolderMountPermission.RW_DELETE, sharer_id=user_uuid
+            vfolder_uuid, user_id, VFolderMountPolicy.READ_WRITE, sharer_id=user_uuid
         )
 
 
@@ -1122,7 +1122,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         invitation_data = MagicMock(spec=VFolderInvitationData)
         invitation_data.vfolder = vfolder_uuid
         invitation_data.invitee = ""
-        invitation_data.permission = VFolderMountPermission.READ_ONLY.value
+        invitation_data.permission = VFolderMountPolicy.READ_ONLY.value
         return invitation_data
 
     @pytest.fixture
@@ -1158,7 +1158,7 @@ class TestEmptyEmailAccountInvitationScenarios:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            mount_permission=VFolderMountPermission.READ_ONLY,
+            mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
 
@@ -1256,7 +1256,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         return UpdateInvitationAction(
             invitation_id=VFolderInvitationID(invitation_uuid),
             requester_user_uuid=user_uuid,
-            mount_permission=VFolderMountPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
     async def test_inviter_with_empty_email_can_update_invitation_permission(
@@ -1271,7 +1271,7 @@ class TestEmptyEmailAccountInvitationScenarios:
 
         assert result.invitation_id == invitation_uuid
         mock_vfolder_repo.update_invitation_permission.assert_called_once_with(
-            invitation_uuid, user_uuid, VFolderMountPermission.READ_WRITE
+            invitation_uuid, user_uuid, VFolderMountPolicy.READ_WRITE
         )
 
     # --- list received ---
