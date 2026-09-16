@@ -6,15 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.container_registry import (
-    MISSING_ENTITY_ID,
-    ManyRegistriesAndACaller,
-    ManyRegistriesAndSomeone,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.user.types import UserRole
@@ -31,8 +22,17 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
+from bai_scenario.components.container_registry import (
+    MISSING_ENTITY_ID,
+    ManyRegistriesAndACaller,
+    ManyRegistriesAndSomeone,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
-type Loaded = list[ContainerRegistryNode | None]
+type Loaded = list[ContainerRegistryNode | Exception | None]
 type ReadingScenario = Scenario[
     SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
 ]
@@ -85,7 +85,10 @@ class TheOrderIsKeptAndTheHoleIsEmpty(Then[ManyRegistriesAndACaller, Loaded]):
             Same("length", len(got), 3),
             Same(
                 "names",
-                [one.registry_name if one is not None else None for one in got],
+                [
+                    one.registry_name if isinstance(one, ContainerRegistryNode) else one
+                    for one in got
+                ],
                 [
                     laid.registries[0].registry_name,
                     None,

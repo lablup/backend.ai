@@ -69,6 +69,5 @@ async def adapter(
             RbacRelationService(RbacRelationRepository(relations)),
             RbacRosterService(RbacRosterRepository(roster)),
             RbacRoleService(PermissionControllerRepository(engine), RbacRosterRepository(roster)),
-            [],
         ),
     )

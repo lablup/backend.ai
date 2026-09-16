@@ -9,15 +9,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
-from bai_scenario.components.answers import MissingResponse
-from bai_scenario.components.domain import SomeoneOf
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.registry import AllowProject, SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
@@ -46,6 +37,15 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.answers import MissingResponse
+from bai_scenario.components.domain import SomeoneOf
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.image.registry import AllowProject, SeedContainerRegistry
+from bai_scenario.seeds.project.project import SeedProject
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 MISSING_ENTITY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """어떤 행에도 대응하지 않는 ID."""

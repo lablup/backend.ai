@@ -6,6 +6,18 @@ from dataclasses import dataclass, field
 from typing import override
 
 import pytest
+
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.container_registry.request import (
+    CreateContainerRegistryInput,
+)
+from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
     AllowedProjects,
@@ -20,18 +32,6 @@ from bai_scenario.components.container_registry import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.container_registry.request import (
-    CreateContainerRegistryInput,
-)
-from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
-from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 type CreationScenario = Scenario[
     SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode

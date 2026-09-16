@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
-
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
@@ -16,6 +14,7 @@ from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
 )
+from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
 
 
 @dataclass(frozen=True)

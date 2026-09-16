@@ -7,18 +7,6 @@ from typing import override
 from uuid import UUID
 
 import pytest
-from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.container_registry import (
-    ARegistryAndACaller,
-    ARegistryAndSomeone,
-    MissingRegistry,
-    RegistryTarget,
-    SeededRegistry,
-    allowed_project_count,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import (
@@ -41,6 +29,18 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
+from bai_scenario.components.container_registry import (
+    ARegistryAndACaller,
+    ARegistryAndSomeone,
+    MissingRegistry,
+    RegistryTarget,
+    SeededRegistry,
+    allowed_project_count,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type DeletionScenario = Scenario[
     SeedingSession,

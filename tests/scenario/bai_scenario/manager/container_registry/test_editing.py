@@ -6,19 +6,6 @@ from dataclasses import dataclass, field
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.container_registry import (
-    ARegistryAndACaller,
-    ARegistryAndSomeone,
-    MissingRegistry,
-    RegistryTarget,
-    SeededRegistry,
-    TheUpdatedRegistryNode,
-    allowed_project_count,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.user.types import UserRole
@@ -36,6 +23,19 @@ from ai.backend.manager.errors.container_registry import (
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.container_registry import (
+    ARegistryAndACaller,
+    ARegistryAndSomeone,
+    MissingRegistry,
+    RegistryTarget,
+    SeededRegistry,
+    TheUpdatedRegistryNode,
+    allowed_project_count,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type EditingScenario = Scenario[
     SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
