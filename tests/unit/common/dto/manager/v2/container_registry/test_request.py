@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.container_registry.request import (
-    AllowedGroupsInput,
+    AllowedProjectsInput,
     CreateContainerRegistryInput,
     DeleteContainerRegistryInput,
     UpdateContainerRegistryInput,
@@ -17,33 +17,33 @@ from ai.backend.common.dto.manager.v2.container_registry.types import ContainerR
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
-class TestAllowedGroupsInput:
-    """Tests for AllowedGroupsInput model."""
+class TestAllowedProjectsInput:
+    """Tests for AllowedProjectsInput model."""
 
     def test_defaults_are_empty_lists(self) -> None:
-        inp = AllowedGroupsInput()
+        inp = AllowedProjectsInput()
         assert inp.add == []
         assert inp.remove == []
 
     def test_with_add_groups(self) -> None:
-        inp = AllowedGroupsInput(add=["group-1", "group-2"])
+        inp = AllowedProjectsInput(add=["group-1", "group-2"])
         assert inp.add == ["group-1", "group-2"]
         assert inp.remove == []
 
     def test_with_remove_groups(self) -> None:
-        inp = AllowedGroupsInput(remove=["group-3"])
+        inp = AllowedProjectsInput(remove=["group-3"])
         assert inp.add == []
         assert inp.remove == ["group-3"]
 
     def test_with_both(self) -> None:
-        inp = AllowedGroupsInput(add=["g1"], remove=["g2"])
+        inp = AllowedProjectsInput(add=["g1"], remove=["g2"])
         assert inp.add == ["g1"]
         assert inp.remove == ["g2"]
 
     def test_round_trip_serialization(self) -> None:
-        inp = AllowedGroupsInput(add=["admin"], remove=["user"])
+        inp = AllowedProjectsInput(add=["admin"], remove=["user"])
         json_str = inp.model_dump_json()
-        restored = AllowedGroupsInput.model_validate_json(json_str)
+        restored = AllowedProjectsInput.model_validate_json(json_str)
         assert restored.add == ["admin"]
         assert restored.remove == ["user"]
 

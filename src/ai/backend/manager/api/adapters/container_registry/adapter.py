@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
-    AllowedGroupsInput,
+    AllowedProjectsInput,
     ContainerRegistryFilter,
     ContainerRegistryOrder,
     CreateContainerRegistryInput,
@@ -195,7 +195,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
     @staticmethod
-    def _links(asked: AllowedGroupsInput | None) -> AllowedProjectsChange | None:
+    def _links(asked: AllowedProjectsInput | None) -> AllowedProjectsChange | None:
         if asked is None:
             return None
         return AllowedProjectsChange(

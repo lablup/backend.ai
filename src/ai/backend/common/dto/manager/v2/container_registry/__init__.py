@@ -4,7 +4,7 @@ Container Registry DTOs v2 for Manager API.
 
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
-    AllowedGroupsInput,
+    AllowedProjectsInput,
     ContainerRegistryFilter,
     ContainerRegistryOrder,
     CreateContainerRegistryInput,
@@ -32,7 +32,7 @@ __all__ = (
     "ContainerRegistryTypeFilter",
     "OrderDirection",
     # Input models (request)
-    "AllowedGroupsInput",
+    "AllowedProjectsInput",
     "ContainerRegistryFilter",
     "ContainerRegistryOrder",
     "CreateContainerRegistryInput",
