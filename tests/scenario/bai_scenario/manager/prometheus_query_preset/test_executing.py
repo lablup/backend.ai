@@ -471,10 +471,7 @@ class EnforcementOffLetsAnyoneRun(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다. "
-            "실행은 역할이 아니라 권한 그래프로 보호되기 때문이다"
-        )
+        return "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

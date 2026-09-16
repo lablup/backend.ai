@@ -238,7 +238,7 @@ Then
 
 #### [turning-enforcement-off-still-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py) — pass
 
-권한 검사를 꺼도 프리셋 생성은 여전히 거부된다. 생성은 권한 그래프가 아니라 역할로 보호되기 때문이다
+권한 검사를 꺼도 프리셋 생성은 여전히 거부된다
 
 Given
 
@@ -571,7 +571,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다. 수정은 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다
 
 Given
 
@@ -960,7 +960,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-run-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다. 실행은 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다
 
 Given
 
@@ -1235,7 +1235,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다. 삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
 
 Given
 
