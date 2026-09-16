@@ -45,7 +45,7 @@ status: draft
 | prefix가 저장된 정책에 prefix 없이 다시 upsert한다 | `default` 대상에 `ipv4_prefix=24`, `ipv6_prefix=48`이 저장된 정책이 있다. 호출자는 슈퍼관리자 | `target_type`과 `mode`만 보낸다 | 저장돼 있던 `ipv4_prefix`·`ipv6_prefix`가 null로 지워진다 |
 | 일반 사용자가 upsert한다 | 호출자에게 전역 역할이 없다 | upsert | `InsufficientPrivilege`로 거부 |
 | 모니터 역할이 upsert한다 | 호출자가 `MONITOR` 역할 | upsert | `InsufficientPrivilege`로 거부 |
-| 권한 검사를 꺼도 일반 사용자는 upsert할 수 없다 | `rbac.enforcement_enabled=false`. 호출자에게 전역 역할이 없다 | upsert | `InsufficientPrivilege`로 거부 |
+| 권한 검사를 꺼도 일반 사용자는 upsert할 수 없다 | 권한 검사 비활성화. 호출자에게 전역 역할이 없다 | upsert | `InsufficientPrivilege`로 거부 |
 
 upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 바꾼다. 그래서 요청에서 뺀
 `ipv4_prefix`·`ipv6_prefix`는 저장돼 있던 값이 있어도 null이 된다. 부분 수정처럼 보여 오해하기 쉬운
@@ -82,7 +82,7 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 | 존재하지 않는 `id`를 삭제한다 | 정책 하나가 있다. 호출자는 슈퍼관리자 | 어느 정책과도 맞지 않는 `id`로 purge | `EntityNotFoundError`로 거부 |
 | 일반 사용자가 정책을 삭제한다 | 정책 하나가 있다. 호출자는 아무 권한도 없는 일반 사용자 | 그 정책의 `id`로 purge | `NotEnoughPermission`으로 거부 |
 | 일반 사용자가 존재하지 않는 `id`를 삭제한다 | 정책 하나가 있다. 호출자는 아무 권한도 없는 일반 사용자 | 어느 정책과도 맞지 않는 `id`로 purge | `EntityNotFoundError`가 아니라 `NotEnoughPermission`으로 거부 |
-| 권한 검사를 끄면 일반 사용자도 삭제할 수 있다 | `rbac.enforcement_enabled=false`. 정책 하나가 있고, 호출자는 아무 권한도 없는 일반 사용자 | 그 정책의 `id`로 purge | 삭제된 정책의 필드를 그대로 담은 응답 |
+| 권한 검사를 끄면 일반 사용자도 삭제할 수 있다 | 권한 검사 비활성화. 정책 하나가 있고, 호출자는 아무 권한도 없는 일반 사용자 | 그 정책의 `id`로 purge | 삭제된 정책의 필드를 그대로 담은 응답 |
 
 세 호출 중 `id`를 받는 것은 `admin_purge`뿐이다. upsert는 `target_type`으로 행을 찾고 purge는
 `id`로 찾으므로, 삭제할 `id`는 upsert 응답이나 검색 결과에서 읽어 와야 한다. 하나를 읽는 호출이 없어
