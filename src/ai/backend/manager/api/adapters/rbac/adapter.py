@@ -1144,6 +1144,12 @@ class RBACAdapter(BaseAdapter):
             conditions.extend(self._convert_user_nested_filter(f.assigned_user))
         if f.mapped_scope is not None:
             conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
+        if f.permission is not None:
+            conditions.extend(
+                self._convert_permission_nested_filter(
+                    RoleConditions.exists_permission_combined, f.permission
+                )
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1296,6 +1302,8 @@ class RBACAdapter(BaseAdapter):
                 raw_conditions.append(
                     RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
                 )
+        if f.mapped_scope is not None:
+            raw_conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
         conditions: list[QueryCondition] = []
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_role_combined(raw_conditions))
@@ -1317,7 +1325,9 @@ class RBACAdapter(BaseAdapter):
         return conditions
 
     def _convert_permission_nested_filter(
-        self, f: PermissionNestedFilterDTO
+        self,
+        exists_factory: Callable[[list[QueryCondition]], QueryCondition],
+        f: PermissionNestedFilterDTO,
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if f.entity_type is not None:
@@ -1343,20 +1353,20 @@ class RBACAdapter(BaseAdapter):
             )
         conditions: list[QueryCondition] = []
         if raw_conditions:
-            conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))
+            conditions.append(exists_factory(raw_conditions))
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_permission_nested_filter(sub))
+                conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_nested_filter(sub))
+                or_conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_nested_filter(sub))
+                not_conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
@@ -1374,7 +1384,11 @@ class RBACAdapter(BaseAdapter):
         if f.role is not None:
             conditions.extend(self._convert_role_nested_filter(f.role))
         if f.permission is not None:
-            conditions.extend(self._convert_permission_nested_filter(f.permission))
+            conditions.extend(
+                self._convert_permission_nested_filter(
+                    AssignedUserConditions.exists_permission_combined, f.permission
+                )
+            )
         if f.username is not None:
             condition = self.convert_string_filter(
                 f.username,

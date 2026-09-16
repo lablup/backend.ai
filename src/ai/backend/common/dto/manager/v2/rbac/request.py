@@ -282,6 +282,19 @@ class MappedScopeNestedFilter(BaseRequestModel):
 MappedScopeNestedFilter.model_rebuild()
 
 
+class PermissionNestedFilter(BaseRequestModel):
+    """Nested filter for permissions within a role assignment."""
+
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = None
+    AND: list[PermissionNestedFilter] | None = None
+    OR: list[PermissionNestedFilter] | None = None
+    NOT: list[PermissionNestedFilter] | None = None
+
+
+PermissionNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
@@ -290,6 +303,7 @@ class RoleFilter(BaseRequestModel):
     status: RoleStatusFilter | None = None
     assigned_user: UserNestedFilter | None = None
     mapped_scope: MappedScopeNestedFilter | None = None
+    permission: PermissionNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -304,25 +318,13 @@ class RoleNestedFilter(BaseRequestModel):
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    mapped_scope: MappedScopeNestedFilter | None = None
     AND: list[RoleNestedFilter] | None = None
     OR: list[RoleNestedFilter] | None = None
     NOT: list[RoleNestedFilter] | None = None
 
 
 RoleNestedFilter.model_rebuild()
-
-
-class PermissionNestedFilter(BaseRequestModel):
-    """Nested filter for permissions within a role assignment."""
-
-    entity_type: StringFilter | None = None
-    permission: PermissionBitFilter | None = None
-    AND: list[PermissionNestedFilter] | None = None
-    OR: list[PermissionNestedFilter] | None = None
-    NOT: list[PermissionNestedFilter] | None = None
-
-
-PermissionNestedFilter.model_rebuild()
 
 
 class RoleAssignmentFilter(BaseRequestModel):

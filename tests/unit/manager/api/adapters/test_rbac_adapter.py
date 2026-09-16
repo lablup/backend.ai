@@ -16,15 +16,22 @@ from ai.backend.common.data.entity.scope_admin import ScopeAdminEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
     MAX_SCOPE_PERMISSION_TARGETS,
+    MappedScopeNestedFilter,
     MyAtomicBulkScopePermissionsInput,
     MyScopePermissionsInput,
+    PermissionNestedFilter,
     PermissionTarget,
+    RoleAssignmentFilter,
+    RoleFilter,
+    RoleNestedFilter,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
     ScopedGetHeldPermissionsActionResult,
 )
@@ -165,3 +172,56 @@ class TestMyAtomicBulkScopePermissions:
 
         with pytest.raises(ValidationError):
             MyAtomicBulkScopePermissionsInput(targets=targets)
+
+
+def _compiled(conditions: list[QueryCondition]) -> str:
+    return " ".join(str(condition().compile()) for condition in conditions)
+
+
+class TestRoleListingFilters:
+    def test_a_role_filter_expresses_scope_and_permission_together(
+        self, adapter: RBACAdapter
+    ) -> None:
+        scope_id = uuid.uuid4()
+        conditions = adapter._convert_role_filter_gql(
+            RoleFilter(
+                mapped_scope=MappedScopeNestedFilter(
+                    scope_type=StringFilter(equals="project"),
+                    scope_id=UUIDFilter(equals=scope_id),
+                ),
+                permission=PermissionNestedFilter(
+                    entity_type=StringFilter(equals=_SCOPE_ADMIN),
+                    permission=PermissionBitFilter(equals=PermissionBitDTO.READ),
+                ),
+            )
+        )
+
+        compiled = _compiled(conditions)
+        assert "roles.scope_type" in compiled
+        assert "roles.scope_id" in compiled
+        assert "permissions.role_id = roles.id" in compiled
+        assert "permissions.entity_type" in compiled
+
+    def test_an_assignment_filter_expresses_scope_and_permission_together(
+        self, adapter: RBACAdapter
+    ) -> None:
+        scope_id = uuid.uuid4()
+        conditions = adapter._convert_assignment_filter(
+            RoleAssignmentFilter(
+                role=RoleNestedFilter(
+                    mapped_scope=MappedScopeNestedFilter(
+                        scope_type=StringFilter(equals="project"),
+                        scope_id=UUIDFilter(equals=scope_id),
+                    )
+                ),
+                permission=PermissionNestedFilter(
+                    permission=PermissionBitFilter(equals=PermissionBitDTO.READ)
+                ),
+            )
+        )
+
+        compiled = _compiled(conditions)
+        assert "roles.id = user_roles.role_id" in compiled
+        assert "roles.scope_type" in compiled
+        assert "roles.scope_id" in compiled
+        assert "permissions.role_id = user_roles.role_id" in compiled

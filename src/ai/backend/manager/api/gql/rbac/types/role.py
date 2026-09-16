@@ -647,6 +647,23 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     status: RoleStatusFilterGQL | None = None
     assigned_user: RoleUserNestedFilterGQL | None = None
     mapped_scope: RoleMappedScopeNestedFilterGQL | None = None
+    permission: (
+        Annotated[
+            PermissionNestedFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None
+    ) = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter roles by the permissions they carry. For listing roles only —"
+                " a role carrying a bit does not mean the caller holds it. Use"
+                " `myScopePermissions` to decide what the caller may do."
+            ),
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -664,6 +681,17 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
+    mapped_scope: RoleMappedScopeNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter assignments by the scope their role is registered in. For listing"
+                " assignments only — a role registered in a scope does not mean the caller"
+                " holds anything there. Use `myScopePermissions` to decide."
+            ),
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

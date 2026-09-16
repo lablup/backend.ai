@@ -17,6 +17,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import StringConditions, make_string_in_factory
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 
@@ -238,6 +239,22 @@ class RoleConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
+
+        return inner
+
+    @staticmethod
+    def exists_permission_combined(permission_conditions: list[QueryCondition]) -> QueryCondition:
+        """Match roles whose permission rows satisfy every one of ``permission_conditions``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .where(PermissionRow.role_id == RoleRow.id)
+                .correlate(RoleRow)
+            )
+            for cond in permission_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
 
         return inner
 
