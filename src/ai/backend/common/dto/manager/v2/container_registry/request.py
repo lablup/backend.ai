@@ -20,7 +20,7 @@ from .types import (
 )
 
 __all__ = (
-    "AllowedProjectsInput",
+    "AllowedGroupsInput",
     "ContainerRegistryFilter",
     "ContainerRegistryOrder",
     "CreateContainerRegistryInput",
@@ -30,8 +30,8 @@ __all__ = (
 )
 
 
-class AllowedProjectsInput(BaseRequestModel):
-    """Input for specifying allowed project membership changes."""
+class AllowedGroupsInput(BaseRequestModel):
+    """Input for specifying allowed group membership changes."""
 
     add: list[str] = Field(
         default_factory=list,
@@ -67,7 +67,7 @@ class CreateContainerRegistryInput(BaseRequestModel):
     extra: dict[str, Any] | None = Field(
         default=None, description="Extra metadata or configuration for the registry."
     )
-    allowed_groups: AllowedProjectsInput | None = Field(
+    allowed_groups: AllowedGroupsInput | None = Field(
         default=None, description="Group membership changes to apply on creation."
     )
 
@@ -115,7 +115,7 @@ class UpdateContainerRegistryInput(BaseRequestModel):
     extra: dict[str, Any] | None = Field(
         default=None, description="Updated extra metadata or configuration."
     )
-    allowed_groups: AllowedProjectsInput | None = Field(
+    allowed_groups: AllowedGroupsInput | None = Field(
         default=None, description="Group membership changes to apply on update."
     )
 
