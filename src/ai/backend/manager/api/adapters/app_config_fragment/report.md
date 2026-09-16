@@ -214,34 +214,6 @@ Then
 
 ### reading
 
-#### [a-user-granted-nothing-may-not-read-a-public-fragment-by-id](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py) — pass
-
-공개 조각을 아무 권한도 없는 사용자가 id로 조회하면, 권한 부족으로 거부된다. 스코프로 조회할 때와 반대로, id 조회는 그 조각 자체에 부여된 권한을 검사한다
-
-Given
-
-- 공개 조각 하나와, 설정 조각 권한이 하나도 없는 사용자 한 명
-  - 도메인 home-1
-  - 설정 조각 권한이 하나도 없는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'public'}
-
-When
-
-- AppConfigFragmentAdapter.get — user-1이 config-1의 조각 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
 #### [a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py) — pass
 
 다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다

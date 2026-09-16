@@ -27,12 +27,10 @@ from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
-    Refused,
     Same,
     SameAs,
     Skipped,
@@ -42,6 +40,7 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.app_config import (
     UNREGISTERED,
     ADesignOf,
+    NotRefused,
     SomeoneGrantedOn,
     SomeoneGrantedOnTheirOwn,
     domain_owner,
@@ -296,7 +295,7 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [NotRefused(answered.raised)]
         written = WrittenByThisRun(self.started)
         seen: list[Verdict] = [
             Same("items", len(payload.items), len(self.configs)),
@@ -427,7 +426,7 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
     ) -> list[Verdict]:
         items = answered.response
         if items is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [NotRefused(answered.raised)]
         seen: list[Verdict] = [Same("items", len(items), len(laid.names))]
         for i, (got, mine) in enumerate(zip(items, laid.mine, strict=False)):
             if mine is None:
@@ -458,7 +457,7 @@ class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNod
     ) -> list[Verdict]:
         items = answered.response
         if items is None or laid.fragment is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [NotRefused(answered.raised)]
         seen: list[Verdict] = [Same("items", len(items), 1)]
         if len(items) != 1:
             return seen
@@ -620,7 +619,7 @@ class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfi
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [NotRefused(answered.raised)]
         return [
             Same(
                 "items",
@@ -731,7 +730,7 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
     ) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [NotRefused(answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
             Held("id", node.id, SameAs(laid.fragment.id, "미리 만들어 둔 조각")),
