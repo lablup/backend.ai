@@ -29,8 +29,8 @@ from ai.backend.common.dto.manager.v2.container_registry.types import ContainerR
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import (
+    AllowedProjectsChange,
     ContainerRegistryData,
-    RegistryProjectChange,
 )
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -195,10 +195,10 @@ class ContainerRegistryAdapter(BaseAdapter):
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
     @staticmethod
-    def _links(asked: AllowedGroupsInput | None) -> RegistryProjectChange | None:
+    def _links(asked: AllowedGroupsInput | None) -> AllowedProjectsChange | None:
         if asked is None:
             return None
-        return RegistryProjectChange(
+        return AllowedProjectsChange(
             add=[ProjectID(uuid.UUID(raw)) for raw in asked.add],
             remove=[ProjectID(uuid.UUID(raw)) for raw in asked.remove],
         )

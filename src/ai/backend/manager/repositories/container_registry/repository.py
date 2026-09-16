@@ -12,9 +12,9 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
+    AllowedProjectsChange,
     ContainerRegistryData,
     ContainerRegistrySearchResult,
-    RegistryProjectChange,
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import (
@@ -82,7 +82,7 @@ class ContainerRegistryRepository:
     async def modify_registry(
         self,
         updater: ContainerRegistryUpdater,
-        links: RegistryProjectChange | None = None,
+        links: AllowedProjectsChange | None = None,
     ) -> ContainerRegistryData:
         """Update the registry and the projects allowed on it in one transaction, so a
         refusal of either leaves both as they were."""
@@ -107,7 +107,7 @@ class ContainerRegistryRepository:
     async def _apply_links(
         w: V2RelationWriteOps,
         target: ContainerRegistryID,
-        links: RegistryProjectChange,
+        links: AllowedProjectsChange,
     ) -> None:
         """A pair already linked is left as it stands; unlinking is refused only when
         none of the named pairs was linked."""

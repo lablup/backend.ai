@@ -3,8 +3,8 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import (
+    AllowedProjectsChange,
     ContainerRegistryData,
-    RegistryProjectChange,
 )
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
@@ -13,7 +13,7 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 @dataclass
 class UpdateContainerRegistryAction(ContainerRegistryAction):
     updater: ContainerRegistryUpdater
-    links: RegistryProjectChange | None = None
+    links: AllowedProjectsChange | None = None
 
     @override
     @classmethod

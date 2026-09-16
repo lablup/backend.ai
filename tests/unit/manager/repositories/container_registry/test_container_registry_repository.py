@@ -21,8 +21,8 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import (
+    AllowedProjectsChange,
     ContainerRegistryData,
-    RegistryProjectChange,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.errors.container_registry import InvalidContainerRegistryURL
@@ -1241,7 +1241,7 @@ class TestContainerRegistryRepository:
 
         result = await repository.modify_registry(
             ContainerRegistryUpdater(registry_id=registry_id, username=TriState.update("edited")),
-            RegistryProjectChange(add=[group_ids[2]], remove=[group_ids[0]]),
+            AllowedProjectsChange(add=[group_ids[2]], remove=[group_ids[0]]),
         )
 
         assert result.username == "edited"
@@ -1288,7 +1288,7 @@ class TestContainerRegistryRepository:
                 ContainerRegistryUpdater(
                     registry_id=registry_id, url=case.url, username=TriState.update("edited")
                 ),
-                RegistryProjectChange(
+                AllowedProjectsChange(
                     add=[group_ids[2]], remove=[group_ids[i] for i in case.unlink]
                 ),
             )

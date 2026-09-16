@@ -58,7 +58,7 @@ class PerProjectContainerRegistryInfo:
 
 
 @dataclass(frozen=True)
-class RegistryProjectChange:
+class AllowedProjectsChange:
     """Which projects an update starts allowing on a registry, and which it stops."""
 
     add: Sequence[ProjectID] = ()
