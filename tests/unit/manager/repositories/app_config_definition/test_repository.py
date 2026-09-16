@@ -9,6 +9,7 @@ import pytest
 
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.app_config_definition.conditions import (
@@ -94,6 +95,12 @@ async def seeded_definitions(
         )
         definitions.append(definition)
     return definitions
+
+
+_PAGINATION_SPEC = PaginationSpec(
+    forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
+    tiebreaker_order=AppConfigDefinitionRow.id.asc(),
+)
 
 
 def _missing_id() -> AppConfigDefinitionID:
@@ -245,7 +252,7 @@ class TestAdminSearch:
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
-                    cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
+                    cursor_condition=_PAGINATION_SPEC.cursor_condition(str(cursor)),
                 )
             )
         )

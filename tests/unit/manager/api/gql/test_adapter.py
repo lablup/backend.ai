@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from http import HTTPStatus
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,6 +17,7 @@ from ai.backend.manager.api.gql.adapter import (
 )
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -34,53 +34,19 @@ class TestBaseGQLAdapterBuildPagination:
         return BaseGQLAdapter()
 
     @pytest.fixture
-    def mock_cursor_factory(self) -> MagicMock:
-        """Create a mock cursor condition factory."""
-        factory = MagicMock()
-        factory.return_value = MagicMock()  # Return a mock QueryCondition
-        return factory
-
-    @pytest.fixture
-    def mock_forward_order(self) -> Any:
-        """Create a mock forward cursor order."""
-        return MagicMock()
-
-    @pytest.fixture
-    def mock_backward_order(self) -> Any:
-        """Create a mock backward cursor order."""
-        return MagicMock()
-
-    @pytest.fixture
-    def mock_tiebreaker_order(self) -> Any:
-        """Create a mock tiebreaker order."""
-        return MagicMock()
-
-    @pytest.fixture
-    def pagination_spec(
-        self,
-        mock_cursor_factory: MagicMock,
-        mock_forward_order: Any,
-        mock_backward_order: Any,
-        mock_tiebreaker_order: Any,
-    ) -> PaginationSpec:
-        """Create PaginationSpec with mocks."""
+    def pagination_spec(self) -> PaginationSpec:
         return PaginationSpec(
-            forward_order=mock_forward_order,
-            backward_order=mock_backward_order,
-            forward_condition_factory=mock_cursor_factory,
-            backward_condition_factory=mock_cursor_factory,
-            tiebreaker_order=mock_tiebreaker_order,
+            forward_order=AppConfigDefinitionRow.created_at.desc(),
+            tiebreaker_order=AppConfigDefinitionRow.id.asc(),
         )
 
     def test_build_pagination_forward_cursor(
         self,
         adapter: BaseGQLAdapter,
-        mock_cursor_factory: MagicMock,
-        mock_forward_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that first + after returns CursorForwardPagination."""
-        cursor = encode_cursor("test-cursor-value")
+        cursor = encode_cursor(uuid.uuid4())
         querier = adapter.build_querier(
             PaginationOptions(first=10, after=cursor),
             pagination_spec,
@@ -88,37 +54,25 @@ class TestBaseGQLAdapterBuildPagination:
 
         assert isinstance(querier.pagination, CursorForwardPagination)
         assert querier.pagination.first == 10
-        mock_cursor_factory.assert_called_once_with("test-cursor-value")
-        assert querier.pagination.cursor_order is mock_forward_order
+        assert querier.pagination.cursor_condition is not None
+        assert querier.pagination.cursor_order is pagination_spec.forward_order
 
     def test_build_pagination_backward_cursor(
         self,
         adapter: BaseGQLAdapter,
-        mock_cursor_factory: MagicMock,
-        mock_forward_order: Any,
-        mock_backward_order: Any,
+        pagination_spec: PaginationSpec,
     ) -> None:
-        """Test that last + before returns CursorBackwardPagination."""
-        cursor = encode_cursor("test-cursor-value")
-        # Need a fresh factory for backward since we check call count
-        backward_factory = MagicMock()
-        backward_factory.return_value = MagicMock()
-        spec = PaginationSpec(
-            forward_order=mock_forward_order,
-            backward_order=mock_backward_order,
-            forward_condition_factory=mock_cursor_factory,
-            backward_condition_factory=backward_factory,
-            tiebreaker_order=MagicMock(),
-        )
+        """Test that last + before returns CursorBackwardPagination on the reversed order."""
+        cursor = encode_cursor(uuid.uuid4())
         querier = adapter.build_querier(
             PaginationOptions(last=5, before=cursor),
-            spec,
+            pagination_spec,
         )
 
         assert isinstance(querier.pagination, CursorBackwardPagination)
         assert querier.pagination.last == 5
-        backward_factory.assert_called_once_with("test-cursor-value")
-        assert querier.pagination.cursor_order is mock_backward_order
+        assert querier.pagination.cursor_condition is not None
+        assert str(querier.pagination.cursor_order) == str(AppConfigDefinitionRow.created_at.asc())
 
     def test_build_pagination_offset(
         self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
@@ -261,7 +215,6 @@ class TestBaseGQLAdapterBuildPagination:
     def test_build_pagination_first_without_after(
         self,
         adapter: BaseGQLAdapter,
-        mock_forward_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that first without after returns CursorForwardPagination with no cursor condition."""
@@ -273,12 +226,11 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorForwardPagination)
         assert querier.pagination.first == 10
         assert querier.pagination.cursor_condition is None
-        assert querier.pagination.cursor_order is mock_forward_order
+        assert querier.pagination.cursor_order is pagination_spec.forward_order
 
     def test_build_pagination_last_without_before(
         self,
         adapter: BaseGQLAdapter,
-        mock_backward_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that last without before returns CursorBackwardPagination with no cursor condition."""
@@ -290,7 +242,7 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorBackwardPagination)
         assert querier.pagination.last == 10
         assert querier.pagination.cursor_condition is None
-        assert querier.pagination.cursor_order is mock_backward_order
+        assert str(querier.pagination.cursor_order) == str(AppConfigDefinitionRow.created_at.asc())
 
     def test_build_pagination_first_must_be_positive(
         self,
@@ -343,8 +295,6 @@ class TestBaseGQLAdapterBuildPagination:
     def test_offset_pagination_applies_default_order_when_order_by_is_none(
         self,
         adapter: BaseGQLAdapter,
-        mock_forward_order: Any,
-        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that offset pagination uses forward_order as default when order_by is not provided."""
@@ -355,14 +305,12 @@ class TestBaseGQLAdapterBuildPagination:
 
         assert isinstance(querier.pagination, OffsetPagination)
         assert len(querier.orders) == 2
-        assert querier.orders[0] is mock_forward_order
-        assert querier.orders[-1] is mock_tiebreaker_order
+        assert querier.orders[0] is pagination_spec.forward_order
+        assert querier.orders[-1] is pagination_spec.tiebreaker_order
 
     def test_default_pagination_applies_default_order_when_order_by_is_none(
         self,
         adapter: BaseGQLAdapter,
-        mock_forward_order: Any,
-        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that default pagination (no params) uses forward_order as default."""
@@ -373,14 +321,12 @@ class TestBaseGQLAdapterBuildPagination:
 
         assert isinstance(querier.pagination, OffsetPagination)
         assert len(querier.orders) == 2
-        assert querier.orders[0] is mock_forward_order
-        assert querier.orders[-1] is mock_tiebreaker_order
+        assert querier.orders[0] is pagination_spec.forward_order
+        assert querier.orders[-1] is pagination_spec.tiebreaker_order
 
     def test_offset_pagination_does_not_apply_default_order_when_order_by_is_provided(
         self,
         adapter: BaseGQLAdapter,
-        mock_forward_order: Any,
-        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that offset pagination does not add default order when order_by is provided."""
@@ -397,13 +343,12 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, OffsetPagination)
         assert len(querier.orders) == 2
         assert querier.orders[0] is mock_query_order
-        assert querier.orders[0] is not mock_forward_order
-        assert querier.orders[-1] is mock_tiebreaker_order
+        assert querier.orders[0] is not pagination_spec.forward_order
+        assert querier.orders[-1] is pagination_spec.tiebreaker_order
 
     def test_cursor_pagination_does_not_add_default_order_to_querier_orders(
         self,
         adapter: BaseGQLAdapter,
-        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that cursor pagination does not add forward_order to querier.orders."""
@@ -417,36 +362,34 @@ class TestBaseGQLAdapterBuildPagination:
         # (it uses cursor_order internally in pagination object)
         # But tiebreaker is always appended
         assert len(querier.orders) == 1
-        assert querier.orders[0] is mock_tiebreaker_order
+        assert querier.orders[0] is pagination_spec.tiebreaker_order
+
+    def test_backward_cursor_pagination_reverses_the_tiebreaker(
+        self,
+        adapter: BaseGQLAdapter,
+        pagination_spec: PaginationSpec,
+    ) -> None:
+        querier = adapter.build_querier(
+            PaginationOptions(last=10),
+            pagination_spec,
+        )
+
+        assert isinstance(querier.pagination, CursorBackwardPagination)
+        assert len(querier.orders) == 1
+        assert str(querier.orders[0]) == str(AppConfigDefinitionRow.id.desc())
 
     def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
         self,
         adapter: BaseGQLAdapter,
+        pagination_spec: PaginationSpec,
     ) -> None:
-        """A payload only the entity can judge, rejected by its factory, is the caller's error.
-
-        The builder itself never decides what a cursor may carry — an entity keyed on a name
-        or an access key accepts this very payload. It only names the failure of the factory
-        that does decide, which used to escape as a bare ValueError and a 500.
-        """
-
-        def parse_the_payload_as_a_uuid(cursor_id: str) -> Any:
-            uuid.UUID(cursor_id)  # raises ValueError for the payload this test sends
-            pytest.fail("the payload parsed, so this no longer exercises a rejected cursor")
-
-        uuid_keyed_spec = PaginationSpec(
-            forward_order=MagicMock(),
-            backward_order=MagicMock(),
-            forward_condition_factory=parse_the_payload_as_a_uuid,
-            backward_condition_factory=parse_the_payload_as_a_uuid,
-            tiebreaker_order=MagicMock(),
-        )
+        """A payload the tiebreaker column cannot hold is the caller's error, not a 500."""
         cursor = encode_cursor("not-a-uuid")
 
         with pytest.raises(InvalidCursor) as forward:
-            adapter.build_querier(PaginationOptions(first=10, after=cursor), uuid_keyed_spec)
+            adapter.build_querier(PaginationOptions(first=10, after=cursor), pagination_spec)
         with pytest.raises(InvalidCursor) as backward:
-            adapter.build_querier(PaginationOptions(last=10, before=cursor), uuid_keyed_spec)
+            adapter.build_querier(PaginationOptions(last=10, before=cursor), pagination_spec)
 
         # A BackendAIError carrying a 4xx: the handler reports its code instead of logging a fault.
         for raised in (forward.value, backward.value):
