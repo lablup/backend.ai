@@ -13963,6 +13963,28 @@ type Mutation
 }
 
 """
+Added in 26.9.0. Input for the caller's permissions on several scopes and entity types.
+"""
+input MyAtomicBulkScopePermissionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The scopes and entity types to answer for, at most 100. A longer list is refused.
+  """
+  targets: [PermissionTarget!]!
+}
+
+"""
+Added in 26.9.0. Payload for the caller's permissions on several scopes and entity types.
+"""
+type MyAtomicBulkScopePermissionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """One answer per target, in the order the targets were given."""
+  items: [ScopeEntityPermission!]!
+}
+
+"""
 Added in 26.4.2. Query result returning the current client's IP address.
 """
 type MyClientIp
@@ -13970,6 +13992,26 @@ type MyClientIp
 {
   """The client's IP address as seen by the server."""
   clientIp: String!
+}
+
+"""
+Added in 26.9.0. Input for the caller's permissions on one scope and entity type.
+"""
+input MyScopePermissionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The scope and entity type to answer for."""
+  target: PermissionTarget!
+}
+
+"""
+Added in 26.9.0. Payload for the caller's permissions on one scope and entity type.
+"""
+type MyScopePermissionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The answer for the named target."""
+  item: ScopeEntityPermission!
 }
 
 """
@@ -14536,6 +14578,22 @@ enum PermissionOrderField
   ID @join__enumValue(graph: STRAWBERRY)
   ENTITY_TYPE @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. One scope and entity type to answer the caller's permissions for.
+"""
+input PermissionTarget
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the scope, e.g. `project`."""
+  scopeType: String!
+
+  """ID of the scope."""
+  scopeId: UUID!
+
+  """Entity type the permissions are asked about."""
+  entityType: String!
 }
 
 type PredefinedAtomicPermission
@@ -16965,6 +17023,16 @@ type Query
   """
   rbacPermissionMatrix: [ScopeEntityOperationCombination!] @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.9.0. The permissions the caller holds on one entity type within one scope, read through every scope that governs it. A scope that does not exist and a scope the caller reaches nothing on answer alike, with no bits.
+  """
+  myScopePermissions(input: MyScopePermissionsInput!): MyScopePermissionsPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. The same answer as `myScopePermissions` for several targets at once, resolved in one grouped pass. Atomic: there is no per-target failure, so the payload carries no failure channel and the whole query fails or none of it does.
+  """
+  myAtomicBulkScopePermissions(input: MyAtomicBulkScopePermissionsInput!): MyAtomicBulkScopePermissionsPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
 
@@ -19122,6 +19190,11 @@ input RoleAssignmentRoleNestedFilter
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
+
+  """
+  Added in 26.9.0. Filter assignments by the scope their role is registered in. For listing assignments only — a role registered in a scope does not mean the caller holds anything there. Use `myScopePermissions` to decide.
+  """
+  mappedScope: RoleMappedScopeNestedFilter = null
   AND: [RoleAssignmentRoleNestedFilter!] = null
   OR: [RoleAssignmentRoleNestedFilter!] = null
   NOT: [RoleAssignmentRoleNestedFilter!] = null
@@ -19159,6 +19232,11 @@ input RoleFilter
   status: RoleStatusFilter = null
   assignedUser: RoleUserNestedFilter = null
   mappedScope: RoleMappedScopeNestedFilter = null
+
+  """
+  Added in 26.9.0. Filter roles by the permissions they carry. For listing roles only — a role carrying a bit does not mean the caller holds it. Use `myScopePermissions` to decide what the caller may do.
+  """
+  permission: PermissionNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -20525,6 +20603,27 @@ type ScopeEntityOperationCombination
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
+}
+
+"""
+Added in 26.9.0. The bits the caller holds on one entity type within one scope.
+"""
+type ScopeEntityPermission
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the scope, echoed from the target."""
+  scopeType: String!
+
+  """ID of the scope, echoed from the target."""
+  scopeId: UUID!
+
+  """Entity type, echoed from the target."""
+  entityType: String!
+
+  """
+  The bits the caller holds. Empty when it holds none, which is also the answer for a scope that does not exist and for an entity type this build does not declare: the two are not told apart, so the answer cannot reveal whether a scope exists.
+  """
+  permissions: [PermissionBit!]!
 }
 
 """

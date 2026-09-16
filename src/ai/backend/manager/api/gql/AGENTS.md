@@ -148,6 +148,28 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 - both admin and user, with different behavior: split `admin_` and non-admin (different input types).
 - differing only in permission checks: a single one — admins already have access.
 
+## Bulk field naming
+
+**Telling atomic from partial** — does a per-item failure path actually exist.
+A write where one item can fail while the rest commit is partial; anything else is
+atomic. A read is atomic by default.
+
+**The rule that follows**:
+- An atomic field carries no `failed` / `errors` channel. A field that carries one is partial.
+- This must agree with whether the action subclasses `BasePartialBulkAction` (`actions/v2/bulk/base.py`).
+
+**Naming**: `AtomicBulk` or `PartialBulk` goes after the access prefix, and the rest of
+the name is identical to the single form, with no pluralisation —
+`myScopePermissions` / `myAtomicBulkScopePermissions`.
+
+**Where the existing surface stands**: 22 payloads carry a `failed` or an `errors` field
+and the names say nothing about which behaviour they have. 17 are genuinely partial.
+4 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
+`BulkAssignRolePayload`, `ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
+The remaining one, `ScanProjectModelCardsV2Payload`, reports a scan summary in `errors`
+rather than a per-item channel. Renaming the 22 is breaking, so this states the policy
+and the migration is judged separately.
+
 ## Legacy
 
 - Do NOT copy `gql_legacy/` (Graphene) patterns — migrating to Strawberry.
