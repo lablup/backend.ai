@@ -14,21 +14,6 @@ from types import MappingProxyType
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.app_config import ENFORCEMENT
-from bai_scenario.components.app_config_fragment import (
-    WRITING,
-    ATargetAndACaller,
-    AWritingPlace,
-    MyWritingPlace,
-    SomewhereToTarget,
-    Target,
-    TheWrittenFragments,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
@@ -49,6 +34,21 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission, VirtualEntityNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config import ENFORCEMENT
+from bai_scenario.components.app_config_fragment import (
+    WRITING,
+    ATargetAndACaller,
+    AWritingPlace,
+    MyWritingPlace,
+    SomewhereToTarget,
+    Target,
+    TheWrittenFragments,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type Written = UpsertAppConfigFragmentsPayload
 type MineStep = Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]

@@ -12,16 +12,6 @@ from typing import override
 from uuid import UUID, uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.app_config_fragment import (
-    AFragmentAndACaller,
-    AFragmentAndSomeone,
-    TheFragmentNode,
-    Whose,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.user.types import UserRole
@@ -32,6 +22,16 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config_fragment import (
+    AFragmentAndACaller,
+    AFragmentAndSomeone,
+    TheFragmentNode,
+    Whose,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
     SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode

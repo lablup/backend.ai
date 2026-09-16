@@ -20,6 +20,7 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfigFragmentAdapter
+from ai.backend.manager.repositories.app_config.repository import AppConfigRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -32,7 +33,8 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> AppConfigFragmentAdapter:
-    repository: OpsRepository[Any] = OpsRepository(V2DBOpsProvider(engine))
+    ops_provider = V2DBOpsProvider(engine)
+    repository: OpsRepository[Any] = OpsRepository(ops_provider)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(monitors=monitors, validators=validators, repository=repository)
     )
@@ -42,6 +44,6 @@ async def adapter(
             registry.group(GroupMeta(AppConfigDefinitionEntityType())),
             registry.group(GroupMeta(AppConfigAllowListEntityType())),
             registry.group(GroupMeta(AppConfigFragmentEntityType())),
-            AppConfigService(repository),
+            AppConfigService(repository, AppConfigRepository(ops_provider)),
         )
     )
