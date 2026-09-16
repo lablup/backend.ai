@@ -6,13 +6,12 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from bai_scenario.seeds.seeder import Naming, SeedRow
-
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.resource_policy.creators import ProjectResourcePolicyCreator
+from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)

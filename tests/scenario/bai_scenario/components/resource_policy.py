@@ -14,14 +14,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 
-from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedNamedProjectPolicy, SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
-from bai_scenario.seeds.user.user import SeedUserOf
-
 from ai.backend.common.data.entity.resource_policy import (
     ProjectResourcePolicyEntityType,
 )
@@ -62,6 +54,13 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedNamedProjectPolicy, SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
+from bai_scenario.seeds.user.user import SeedUserOf
 
 type Searched = SearchProjectResourcePoliciesPayload
 

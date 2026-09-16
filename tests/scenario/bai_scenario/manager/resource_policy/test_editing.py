@@ -11,6 +11,13 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     FAMILIES,
@@ -23,12 +30,6 @@ from bai_scenario.components.resource_policy import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
-from ai.backend.manager.errors.common import GenericBadRequest
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 NOBODY = "nobody"
 
@@ -183,20 +184,20 @@ class AUserGrantedNothingMayNotEdit(
 
 
 @dataclass(frozen=True)
-class ANameNothingAnswersToIsUnresolvable(
+class ANameNothingAnswersToIsNotFound(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
     @override
     def summary(self) -> str:
-        return f"editing-a-{self.family.label}-name-nothing-answers-to-is-unresolvable"
+        return f"editing-a-{self.family.label}-name-nothing-answers-to-is-not-found"
 
     @override
     def describe(self) -> str:
         return (
             f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름을 수정하려 하면, "
-            "정책을 찾을 수 없다는 이유로 거부된다"
+            "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
         )
 
     @override
@@ -209,7 +210,7 @@ class ANameNothingAnswersToIsUnresolvable(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 SCENARIOS: list[EditingStep] = [
@@ -217,7 +218,7 @@ SCENARIOS: list[EditingStep] = [
     *(GivingNothingChangesNothing(family, started=datetime.now(UTC)) for family in FAMILIES),
     *(ANonNullableValueStaysWhenCleared(family, started=datetime.now(UTC)) for family in FAMILIES),
     *(AUserGrantedNothingMayNotEdit(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsUnresolvable(family) for family in FAMILIES),
+    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
 ]
 
 
