@@ -215,7 +215,7 @@ Then
 
 #### [turning-enforcement-off-still-does-not-let-a-user-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
 
-권한 검사를 꺼도 키페어 정책 생성은 여전히 거부된다. 생성은 권한 그래프가 아니라 역할로 보호되기 때문이다
+권한 검사를 꺼도 키페어 정책 생성은 여전히 거부된다
 
 Given
 
@@ -548,7 +548,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 키페어 정책을 이름으로 조회할 수 있다. 이 호출은 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 키페어 정책을 이름으로 조회할 수 있다
 
 Given
 
@@ -761,7 +761,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 자기 키페어 정책을 조회할 수 있다. 이 호출은 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 자기 키페어 정책을 조회할 수 있다
 
 Given
 

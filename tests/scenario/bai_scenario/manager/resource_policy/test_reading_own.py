@@ -227,8 +227,7 @@ class EnforcementOffOpensTheirOwn(
     @override
     def describe(self) -> str:
         return (
-            f"권한 검사를 끄면 아무 권한도 없는 사용자도 자기 {self.family.kind}을 "
-            "조회할 수 있다. 이 호출은 권한 그래프로 보호되기 때문이다"
+            f"권한 검사를 끄면 아무 권한도 없는 사용자도 자기 {self.family.kind}을 조회할 수 있다"
         )
 
     @override
