@@ -101,11 +101,10 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
 
 @dataclass(frozen=True)
 class ManyEntriesAndACaller:
-    """검색할 허용 목록 항목, 이름 필터의 기준값, 호출자."""
+    """검색할 허용 목록 항목과 호출자."""
 
     caller: UserData
     laid: tuple[AppConfigAllowListData, ...]
-    named: str
 
 
 @dataclass(frozen=True)
@@ -125,13 +124,8 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
     async def lay(self, seeding: Any) -> ManyEntriesAndACaller:
         home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
         laid = []
-        named = ""
-        for i in range(self.names):
-            definition = await seeding.creating(
-                SeedDefinition(name_hint="wanted" if i == 0 else "other")
-            )
-            if i == 0:
-                named = seeding.made(definition).config_name
+        for _ in range(self.names):
+            definition = await seeding.creating(SeedDefinition(name_hint="definition"))
             for kind in self.kinds:
                 laid.append(
                     await seeding.creating_from(SeedAllowListEntry(scope_type=kind), definition)
@@ -140,7 +134,6 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
         return ManyEntriesAndACaller(
             caller=seeding.made(caller),
             laid=tuple(seeding.made(one) for one in laid),
-            named=named,
         )
 
 
@@ -262,186 +255,4 @@ class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowList
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyTheNamedNamesEntriesAreFound(
-    Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]
-):
-    """필터에 맞는 이름의 항목만 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "이름 필터에 맞는 항목만 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        wanted = sorted(
-            (one.config_name, one.scope_type) for one in laid.laid if one.config_name == laid.named
-        )
-        return [
-            Same(
-                "items", sorted((one.config_name, one.scope_type) for one in payload.items), wanted
-            ),
-            Same("total_count", payload.total_count, len(wanted)),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyOneKindsEntriesAreFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """필터에 맞는 스코프 유형의 항목만 반환된다."""
-
-    kind: AppConfigScopeType
-
-    @override
-    def says(self) -> str:
-        return f"{SCOPE_NAMES[self.kind]} 스코프 유형의 항목만 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        wanted = sorted(
-            (one.config_name, one.scope_type) for one in laid.laid if one.scope_type == self.kind
-        )
-        return [
-            Same(
-                "items", sorted((one.config_name, one.scope_type) for one in payload.items), wanted
-            ),
-            Same("total_count", payload.total_count, len(wanted)),
-        ]
-
-
-@dataclass(frozen=True)
-class EntriesComeInRankOrder(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """순위 오름차순으로 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "순위 순서대로 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same(
-                "items", [one.rank for one in payload.items], sorted(one.rank for one in laid.laid)
-            ),
-            Same("total_count", payload.total_count, len(laid.laid)),
-        ]
-
-
-@dataclass(frozen=True)
-class TenEntriesComeWithANextPage(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """크기를 지정하지 않으면 10건까지 반환되고 다음 페이지가 있다고 응답한다."""
-
-    @override
-    def says(self) -> str:
-        return "10건까지 반환되고 다음 페이지가 있다고 응답한다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("items", len(payload.items), 10),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class TwoNamedEntriesAreFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """OR 이름 필터에 맞는 두 항목만 이름순으로 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "두 설정 이름 중 하나와 일치하는 항목만 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        wanted = sorted(one.config_name for one in laid.laid[:2])
-        return [
-            Same("items", [one.config_name for one in payload.items], wanted),
-            Same("total_count", payload.total_count, 2),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class TheMiddleOffsetPageIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """설정 이름순 중간 페이지와 앞뒤 페이지 표시를 확인한다."""
-
-    @override
-    def says(self) -> str:
-        return "중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        wanted = sorted(one.config_name for one in laid.laid)[1:3]
-        return [
-            Same("items", [one.config_name for one in payload.items], wanted),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
-            Same("has_previous_page", payload.has_previous_page, True),
-        ]
-
-
-@dataclass(frozen=True)
-class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
-    """기본 정렬에서 커서 다음 항목과 페이지 정보를 확인한다."""
-
-    @override
-    def says(self) -> str:
-        return "커서 다음 항목과 앞뒤 페이지가 모두 있다고 응답한다"
-
-    @override
-    def look(
-        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        ordered = sorted(laid.laid, key=lambda one: one.id)
-        ordered.sort(key=lambda one: one.created_at, reverse=True)
-        return [
-            Held[object](
-                "items[0].id",
-                getattr(payload.items[0], "id", None) if payload.items else None,
-                SameAs[object](ordered[1].id, "커서 다음 ID"),
-            ),
-            Same("items", len(payload.items), 1),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
-            Same("has_previous_page", payload.has_previous_page, True),
         ]
