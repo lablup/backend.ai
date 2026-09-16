@@ -17,7 +17,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
     EntityShareStatus,
@@ -32,6 +33,7 @@ from ai.backend.manager.models.user.row import UserRow
 __all__ = (
     "EntityShareAcceptUpdater",
     "EntityShareCancelUpdater",
+    "EntityShareCapUpdater",
     "EntityShareLeaveUpdater",
     "EntityShareRejectUpdater",
     "EntityShareRevokeUpdater",
@@ -231,6 +233,65 @@ class EntityShareRevokeUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
     @override
     def build_values(self) -> dict[str, Any]:
         return {"status": EntityShareStatus.REVOKED}
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: EntityShareRow) -> EntityShareData:
+        return row.to_data()
+
+
+@dataclass
+class EntityShareCapUpdater(GuardedDataUpdater[EntityShareRow, EntityShareData]):
+    """The sharer sets what an offer still waiting lends.
+
+    A taken share is restated through ``restate_share``, which carries its edge.
+    """
+
+    share_id: EntityShareID
+    sharer_user_id: UserID
+    permission_cap: Permission | None
+
+    @property
+    @override
+    def row_class(self) -> type[EntityShareRow]:
+        return EntityShareRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return EntityShareRow.id
+
+    @override
+    def target_id_value(self) -> EntityShareID:
+        return self.share_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        def pending() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.status == EntityShareStatus.PENDING
+
+        def offered_by_sharer() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.sharer_user_id == self.sharer_user_id
+
+        return (
+            GuardCheck(
+                condition=pending,
+                error=EntityShareNotFound(f"No open offer {self.share_id} to set"),
+            ),
+            GuardCheck(
+                condition=offered_by_sharer,
+                error=EntityShareNotFound(
+                    f"Offer {self.share_id} was not made by {self.sharer_user_id}"
+                ),
+            ),
+        )
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"permission_cap": self.permission_cap}
 
     @property
     @override

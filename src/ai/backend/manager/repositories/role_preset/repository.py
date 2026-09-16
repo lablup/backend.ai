@@ -6,7 +6,7 @@ commits ahead of the roles that stand for it.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -73,3 +73,9 @@ class RolePresetRepository:
             for preset_id in {entry.role_preset_id for entry in result.successes.values()}:
                 await w.sync_preset_roles(preset_id)
             return result
+
+    async def provision_roles(self, creator_preset_ids: Collection[RolePresetID]) -> None:
+        """Instantiate the active presets in every scope lacking their role and grant what
+        the scopes assign on their own, in one transaction."""
+        async with self._ops.write_ops() as w:
+            await w.provision_preset_roles(creator_preset_ids)
