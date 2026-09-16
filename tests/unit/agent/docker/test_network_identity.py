@@ -301,6 +301,83 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
         assert "_local_cron.start()" in source
         assert "AgentStartedEvent" in source
 
+    def _heartbeating_agent(self, reasons: list[str | None]) -> Any:
+        """The slice of the agent `heartbeat` touches, answering `not_serving_reason` from
+        ``reasons`` one tick at a time."""
+        stub = SimpleNamespace(
+            _announcing=True,
+            computers={},
+            slots={},
+            rpc_addr=SimpleNamespace(host="10.0.0.1", port=6011),
+            local_config=SimpleNamespace(
+                agent=SimpleNamespace(
+                    region=None,
+                    initial_resource_group_name="default",
+                    force_terminate_abusing_containers=False,
+                ),
+                debug=SimpleNamespace(log_heartbeats=False),
+            ),
+            agent_public_key=None,
+            _get_public_host=lambda: "10.0.0.1",
+            images={},
+            id="i-abc123",
+            anycast_event=AsyncMock(),
+            valkey_image_client=SimpleNamespace(add_agent_installed_images=AsyncMock()),
+        )
+        answers = iter(reasons)
+
+        async def not_serving_reason() -> str | None:
+            return next(answers)
+
+        stub.not_serving_reason = not_serving_reason
+        return stub
+
+    @staticmethod
+    def _events(stub: Any) -> list[str]:
+        return [type(call.args[0]).__name__ for call in stub.anycast_event.await_args_list]
+
+    async def test_a_node_that_cannot_take_work_stops_heartbeating(self) -> None:
+        """The heartbeat IS the claim that this node can take work -- the manager marks it ALIVE
+        on that alone -- so it is withheld while the claim is false, and the manager is told at
+        once rather than finding the node lost forty seconds later."""
+        stub = self._heartbeating_agent(["the helper is gone", "the helper is gone"])
+        await AbstractAgent.heartbeat(stub)
+        await AbstractAgent.heartbeat(stub)
+        assert self._events(stub) == ["AgentTerminatedEvent"], (
+            "expected one restart announcement and no heartbeat"
+        )
+        assert stub.anycast_event.await_args_list[0].args[0].reason == "agent-restart"
+
+    async def test_the_first_heartbeat_after_recovery_announces_the_node_again(self) -> None:
+        stub = self._heartbeating_agent(["the helper is gone", None])
+        await AbstractAgent.heartbeat(stub)
+        await AbstractAgent.heartbeat(stub)
+        assert self._events(stub) == ["AgentTerminatedEvent", "AgentHeartbeatEvent"]
+        assert stub._announcing is True
+
+    async def test_a_node_that_can_take_work_just_heartbeats(self) -> None:
+        stub = self._heartbeating_agent([None, None])
+        await AbstractAgent.heartbeat(stub)
+        await AbstractAgent.heartbeat(stub)
+        assert self._events(stub) == ["AgentHeartbeatEvent", "AgentHeartbeatEvent"]
+
+    async def test_the_docker_agent_answers_with_its_privnet(self, tmp_path: pathlib.Path) -> None:
+        """On a privnet-backed node every session's devices are made by that process, the
+        single-node bridge included, so a node that cannot reach it can serve nothing."""
+        stub = SimpleNamespace(
+            local_config=SimpleNamespace(
+                agent=SimpleNamespace(network_privnet_socket=str(tmp_path / "absent.sock"))
+            )
+        )
+        reason = await DockerAgent.not_serving_reason(cast(Any, stub))
+        assert reason is not None and "does not exist" in reason
+
+    async def test_a_node_without_a_privnet_has_nothing_to_answer_for(self) -> None:
+        stub = SimpleNamespace(
+            local_config=SimpleNamespace(agent=SimpleNamespace(network_privnet_socket=None))
+        )
+        assert await DockerAgent.not_serving_reason(cast(Any, stub)) is None
+
     async def test_announcing_before_the_transport_serves_is_refused(self) -> None:
         """Refuse announcements before the transport enters serving state."""
         server = object.__new__(agent_server.AgentRPCServer)
