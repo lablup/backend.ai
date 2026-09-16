@@ -8,7 +8,10 @@ from ai.backend.common.data.entity.keypair import KeyPairFieldType
 from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -56,6 +59,10 @@ from ai.backend.manager.services.export.actions.list_reports import (
     ListReportsAction,
     ListReportsActionResult,
 )
+from ai.backend.manager.services.export.actions.public_get_report import (
+    PublicGetReportAction,
+    PublicGetReportActionResult,
+)
 from ai.backend.manager.services.export.service import ExportService
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupBulkKeypairOwnerAction,
@@ -70,6 +77,7 @@ class ExportProcessors:
 
     list_reports: GlobalActionProcessor[ListReportsAction, ListReportsActionResult]
     get_report: GlobalActionProcessor[GetReportAction, GetReportActionResult]
+    public_get_report: PublicActionProcessor[PublicGetReportAction, PublicGetReportActionResult]
     export_users_csv: GlobalActionProcessor[ExportUsersCSVAction, ExportUsersCSVActionResult]
     export_sessions_csv: GlobalActionProcessor[
         ExportSessionsCSVAction, ExportSessionsCSVActionResult
@@ -113,6 +121,9 @@ class ExportProcessors:
         )
         self.list_reports = global_group.global_scope(ListReportsAction, service.list_reports)
         self.get_report = global_group.global_scope(GetReportAction, service.get_report)
+        self.public_get_report = global_group.public(
+            PublicGetReportAction, service.public_get_report
+        )
         self.export_users_csv = user_group.global_scope(
             ExportUsersCSVAction, service.export_users_csv
         )

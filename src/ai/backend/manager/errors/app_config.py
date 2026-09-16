@@ -1,28 +1,29 @@
 from __future__ import annotations
 
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericForbidden
 
 __all__ = (
-    "AppConfigAllowListNotFound",
     "AppConfigDefinitionNotFound",
-    "AppConfigFragmentNotFound",
     "AppConfigFragmentWriteNotAllowed",
 )
 
 
-class AppConfigDefinitionNotFound(ObjectNotFound):
+class AppConfigDefinitionNotFound(EntityNotFoundError):
     error_type = "https://api.backend.ai/probs/app-config-definition-not-found"
-    object_name = "app config definition"
+    error_title = "The app config definition does not exist."
 
-
-class AppConfigAllowListNotFound(ObjectNotFound):
-    error_type = "https://api.backend.ai/probs/app-config-allow-list-not-found"
-    object_name = "app config allow-list entry"
-
-
-class AppConfigFragmentNotFound(ObjectNotFound):
-    error_type = "https://api.backend.ai/probs/app-config-fragment-not-found"
-    object_name = "app config fragment"
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(
+            extra_msg, entity_type=AppConfigDefinitionEntityType(), operation=operation
+        )
 
 
 class AppConfigFragmentWriteNotAllowed(GenericForbidden):

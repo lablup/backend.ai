@@ -305,10 +305,64 @@ class SessionEntityData(EntityData):
     network_type: NetworkType | None
     network_id: str | None
     replica_id: ReplicaID | None
+    created_at: datetime = field(compare=False)
 
     @override
     def entity_id(self) -> SessionID:
         return self.id
+
+    def to_session_data(self, owner: UserData | None = None) -> SessionData:
+        """The same session as the shape the API layer reports.
+
+        ``service_ports`` is left empty: it is a kernel column, and nothing reads it
+        off a session.
+        """
+        return SessionData(
+            id=self.id,
+            session_type=self.session_type,
+            priority=self.priority,
+            job_priority=self.job_priority,
+            is_preemptible=self.is_preemptible,
+            cluster_mode=ClusterMode(self.cluster_mode),
+            cluster_size=self.cluster_size,
+            domain_name=self.domain_name,
+            group_id=self.group_id,
+            user_uuid=self.user_uuid,
+            use_host_network=self.use_host_network,
+            created_at=self.created_at,
+            status=self.status,
+            result=self.result,
+            num_queries=self.num_queries or 0,
+            creation_id=self.creation_id,
+            name=self.name,
+            access_key=self.access_key,
+            agent_ids=self.agent_ids,
+            images=self.images,
+            image_ids=self.image_ids,
+            tag=self.tag,
+            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts]
+            if self.vfolder_mounts
+            else None,
+            environ=self.environ,
+            bootstrap_script=self.bootstrap_script,
+            target_sgroup_names=self.target_sgroup_names,
+            timeout=self.timeout,
+            batch_timeout=self.batch_timeout,
+            terminated_at=self.terminated_at,
+            resource_group_name=self.resource_group_name,
+            starts_at=self.starts_at,
+            status_info=self.status_info,
+            status_data=self.status_data,
+            status_history=self.status_history,
+            callback_url=str(self.callback_url) if self.callback_url else None,
+            startup_command=self.startup_command,
+            last_stat=self.last_stat,
+            network_type=self.network_type,
+            network_id=self.network_id,
+            replica_id=self.replica_id,
+            owner=owner,
+            service_ports=None,
+        )
 
 
 @dataclass(frozen=True)
@@ -532,16 +586,6 @@ class SessionSchedulingHistoryListResult:
     """Search result with pagination for session scheduling history."""
 
     items: list[SessionSchedulingHistoryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
-class SessionListResult:
-    """Search result with total count and pagination info for sessions."""
-
-    items: list[SessionData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

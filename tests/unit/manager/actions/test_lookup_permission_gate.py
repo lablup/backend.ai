@@ -24,7 +24,6 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -41,6 +40,7 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.base.field import FieldNotFoundError
@@ -129,7 +129,7 @@ class _RecordingMonitor(LookupActionMonitor):
         self.done_results: list[LookupActionProcessResult] = []
 
     @override
-    async def prepare(self, action: BaseLookupAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseLookupAction, meta: ActionTriggerMeta) -> None:
         return
 
     @override
@@ -145,6 +145,19 @@ def authenticated_user() -> UserData:
         is_admin=False,
         is_superadmin=False,
         role=UserRole.USER,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
+
+
+@pytest.fixture
+def superadmin() -> UserData:
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=True,
+        is_superadmin=True,
+        role=UserRole.SUPERADMIN,
         domain_name="default",
         domain_id=DomainID(uuid.uuid4()),
     )
@@ -235,6 +248,16 @@ async def test_an_ungated_lookup_still_reports_the_miss(
     with with_user(authenticated_user):
         with pytest.raises(EntityNotFoundError):
             await _processor(_missing, monitor, []).run(action)
+
+    assert monitor.done_results[0].meta.status is OperationStatus.ERROR
+
+
+async def test_a_superadmin_gets_the_miss_unmerged(action: _Action, superadmin: UserData) -> None:
+    monitor = _RecordingMonitor()
+
+    with with_user(superadmin):
+        with pytest.raises(EntityNotFoundError):
+            await _processor(_missing, monitor, [_PassingValidator()]).run(action)
 
     assert monitor.done_results[0].meta.status is OperationStatus.ERROR
 

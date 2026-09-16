@@ -197,7 +197,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         )
         if row is None:
             return None
-        await self._teardown(purger.entity_id())
+        await self._teardown([purger.entity_id()])
         return purger.to_data(row)
 
     async def partial_bulk_purge_entities[TRow: Base, TData](
@@ -326,7 +326,11 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         """Create the roles the active presets matching the scopes' types call for —
         presets are the only source of a scope's roles. Each role carries its scope,
         which owns and governs it as it does every other entity created there."""
-        specs = await self._preset_role_specs(entity_values)
+        await self._write_preset_roles(await self._preset_role_specs(entity_values))
+
+    async def _write_preset_roles(self, specs: Sequence[_PresetRoleSpec]) -> None:
+        """Write each spec's role, its place in the graph under its scope, and its
+        permissions."""
         if not specs:
             return
         role_rows = [

@@ -9,9 +9,9 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionFieldType
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyFieldType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -189,7 +189,7 @@ class VFolderInvitationNotFound(EntityError, web.HTTPNotFound):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(
-            VFolderInvitationEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
+            EntityShareEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
@@ -206,14 +206,38 @@ class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class VFolderGrantAlreadyExists(FieldError, web.HTTPConflict):
+class VFolderGrantAlreadyExists(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-grant-already-exists"
     error_title = "Virtual folder grant already exists."
 
     @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderEntityType(), ActionOperationType.UPDATE, ErrorDetail.ALREADY_EXISTS
+        )
+
+
+class VFolderMountPolicyTooWide(FieldError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/vfolder-mount-policy-too-wide"
+    error_title = "The mount level exceeds what the requester mounts the folder at."
+
+    @override
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
-            VFolderPermissionFieldType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
+            VFolderMountPolicyFieldType(), ActionOperationType.UPDATE, ErrorDetail.FORBIDDEN
+        )
+
+
+class VFolderMountPolicyNotApplicable(FieldError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-mount-policy-not-applicable"
+    error_title = "The user takes no mount policy row on this folder."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            VFolderMountPolicyFieldType(),
+            ActionOperationType.UPDATE,
+            ErrorDetail.INVALID_PARAMETERS,
         )
 
 

@@ -13,11 +13,31 @@
        policy. The web server substitutes {{nonce}} per request (empty in dev). -->
   <meta property="csp-nonce" nonce="{{nonce}}">
   <base href="/">
+  <!-- FR-3532: cascade-layer order, declared before ANY stylesheet in the
+       document. Layer precedence is fixed by first appearance, so the app's
+       own copy (react/src/index.css) arrives too late whenever the bundle
+       evaluates a layered sheet before it — which is what made the brand
+       theme lose to Astryx's defaults on the dev server but win in the build.
+       Every bundle style lands after this element, in both.
+       KEEP IN SYNC with react/src/index.css,
+       packages/backend.ai-ui/src/styles/backend.ai-ui.css and
+       packages/backend.ai-ui/.storybook/astryx.css;
+       scripts/migration-gates/layer-order-gate.mjs fails on drift. -->
+  <style nonce="{{nonce}}">
+    @layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+  </style>
   <link rel="icon" href="manifest/favicon.ico">
   <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
   <link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png">
   <link rel="icon" type="image/png" sizes="16x16" href="manifest/backend-ai.iconset/icon_16x16@1x.png">
   <link rel="manifest" href="manifest.json">
+  <!-- The splash paints before anything else and renders in Ubuntu. Without
+       this the face is only discovered once layout reaches the splash text, so
+       it resolves AFTER first paint and the corner metadata visibly re-renders.
+       `crossorigin` is required even same-origin — font fetches are CORS-mode,
+       and omitting it makes the browser download the file a second time. -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="resources/fonts/ubuntu/ubuntu-v14-latin-regular.woff2">
   <link rel="stylesheet" href="resources/fonts/roboto/roboto.css">
   <link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css">
   <link rel="stylesheet" href="resources/webui.css">
@@ -29,16 +49,45 @@
   <title>Backend.AI</title>
   <!-- Critical inline CSS: paints the page/splash backdrop immediately so there
        is no color flash before the stylesheet applies. The full splash (Diagonal
-       Weave) styling lives in resources/webui.css. -->
+       Weave) styling lives in resources/webui.css.
+
+       The page backdrop is a LITERAL `light-dark()`, not the
+       `--color-background-body` token, and mode-reactive via `color-scheme`:
+         1. `html[data-theme]` -> `color-scheme` is duplicated from Astryx's
+            reset.css here so the mapping exists BEFORE any external stylesheet
+            loads. The boot script below writes the attribute from the stored
+            themeMode; once React mounts, Astryx's root `<Theme>` owns the very
+            same attribute (`useRootThemeSync`) and rewrites it on every mode
+            flip. One attribute, one owner at a time, always reactive.
+         2. `#F7F7F6`/`#191919` is the measured LEGACY antd page backdrop (see
+            ANTD_NEUTRAL_SURFACES in `react/src/astryx-theme/backendAiTheme.ts`),
+            pinned identically to `--color-background-body`'s own value — but
+            declared as a literal here rather than `var(--color-background-body)`.
+            `@astryxdesign/core/astryx.css` sets that token on bare `:root`
+            (Astryx's own cool-toned default, `#F1F4F7`/`#111112`), unscoped and
+            active the instant the bundle's CSS loads — BEFORE the brand theme's
+            `@scope`d override registers on `data-astryx-theme`. Reading the
+            token here would visibly flash to Astryx's default for that window;
+            the literal never resolves to it in the first place.
+       Do NOT reintroduce an inline `document.body.style.backgroundColor`
+       assignment here: an inline style outranks every rule above and froze the
+       backdrop at its boot-time value, so toggling the theme mid-session left
+       the page painting the previous mode until a reload. -->
+  <!-- `--bai-z-splash` mirrors the ladder in
+       `packages/backend.ai-ui/src/styles/zIndexLadder.ts`; this file is parsed
+       before any JS, so it cannot import it. verify.sh's z-index ladder gate
+       fails on drift. -->
   <style nonce="{{nonce}}">
-    body { margin: 0; background-color: rgba(247, 247, 246, 1); }
-    body.dark-theme { background-color: #191919; }
+    :root { --bai-z-splash: 900; }
+    html[data-theme="light"] { color-scheme: light; }
+    html[data-theme="dark"] { color-scheme: dark; }
+    body { margin: 0; background-color: light-dark(#F7F7F6, #191919); }
     #splash {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      z-index: 10000; display: flex; align-items: center; justify-content: center;
-      background-color: rgba(247, 247, 246, 1); transition: opacity 0.3s ease-out;
+      z-index: var(--bai-z-splash); display: flex; align-items: center; justify-content: center;
+      background-color: light-dark(#F7F7F6, #191919);
+      transition: opacity 0.3s ease-out;
     }
-    body.dark-theme #splash { background-color: #191919; }
     .splash-hidden { opacity: 0; pointer-events: none; }
   </style>
   <script nonce="{{nonce}}">
@@ -48,16 +97,16 @@
     }
     globalThis.enableSW = true;
 
-    globalThis.packageVersion = "26.8.0-rc.0";
-    globalThis.buildNumber = "1";
+    globalThis.packageVersion = "26.9.0-rc.4";
+    globalThis.buildNumber = "8973";
     globalThis.baiNonce = "{{nonce}}";
 
     // DO NOT CHANGE BELOW LINE
     
   </script>
   <!-- DO NOT CHANGE BELOW LINE -->
-  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-DB7yUW94.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CDgRDCYd.css">
+  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-DPebpL40.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CiPL7ix-.css">
 </head>
 
 <body>
@@ -65,7 +114,7 @@
     //To avoid flickering when first loading the page, we add a class to the body to indicate the theme.
     const storedThemeMode = localStorage.getItem('backendaiwebui.settings.themeMode');
     const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    // ahooks stores JSON-serialized values, so parse the stored themeMode
+    // The storage-state hook stores JSON-serialized values, so parse the stored themeMode
     let parsedThemeMode;
     try { parsedThemeMode = storedThemeMode ? JSON.parse(storedThemeMode) : null; } catch(e) { parsedThemeMode = null; }
     if (parsedThemeMode === 'dark') {
@@ -79,8 +128,13 @@
     if (globalThis.isDarkMode) {
       document.body.classList.add('dark-theme');
     }
-    // Set body background immediately to prevent white flash before CSS loads
-    document.body.style.backgroundColor = globalThis.isDarkMode ? '#191919' : 'rgba(247, 247, 246, 1)';
+    // Seed Astryx's own mode attribute before first paint (the pattern its docs
+    // prescribe for SSR: `<html data-theme="dark">`). The critical CSS above maps
+    // it to `color-scheme`, so every `light-dark()` token — including the page
+    // backdrop — resolves correctly on the very first frame. React's root
+    // `<Theme>` takes ownership of this attribute on mount and keeps it in sync
+    // with `useThemeMode` from then on.
+    document.documentElement.setAttribute('data-theme', globalThis.isDarkMode ? 'dark' : 'light');
     // Apply the selected theme family before paint so the data-theme-family
     // attribute keys resources/theme-families.css (glass/stained header effects)
     // on the first render. Mirrors the themeMode read above; useCustomThemeConfig owns
@@ -197,20 +251,31 @@
       //   metadata as the login screen background, hides only the loader.
       // - window.__dismissSplash(): called by MainLayout when the authenticated
       //   UI is ready (logged-in). Fades out and removes the whole splash so it
-      //   can't cover the app (it sits at z-index 10000).
+      //   can't cover the app (it sits at --bai-z-splash, above page content).
       //
-      // A MutationObserver + timers serve as fallbacks for routes that call
-      // neither (e.g. /verify-email, /change-password).
+      // A ResizeObserver + timers serve as fallbacks for routes that call
+      // neither (e.g. /verify-email, /change-password). Every fallback is
+      // gated on the app having actually rendered content — see appHasContent.
       (function () {
         var splash = document.getElementById('splash');
         if (!splash) return;
         var state = 'loading'; // 'loading' | 'backdrop' | 'removed'
+        var reactRoot = document.getElementById('react-root');
         var observer = null;
         var fallbackTimer = null;
 
         function clearFallbacks() {
           if (observer) { observer.disconnect(); observer = null; }
           if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        }
+
+        // "Is the app actually on screen?" — NOT "has React committed?".
+        // Astryx's root <Theme> wrapper is `display: contents`, so it adds no
+        // box: #react-root has height only once real content renders. The old
+        // childList observer fired on that wrapper, i.e. before anything was
+        // visible, which is what turned the curtain into a blank screen.
+        function appHasContent() {
+          return !!reactRoot && reactRoot.getBoundingClientRect().height > 0;
         }
 
         // Full removal (authenticated UI ready, or fallback).
@@ -242,20 +307,28 @@
         window.__dismissSplash = dismiss;
         window.__enterLoginBackdrop = enterLoginBackdrop;
 
-        // Fallback: MutationObserver for routes that don't explicitly signal.
-        var reactRoot = document.getElementById('react-root');
-        if (reactRoot) {
-          observer = new MutationObserver(function () {
-            if (reactRoot.childNodes.length > 0) {
-              observer.disconnect();
-              observer = null;
+        // Fallback for routes that signal neither (/verify-email,
+        // /change-password): dismiss once the app occupies space. A
+        // ResizeObserver IS the predicate, so no polling and no forced layout.
+        // The 3s delay is the margin that lets LoginView's
+        // __enterLoginBackdrop() win this race on the logged-out path.
+        if (reactRoot && typeof ResizeObserver === 'function') {
+          observer = new ResizeObserver(function () {
+            if (state === 'loading' && appHasContent()) {
+              clearFallbacks();
               fallbackTimer = setTimeout(dismiss, 3000);
             }
           });
-          observer.observe(reactRoot, { childList: true });
+          observer.observe(reactRoot);
         }
-        // Ultimate safety fallback — but never tear down an active login backdrop.
-        setTimeout(function () { if (state !== 'backdrop') dismiss(); }, 10000);
+        // Ultimate safety net — never tear the curtain down over NOTHING. If
+        // React has rendered no content by now the boot is broken or merely
+        // slow, and "Loading components…" is a better screen than the blank
+        // page this used to reveal; the observer above still dismisses if
+        // content lands later.
+        setTimeout(function () {
+          if (state !== 'backdrop' && appHasContent()) dismiss();
+        }, 10000);
       })();
     </script>
 </body>

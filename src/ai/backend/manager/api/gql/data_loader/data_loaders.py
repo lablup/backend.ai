@@ -72,6 +72,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.types import AgentId
 
 if TYPE_CHECKING:
@@ -267,13 +268,16 @@ class DataLoaders:
     ) -> DataLoader[IdleCheckerID, IdleCheckerGQL | None]:
         adapter = self._adapters.idle_checker
 
-        async def load_fn(ids: list[IdleCheckerID]) -> list[IdleCheckerGQL | None]:
+        async def load_fn(ids: list[IdleCheckerID]) -> list[IdleCheckerGQL | Exception | None]:
             from ai.backend.manager.api.gql.idle_checker.types import (  # pants: no-infer-dep
                 IdleCheckerGQL as IC,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [IC.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else IC.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -283,13 +287,16 @@ class DataLoaders:
     ) -> DataLoader[AuditLogID, AuditLogV2GQL | None]:
         adapter = self._adapters.audit_log
 
-        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | None]:
+        async def load_fn(ids: list[AuditLogID]) -> list[AuditLogV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.audit_log.types.node import (  # pants: no-infer-dep
                 AuditLogV2GQL as AL,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [AL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else AL.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -348,6 +355,17 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def vfolder_permission_loader(
+        self,
+    ) -> DataLoader[VFolderUUID, list[PermissionBitDTO]]:
+        adapter = self._adapters.vfolder
+
+        async def load_fn(ids: list[VFolderUUID]) -> list[list[PermissionBitDTO] | Exception]:
+            return await adapter.batch_load_permissions(ids)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def notification_channel_loader(
         self,
     ) -> DataLoader[NotificationChannelID, NotificationChannel | None]:
@@ -395,7 +413,9 @@ class DataLoaders:
     ) -> DataLoader[ArtifactRegistryID, ArtifactRegistry | None]:
         adapter = self._adapters.artifact_registry
 
-        async def load_fn(ids: list[ArtifactRegistryID]) -> list[ArtifactRegistry | None]:
+        async def load_fn(
+            ids: list[ArtifactRegistryID],
+        ) -> list[ArtifactRegistry | Exception | None]:
             from strawberry import ID  # pants: no-infer-dep
 
             from ai.backend.manager.api.gql.artifact_registry import (  # pants: no-infer-dep
@@ -404,14 +424,14 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [
-                AR(
+                dto
+                if dto is None or isinstance(dto, Exception)
+                else AR(
                     id=ID(str(dto.id)),
                     registry_id=ID(str(dto.registry_id)),
                     name=dto.name,
                     type=dto.type,
                 )
-                if dto is not None
-                else None
                 for dto in dtos
             ]
 
@@ -423,13 +443,18 @@ class DataLoaders:
     ) -> DataLoader[ContainerRegistryID, ContainerRegistryGQL | None]:
         adapter = self._adapters.container_registry
 
-        async def load_fn(ids: list[ContainerRegistryID]) -> list[ContainerRegistryGQL | None]:
+        async def load_fn(
+            ids: list[ContainerRegistryID],
+        ) -> list[ContainerRegistryGQL | Exception | None]:
             from ai.backend.manager.api.gql.container_registry.types import (  # pants: no-infer-dep
                 ContainerRegistryGQL as CR,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [CR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else CR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -439,13 +464,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, HuggingFaceRegistry | None]:
         adapter = self._adapters.huggingface_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[HuggingFaceRegistry | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[HuggingFaceRegistry | Exception | None]:
             from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
                 HuggingFaceRegistry as HF,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [HF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else HF.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -455,13 +483,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ReservoirRegistry | None]:
         adapter = self._adapters.reservoir_registry
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ReservoirRegistry | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[ReservoirRegistry | Exception | None]:
             from ai.backend.manager.api.gql.reservoir_registry import (  # pants: no-infer-dep
                 ReservoirRegistry as RR,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [RR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -511,13 +542,16 @@ class DataLoaders:
     ) -> DataLoader[VFSStorageID, VFSStorage | None]:
         adapter = self._adapters.vfs_storage
 
-        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | None]:
+        async def load_fn(ids: list[VFSStorageID]) -> list[VFSStorage | Exception | None]:
             from ai.backend.manager.api.gql.vfs_storage import (  # pants: no-infer-dep
                 VFSStorage as VS,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [VS.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else VS.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -567,13 +601,16 @@ class DataLoaders:
     ) -> DataLoader[DeploymentID, ModelDeployment | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | None]:
+        async def load_fn(ids: list[DeploymentID]) -> list[ModelDeployment | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.deployment import (  # pants: no-infer-dep
                 ModelDeployment as MD,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [MD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else MD.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -606,29 +643,16 @@ class DataLoaders:
 
         async def load_fn(
             ids: list[DeploymentPresetID],
-        ) -> list[DeploymentRevisionPresetGQL | None]:
-            from ai.backend.common.dto.manager.query import UUIDFilter
-            from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (  # pants: no-infer-dep
-                DeploymentRevisionPresetFilter,
-                SearchDeploymentRevisionPresetsInput,
-            )
-            from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (  # pants: no-infer-dep
-                DeploymentRevisionPresetNode,
-            )
+        ) -> list[DeploymentRevisionPresetGQL | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
                 DeploymentRevisionPresetGQL as DRP,
             )
 
-            payload = await adapter.search(
-                SearchDeploymentRevisionPresetsInput(
-                    filter=DeploymentRevisionPresetFilter(id=UUIDFilter(in_=list(ids))),
-                    limit=len(ids),
-                )
-            )
-            node_map: dict[DeploymentPresetID, DeploymentRevisionPresetNode] = {
-                DeploymentPresetID(item.id): item for item in payload.items
-            }
-            return [DRP.from_pydantic(node) if (node := node_map.get(pid)) else None for pid in ids]
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else DRP.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -668,13 +692,16 @@ class DataLoaders:
     ) -> DataLoader[ImageID, ImageV2GQL | None]:
         adapter = self._adapters.image
 
-        async def load_fn(image_ids: list[ImageID]) -> list[ImageV2GQL | None]:
+        async def load_fn(image_ids: list[ImageID]) -> list[ImageV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
                 ImageV2GQL as IG,
             )
 
             dtos = await adapter.batch_load_by_ids(image_ids)
-            return [IG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else IG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -684,13 +711,16 @@ class DataLoaders:
     ) -> DataLoader[KernelID, KernelV2GQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(kernel_ids: list[KernelID]) -> list[KernelV2GQL | None]:
+        async def load_fn(kernel_ids: list[KernelID]) -> list[KernelV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 KernelV2GQL as KG,
             )
 
             dtos = await adapter.batch_load_kernels_by_ids(kernel_ids)
-            return [KG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -700,13 +730,16 @@ class DataLoaders:
     ) -> DataLoader[SessionID, SessionV2GQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionID]) -> list[SessionV2GQL | None]:
+        async def load_fn(session_ids: list[SessionID]) -> list[SessionV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.session.types import (  # pants: no-infer-dep
                 SessionV2GQL as SG,
             )
 
             dtos = await adapter.batch_load_by_ids(session_ids)
-            return [SG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -749,13 +782,16 @@ class DataLoaders:
         """Load a single alias by its own ID (ImageAliasRow.id)."""
         adapter = self._adapters.image
 
-        async def load_fn(ids: list[ImageAliasID]) -> list[ImageV2AliasGQL | None]:
+        async def load_fn(ids: list[ImageAliasID]) -> list[ImageV2AliasGQL | Exception | None]:
             from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
                 ImageV2AliasGQL as IAG,
             )
 
             dtos = await adapter.batch_load_aliases_by_ids(ids)
-            return [IAG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else IAG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -765,13 +801,16 @@ class DataLoaders:
     ) -> DataLoader[UserID, UserV2GQL | None]:
         adapter = self._adapters.user
 
-        async def load_fn(ids: list[UserID]) -> list[UserV2GQL | None]:
+        async def load_fn(ids: list[UserID]) -> list[UserV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.user.types.node import (  # pants: no-infer-dep
                 UserV2GQL as U,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [U.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else U.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -819,13 +858,16 @@ class DataLoaders:
     ) -> DataLoader[ProjectID, ProjectV2GQL | None]:
         adapter = self._adapters.project
 
-        async def load_fn(ids: list[ProjectID]) -> list[ProjectV2GQL | None]:
+        async def load_fn(ids: list[ProjectID]) -> list[ProjectV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.project_v2.types.node import (  # pants: no-infer-dep
                 ProjectV2GQL as PG,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [PG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else PG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -873,13 +915,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, AutoScalingRule | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[AutoScalingRule | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[AutoScalingRule | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.auto_scaling import (  # pants: no-infer-dep
                 AutoScalingRule as ASR,
             )
 
             dtos = await adapter.batch_load_auto_scaling_rules_by_ids(ids)
-            return [ASR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ASR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -1061,60 +1106,6 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_role_assignments_by_ids(ids)
             return [RAG.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def role_assignment_by_role_and_user_loader(
-        self,
-    ) -> DataLoader[tuple[RoleID, UserID], RoleAssignmentGQL | None]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(
-            pairs: list[tuple[RoleID, UserID]],
-        ) -> list[RoleAssignmentGQL | None]:
-            from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
-                RoleAssignmentGQL as RAG,
-            )
-
-            dtos = await adapter.batch_load_role_assignments_by_role_and_user_ids(pairs)
-            return [RAG.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def role_assignments_by_user_loader(
-        self,
-    ) -> DataLoader[UserID, list[RoleAssignmentGQL]]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(user_ids: list[UserID]) -> list[list[RoleAssignmentGQL]]:
-            from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
-                RoleAssignmentGQL as RAG,
-            )
-
-            dtos = await adapter.batch_load_role_assignments_by_user_ids(user_ids)
-            return [
-                [RAG.from_pydantic(dto) for dto in user_assignments] for user_assignments in dtos
-            ]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def assignments_by_role_loader(
-        self,
-    ) -> DataLoader[RoleID, list[RoleAssignmentGQL]]:
-        adapter = self._adapters.rbac
-
-        async def load_fn(role_ids: list[RoleID]) -> list[list[RoleAssignmentGQL]]:
-            from ai.backend.manager.api.gql.rbac.types.role import (  # pants: no-infer-dep
-                RoleAssignmentGQL as RAG,
-            )
-
-            dtos = await adapter.batch_load_assignments_by_role_ids(role_ids)
-            return [
-                [RAG.from_pydantic(dto) for dto in role_assignments] for role_assignments in dtos
-            ]
 
         return DataLoader(load_fn=load_fn)
 

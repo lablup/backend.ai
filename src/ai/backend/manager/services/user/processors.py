@@ -4,6 +4,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
@@ -31,6 +32,7 @@ from ai.backend.manager.services.user.actions.bootstrap_script import (
     UpdateBootstrapScriptAction,
     UpdateBootstrapScriptActionResult,
 )
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
     CreateKeypairDotfileAction,
     CreateKeypairDotfileActionResult,
@@ -101,7 +103,6 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_role import SearchUsersByRoleAction
 from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
     UpdateKeypairDotfileAction,
     UpdateKeypairDotfileActionResult,
@@ -131,9 +132,9 @@ class UserProcessors:
     ]
     keypair_group: LookupFieldGroup[KeyPairData]
     error_log: ErrorLogProcessors
+    bulk_get: PartialBulkActionProcessor[BulkGetUsersAction, UserData]
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
     scoped_search: ScopeActionProcessor[ScopedSearchUsersAction, ScopedBatchOpsResult[UserData]]
-    search_users_by_role: GlobalActionProcessor[SearchUsersByRoleAction, BatchOpsResult[UserData]]
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
@@ -195,9 +196,9 @@ class UserProcessors:
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetUsersAction)
         self.global_search = group.global_search_ops(GlobalSearchUsersAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchUsersAction)
-        self.search_users_by_role = group.global_search_ops(SearchUsersByRoleAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
         self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)

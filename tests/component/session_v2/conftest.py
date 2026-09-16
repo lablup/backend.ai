@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEnti
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageEntityType, ImageID
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
@@ -49,7 +50,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -59,7 +60,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -74,17 +75,27 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -144,7 +155,7 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine)
+    return SessionRepository(database_engine, V2DBOpsProvider(database_engine))
 
 
 @pytest.fixture()
@@ -185,6 +196,12 @@ async def session_processors(
     return SessionProcessors(
         processor_registry.group(GroupMeta(SessionEntityType())),
         processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
+        ),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(UserEntityType())),
             processor_registry.group(GroupMeta(ProjectEntityType())),
@@ -659,6 +676,7 @@ async def compute_session_processors(
         valkey_clients.schedule,
         config_provider,
         storage_manager,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(
@@ -681,7 +699,7 @@ async def compute_session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=SessionRepository(database_engine),
+        session_repository=SessionRepository(database_engine, V2DBOpsProvider(database_engine)),
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),
@@ -696,6 +714,12 @@ async def compute_session_processors(
     return SessionProcessors(
         processor_registry.group(GroupMeta(SessionEntityType())),
         processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
+        ),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(UserEntityType())),
             processor_registry.group(GroupMeta(ProjectEntityType())),

@@ -3,20 +3,26 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.login_session import LoginSessionID
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.services.auth.actions.lookup_login_session_owner import (
     LookupLoginSessionOwnerAction,
 )
 
 
 @dataclass(frozen=True)
-class GlobalRevokeLoginSessionAction(AuthGlobalAction):
+class GlobalRevokeLoginSessionAction(BaseGlobalAction):
     """Revoke any login session, without reading who owns it."""
 
     session_id: UUID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
     @classmethod

@@ -49,6 +49,7 @@ from .resolver import (
     # Route
     route,
     routes,
+    scoped_deployments,
     sync_replicas,
     update_auto_scaling_rule,
     # Policy
@@ -301,6 +302,7 @@ __all__ = [
     "admin_refresh_deployment_revisions",
     "my_deployments",
     "project_deployments",
+    "scoped_deployments",
     "replace_deployment_options",
     "sync_replicas",
     "update_model_deployment",

@@ -16,11 +16,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
-from ai.backend.manager.models.vfolder import (
-    VFolderPermission,
-    VFolderPermissionSetAlias,
-    VFolderStatusSet,
-)
+from ai.backend.manager.models.vfolder import VFolderStatusSet
 from ai.backend.manager.services.vfolder.actions.base import LookupAccessibleVFolderAction
 from ai.backend.manager.services.vfolder.actions.get_row import GetVFolderLegacyRowAction
 
@@ -32,23 +28,21 @@ if TYPE_CHECKING:
 
 
 def _vfolder_resolver(
-    perm: VFolderPermissionSetAlias | VFolderPermission,
     status: VFolderStatusSet,
     *,
     vfolder_processors: VFolderProcessors,
-    allow_privileged_access: bool = False,
 ) -> RouteMiddleware:
     """Route middleware that resolves vfolder rows and checks status.
 
     Branches on the path parameter type:
 
-    - When the path parameter is a UUID, fetch the row directly without
-      legacy permission filtering and without status validation. Permission
-      evaluation is delegated to the downstream RBAC validator on the action
-      invoked by the handler.
-    - When the path parameter is a name (str), use the legacy
-      ``get_accessible_vfolder`` flow, which scopes the lookup by the
-      requester's permissions to disambiguate folders sharing a name.
+    - When the path parameter is a UUID, fetch the row directly without status
+      validation.
+    - When the path parameter is a name (str), resolve it within the requester's
+      personal project and check the status.
+
+    Permission evaluation is delegated to the RBAC validators on the actions run here
+    and by the handler.
 
     Sets ``request["vfolder_row"]`` so that ``VFolderAuthContext`` can
     extract the row in handler methods.
@@ -64,13 +58,8 @@ def _vfolder_resolver(
                 result = await vfolder_processors.get_accessible_vfolder.run(
                     LookupAccessibleVFolderAction(
                         user_uuid=request["user"]["uuid"],
-                        user_role=request["user"]["role"],
-                        domain_name=request["user"]["domain_name"],
-                        is_admin=request["is_admin"],
-                        perm=perm,
                         folder_id_or_name=piece,
                         required_status=status,
-                        allow_privileged_access=allow_privileged_access,
                     )
                 )
                 request["vfolder_row"] = result.row
@@ -124,25 +113,19 @@ def register_vfolder_routes(
     def _admin_rw() -> list[RouteMiddleware]:
         return [admin_required, route_deps.all_status_mw]
 
+    def _readable() -> RouteMiddleware:
+        return _vfolder_resolver(VFolderStatusSet.READABLE, vfolder_processors=vfolder_processors)
+
+    def _updatable() -> RouteMiddleware:
+        return _vfolder_resolver(VFolderStatusSet.UPDATABLE, vfolder_processors=vfolder_processors)
+
     # --- Root resource: POST / (create), GET / (list), DELETE / (delete_by_id) ---
     reg.add("POST", "", handler.create, middlewares=_auth_rw())
     reg.add("GET", "", handler.list_folders, middlewares=_auth_ro())
     reg.add("DELETE", "", handler.delete_by_id, middlewares=_auth_rw())
 
     # --- Named resource: GET /{name} (get_info), DELETE /{name} (delete_by_name) ---
-    reg.add(
-        "GET",
-        "/{name}",
-        handler.get_info,
-        middlewares=[
-            *_auth_ro(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.READABLE,
-                VFolderStatusSet.READABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
+    reg.add("GET", "/{name}", handler.get_info, middlewares=[*_auth_ro(), _readable()])
     reg.add("DELETE", "/{name}", handler.delete_by_name, middlewares=_auth_rw())
 
     # --- Utility endpoints ---
@@ -160,271 +143,76 @@ def register_vfolder_routes(
 
     # --- VFolder operations (name-based) ---
     reg.add(
-        "POST",
-        "/{name}/rename",
-        handler.rename_vfolder,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermission.OWNER_PERM,
-                VFolderStatusSet.READABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        "POST", "/{name}/rename", handler.rename_vfolder, middlewares=[*_auth_rw(), _readable()]
     )
     reg.add(
         "POST",
         "/{name}/update-options",
         handler.update_vfolder_options,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermission.OWNER_PERM,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_rw(), _updatable()],
     )
 
     # --- File operations ---
-    reg.add(
-        "POST",
-        "/{name}/mkdir",
-        handler.mkdir,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
+    reg.add("POST", "/{name}/mkdir", handler.mkdir, middlewares=[*_auth_rw(), _updatable()])
     reg.add(
         "POST",
         "/{name}/request-upload",
         handler.create_upload_session,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_rw(), _updatable()],
     )
     reg.add(
         "POST",
         "/{name}/request-download",
         handler.create_download_session,
-        middlewares=[
-            *_auth_ro(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.READABLE,
-                VFolderStatusSet.READABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_ro(), _readable()],
     )
     reg.add(
         "POST",
         "/{name}/request-download-archive",
         handler.create_archive_download_session,
-        middlewares=[
-            *_auth_ro(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.READABLE,
-                VFolderStatusSet.READABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_ro(), _readable()],
     )
+    reg.add("POST", "/{name}/move-file", handler.move_file, middlewares=[*_auth_rw(), _updatable()])
     reg.add(
-        "POST",
-        "/{name}/move-file",
-        handler.move_file,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
-    reg.add(
-        "POST",
-        "/{name}/rename-file",
-        handler.rename_file,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        "POST", "/{name}/rename-file", handler.rename_file, middlewares=[*_auth_rw(), _updatable()]
     )
     reg.add(
         "POST",
         "/{name}/delete-files",
         handler.delete_files,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_rw(), _updatable()],
     )
     reg.add(
         "DELETE",
         "/{name}/delete-files",
         handler.delete_files,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_rw(), _updatable()],
     )
     reg.add(
         "POST",
         "/{name}/delete-files-async",
         handler.delete_files_async,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_rw(), _updatable()],
     )
     # Legacy underbar variants
     reg.add(
-        "POST",
-        "/{name}/rename_file",
-        handler.rename_file,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        "POST", "/{name}/rename_file", handler.rename_file, middlewares=[*_auth_rw(), _updatable()]
     )
     reg.add(
         "DELETE",
         "/{name}/delete_files",
         handler.delete_files,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.WRITABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
+        middlewares=[*_auth_rw(), _updatable()],
     )
-    reg.add(
-        "GET",
-        "/{name}/files",
-        handler.list_files,
-        middlewares=[
-            *_auth_ro(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.READABLE,
-                VFolderStatusSet.READABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
+    reg.add("GET", "/{name}/files", handler.list_files, middlewares=[*_auth_ro(), _readable()])
 
     # --- Invitation endpoints ---
-    reg.add(
-        "POST",
-        "/{name}/invite",
-        handler.invite,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermission.OWNER_PERM,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
-    reg.add(
-        "POST",
-        "/{name}/leave",
-        handler.leave,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.READABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-                allow_privileged_access=False,
-            ),
-        ],
-    )
-    reg.add(
-        "POST",
-        "/{name}/share",
-        handler.share,
-        middlewares=[
-            *_admin_rw(),
-            _vfolder_resolver(
-                VFolderPermission.READ_ONLY,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
-    reg.add(
-        "POST",
-        "/{name}/unshare",
-        handler.unshare,
-        middlewares=[
-            *_admin_rw(),
-            _vfolder_resolver(
-                VFolderPermission.READ_ONLY,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
-    reg.add(
-        "DELETE",
-        "/{name}/unshare",
-        handler.unshare,
-        middlewares=[
-            *_admin_rw(),
-            _vfolder_resolver(
-                VFolderPermission.READ_ONLY,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
-    reg.add(
-        "POST",
-        "/{name}/clone",
-        handler.clone,
-        middlewares=[
-            *_auth_rw(),
-            _vfolder_resolver(
-                VFolderPermissionSetAlias.READABLE,
-                VFolderStatusSet.UPDATABLE,
-                vfolder_processors=vfolder_processors,
-            ),
-        ],
-    )
+    reg.add("POST", "/{name}/invite", handler.invite, middlewares=[*_auth_rw(), _updatable()])
+    reg.add("POST", "/{name}/leave", handler.leave, middlewares=[*_auth_rw(), _updatable()])
+    reg.add("POST", "/{name}/share", handler.share, middlewares=[*_admin_rw(), _updatable()])
+    reg.add("POST", "/{name}/unshare", handler.unshare, middlewares=[*_admin_rw(), _updatable()])
+    reg.add("DELETE", "/{name}/unshare", handler.unshare, middlewares=[*_admin_rw(), _updatable()])
+    reg.add("POST", "/{name}/clone", handler.clone, middlewares=[*_auth_rw(), _updatable()])
 
     # --- Trash / purge / restore ---
     reg.add("POST", "/purge", handler.purge, middlewares=_auth_rw())

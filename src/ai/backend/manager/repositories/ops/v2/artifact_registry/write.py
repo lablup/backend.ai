@@ -69,10 +69,14 @@ class ArtifactRegistryWriteOps(V2WriteOps):
     async def purge_registry[TRow: Base, TData](
         self, purger: GuardedEntityPurger[TRow, TData]
     ) -> TData | None:
-        """Delete a registry, the row naming it, and the graph node it was."""
+        """Delete a registry, the graph node it was, and the row naming it; ``None`` and
+        nothing deleted if the registry is already gone."""
+        data = await self.purge_entity(purger)
+        if data is None:
+            return None
         await self._sess.execute(
             sa.delete(ArtifactRegistryRow).where(
                 ArtifactRegistryRow.registry_id == purger.entity_id()
             )
         )
-        return await self.purge_entity(purger)
+        return data

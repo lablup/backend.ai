@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/ChangePasswordView-BpNWkBgN.js","assets/index-DPebpL40.js","assets/index-CiPL7ix-.css"])))=>i.map(i=>d[i]);
+import{j as e,eB as o,l as r,i as n,bY as i,e4 as l}from"./index-DPebpL40.js";import{u as c}from"./useApiEndpoint-CYqsKyP2.js";const p=i.lazy(()=>l(()=>import("./ChangePasswordView-BpNWkBgN.js"),__vite__mapDeps([0,1,2]))),x=()=>e.jsxs(e.Fragment,{children:[e.jsx(o,{}),e.jsx(r.Suspense,{fallback:null,children:e.jsx(u,{})})]}),u=()=>{"use memo";const s=n.c(2),a=c();let t;return s[0]!==a?(t=e.jsx(p,{apiEndpoint:a,active:!0}),s[0]=a,s[1]=t):t=s[1],t};export{x as default};
+//# sourceMappingURL=ChangePasswordPage-CFkQ_FrU.js.map

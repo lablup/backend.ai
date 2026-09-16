@@ -15,6 +15,7 @@ from typing import Final
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
@@ -47,13 +48,14 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     AuthTokenType,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
-from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleAction
+from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
 from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
@@ -106,8 +108,11 @@ class AuthHandler:
 
     async def get_role(self, query: QueryParam[GetRoleRequest], ctx: UserContext) -> APIResponse:
         params = query.parsed
-        action = PublicGetRoleAction(group_id=params.group)
-        result = await self._auth.public_get_role.run(action)
+        user = current_user()
+        if user is None:
+            raise UnreachableError("authenticated user missing from request context")
+        action = GetRoleAction(user_id=UserID(user.user_id), group_id=params.group)
+        result = await self._auth.get_role.run(action)
         resp = GetRoleResponse(
             global_role=result.global_role,
             domain_role=result.domain_role,

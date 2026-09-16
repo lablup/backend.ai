@@ -96,17 +96,6 @@ class ResourcePresetRow(Base):
         except sa.exc.IntegrityError:
             return None
 
-    @classmethod
-    async def delete(
-        cls,
-        query_option: QueryOption,
-        *,
-        db_session: AsyncSession,
-    ) -> None:
-        base_delete_stmt = sa.delete(ResourcePresetRow)
-        filtered_stmt = query_option(base_delete_stmt)
-        await db_session.execute(filtered_stmt)
-
     def to_dataclass(self) -> ResourcePresetData:
         return ResourcePresetData(
             id=ResourcePresetID(self.id),

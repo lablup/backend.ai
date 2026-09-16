@@ -158,19 +158,12 @@ class AppConfigFragmentConditions:
     def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
         """The ``domain`` scope for ``domain_id``."""
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                sa.and_(
-                    AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                    AppConfigFragmentRow.scope_id == domain_id,
-                ),
-                scope_membership_exists(
-                    DomainEntityType(),
-                    domain_id,
-                    AppConfigFragmentEntityType(),
-                    AppConfigFragmentRow.id,
-                ),
+            return scope_membership_exists(
+                DomainEntityType(),
+                domain_id,
+                AppConfigFragmentEntityType(),
+                AppConfigFragmentRow.id,
             )
 
         return inner
@@ -179,19 +172,12 @@ class AppConfigFragmentConditions:
     def by_user_visibility(user_id: UserID) -> QueryCondition:
         """The ``user`` scope for ``user_id``."""
 
-        # TODO(BA-7571): drop the column term once the ownership backfill lands.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                sa.and_(
-                    AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                    AppConfigFragmentRow.scope_id == user_id,
-                ),
-                scope_membership_exists(
-                    UserEntityType(),
-                    user_id,
-                    AppConfigFragmentEntityType(),
-                    AppConfigFragmentRow.id,
-                ),
+            return scope_membership_exists(
+                UserEntityType(),
+                user_id,
+                AppConfigFragmentEntityType(),
+                AppConfigFragmentRow.id,
             )
 
         return inner

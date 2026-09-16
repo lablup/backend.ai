@@ -113,13 +113,19 @@ class ResourceGroupHandler:
     ) -> APIResponse:
         path_params = path.parsed
         query_params = query.parsed
-        resource_group_name = path_params.scaling_group
-        group_id_or_name = query_params.group
+        domain_lookup = await self._domain.lookup.run(
+            LookupDomainAction(name=DomainName(ctx.user_domain))
+        )
+        project_ids = (
+            [await self._resolve_project_id(ctx.user_domain, query_params.group)]
+            if query_params.group
+            else []
+        )
         action = GetWsproxyVersionAction(
-            resource_group_name=resource_group_name,
-            domain_name=ctx.user_domain,
-            group=group_id_or_name or "",
-            access_key=ctx.access_key,
+            resource_group_name=path_params.scaling_group,
+            domain_id=domain_lookup.resolved_entity_id,
+            project_ids=project_ids,
+            user_id=UserID(ctx.user_uuid),
         )
         result = await self._resource_group.get_wsproxy_version.run(action)
         resp = WsproxyVersionResponse(wsproxy_version=result.wsproxy_version)

@@ -7,7 +7,6 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     CreateQueryDefinitionOptionsInput,
@@ -27,6 +26,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     QueryDefinitionOrderField,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import Unset
 
 _SAMPLE_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
@@ -170,8 +170,13 @@ class TestCreateQueryDefinitionInput:
 class TestModifyQueryDefinitionOptionsInput:
     """Tests for ModifyQueryDefinitionOptionsInput model."""
 
-    def test_default_values(self) -> None:
+    def test_default_values_are_unset(self) -> None:
         opts = ModifyQueryDefinitionOptionsInput()
+        assert isinstance(opts.filter_labels, Unset)
+        assert isinstance(opts.group_labels, Unset)
+
+    def test_explicit_none_stays_none(self) -> None:
+        opts = ModifyQueryDefinitionOptionsInput(filter_labels=None, group_labels=None)
         assert opts.filter_labels is None
         assert opts.group_labels is None
 
@@ -187,17 +192,38 @@ class TestModifyQueryDefinitionOptionsInput:
 class TestModifyQueryDefinitionInput:
     """Tests for ModifyQueryDefinitionInput model."""
 
-    def test_default_time_window_is_sentinel(self) -> None:
+    def test_default_time_window_is_unset(self) -> None:
         inp = ModifyQueryDefinitionInput()
-        assert isinstance(inp.time_window, Sentinel)
+        assert isinstance(inp.time_window, Unset)
 
-    def test_all_fields_default_to_none_or_sentinel(self) -> None:
+    def test_all_fields_default_to_unset(self) -> None:
         inp = ModifyQueryDefinitionInput()
+        assert isinstance(inp.name, Unset)
+        assert isinstance(inp.description, Unset)
+        assert isinstance(inp.rank, Unset)
+        assert isinstance(inp.category_id, Unset)
+        assert isinstance(inp.metric_name, Unset)
+        assert isinstance(inp.query_template, Unset)
+        assert isinstance(inp.options, Unset)
+        assert isinstance(inp.time_window, Unset)
+
+    def test_explicit_none_stays_none(self) -> None:
+        inp = ModifyQueryDefinitionInput(
+            name=None,
+            description=None,
+            rank=None,
+            category_id=None,
+            metric_name=None,
+            query_template=None,
+            options=None,
+        )
         assert inp.name is None
+        assert inp.description is None
+        assert inp.rank is None
+        assert inp.category_id is None
         assert inp.metric_name is None
         assert inp.query_template is None
         assert inp.options is None
-        assert isinstance(inp.time_window, Sentinel)
 
     def test_time_window_none_means_clear(self) -> None:
         inp = ModifyQueryDefinitionInput(time_window=None)
@@ -238,7 +264,7 @@ class TestModifyQueryDefinitionInput:
         )
         assert inp.name == "new_name"
         assert inp.metric_name == "new_metric"
-        assert inp.query_template is None
+        assert isinstance(inp.query_template, Unset)
 
     def test_round_trip_serialization(self) -> None:
         inp = ModifyQueryDefinitionInput(

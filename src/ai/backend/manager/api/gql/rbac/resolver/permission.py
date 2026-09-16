@@ -6,6 +6,7 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -31,7 +32,13 @@ from ai.backend.manager.api.gql.rbac.types import (
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
 )
-from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
+from ai.backend.manager.api.gql.rbac.types.permission import (
+    MyAtomicBulkScopePermissionsInputGQL,
+    MyAtomicBulkScopePermissionsPayloadGQL,
+    MyScopePermissionsInputGQL,
+    MyScopePermissionsPayloadGQL,
+    PermissionEdge,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -207,3 +214,39 @@ async def admin_replace_role_permissions(
     check_admin_only()
     result = await info.context.adapters.rbac.replace_role_permissions(input.to_pydantic())
     return ReplaceRolePermissionsPayloadGQL.from_pydantic(result)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "The permissions the caller holds on one entity type within one scope, read"
+            " through every scope that governs it. A scope that does not exist and a scope"
+            " the caller reaches nothing on answer alike, with no bits."
+        ),
+    )
+)  # type: ignore[misc]
+async def my_scope_permissions(
+    info: Info[StrawberryGQLContext],
+    input: MyScopePermissionsInputGQL,
+) -> MyScopePermissionsPayloadGQL | None:
+    payload = await info.context.adapters.rbac.my_scope_permissions(input.to_pydantic())
+    return MyScopePermissionsPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "The same answer as `myScopePermissions` for several targets at once, resolved"
+            " in one grouped pass. Atomic: there is no per-target failure, so the payload"
+            " carries no failure channel and the whole query fails or none of it does."
+        ),
+    )
+)  # type: ignore[misc]
+async def my_atomic_bulk_scope_permissions(
+    info: Info[StrawberryGQLContext],
+    input: MyAtomicBulkScopePermissionsInputGQL,
+) -> MyAtomicBulkScopePermissionsPayloadGQL | None:
+    payload = await info.context.adapters.rbac.my_atomic_bulk_scope_permissions(input.to_pydantic())
+    return MyAtomicBulkScopePermissionsPayloadGQL.from_pydantic(payload)

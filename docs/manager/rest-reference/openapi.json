@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.8.0rc1",
+    "version": "26.9.0a1",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -5412,6 +5412,200 @@
         "title": "AdminSearchDeploymentsInput",
         "type": "object"
       },
+      "DeploymentScope": {
+        "description": "Scope for the scoped deployment query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose deployments are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose deployments are being read",
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose deployments are being read",
+            "title": "User"
+          }
+        },
+        "title": "DeploymentScope",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "UUIDScope",
+        "type": "object"
+      },
+      "ScopedSearchDeploymentsInput": {
+        "description": "Input for searching the deployments the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DeploymentScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter criteria"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeploymentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sort order",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max results per page (offset)",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pagination offset",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchDeploymentsInput",
+        "type": "object"
+      },
       "UpdateDeploymentInput": {
         "description": "Input for updating a deployment.",
         "properties": {
@@ -9256,21 +9450,6 @@
         "title": "DomainScope",
         "type": "object"
       },
-      "UUIDScope": {
-        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
-        "properties": {
-          "value": {
-            "format": "uuid",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value"
-        ],
-        "title": "UUIDScope",
-        "type": "object"
-      },
       "ScopedSearchDomainsInput": {
         "description": "Input for searching the domains the named scopes reach.",
         "properties": {
@@ -9462,14 +9641,14 @@
             "anyOf": [
               {
                 "maxLength": 64,
+                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New domain name.",
+            "description": "New domain name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -9478,14 +9657,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New domain description. Set to null to clear.",
+            "description": "Updated domain description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -9497,8 +9672,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated active status.",
+            "description": "Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "allowed_docker_registries": {
@@ -9510,14 +9684,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New list of allowed Docker registry URLs. Set to null to clear.",
+            "description": "Updated list of allowed Docker registry URLs. Omit to leave unchanged.",
             "title": "Allowed Docker Registries"
           },
           "integration_name": {
@@ -9526,14 +9696,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           }
         },
@@ -11288,6 +11454,13 @@
         "title": "SearchIdleCheckersInput",
         "type": "object"
       },
+      "NonEmptyList_SessionTypes_": {
+        "items": {
+          "$ref": "#/components/schemas/SessionTypes"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
       "UpdateIdleCheckerInput": {
         "properties": {
           "id": {
@@ -11307,7 +11480,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -11316,30 +11489,22 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Omit to leave unchanged or pass null to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "target_session_types": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/SessionTypes"
-                },
-                "minItems": 1,
-                "type": "array"
+                "$ref": "#/components/schemas/NonEmptyList_SessionTypes_"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated target session types. Omit to leave unchanged.",
             "title": "Target Session Types"
           },
           "initial_grace_period_seconds": {
@@ -11352,7 +11517,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Updated initial grace period in seconds. Omit to leave unchanged.",
             "title": "Initial Grace Period Seconds"
           },
           "checker_spec": {
@@ -11364,7 +11529,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "description": "Updated checker specification. Omit to leave unchanged.",
+            "title": "Checker Spec"
           }
         },
         "required": [
@@ -12239,6 +12405,203 @@
           }
         },
         "title": "AdminSearchImagesInput",
+        "type": "object"
+      },
+      "ImageScope": {
+        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``global_`` names no scope and is\nauthorized against none: a registry marked global shows its images to everyone.\nRaises an error if every field is empty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose images are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose images are being read",
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose images are being read",
+            "title": "User"
+          },
+          "container_registry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Container registries whose images are being read",
+            "title": "Container Registry"
+          },
+          "global": {
+            "default": false,
+            "description": "Include the images of every registry marked global",
+            "title": "Global",
+            "type": "boolean"
+          }
+        },
+        "title": "ImageScope",
+        "type": "object"
+      },
+      "ScopedSearchImagesInput": {
+        "description": "Input for searching the images the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/ImageScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageFilterInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageOrderByInputDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchImagesInput",
         "type": "object"
       },
       "ImageAliasFilterInputDTO": {
@@ -18554,8 +18917,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Allowed filter label keys",
+            "description": "Allowed filter label keys. Omit to leave unchanged.",
             "title": "Filter Labels"
           },
           "group_labels": {
@@ -18570,8 +18932,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Allowed group-by label keys",
+            "description": "Allowed group-by label keys. Omit to leave unchanged.",
             "title": "Group Labels"
           }
         },
@@ -18579,7 +18940,7 @@
         "type": "object"
       },
       "ModifyQueryDefinitionInput": {
-        "description": "Input for modifying a prometheus query definition.\n\nNullable DB columns (``time_window``, ``description``, ``category_id``) use the\n``Sentinel`` pattern so callers can distinguish \"leave unchanged\" from \"clear to null\".\nNon-nullable fields use ``None`` to mean \"do not update\".",
+        "description": "Input for modifying a prometheus query definition.\n\nEvery field defaults to ``Unset``; only fields the caller sends are updated.",
         "properties": {
           "name": {
             "anyOf": [
@@ -18590,8 +18951,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated human-readable name",
+            "description": "Updated human-readable name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -18600,14 +18960,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "rank": {
@@ -18620,8 +18976,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated sort rank",
+            "description": "Updated sort rank. Omit to leave unchanged.",
             "title": "Rank"
           },
           "category_id": {
@@ -18631,14 +18986,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated category ID. Omit to leave unchanged; null clears.",
             "title": "Category Id"
           },
           "metric_name": {
@@ -18650,8 +19001,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated Prometheus metric name",
+            "description": "Updated Prometheus metric name. Omit to leave unchanged.",
             "title": "Metric Name"
           },
           "query_template": {
@@ -18663,8 +19013,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
+            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}}). Omit to leave unchanged.",
             "title": "Query Template"
           },
           "time_window": {
@@ -18673,14 +19022,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.",
+            "description": "Updated default time window. Omit to leave unchanged; null clears.",
             "title": "Time Window"
           },
           "options": {
@@ -18692,8 +19037,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated query definition options"
+            "description": "Updated query definition options. Omit to leave unchanged.",
+            "title": "Options"
           }
         },
         "title": "ModifyQueryDefinitionInput",
@@ -19217,6 +19562,80 @@
         "title": "MappedScopeNestedFilter",
         "type": "object"
       },
+      "PermissionNestedFilter": {
+        "description": "Nested filter for permissions within a role assignment.",
+        "properties": {
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "PermissionNestedFilter",
+        "type": "object"
+      },
       "RoleFilter": {
         "description": "Filter for roles.",
         "properties": {
@@ -19598,8 +20017,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated role name",
+            "description": "Updated role name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -19608,14 +20026,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description. Use SENTINEL to clear.",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "status": {
@@ -19627,8 +20041,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated role status"
+            "description": "Updated role status. Omit to leave unchanged.",
+            "title": "Status"
           },
           "auto_assign": {
             "anyOf": [
@@ -19639,8 +20053,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.",
+            "description": "Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in. Omit to leave unchanged.",
             "title": "Auto Assign"
           }
         },
@@ -19932,8 +20345,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated entity type",
+            "description": "Updated entity type. Omit to leave unchanged.",
             "title": "Entity Type"
           },
           "permission": {
@@ -19945,8 +20357,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated operation bit"
+            "description": "Updated operation bit. Omit to leave unchanged.",
+            "title": "Permission"
           }
         },
         "required": [
@@ -20091,80 +20503,6 @@
           "role_id"
         ],
         "title": "RevokeRoleInput",
-        "type": "object"
-      },
-      "PermissionNestedFilter": {
-        "description": "Nested filter for permissions within a role assignment.",
-        "properties": {
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "PermissionNestedFilter",
         "type": "object"
       },
       "RoleAssignmentFilter": {
@@ -20321,6 +20659,17 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RoleStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "mapped_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MappedScopeNestedFilter"
               },
               {
                 "type": "null"
@@ -21398,8 +21747,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Updated resource group name. Leave null to keep existing value.",
+            "description": "Updated resource group name. Omit to leave unchanged.",
             "title": "Name"
           },
           "description": {
@@ -21408,14 +21756,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "is_active": {
@@ -21427,8 +21771,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the resource group is active. Leave null to keep existing value.",
+            "description": "Whether the resource group is active. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "is_default": {
@@ -21440,8 +21783,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.",
             "title": "Is Default"
           },
           "total_resource_slots": {
@@ -21451,14 +21793,10 @@
                 "type": "object"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated total resource slot limits. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated total resource slot limits. Omit to leave unchanged; null clears.",
             "title": "Total Resource Slots"
           },
           "allowed_vfolder_hosts": {
@@ -21468,14 +21806,10 @@
                 "type": "object"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated allowed vfolder host permissions. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated allowed vfolder host permissions. Omit to leave unchanged; null clears.",
             "title": "Allowed Vfolder Hosts"
           },
           "integration_name": {
@@ -21484,14 +21818,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated external integration ID. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated external integration ID. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           },
           "resource_policy": {
@@ -21500,14 +21830,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource policy name. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated resource policy name. Omit to leave unchanged; null clears.",
             "title": "Resource Policy"
           }
         },
@@ -21563,8 +21889,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Half-life for exponential decay in days. Leave null to keep existing value.",
+            "description": "Half-life for exponential decay in days. Omit to leave unchanged.",
             "title": "Half Life Days"
           },
           "lookback_days": {
@@ -21576,8 +21901,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Total lookback period in days. Leave null to keep existing value.",
+            "description": "Total lookback period in days. Omit to leave unchanged.",
             "title": "Lookback Days"
           },
           "decay_unit_days": {
@@ -21589,8 +21913,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Granularity of decay buckets in days. Leave null to keep existing value.",
+            "description": "Granularity of decay buckets in days. Omit to leave unchanged.",
             "title": "Decay Unit Days"
           },
           "default_weight": {
@@ -21606,8 +21929,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Default weight for entities. Leave null to keep existing value.",
+            "description": "Default weight for entities. Omit to leave unchanged.",
             "title": "Default Weight"
           },
           "resource_weights": {
@@ -21622,8 +21944,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Resource weights for fair share calculation. Leave null to keep existing values.",
+            "description": "Resource weights for fair share calculation. Omit to leave unchanged.",
             "title": "Resource Weights"
           }
         },
@@ -21687,6 +22008,17 @@
         "title": "PreemptionVictimScope",
         "type": "string"
       },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "UpdateResourceGroupConfigInput": {
         "description": "Input for updating resource group configuration via GQL (all fields optional).",
         "properties": {
@@ -21704,8 +22036,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the resource group is active. Leave null to keep existing value.",
+            "description": "Whether the resource group is active. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "is_public": {
@@ -21717,8 +22048,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the resource group is public. Leave null to keep existing value.",
+            "description": "Whether the resource group is public. Omit to leave unchanged.",
             "title": "Is Public"
           },
           "is_default": {
@@ -21730,8 +22060,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.",
             "title": "Is Default"
           },
           "description": {
@@ -21743,8 +22072,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Human-readable description. Leave null to keep existing value.",
+            "description": "Human-readable description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "app_proxy_addr": {
@@ -21756,8 +22084,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "App proxy address. Leave null to keep existing value.",
+            "description": "App proxy address. Omit to leave unchanged; null clears.",
             "title": "App Proxy Addr"
           },
           "appproxy_api_token": {
@@ -21769,8 +22096,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "App proxy API token. Leave null to keep existing value.",
+            "description": "App proxy API token. Omit to leave unchanged; null clears.",
             "title": "Appproxy Api Token"
           },
           "use_host_network": {
@@ -21782,21 +22108,19 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether to use host network mode. Leave null to keep existing value.",
+            "description": "Whether to use host network mode. Omit to leave unchanged.",
             "title": "Use Host Network"
           },
           "scheduler_type": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/SchedulerTypeDTO"
               },
               {
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Scheduler type value (fifo/lifo/drf/fair-share). Leave null to keep existing.",
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share). Omit to leave unchanged.",
             "title": "Scheduler Type"
           },
           "preemption": {
@@ -21808,8 +22132,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Preemption configuration. Leave null to keep existing value."
+            "description": "Preemption configuration. Omit to leave unchanged.",
+            "title": "Preemption"
           }
         },
         "required": [
@@ -26609,8 +26933,24 @@
         "type": "object"
       },
       "ModelCardScope": {
-        "description": "Scope for the scoped model card query.\n\nEach list is OR'd internally. Raises an error if every field is empty.",
+        "description": "Scope for the scoped model card query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
         "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose model cards are being read",
+            "title": "Domain"
+          },
           "project": {
             "anyOf": [
               {
@@ -26626,6 +26966,22 @@
             "default": null,
             "description": "Projects whose model cards are being read",
             "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose model cards are being read",
+            "title": "User"
           }
         },
         "title": "ModelCardScope",
@@ -26967,7 +27323,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Model card name. Omit to leave unchanged.",
             "title": "Name"
           },
           "author": {
@@ -26976,13 +27332,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card author. Omit to leave unchanged; null clears.",
             "title": "Author"
           },
           "title": {
@@ -26991,13 +27344,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card title. Omit to leave unchanged; null clears.",
             "title": "Title"
           },
           "model_version": {
@@ -27006,13 +27356,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model version. Omit to leave unchanged; null clears.",
             "title": "Model Version"
           },
           "description": {
@@ -27021,13 +27368,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model card description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "task": {
@@ -27036,13 +27380,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Task type. Omit to leave unchanged; null clears.",
             "title": "Task"
           },
           "category": {
@@ -27051,13 +27392,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model category. Omit to leave unchanged; null clears.",
             "title": "Category"
           },
           "architecture": {
@@ -27066,13 +27404,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model architecture. Omit to leave unchanged; null clears.",
             "title": "Architecture"
           },
           "framework": {
@@ -27087,7 +27422,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Frameworks. Omit to leave unchanged.",
             "title": "Framework"
           },
           "label": {
@@ -27102,7 +27437,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "description": "Labels. Omit to leave unchanged.",
             "title": "Label"
           },
           "license": {
@@ -27111,13 +27446,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model license. Omit to leave unchanged; null clears.",
             "title": "License"
           },
           "min_resource": {
@@ -27129,13 +27461,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Minimum resource requirements. Omit to leave unchanged; null clears.",
             "title": "Min Resource"
           },
           "readme": {
@@ -27144,13 +27473,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Model readme. Omit to leave unchanged; null clears.",
             "title": "Readme"
           },
           "access_level": {
@@ -27159,13 +27485,10 @@
                 "$ref": "#/components/schemas/ModelCardAccessLevel"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
+            "description": "Access level. Omit to leave unchanged.",
             "title": "Access Level"
           }
         },
@@ -30744,6 +31067,185 @@
         "title": "AdminSearchKernelsInput",
         "type": "object"
       },
+      "SessionScope": {
+        "description": "Scope for the scoped session query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose sessions are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose sessions are being read",
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose sessions are being read",
+            "title": "User"
+          }
+        },
+        "title": "SessionScope",
+        "type": "object"
+      },
+      "ScopedSearchSessionsInput": {
+        "description": "Input for searching the sessions the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/SessionScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter criteria"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sort order",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max results per page (offset)",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pagination offset",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchSessionsInput",
+        "type": "object"
+      },
       "TerminateSessionsInput": {
         "description": "Input for terminating one or more sessions.",
         "properties": {
@@ -31670,8 +32172,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New username.",
+            "description": "New username. Omit to leave unchanged.",
             "title": "Username"
           },
           "password": {
@@ -31683,8 +32184,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New password.",
+            "description": "New password. Omit to leave unchanged.",
             "title": "Password"
           },
           "full_name": {
@@ -31693,14 +32193,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New full display name. Set to null to clear.",
+            "description": "Updated full display name. Omit to leave unchanged; null clears.",
             "title": "Full Name"
           },
           "description": {
@@ -31709,14 +32205,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New description. Set to null to clear.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           },
           "status": {
@@ -31728,8 +32220,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New account status."
+            "description": "New account status. Omit to leave unchanged.",
+            "title": "Status"
           },
           "role": {
             "anyOf": [
@@ -31740,8 +32232,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New user role."
+            "description": "New user role. Omit to leave unchanged.",
+            "title": "Role"
           },
           "domain_name": {
             "anyOf": [
@@ -31752,8 +32244,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New domain assignment.",
+            "description": "New domain assignment. Omit to leave unchanged.",
             "title": "Domain Name"
           },
           "group_ids": {
@@ -31766,14 +32257,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New project (group) assignments. Replaces existing assignments. Set to null to clear.",
+            "description": "Updated project (group) assignments, replacing the existing ones. Omit to leave unchanged.",
             "title": "Group Ids"
           },
           "allowed_client_ip": {
@@ -31785,14 +32272,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New allowed client IP addresses or CIDR ranges. Set to null to allow all.",
+            "description": "Updated allowed client IP addresses or CIDR ranges. Omit to leave unchanged; null allows all.",
             "title": "Allowed Client Ip"
           },
           "need_password_change": {
@@ -31804,8 +32287,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Set password change requirement.",
+            "description": "Set password change requirement. Omit to leave unchanged.",
             "title": "Need Password Change"
           },
           "resource_policy": {
@@ -31817,8 +32299,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "New user resource policy name.",
+            "description": "New user resource policy name. Omit to leave unchanged.",
             "title": "Resource Policy"
           },
           "sudo_session_enabled": {
@@ -31830,8 +32311,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Enable or disable sudo session capability.",
+            "description": "Enable or disable sudo session capability. Omit to leave unchanged.",
             "title": "Sudo Session Enabled"
           },
           "main_access_key": {
@@ -31840,14 +32320,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Set the primary API access key. It cannot be cleared; null is ignored.",
+            "description": "Updated primary API access key. Omit to leave unchanged; it cannot be cleared, so null is ignored.",
             "title": "Main Access Key"
           },
           "container_uid": {
@@ -31856,14 +32332,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New container user ID. Set to null to clear.",
+            "description": "Updated container user ID. Omit to leave unchanged; null clears.",
             "title": "Container Uid"
           },
           "container_main_gid": {
@@ -31872,14 +32344,10 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New container primary group ID. Set to null to clear.",
+            "description": "Updated container primary group ID. Omit to leave unchanged; null clears.",
             "title": "Container Main Gid"
           },
           "container_gids": {
@@ -31891,14 +32359,10 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New container supplementary group IDs. Set to null to clear.",
+            "description": "Updated container supplementary group IDs. Omit to leave unchanged; null clears.",
             "title": "Container Gids"
           },
           "integration_name": {
@@ -31907,14 +32371,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New external integration identifier. Set to null to clear.",
+            "description": "Updated external integration identifier. Omit to leave unchanged; null clears.",
             "title": "Integration Name"
           }
         },
@@ -31987,6 +32447,22 @@
             "default": null,
             "description": "Projects whose users are being read",
             "title": "Project"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Roles whose holders are being read",
+            "title": "Role"
           }
         },
         "title": "UserScope",
@@ -32474,8 +32950,184 @@
         "title": "SearchVFoldersInput",
         "type": "object"
       },
+      "VFolderScope": {
+        "description": "Scope for the scoped vfolder query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose vfolders are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose vfolders are being read",
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose vfolders are being read",
+            "title": "User"
+          }
+        },
+        "title": "VFolderScope",
+        "type": "object"
+      },
+      "ScopedSearchVFoldersInput": {
+        "description": "Input for searching the vfolders the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/VFolderScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchVFoldersInput",
+        "type": "object"
+      },
       "VFolderPermissionField": {
         "enum": [
+          "none",
           "ro",
           "rw",
           "wd",
@@ -32605,6 +33257,27 @@
           }
         },
         "title": "PurgeVFolderInput",
+        "type": "object"
+      },
+      "SetVFolderMountPolicyInput": {
+        "description": "Input for setting the mount level one user gets on a virtual folder.",
+        "properties": {
+          "user_id": {
+            "description": "User the mount level is set for",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "description": "Mount level: none, ro or rw. wd is stored as rw."
+          }
+        },
+        "required": [
+          "user_id",
+          "permission"
+        ],
+        "title": "SetVFolderMountPolicyInput",
         "type": "object"
       },
       "DeployVFolderInput": {
@@ -35413,14 +36086,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated role description",
+            "description": "Updated role description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
@@ -44713,6 +45382,35 @@
         "description": "Search deployments with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/deployments/scoped/search": {
+      "post": {
+        "operationId": "v2/deployments.scoped_search",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchDeploymentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the deployments the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/deployments/projects/{project_id}/search": {
       "post": {
         "operationId": "v2/deployments.project_search",
@@ -47061,6 +47759,30 @@
         },
         "parameters": [],
         "description": "Search images with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/images/scoped/search": {
+      "post": {
+        "operationId": "v2/images.scoped_search_images",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchImagesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the images the named scopes reach."
       }
     },
     "/v2/images/aliases/search": {
@@ -50027,6 +50749,35 @@
         "description": "Hard-delete a role from the database.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/rbac/roles/my/search": {
+      "post": {
+        "operationId": "v2/rbac.my_search_roles",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRolesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the roles the current authenticated user holds.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/rbac/roles/projects/{project_id}/search": {
       "post": {
         "operationId": "v2/rbac.project_search_roles",
@@ -50457,7 +51208,7 @@
           }
         ],
         "parameters": [],
-        "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Return the complete RBAC permission matrix.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/reservoir-registries": {
@@ -53923,6 +54674,35 @@
         "description": "Search sessions owned by the current user.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/sessions/scoped/search": {
+      "post": {
+        "operationId": "v2/sessions.scoped_search",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchSessionsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the sessions the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/sessions/projects/{project_id}/search": {
       "post": {
         "operationId": "v2/sessions.project_search",
@@ -54661,6 +55441,35 @@
         "description": "Search vfolders owned by the current user.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/vfolders/scoped/search": {
+      "post": {
+        "operationId": "v2/vfolders.scoped_search",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchVFoldersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the vfolders the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/vfolders/projects/{project_id}/search": {
       "post": {
         "operationId": "v2/vfolders.project_search",
@@ -54887,6 +55696,108 @@
           }
         ],
         "description": "Permanently delete a vfolder, optionally cascading linked model cards.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/mount-policies": {
+      "put": {
+        "operationId": "v2/vfolders.set_mount_policy",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVFolderMountPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Set the mount level one user gets on the vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "get": {
+        "operationId": "v2/vfolders.list_mount_policies",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "The mount levels set on the vfolder, one row per user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/mount-policies/{user_id}": {
+      "delete": {
+        "operationId": "v2/vfolders.unset_mount_policy",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take back the mount level one user was given on the vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolders/{vfolder_id}/restore": {

@@ -8,10 +8,11 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     OrderDirection,
@@ -24,6 +25,7 @@ from .types import (
 )
 
 __all__ = (
+    "MAX_SCOPE_PERMISSION_TARGETS",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -36,9 +38,14 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
+    "EntityFilter",
+    "EntityOrderBy",
+    "MyAtomicBulkScopePermissionsInput",
+    "MyScopePermissionsInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
+    "PermissionTarget",
     "PurgeRoleInput",
     "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
@@ -103,23 +110,28 @@ class CreateRoleInput(BaseRequestModel):
 class UpdateRoleInput(BaseRequestModel):
     """Input for updating a role."""
 
-    name: str | None = Field(default=None, description="Updated role name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated role description. Use SENTINEL to clear."
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated role name. Omit to leave unchanged."
     )
-    status: RoleStatus | None = Field(default=None, description="Updated role status")
-    auto_assign: bool | None = Field(
-        default=None,
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
+    )
+    status: RoleStatus | None | Unset = Field(
+        default=UNSET, description="Updated role status. Omit to leave unchanged."
+    )
+    auto_assign: bool | None | Unset = Field(
+        default=UNSET,
         description=(
             "Updated value for the `auto_assign` flag. When true, the role is automatically "
-            "granted to a user when the user is added to a scope this role is registered in."
+            "granted to a user when the user is added to a scope this role is registered in. "
+            "Omit to leave unchanged."
         ),
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -155,12 +167,18 @@ class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    entity_type: EntityType | None = Field(default=None, description="Updated entity type")
-    permission: PermissionBitDTO | None = Field(default=None, description="Updated operation bit")
+    entity_type: EntityType | None | Unset = Field(
+        default=UNSET, description="Updated entity type. Omit to leave unchanged."
+    )
+    permission: PermissionBitDTO | None | Unset = Field(
+        default=UNSET, description="Updated operation bit. Omit to leave unchanged."
+    )
 
-    def permission_bit(self) -> Permission:
-        """The bit this input names; ``NONE`` when it names none."""
-        return Permission.NONE if self.permission is None else self.permission.to_permission()
+    def permission_bit(self) -> Permission | None | Unset:
+        """The bit this input names; ``None`` and ``UNSET`` pass through untouched."""
+        if isinstance(self.permission, PermissionBitDTO):
+            return self.permission.to_permission()
+        return self.permission
 
 
 class DeletePermissionInput(BaseRequestModel):
@@ -264,6 +282,19 @@ class MappedScopeNestedFilter(BaseRequestModel):
 MappedScopeNestedFilter.model_rebuild()
 
 
+class PermissionNestedFilter(BaseRequestModel):
+    """Nested filter for permissions within a role assignment."""
+
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = None
+    AND: list[PermissionNestedFilter] | None = None
+    OR: list[PermissionNestedFilter] | None = None
+    NOT: list[PermissionNestedFilter] | None = None
+
+
+PermissionNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
@@ -272,6 +303,7 @@ class RoleFilter(BaseRequestModel):
     status: RoleStatusFilter | None = None
     assigned_user: UserNestedFilter | None = None
     mapped_scope: MappedScopeNestedFilter | None = None
+    permission: PermissionNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -286,25 +318,13 @@ class RoleNestedFilter(BaseRequestModel):
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    mapped_scope: MappedScopeNestedFilter | None = None
     AND: list[RoleNestedFilter] | None = None
     OR: list[RoleNestedFilter] | None = None
     NOT: list[RoleNestedFilter] | None = None
 
 
 RoleNestedFilter.model_rebuild()
-
-
-class PermissionNestedFilter(BaseRequestModel):
-    """Nested filter for permissions within a role assignment."""
-
-    entity_type: StringFilter | None = None
-    permission: PermissionBitFilter | None = None
-    AND: list[PermissionNestedFilter] | None = None
-    OR: list[PermissionNestedFilter] | None = None
-    NOT: list[PermissionNestedFilter] | None = None
-
-
-PermissionNestedFilter.model_rebuild()
 
 
 class RoleAssignmentFilter(BaseRequestModel):
@@ -321,6 +341,21 @@ class RoleAssignmentFilter(BaseRequestModel):
 
 
 RoleAssignmentFilter.model_rebuild()
+
+
+class EntityFilter(BaseRequestModel):
+    """Filter for the deprecated `Role.scopes` connection. Accepted and ignored."""
+
+    entity_type: StringFilter | None = None
+    entity_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: StringFilter | None = None
+    AND: list[EntityFilter] | None = None
+    OR: list[EntityFilter] | None = None
+    NOT: list[EntityFilter] | None = None
+
+
+EntityFilter.model_rebuild()
 
 
 class PermissionFilter(BaseRequestModel):
@@ -346,6 +381,13 @@ class RoleOrderBy(BaseRequestModel):
 
 class RoleAssignmentOrderBy(BaseRequestModel):
     """Order by specification for role assignments."""
+
+    field: str
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class EntityOrderBy(BaseRequestModel):
+    """Order of the deprecated `Role.scopes` connection. Accepted and ignored."""
 
     field: str
     direction: OrderDirection = OrderDirection.DESC
@@ -395,3 +437,31 @@ class SearchRoleAssignmentsInput(BaseRequestModel):
     before: str | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+MAX_SCOPE_PERMISSION_TARGETS = 100
+
+
+class PermissionTarget(BaseRequestModel):
+    """One scope and entity type to answer the caller's permissions for."""
+
+    scope_type: str = Field(description="Type of the scope, e.g. 'project'.")
+    scope_id: UUID = Field(description="ID of the scope.")
+    entity_type: str = Field(description="Entity type the permissions are asked about.")
+
+
+class MyScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on one scope and entity type."""
+
+    target: PermissionTarget = Field(description="The scope and entity type to answer for.")
+
+
+class MyAtomicBulkScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on several scopes and entity types."""
+
+    targets: list[PermissionTarget] = Field(
+        max_length=MAX_SCOPE_PERMISSION_TARGETS,
+        description=(
+            f"The scopes and entity types to answer for, at most {MAX_SCOPE_PERMISSION_TARGETS}."
+        ),
+    )

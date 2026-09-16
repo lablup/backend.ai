@@ -19,8 +19,8 @@ from ai.backend.manager.data.permission.role import AssignedUserData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.models.rbac_models.orders import AssignedUserOrders
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("AssignedUserAdapter",)
@@ -37,21 +37,12 @@ class AssignedUserAdapter(BaseFilterAdapter):
             granted_at=data.granted_at,
         )
 
-    def build_querier(
+    def build_searcher(
         self,
         param: SearchUsersAssignedToRolePathParam,
         request: SearchUsersAssignedToRoleRequest,
-    ) -> BatchQuerier:
-        """
-        Build a Querier for assigned users from search request.
-
-        Args:
-            param: Path parameter containing role_id
-            request: Search request containing filter, order, and pagination
-
-        Returns:
-            Querier object with converted conditions, orders, and pagination
-        """
+    ) -> RoleAssignmentSearcher:
+        """Build a searcher for the users assigned to the role in the path."""
         conditions = [self._get_base_filter(param)]
         if request.filter is not None:
             conditions.extend(self._convert_filter(request.filter))
@@ -61,7 +52,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 orders.append(self._convert_order(order))
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return RoleAssignmentSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _get_base_filter(self, param: SearchUsersAssignedToRolePathParam) -> QueryCondition:
         return AssignedUserConditions.by_role_id(param.role_id)

@@ -7,7 +7,7 @@ from typing import Any, Final
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
-from ai.backend.manager.models.session_template import (
+from ai.backend.manager.models.session_template.row import (
     TemplateType,
     check_cluster_template,
     check_task_template,

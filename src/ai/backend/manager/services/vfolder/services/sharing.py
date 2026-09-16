@@ -4,6 +4,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
@@ -52,9 +53,7 @@ class VFolderSharingService:
         user = await self._user_repository.get_user_by_uuid(requester_id)
         if not user.domain_name:
             raise VFolderNotFound("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         if vfolder_data.ownership_type != VFolderOwnershipType.GROUP:
             raise VFolderNotFound("Only project folders are directly sharable.")
 
@@ -81,9 +80,7 @@ class VFolderSharingService:
         user = await self._user_repository.get_user_by_uuid(requester_id)
         if not user.domain_name:
             raise VFolderNotFound("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         if vfolder_data.ownership_type != VFolderOwnershipType.GROUP:
             raise VFolderNotFound("Only project folders are directly unsharable.")
 
@@ -117,7 +114,7 @@ class VFolderSharingService:
                     folder_type=folder_type,
                     shared_user_uuid=row["user"],
                     shared_user_email=row["email"],
-                    permission=row["permission"],
+                    permission=VFolderMountPolicy(row["permission"]),
                 )
             )
         return shared_info
@@ -151,5 +148,6 @@ class VFolderSharingService:
             action.vfolder_uuid,
             action.to_delete,
             action.to_update,
+            sharer_id=UserID(self._requester().user_id),
         )
         return UpdateVFolderSharingStatusActionResult()

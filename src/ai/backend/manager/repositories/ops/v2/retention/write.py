@@ -17,6 +17,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
@@ -30,7 +31,8 @@ class RetentionDrain[TRow: Base]:
     (terminal-status / discriminator filters). When ``match_column`` is set the
     boundary belongs to a parent table: rows are kept whose ``match_column`` is
     among ``source_key`` values past the boundary (with ``source_conditions``),
-    letting an FK-less child be drained by its parent.
+    letting an FK-less child be drained by its parent. ``entity`` names the entity
+    type of a table keyed on its entity id; each drained row's node goes with it.
     """
 
     # Any-typed columns: targets span declaratively- and imperatively-mapped
@@ -42,6 +44,7 @@ class RetentionDrain[TRow: Base]:
     match_column: Any = None
     source_key: Any = None
     source_conditions: Sequence[Any] = field(default_factory=tuple)
+    entity: EntityType | None = None
 
     def build_subquery(self) -> sa.sql.Select[tuple[TRow]]:
         if self.match_column is None:
@@ -63,10 +66,11 @@ class RetentionWriteOps(V2WriteOps):
         """Delete the spec's rows in ``batch_size`` chunks; total deleted.
 
         Composite primary keys are matched as a tuple, so a table keyed on more
-        than one column drains the same way.
+        than one column drains the same way. An entity table tears down the node of
+        every row it drains in the same batch.
         """
-        entity = spec.build_subquery().column_descriptions[0]["entity"]
-        table = sa.inspect(entity).local_table
+        mapped = spec.build_subquery().column_descriptions[0]["entity"]
+        table = sa.inspect(mapped).local_table
         pk_columns = list(table.primary_key.columns)
 
         total_deleted = 0
@@ -75,10 +79,18 @@ class RetentionWriteOps(V2WriteOps):
             pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
             stmt = sa.delete(table).where(sa.tuple_(*pk_columns).in_(pk_subquery))
             try:
-                result = await self._sess.execute(stmt)
+                if spec.entity is None:
+                    result = await self._sess.execute(stmt)
+                    batch_deleted = cast(CursorResult[Any], result).rowcount
+                else:
+                    entity_type = spec.entity
+                    drained_ids = (await self._sess.scalars(stmt.returning(pk_columns[0]))).all()
+                    batch_deleted = len(drained_ids)
+                    await self._teardown([
+                        RuntimeEntityID(entity_type, drained_id) for drained_id in drained_ids
+                    ])
             except sa.exc.IntegrityError as e:
                 raise self._parse_integrity_error(e) from e
-            batch_deleted = cast(CursorResult[Any], result).rowcount
             total_deleted += batch_deleted
             if batch_deleted < batch_size:
                 break

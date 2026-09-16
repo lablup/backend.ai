@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     ExcludeSessionIdleChecksInput,
     GetSessionLogsQuery,
     IncludeSessionIdleChecksInput,
+    ScopedSearchSessionsInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -132,6 +133,14 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Search sessions owned by the current user."""
         result = await self._adapter.my_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchSessionsInput],
+    ) -> APIResponse:
+        """Search the sessions the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(

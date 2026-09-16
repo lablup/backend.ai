@@ -4,8 +4,8 @@ import secrets
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
@@ -45,6 +45,7 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
+    ModelCardScope,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
@@ -97,8 +98,11 @@ from ai.backend.manager.services.model_card.actions.delete import DeleteModelCar
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
 from ai.backend.manager.services.model_card.actions.scoped_search import (
+    DomainModelCardScopeItem,
     ModelCardScopeItem,
+    ProjectModelCardScopeItem,
     ScopedSearchModelCardsAction,
+    UserModelCardScopeItem,
 )
 from ai.backend.manager.services.model_card.actions.scoped_search_requirements import (
     ScopedSearchModelCardResourceRequirementsAction,
@@ -206,6 +210,21 @@ class ModelCardAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
+    def _scope_items(self, scope: ModelCardScope) -> list[ModelCardScopeItem]:
+        """The scope items the request named, in the order the input lists them."""
+        items: list[ModelCardScopeItem] = [
+            DomainModelCardScopeItem(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        items.extend(
+            ProjectModelCardScopeItem(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        items.extend(
+            UserModelCardScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        )
+        return items
+
     async def scoped_search(
         self,
         input: ScopedSearchModelCardsInput,
@@ -227,10 +246,7 @@ class ModelCardAdapter(BaseAdapter):
         )
         result = await self._model_card.scoped_search.run(
             ScopedSearchModelCardsAction(
-                items=[
-                    ModelCardScopeItem(project_id=ProjectID(entry.value))
-                    for entry in input.scope.project or ()
-                ],
+                items=self._scope_items(input.scope),
                 searcher=searcher,
             )
         )
@@ -262,7 +278,8 @@ class ModelCardAdapter(BaseAdapter):
         )
         result = await self._model_card.scoped_search.run(
             ScopedSearchModelCardsAction(
-                items=[ModelCardScopeItem(project_id=ProjectID(project_id))], searcher=searcher
+                items=[ProjectModelCardScopeItem(project_id=ProjectID(project_id))],
+                searcher=searcher,
             )
         )
         return SearchModelCardsPayload(
@@ -353,99 +370,22 @@ class ModelCardAdapter(BaseAdapter):
         self,
         input: UpdateModelCardInput,
     ) -> UpdateModelCardPayload:
-        min_resource_state: TriState[list[ResourceRequirementEntry]] = TriState.nop()
-        if input.min_resource is not SENTINEL:
-            if input.min_resource is None:
-                min_resource_state = TriState.nullify()
-            else:
-                min_resource_state = TriState.update(_entries_to_requirements(input.min_resource))
-
         updater = ModelCardUpdater(
             card_id=ModelCardID(input.id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            author=(
-                TriState.nop()
-                if input.author is SENTINEL
-                else TriState.nullify()
-                if input.author is None
-                else TriState.update(input.author)
-            ),
-            title=(
-                TriState.nop()
-                if input.title is SENTINEL
-                else TriState.nullify()
-                if input.title is None
-                else TriState.update(input.title)
-            ),
-            model_version=(
-                TriState.nop()
-                if input.model_version is SENTINEL
-                else TriState.nullify()
-                if input.model_version is None
-                else TriState.update(input.model_version)
-            ),
-            description=(
-                TriState.nop()
-                if input.description is SENTINEL
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            task=(
-                TriState.nop()
-                if input.task is SENTINEL
-                else TriState.nullify()
-                if input.task is None
-                else TriState.update(input.task)
-            ),
-            category=(
-                TriState.nop()
-                if input.category is SENTINEL
-                else TriState.nullify()
-                if input.category is None
-                else TriState.update(input.category)
-            ),
-            architecture=(
-                TriState.nop()
-                if input.architecture is SENTINEL
-                else TriState.nullify()
-                if input.architecture is None
-                else TriState.update(input.architecture)
-            ),
-            framework=(
-                OptionalState.update(input.framework)
-                if input.framework is not None
-                else OptionalState.nop()
-            ),
-            label=(
-                OptionalState.update(input.label)
-                if input.label is not None
-                else OptionalState.nop()
-            ),
-            license=(
-                TriState.nop()
-                if input.license is SENTINEL
-                else TriState.nullify()
-                if input.license is None
-                else TriState.update(input.license)
-            ),
-            min_resource=min_resource_state,
-            readme=(
-                TriState.nop()
-                if input.readme is SENTINEL
-                else TriState.nullify()
-                if input.readme is None
-                else TriState.update(input.readme)
-            ),
-            access_level=(
-                OptionalState.nop()
-                if input.access_level is SENTINEL
-                else OptionalState.update(input.access_level.value)
-                if input.access_level is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            author=TriState.from_unset(input.author),
+            title=TriState.from_unset(input.title),
+            model_version=TriState.from_unset(input.model_version),
+            description=TriState.from_unset(input.description),
+            task=TriState.from_unset(input.task),
+            category=TriState.from_unset(input.category),
+            architecture=TriState.from_unset(input.architecture),
+            framework=OptionalState.from_unset(input.framework),
+            label=OptionalState.from_unset(input.label),
+            license=TriState.from_unset(input.license),
+            min_resource=TriState.from_unset(input.min_resource).map(_entries_to_requirements),
+            readme=TriState.from_unset(input.readme),
+            access_level=OptionalState.from_unset(input.access_level).map(lambda x: x.value),
         )
         result = await self._model_card.update.run(
             UpdateModelCardAction(model_card_id=ModelCardID(input.id), updater=updater)

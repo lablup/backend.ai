@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_log.row import ErrorLogRow
@@ -34,7 +33,6 @@ from ai.backend.manager.models.specs.purger import (
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import VFolderPermissionRow
 
 
 @dataclass
@@ -69,28 +67,6 @@ class UserKeyPairPurger(FieldBatchPurger[UserID, KeyPairRow, KeyPairID]):
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairID:
         return row.id
-
-
-@dataclass
-class UserVFolderPermissionPurger(FieldBatchPurger[UserID, VFolderPermissionRow, VFolderUUID]):
-    """Clears the vfolder permissions granted to a user.
-
-    Answers with the folders taken back rather than the rows removed: what the caller
-    does next is take the share caps off those folders, and the row ids name nothing
-    it can act on.
-    """
-
-    @override
-    def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
-        return sa.select(VFolderPermissionRow).where(VFolderPermissionRow.user == owner_id)
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
-        return VFolderUUID(row.vfolder)
 
 
 @dataclass

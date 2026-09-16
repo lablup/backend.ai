@@ -13,9 +13,8 @@ from aiohttp.web_exceptions import HTTPForbidden
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    PermissionBitDTO,
-)
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.tristate.unset import UNSET
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import (
     PermissionBitGQL,
@@ -100,8 +99,8 @@ class TestAdminUpdatePermission:
         dto = input_data.to_pydantic()
 
         assert dto.id == permission_id
-        assert dto.permission is not None
-        assert dto.entity_type is None
+        assert dto.permission is PermissionBitDTO.UPDATE
+        assert dto.entity_type is UNSET
 
         resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         result = await resolver_fn(info=info, input=input_data)

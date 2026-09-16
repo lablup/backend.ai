@@ -3,10 +3,23 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
+from ai.backend.manager.data.app_config.types import (
+    AppConfigAllowListData,
+    AppConfigData,
+    AppConfigDefinitionData,
+    AppConfigFragmentData,
+)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.repositories.app_config.repository import AppConfigRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.app_config.actions.allow_list.purge import (
+    PurgeAppConfigAllowListAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.purge import (
+    PurgeAppConfigDefinitionAction,
+)
 from ai.backend.manager.services.app_config.actions.search import (
     AnonymousSearchAppConfigsAction,
     SearchAppConfigsAction,
@@ -41,16 +54,36 @@ def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]
 
 
 class AppConfigService:
-    """Read-side service for the merged ``AppConfig`` view.
+    """The merged ``AppConfig`` view and the purges that clear what a row cascades to.
 
     The fragment read is a plain scoped search, so it runs against ops; what keeps a
     service here is the merge, which turns many rows into one value per name.
     """
 
     _repository: OpsRepository[AppConfigFragmentData]
+    _app_config_repository: AppConfigRepository
 
-    def __init__(self, repository: OpsRepository[AppConfigFragmentData]) -> None:
+    def __init__(
+        self,
+        repository: OpsRepository[AppConfigFragmentData],
+        app_config_repository: AppConfigRepository,
+    ) -> None:
         self._repository = repository
+        self._app_config_repository = app_config_repository
+
+    async def purge_definition(
+        self, action: PurgeAppConfigDefinitionAction
+    ) -> EntityOpsResult[AppConfigDefinitionData]:
+        """Purge a config name with the allow-list entries and fragments under it."""
+        data = await self._app_config_repository.purge_definition(action.to_purger())
+        return EntityOpsResult(data=data)
+
+    async def purge_allow_list(
+        self, action: PurgeAppConfigAllowListAction
+    ) -> EntityOpsResult[AppConfigAllowListData]:
+        """Purge an allow-list entry with the fragments it admits."""
+        data = await self._app_config_repository.purge_allow_list(action.to_purger())
+        return EntityOpsResult(data=data)
 
     async def search_app_configs(
         self, action: SearchAppConfigsAction

@@ -45,9 +45,10 @@ class ScenarioConfigProvider(ManagerConfigProvider):
 
 
 def base_config_dict(
-    db_addr: HostPortPairModel, dbname: str, redis_addr: HostPortPairModel | None
+    db_addr: HostPortPairModel, dbname: str, redis_addr: HostPortPairModel
 ) -> dict[str, Any]:
     raw: dict[str, Any] = {
+        "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
         "db": {
             "addr": {"host": db_addr.host, "port": db_addr.port},
             "name": dbname,
@@ -73,8 +74,6 @@ def base_config_dict(
             },
         },
     }
-    if redis_addr is not None:
-        raw["redis"] = {"addr": {"host": redis_addr.host, "port": redis_addr.port}}
     return raw
 
 

@@ -1,13 +1,15 @@
 ---
 name: models-schema-declaration
 type: design-rationale
-description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories, why every id default is UUIDv7
+description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories, why every id default is UUIDv7, what an OperationScope reads its condition from in each of the three row shapes
 scope: src/ai/backend/manager/models
-keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic, uuid_generate_v7, server_default, creator_id, personal project, dangling]
+keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic, uuid_generate_v7, server_default, creator_id, personal project, dangling, OperationScope, ExistenceCheck, scope, entity_memberships, membership graph, field row]
 sources:
   - src/ai/backend/manager/models/specs
   - src/ai/backend/manager/models/uuid7.py
   - src/ai/backend/manager/models/project/row.py
+  - src/ai/backend/manager/models/scopes.py
+  - src/ai/backend/manager/models/virtual_entity/queries.py
 generated:
   by: claude-code/opus-5
   at: 2026-09-05
@@ -101,3 +103,68 @@ must not block their purge.
 
 A user has at most one personal project, held by a partial unique index. Dangling ones
 carry NULL, and NULLs do not collide in a unique index, so any number of them coexist.
+
+## What a scope reads its condition from
+
+The row an `OperationScope` bounds takes one of three shapes. Which shape it is decides
+what the condition may read.
+
+| Shape | How it is told | Condition |
+|---|---|---|
+| Entity | the row's id class is an `EntityIdentifier` and answers its own `EntityType` | a correlated EXISTS over the govern and own edges |
+| Field | `FieldType.owner_type()` answers an entity kind | equality on the owner column, or an edge EXISTS on that owner |
+| Dangling field | `FieldType.owner_type()` is `None` | equality on the `(entity_type, entity_id)` pair written on the row |
+
+### A scope does not authorize
+
+The action's scope check or bulk check runs first. A scope narrows what that check
+already allowed. A role branch or a permission judgment inside a scope condition
+therefore leaves two answers to one question.
+
+A read bounded by nothing is not written as an empty scope list. A global read has a
+place declared for it, and an empty list is rejected. Where several scopes arrive
+together, their conditions are OR-ed.
+
+### The owner comes from a value, its membership from an edge
+
+A field row and a dangling field row hold no node in the graph, so who owns one is read
+from a value on the row. Whether that owner belongs to the scope the caller named is
+read from an edge. That is how the two hops divide.
+
+A field scope takes the scopes above its owner as well as the owner itself. Where the
+named scope is the owning entity, the condition is equality on the owner column; where
+it is above that owner, it is an edge EXISTS on the same column. Which axes a kind
+accepts is declared per kind, not open to any scope.
+
+### What a scope reaches is two edges, not one
+
+`entity_memberships` says which virtual entity holds a row; `scope_bindings` says which
+scopes govern a virtual entity. A permission check walks both, so a scope predicate that
+walked only the first would find less than the caller is allowed to see -- a domain would
+miss every row its projects hold. Every node carries a self-govern edge, so a scope
+holding the row itself answers through the same span.
+
+A membership edge answers without telling belonging from a share. What may be done with
+something reached through a share is bounded by that edge's cap, so a scope has no
+reason to tell the two apart. Filtering shares out of a scope would instead drop shared
+rows from a read, which is not the scope's judgment to make.
+
+### An axis that asks for no permission
+
+Most axes name a scope the caller is checked against first. An axis reading what is
+shown to everyone has nothing to check against. Such an axis stays out of
+`scope_targets()` and is added to `operation_scopes()` alone -- only `scope_targets()`
+is gated, so an ungated axis is expressible.
+
+`image`'s `global` axis is one. Whether an image is global is answered by the
+`is_global` of the container registry it is attached to, not by the image row. The
+column is nullable, and a registry that leaves it unset is not global.
+
+### `existence_checks`
+
+Validates that an entity the scope names exists. Every check of every scope is combined
+into one query ahead of the main one.
+
+It is left empty where authorization already settled that existence — a scope naming the
+authenticated requester themselves, and a dangling field whose reachability the bulk
+check already answered. An empty one says in one line what answered instead.

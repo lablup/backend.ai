@@ -1,11 +1,11 @@
 ---
 name: auth-service-composition
 type: decision-table
-description: 인증 도메인의 액션이 왜 auth 와 user 두 그룹으로 갈리는지, 게이트 없는 네 배선이 무엇으로 호출자를 확인하는지, 로그인 세션과 SSH 키페어 조작이 왜 사용자 단위로 기록되는지
+description: 인증 도메인의 액션이 왜 global 과 user 두 그룹으로 갈리는지, 게이트 없는 네 배선이 무엇으로 호출자를 확인하는지, 로그인 세션과 SSH 키페어 조작이 왜 사용자 단위로 기록되는지
 scope: src/ai/backend/manager/services/auth
 keywords:
   - AuthProcessors
-  - AuthEntityType
+  - GlobalEntityType
   - anonymous_global
   - PublicActionProcessor
   - RevokeLoginSessionAction
@@ -22,10 +22,10 @@ status: draft
 
 ## 그룹이 둘인 이유
 
-`auth` 그룹은 어떤 사용자 행도 답하지 않는 상태 — 자격 증명과 로그인 세션 — 을 맡는다.
-로그인·로그아웃·비밀번호 재설정은 호출자가 아직 주체를 갖지 않은 채 들어오고, 관리자가
-전체 세션에 닿는 조회도 어떤 사용자를 지목하지 않는다. `user` 그룹은 한 사용자의 행,
-자격 증명, 로그인 기록이 답하는 것을 맡는다.
+`global` 그룹은 어떤 엔티티도 지목하지 않는 동작을 맡는다. 로그인과 만료 비밀번호 교체는
+호출자가 아직 주체를 갖지 않은 채 들어온다. 관리자의 로그인 세션 회수와 로그인 차단 해제는
+소유자를 읽지 않는다. `user` 그룹은 한 사용자의 행, 자격 증명, 로그인 기록이 답하는 것을
+맡는다.
 
 ## 게이트 없는 세 배선
 
@@ -39,12 +39,14 @@ status: draft
 라우트가 인증을 요구하고, 액션은 그 사용자를 지목한다. 세션 토큰은 그대로 어느 세션을
 끝낼지 고르는 값으로 남는다.
 
-## 인증만 요구하는 세 읽기
+## 역할 조회와 access key 스코프 해석
 
-`public_get_role`, `public_resolve_access_key_scope`, `public_resolve_user_scope` 는
-호출자 맥락에서 대상이 정해진다. 호출자가 지목할 수 있는 대상이 자기 자신뿐이므로
-권한 확인이 더할 것이 없고, 인증만 확인한다. 위임 대상을 지목하는 경우는 서비스가
-요청자와 대상의 역할·도메인을 비교해 판정한다.
+`get_role` 은 요청자 자신을 지목하는 `single_entity` GET 이다.
+
+`public_resolve_access_key_scope` 는 access key 로 keypair 소유자를 찾는 lookup 에 요청자의
+기본 keypair 읽기와 위임 자격 검사가 섞여 있어 lookup 으로 배선하지 못한다. 답하는 대상이
+user 이므로 user 그룹의 public 이다. 위임 대상을 지목하는 경우는 서비스가 요청자와 대상의
+역할과 도메인을 비교해 판정한다.
 
 ## 로그인 세션과 SSH 키페어는 사용자로 기록된다
 
