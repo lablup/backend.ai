@@ -22,7 +22,7 @@ class SeedRuntimeVariantPreset(SeedRowFrom[RuntimeVariantData, RuntimeVariantPre
     """A preset of the variant laid before it. The insert ranks it last in that variant."""
 
     name_hint: str = "preset"
-    description: str | None = "미리 만들어 둔 preset"
+    description: str | None = "미리 만들어 둔 프리셋"
     preset_target: PresetTarget = PresetTarget.ENV
     value_type: PresetValueType = PresetValueType.STR
     default_value: str | None = None
@@ -36,11 +36,11 @@ class SeedRuntimeVariantPreset(SeedRowFrom[RuntimeVariantData, RuntimeVariantPre
 
     @override
     def kind(self) -> str:
-        return "런타임 변형 preset"
+        return "런타임 변형 프리셋"
 
     @override
     def detail(self) -> str:
-        parts = [f"{self.preset_target.value} 대상, 값 종류 {self.value_type.value}"]
+        parts = [f"대상 {self.preset_target.value}, 값 종류 {self.value_type.value}"]
         if self.default_value is not None:
             parts.append(f"기본값 {self.default_value}")
         if self.added_version is not None or self.deprecated_version is not None:

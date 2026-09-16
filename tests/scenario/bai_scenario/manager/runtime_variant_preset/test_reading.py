@@ -1,7 +1,6 @@
-"""preset 조회 — id로, 그리고 여러 id로. 둘 다 인증만 확인한다.
+"""프리셋 조회 — 하나 또는 여러 ID로 조회하며, 두 방식 모두 인증 여부만 확인한다.
 
-여러 id로 조회하기는 검색을 id 조건으로 호출한 것이라, 없는 id가 거부가 아니라 빈 항목으로
-반환된다.
+여러 ID 조회는 검색에 ID 조건을 지정하여 실행하므로 존재하지 않는 ID는 빈 항목으로 반환된다.
 """
 
 from __future__ import annotations
@@ -52,7 +51,7 @@ type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantPresetAdapter, An
 
 @dataclass(frozen=True)
 class ReadingById(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
-    """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
+    """ID로 조회한다. ``unknown``이면 어느 행에도 없는 ID를 사용한다."""
 
     unknown: bool = False
 
@@ -62,8 +61,8 @@ class ReadingById(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVa
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}이 {target}(으)로 조회"
+        target = "존재하지 않는 ID" if self.unknown else laid.preset.name
+        return f"{laid.caller.username}의 조회 요청 — 대상: {target}"
 
     @override
     async def call(
@@ -75,7 +74,7 @@ class ReadingById(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVa
 
 @dataclass(frozen=True)
 class ReadingManyByIds(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]):
-    """미리 만들어 둔 preset들의 id 뒤에 없는 id 하나를 붙여 한 번에 조회한다."""
+    """미리 만들어 둔 프리셋들의 ID와 존재하지 않는 ID 하나를 함께 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -83,7 +82,10 @@ class ReadingManyByIds(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, 
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
+        return (
+            f"{laid.caller.username}이 미리 만들어 둔 프리셋 {len(laid.laid)}개와 "
+            "존재하지 않는 ID 하나를 함께 조회"
+        )
 
     @override
     async def call(
@@ -99,7 +101,7 @@ class ReadingManyByIds(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, 
 
 @dataclass(frozen=True)
 class ReadingNoIds(When[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]):
-    """빈 id 목록으로 조회한다."""
+    """빈 ID 목록으로 조회한다."""
 
     @override
     def operation(self) -> str:
@@ -107,7 +109,7 @@ class ReadingNoIds(When[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded])
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return f"{laid.caller.username}이 빈 ID 목록으로 조회"
 
     @override
     async def call(self, adapter: RuntimeVariantPresetAdapter, laid: APresetAndACaller) -> Loaded:
@@ -145,7 +147,7 @@ class AUserGrantedNothingReadsById(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 id로 조회하면, 그 preset 전체가 반환된다. 이 조회는 인증만 확인한다"
+        return "아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -174,7 +176,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return "존재하지 않는 ID로 조회하면 대상을 찾을 수 없어 요청이 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -203,7 +205,7 @@ class MixedIdsComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
+        return "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
@@ -228,7 +230,7 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
+        return "빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:

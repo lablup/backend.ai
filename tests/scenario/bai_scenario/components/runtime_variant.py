@@ -50,7 +50,7 @@ FIXED_MODEL_DEFINITION = RuntimeVariantModelDefinitionInfo.model_validate(
 
 @dataclass(frozen=True)
 class AVariantAndACaller:
-    """변형 하나와, 그것을 호출할 사용자."""
+    """변형 하나와 호출할 사용자."""
 
     variant: RuntimeVariantData
     caller: UserData
@@ -58,7 +58,7 @@ class AVariantAndACaller:
 
 @dataclass(frozen=True)
 class ManyVariantsAndACaller:
-    """검색 대상 변형 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
+    """검색 대상 변형 여러 개와 호출할 사용자. ``named``는 이름 필터로 선택할 변형이다."""
 
     laid: tuple[RuntimeVariantData, ...]
     named: RuntimeVariantData
@@ -74,7 +74,7 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"런타임 변형 하나와, {role_named(self.role)} 한 명"
+        return f"런타임 변형 하나와 {role_named(self.role)} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> AVariantAndACaller:
@@ -85,14 +85,14 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
 
 @dataclass(frozen=True)
 class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
-    """변형 여럿과 사용자 한 명."""
+    """변형 여러 개와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
     besides: int = 1
 
     @override
     def describe(self) -> str:
-        return f"런타임 변형 {self.besides + 1}개와, {role_named(self.role)} 한 명"
+        return f"런타임 변형 {self.besides + 1}개와 {role_named(self.role)} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyVariantsAndACaller:
@@ -133,7 +133,7 @@ def variant_verdicts(
 
 @dataclass(frozen=True)
 class TheNewVariantNode(Then[Any, RuntimeVariantNode]):
-    """방금 생성한 변형이 통째로 반환된다. 이름과 설명은 시나리오가 정한 값이다."""
+    """방금 생성한 변형 전체가 반환된다. 이름과 설명은 시나리오에서 정한 값이다."""
 
     started: datetime
     named: str
@@ -159,7 +159,7 @@ class TheNewVariantNode(Then[Any, RuntimeVariantNode]):
 
 @dataclass(frozen=True)
 class TheVariantNode(Then[AVariantAndACaller, RuntimeVariantNode]):
-    """미리 만들어 둔 변형이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
+    """미리 만들어 둔 변형 전체가 반환된다. 수정 요청에는 변경할 필드만 담는다."""
 
     started: datetime
     named: str | Kept = KEPT
@@ -185,11 +185,11 @@ class TheVariantNode(Then[AVariantAndACaller, RuntimeVariantNode]):
 
 @dataclass(frozen=True)
 class EveryLaidVariantIsCounted(Then[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
-    """미리 만들어 둔 변형이 모두 집계된다."""
+    """미리 만들어 둔 변형이 모두 반환된다."""
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형이 모두 집계된다"
+        return "미리 만들어 둔 변형이 모두 반환된다"
 
     @override
     def look(
@@ -212,7 +212,7 @@ class EveryLaidVariantIsCounted(Then[ManyVariantsAndACaller, SearchRuntimeVarian
 
 @dataclass(frozen=True)
 class OnlyTheNamedVariantIsLeft(Then[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
-    """필터에 맞는 그 하나만 반환된다."""
+    """필터와 일치하는 변형 하나만 반환된다."""
 
     @override
     def says(self) -> str:
@@ -235,7 +235,7 @@ class OnlyTheNamedVariantIsLeft(Then[ManyVariantsAndACaller, SearchRuntimeVarian
 
 @dataclass(frozen=True)
 class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
-    """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
+    """페이지 크기를 생략한 첫 페이지. 기본 크기만큼 반환하고 다음 페이지가 있음을 표시한다."""
 
     size: int
 
@@ -262,13 +262,13 @@ class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsP
 class TheVariantsInTheOrderAsked(
     Then[ManyVariantsAndACaller, list[RuntimeVariantNode | Exception | None]]
 ):
-    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
+    """요청한 순서대로 반환한다. 존재하지 않는 ID의 위치에는 빈 항목을 반환한다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
+        return "요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다"
 
     @override
     def look(
@@ -303,11 +303,11 @@ class TheVariantsInTheOrderAsked(
 
 @dataclass(frozen=True)
 class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload]):
-    """삭제한 변형의 id를 담은 응답."""
+    """삭제한 변형의 ID를 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "삭제한 변형의 id가 반환된다"
+        return "삭제한 변형의 ID가 반환된다"
 
     @override
     def look(
@@ -316,16 +316,20 @@ class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload])
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.variant.id, "미리 만들어 둔 변형"))]
+        return [
+            Held[UUID](
+                "id", payload.id, SameAs[UUID](laid.variant.id, "미리 만들어 둔 변형의 식별자")
+            )
+        ]
 
 
 @dataclass(frozen=True)
 class TheCountAsked(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
-    """요청한 id의 수를 그대로 응답한다."""
+    """요청한 ID의 수를 그대로 응답한다."""
 
     @override
     def says(self) -> str:
-        return "요청한 id의 수가 반환된다"
+        return "요청한 ID의 수가 반환된다"
 
     @override
     def look(

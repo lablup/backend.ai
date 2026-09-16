@@ -1,4 +1,4 @@
-"""preset 삭제 — 누가 삭제할 수 있고, 권한 검사를 끄면 무엇이 허용되는가."""
+"""프리셋 삭제 — 누가 삭제할 수 있고, 권한 검사를 끄면 무엇이 허용되는가."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ type RetiringStep = Scenario[
 
 @dataclass(frozen=True)
 class Deleting(When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
-    """미리 만들어 둔 preset 하나를 삭제한다."""
+    """미리 만들어 둔 프리셋 하나를 삭제한다."""
 
     unknown: bool = False
 
@@ -49,8 +49,8 @@ class Deleting(When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}이 {target} 삭제"
+        target = "존재하지 않는 ID" if self.unknown else laid.preset.name
+        return f"{laid.caller.username}의 삭제 요청 — 대상: {target}"
 
     @override
     async def call(self, adapter: RuntimeVariantPresetAdapter, laid: APresetAndACaller) -> Deleted:
@@ -68,7 +68,7 @@ class TheSuperadminDeletesAPreset(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 preset을 삭제하면 삭제한 preset의 id를 담은 응답이 반환된다"
+        return "슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -93,7 +93,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -118,7 +118,7 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 preset을 삭제하면 권한 부족으로 거부된다"
+        return "아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -144,7 +144,7 @@ class EnforcementOffLetsAnyoneDelete(
     @override
     def describe(self) -> str:
         return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 preset을 삭제할 수 있다. "
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다. "
             "삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 

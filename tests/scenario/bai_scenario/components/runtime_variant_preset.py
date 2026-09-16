@@ -44,19 +44,19 @@ from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
 from bai_scenario.seeds.runtime_variant.preset import SeedRuntimeVariantPreset
 from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
 
-DESCRIBED = "미리 만들어 둔 preset"
-"""시드가 미리 만들어 두는 preset의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
+DESCRIBED = "미리 만들어 둔 프리셋"
+"""시드가 미리 만들어 두는 프리셋의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 KEY = "PRESET_KEY"
-"""시드가 미리 만들어 두는 preset의 키."""
+"""시드가 미리 만들어 두는 프리셋의 키."""
 
 RANK_GAP = 100
-"""생성이 같은 변형 안 가장 큰 순위에 더하는 값. 첫 preset의 순위이기도 하다."""
+"""생성 시 같은 변형에서 가장 큰 순위에 더하는 값. 첫 프리셋의 순위이기도 하다."""
 
 
 @dataclass(frozen=True)
 class APresetAndACaller:
-    """preset 하나와 그 변형, 그리고 호출할 사용자."""
+    """프리셋 하나와 해당 변형, 그리고 호출할 사용자."""
 
     variant: RuntimeVariantData
     preset: RuntimeVariantPresetData
@@ -65,7 +65,7 @@ class APresetAndACaller:
 
 @dataclass(frozen=True)
 class TwoVariantsAndAPreset:
-    """변형 둘과 한쪽에만 있는 preset 하나, 그리고 호출할 사용자."""
+    """변형 둘과 한쪽에만 있는 프리셋 하나, 그리고 호출할 사용자."""
 
     variant: RuntimeVariantData
     other: RuntimeVariantData
@@ -75,7 +75,7 @@ class TwoVariantsAndAPreset:
 
 @dataclass(frozen=True)
 class ManyPresetsAndACaller:
-    """검색 대상 preset 여럿과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것만이다."""
+    """검색 대상 프리셋과 호출할 사용자. ``laid``에는 응답에 포함할 프리셋만 담는다."""
 
     variant: RuntimeVariantData
     laid: tuple[RuntimeVariantPresetData, ...]
@@ -84,7 +84,7 @@ class ManyPresetsAndACaller:
 
 @dataclass(frozen=True)
 class APresetAndSomeone(Given[Any, APresetAndACaller]):
-    """변형 하나, 그 변형의 preset 하나, 사용자 한 명."""
+    """변형 하나, 해당 변형의 프리셋 하나, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
     preset_target: PresetTarget = PresetTarget.ENV
@@ -93,7 +93,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"변형 하나와 그 변형의 preset 하나, 그리고 {role_named(self.role)} 한 명"
+        return f"변형 하나와 해당 변형의 프리셋 하나, 그리고 {role_named(self.role)} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
@@ -112,13 +112,13 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
 @dataclass(frozen=True)
 class TwoVariantsOneWithAPreset(Given[Any, TwoVariantsAndAPreset]):
-    """변형 둘과, 한쪽에만 있는 preset 하나, 사용자 한 명."""
+    """변형 둘, 한쪽에만 있는 프리셋 하나, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
-        return f"변형 둘, 한쪽에만 있는 preset 하나, 그리고 {role_named(self.role)} 한 명"
+        return f"변형 둘과 한쪽에만 있는 프리셋 하나, 그리고 {role_named(self.role)} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> TwoVariantsAndAPreset:
@@ -133,14 +133,14 @@ class TwoVariantsOneWithAPreset(Given[Any, TwoVariantsAndAPreset]):
 
 @dataclass(frozen=True)
 class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
-    """한 변형의 preset 여럿과 사용자 한 명."""
+    """한 변형의 프리셋 여러 개와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
     besides: int = 1
 
     @override
     def describe(self) -> str:
-        return f"한 변형의 preset {self.besides + 1}개와, {role_named(self.role)} 한 명"
+        return f"한 변형의 프리셋 {self.besides + 1}개와 {role_named(self.role)} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -159,11 +159,11 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
 @dataclass(frozen=True)
 class PresetsInTwoVariants(Given[Any, ManyPresetsAndACaller]):
-    """두 변형에 나뉜 preset들과 사용자 한 명. ``laid``는 앞 변형의 것뿐이다."""
+    """두 변형에 나뉘어 있는 프리셋과 사용자 한 명. ``laid``에는 첫 변형의 것만 담는다."""
 
     @override
     def describe(self) -> str:
-        return "두 변형에 나뉜 preset 셋과, 일반 사용자 한 명"
+        return "두 변형에 나뉘어 있는 프리셋 세 개와 일반 사용자 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -188,11 +188,11 @@ VALID_AT = "2.5.0"
 
 @dataclass(frozen=True)
 class PresetsAcrossVersions(Given[Any, ManyPresetsAndACaller]):
-    """추가 버전과 폐기 버전이 서로 다른 preset 다섯. ``laid``는 지정한 버전에 유효한 둘이다."""
+    """추가·폐기 버전이 서로 다른 프리셋 다섯 개. ``laid``에는 지정한 버전에 유효한 것만 담는다."""
 
     @override
     def describe(self) -> str:
-        return "추가 버전과 폐기 버전이 다른 preset 다섯과, 일반 사용자 한 명"
+        return "추가 버전과 폐기 버전이 서로 다른 프리셋 다섯 개와 일반 사용자 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -246,7 +246,7 @@ def preset_verdicts(
         Held(
             f"{at}runtime_variant_id",
             node.runtime_variant_id,
-            SameAs(variant_id, "미리 만들어 둔 변형"),
+            SameAs(variant_id, "미리 만들어 둔 변형의 식별자"),
         ),
         Same(f"{at}name", node.name, named),
         Same(f"{at}description", node.description, described),
@@ -296,7 +296,7 @@ def laid_preset_verdicts(
 
 @dataclass(frozen=True)
 class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
-    """방금 생성한 preset이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽고, 변형은 미리 만들어 둔 것에서 읽는다."""
+    """방금 생성한 프리셋 전체가 반환된다. 기대값은 요청과 미리 만들어 둔 변형에서 읽는다."""
 
     started: datetime
     named: str
@@ -312,7 +312,7 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 preset 전체가 반환된다"
+        return "생성한 프리셋 전체가 반환된다"
 
     @override
     def look(
@@ -341,14 +341,14 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
 
 @dataclass(frozen=True)
 class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariantPresetNode]):
-    """다른 변형 아래 같은 이름으로 생성한 preset이 통째로 반환된다."""
+    """다른 변형에 같은 이름으로 생성한 프리셋 전체가 반환된다."""
 
     started: datetime
     target: PresetTargetSpec
 
     @override
     def says(self) -> str:
-        return "다른 변형 아래 생성한 preset 전체가 반환된다"
+        return "다른 변형에 생성한 프리셋 전체가 반환된다"
 
     @override
     def look(
@@ -377,7 +377,7 @@ class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariant
 
 @dataclass(frozen=True)
 class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
-    """미리 만들어 둔 preset이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
+    """미리 만들어 둔 프리셋 전체가 반환된다. 수정 요청에는 변경할 필드만 담는다."""
 
     started: datetime
     named: str | Kept = KEPT
@@ -386,7 +386,7 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 preset 전체가 반환된다"
+        return "미리 만들어 둔 프리셋 전체가 반환된다"
 
     @override
     def look(
@@ -422,11 +422,11 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
 @dataclass(frozen=True)
 class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
-    """응답에 나와야 하는 preset이 모두, 그리고 그것만 반환된다."""
+    """응답에 포함되어야 하는 프리셋만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 preset만 반환된다"
+        return "응답에 포함되어야 하는 프리셋만 반환된다"
 
     @override
     def look(
@@ -449,7 +449,7 @@ class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 @dataclass(frozen=True)
 class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
-    """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
+    """페이지 크기를 생략한 첫 페이지. 기본 크기만큼 반환하고 다음 페이지가 있음을 표시한다."""
 
     size: int
 
@@ -474,13 +474,13 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 @dataclass(frozen=True)
 class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | None]]):
-    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
+    """요청한 순서대로 반환한다. 존재하지 않는 ID의 위치에는 빈 항목을 반환한다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
+        return "요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다"
 
     @override
     def look(
@@ -507,11 +507,11 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
 
 @dataclass(frozen=True)
 class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPayload]):
-    """삭제한 preset의 id를 담은 응답."""
+    """삭제한 프리셋의 ID를 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "삭제한 preset의 id가 반환된다"
+        return "삭제한 프리셋의 ID가 반환된다"
 
     @override
     def look(
@@ -520,4 +520,8 @@ class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPaylo
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 preset"))]
+        return [
+            Held[UUID](
+                "id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 프리셋의 식별자")
+            )
+        ]

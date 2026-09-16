@@ -1,7 +1,7 @@
-"""preset 생성 — 순위가 어떻게 매겨지고, 무엇이 중복되면 안 되며, 누가 생성할 수 있는가.
+"""프리셋 생성 — 순위가 어떻게 매겨지고, 무엇이 중복되면 안 되며, 누가 생성할 수 있는가.
 
-flag를 args가 아닌 대상에 두는 요청과 값 종류에 맞지 않는 기본값은 여기 없다. 생성할 때는 요청
-타입이 막으므로 어댑터가 보장하는 것이 아니다.
+값 종류가 ``flag``인데 대상이 ``args``가 아닌 요청과 값 종류에 맞지 않는 기본값은 여기 없다.
+생성 요청 타입에서 거부하므로 어댑터가 보장하는 동작이 아니다.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ type CreatingStep = Scenario[
 
 @dataclass(frozen=True)
 class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
-    """미리 만들어 둔 변형 아래 preset 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
+    """미리 만들어 둔 변형에 프리셋 하나를 생성하고 응답 노드를 반환한다."""
 
     named: str = MADE
     target: PresetTargetSpec = field(default_factory=lambda: ENV_STR)
@@ -95,7 +95,7 @@ class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVari
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 변형 {laid.variant.name}에 preset {self.named} 생성"
+        return f"{laid.caller.username}이 {laid.variant.name} 변형에 {self.named} 프리셋을 생성"
 
     @override
     async def call(
@@ -120,7 +120,7 @@ class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVari
 class CreatingBesideTheLaidOne(
     When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
 ):
-    """이미 preset이 하나 있는 변형에 하나 더 생성한다. 이름을 지정하지 않으면 미리 만들어 둔 것과 같은 이름을 쓴다."""
+    """이미 프리셋이 있는 변형에 하나 더 생성한다. 이름을 생략하면 기존 이름을 사용한다."""
 
     named: str | None = MADE
 
@@ -130,7 +130,10 @@ class CreatingBesideTheLaidOne(
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 변형 {laid.variant.name}에 preset {self.named or laid.preset.name} 하나 더 생성"
+        return (
+            f"{laid.caller.username}이 {laid.variant.name} 변형에 "
+            f"{self.named or laid.preset.name} 프리셋을 하나 더 생성"
+        )
 
     @override
     async def call(
@@ -153,7 +156,7 @@ class CreatingBesideTheLaidOne(
 class CreatingTheSameNameUnderTheOther(
     When[TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
 ):
-    """preset이 없는 쪽 변형에, 있는 쪽 preset과 같은 이름으로 생성한다."""
+    """프리셋이 없는 변형에 다른 변형의 프리셋과 같은 이름으로 생성한다."""
 
     @override
     def operation(self) -> str:
@@ -161,7 +164,7 @@ class CreatingTheSameNameUnderTheOther(
 
     @override
     def describe(self, laid: TwoVariantsAndAPreset) -> str:
-        return f"{laid.caller.username}이 변형 {laid.other.name}에 preset {laid.preset.name} 생성"
+        return f"{laid.caller.username}이 {laid.other.name} 변형에 {laid.preset.name} 프리셋을 생성"
 
     @override
     async def call(
@@ -182,13 +185,13 @@ class CreatingTheSameNameUnderTheOther(
 
 @dataclass(frozen=True)
 class TheNextPresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
-    """같은 변형에 하나 더 생성한 preset. 순위가 앞의 것보다 간격만큼 크다."""
+    """같은 변형에 새로 생성한 프리셋. 순위는 기존 프리셋보다 지정된 간격만큼 크다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "순위가 앞의 것보다 간격만큼 큰 preset 전체가 반환된다"
+        return "순위가 기존 프리셋보다 지정된 간격만큼 큰 프리셋 전체가 반환된다"
 
     @override
     def look(
@@ -230,8 +233,8 @@ class TheFirstPresetIsRankedAHundred(
     @override
     def describe(self) -> str:
         return (
-            "preset이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면, 순위는 100, 필수 여부는 거짓, "
-            "나머지 선택 항목은 비어 있는 노드가 반환된다"
+            "프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, "
+            "필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다"
         )
 
     @override
@@ -263,7 +266,9 @@ class TheSecondPresetIsRankedAHundredHigher(
 
     @override
     def describe(self) -> str:
-        return "preset이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 순위가 앞의 것보다 100 크다"
+        return (
+            "프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -294,9 +299,7 @@ class FourValuesComeBackAsOneSpec(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상·값 종류·기본값·키를 따로 지정해 생성하면, 응답에서는 넷이 한 명세로 묶여 반환된다"
-        )
+        return "대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -328,7 +331,7 @@ class ADefaultValueOfEachType(
 
     @override
     def describe(self) -> str:
-        return f"값 종류를 {self.target.value_type.value}(으)로 두고 그에 맞는 기본값을 지정하면 생성된다"
+        return f"값 종류를 {self.target.value_type.value} 값으로 설정하고 올바른 기본값을 지정하면 생성된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -359,7 +362,7 @@ class AUiOptionCarriesItsType(
 
     @override
     def describe(self) -> str:
-        return "슬라이더 옵션을 붙여 생성하면, UI 종류가 옵션에서 읽혀 노드에 함께 담긴다"
+        return "슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -388,7 +391,7 @@ class ANameTakenInTheSameVariantIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 변형에 같은 이름의 preset이 있을 때 다시 생성하면, 이름 중복으로 거부된다"
+        return "같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -419,7 +422,7 @@ class TheSameNameIsFreeInAnotherVariant(
 
     @override
     def describe(self) -> str:
-        return "유니크 제약이 변형과 이름의 조합에 걸려 있으므로, 다른 변형에는 같은 이름의 preset을 생성할 수 있다"
+        return "고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다"
 
     @override
     def given(self) -> Given[SeedingSession, TwoVariantsAndAPreset]:
@@ -448,7 +451,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 preset을 생성하면 역할 부족으로 거부된다"
+        return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -479,8 +482,8 @@ class EnforcementOffStillNeedsTheSuperadmin(
     @override
     def describe(self) -> str:
         return (
-            "권한 검사를 꺼도 슈퍼관리자가 아니면 preset을 생성하지 못한다. "
-            "생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
+            "권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다. "
+            "생성은 권한 그래프가 아니라 역할로 보호되므로 이 설정의 영향을 받지 않는다"
         )
 
     @override

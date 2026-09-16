@@ -1,4 +1,4 @@
-"""preset 수정 — 무엇이 바뀌고, 서비스가 저장된 행과 합쳐 무엇을 막으며, 누가 수정할 수 있는가."""
+"""프리셋 수정 — 무엇이 바뀌고, 서비스가 어떤 요청을 거부하며, 누가 수정할 수 있는가."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ type EditingStep = Scenario[
 
 @dataclass(frozen=True)
 class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
-    """미리 만들어 둔 preset을 수정한다. ``changes``에 없는 필드는 요청에 담지 않는다."""
+    """미리 만들어 둔 프리셋을 수정한다. ``changes``에 없는 필드는 요청에 담지 않는다."""
 
     changes: Mapping[str, Any] = field(default_factory=dict)
     unknown: bool = False
@@ -58,9 +58,9 @@ class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVarian
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.preset.name
-        changing = ", ".join(self.changes) or "아무것도"
-        return f"{laid.caller.username}이 {target}의 {changing} 수정"
+        target = "존재하지 않는 ID" if self.unknown else laid.preset.name
+        changing = ", ".join(self.changes) or "변경 항목 없음"
+        return f"{laid.caller.username}의 수정 요청 — 대상: {target}, 변경 항목: {changing}"
 
     @override
     async def call(
@@ -89,7 +89,9 @@ class TheNameChangesAndTheRestStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 preset의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 유지된다"
+        return (
+            "슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -120,7 +122,7 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 preset에 설명을 비우는 수정을 하면, 설명이 없어진다"
+        return "설명이 있는 프리셋의 설명을 비우면 설명이 없어진다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -151,7 +153,7 @@ class RerankingMovesIt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 preset의 순위를 바꾸면 순위가 새 값인 노드가 반환된다"
+        return "슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -182,7 +184,7 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return "변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -212,8 +214,8 @@ class FlagOnAnEnvPresetIsRefusedByTheService(
     @override
     def describe(self) -> str:
         return (
-            "대상이 env인 preset의 값 종류만 flag로 수정하면 잘못된 입력으로 거부된다. "
-            "요청은 대상을 생략했으므로 요청 타입은 통과시키고, 서비스가 저장된 대상과 합쳐 검사한 뒤 막는다"
+            "대상이 env인 프리셋의 값 종류만 flag로 수정하면 잘못된 입력으로 요청이 거부된다. "
+            "대상을 생략한 요청은 타입 검증을 통과하지만 서비스가 저장된 대상과 합쳐 검사한 뒤 거부한다"
         )
 
     @override
@@ -244,8 +246,8 @@ class ADefaultThatDoesNotFitTheStoredTypeIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "값 종류가 정수인 preset의 기본값만 숫자 아닌 문자열로 수정하면 잘못된 입력으로 "
-            "거부된다. 서비스가 저장된 값 종류를 기준으로 새 기본값을 검사한다"
+            "값 종류가 정수인 프리셋의 기본값만 숫자가 아닌 문자열로 수정하면 잘못된 입력으로 "
+            "요청이 거부된다. 서비스가 저장된 값 종류를 기준으로 새 기본값을 검사한다"
         )
 
     @override
@@ -277,7 +279,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return "슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -307,8 +309,8 @@ class AUserGrantedNothingMayNotEdit(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 없는 사용자가 preset을 수정하면 권한 부족으로 거부된다. "
-            "preset은 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다"
+            "아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. "
+            "프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다"
         )
 
     @override
@@ -342,7 +344,7 @@ class EnforcementOffLetsAnyoneEdit(
     @override
     def describe(self) -> str:
         return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 preset을 수정할 수 있다. "
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다. "
             "수정은 역할이 아니라 권한 그래프로 보호되기 때문이다"
         )
 
