@@ -235,9 +235,6 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     _PAGINATION_SPEC = PaginationSpec(
         forward_order=PrometheusQueryPresetOrders.created_at(ascending=False),
-        backward_order=PrometheusQueryPresetOrders.created_at(ascending=True),
-        forward_condition_factory=PrometheusQueryPresetConditions.by_cursor_forward,
-        backward_condition_factory=PrometheusQueryPresetConditions.by_cursor_backward,
         tiebreaker_order=PrometheusQueryPresetRow.id.asc(),
     )
 

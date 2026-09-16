@@ -295,42 +295,6 @@ class DomainConditions:
 
         return inner
 
-    # ==================== Cursor Pagination ====================
-
-    @staticmethod
-    def by_cursor_forward(cursor_name: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DomainRow.created_at)
-                .where(DomainRow.name == cursor_name)
-                .scalar_subquery()
-            )
-            return DomainRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_name: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DomainRow.created_at)
-                .where(DomainRow.name == cursor_name)
-                .scalar_subquery()
-            )
-            return DomainRow.created_at > subquery
-
-        return inner
-
     # ==================== Project Nested Filters ====================
 
     @staticmethod

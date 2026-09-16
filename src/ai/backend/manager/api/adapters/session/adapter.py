@@ -118,9 +118,6 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.orders import (
-    DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
-)
-from ai.backend.manager.models.kernel.orders import (
     DEFAULT_FORWARD_ORDER as KERNEL_DEFAULT_FORWARD_ORDER,
 )
 from ai.backend.manager.models.kernel.orders import (
@@ -131,9 +128,6 @@ from ai.backend.manager.models.kernel.orders import (
 )
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.models.session.orders import (
-    DEFAULT_BACKWARD_ORDER as SESSION_DEFAULT_BACKWARD_ORDER,
-)
 from ai.backend.manager.models.session.orders import (
     DEFAULT_FORWARD_ORDER as SESSION_DEFAULT_FORWARD_ORDER,
 )
@@ -230,17 +224,11 @@ def _fold_session_status(status: SessionStatus) -> str:
 
 _SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=SESSION_DEFAULT_FORWARD_ORDER,
-    backward_order=SESSION_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=SessionConditions.by_cursor_forward,
-    backward_condition_factory=SessionConditions.by_cursor_backward,
     tiebreaker_order=SESSION_TIEBREAKER_ORDER,
 )
 
 _KERNEL_PAGINATION_SPEC = PaginationSpec(
     forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
-    backward_order=KERNEL_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=KernelConditions.by_cursor_forward,
-    backward_condition_factory=KernelConditions.by_cursor_backward,
     tiebreaker_order=KERNEL_TIEBREAKER_ORDER,
 )
 

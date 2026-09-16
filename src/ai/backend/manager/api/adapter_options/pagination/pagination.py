@@ -24,7 +24,6 @@ from ai.backend.manager.models.specs.pagination import (
     OffsetPagination,
     QueryPagination,
 )
-from ai.backend.manager.repositories.base import CursorConditionFactory
 
 DEFAULT_PAGINATION_LIMIT = 10
 
@@ -76,30 +75,18 @@ class PaginationSpec:
 
     forward_order: QueryOrder
     tiebreaker_order: QueryOrder
-    backward_order: QueryOrder | None = None
-    forward_condition_factory: CursorConditionFactory | None = None
-    backward_condition_factory: CursorConditionFactory | None = None
+
+    @property
+    def backward_order(self) -> QueryOrder:
+        return _reverse_order(self.forward_order)
 
     @property
     def backward_tiebreaker_order(self) -> QueryOrder:
         return _reverse_order(self.tiebreaker_order)
 
-    def cursor_order(self, *, backward: bool = False) -> QueryOrder:
-        if not backward:
-            return self.forward_order
-        if self.backward_order is not None:
-            return self.backward_order
-        return _reverse_order(self.forward_order)
-
     def build_cursor_condition(self, cursor_id: str, *, backward: bool = False) -> QueryCondition:
         """Rows past the cursor row in ``(forward_order, tiebreaker_order)``; before it when
         ``backward``. ``cursor_id`` is the decoded cursor, the value of the tiebreaker column."""
-        factory = self.backward_condition_factory if backward else self.forward_condition_factory
-        if factory is not None:
-            try:
-                return factory(cursor_id)
-            except ValueError as e:
-                raise InvalidCursor(f"Invalid cursor value: {cursor_id}") from e
         sort_column = _order_column(self.forward_order)
         id_column = _order_column(self.tiebreaker_order)
         cursor_value = _parse_cursor_id(id_column, cursor_id)
@@ -170,7 +157,7 @@ def build_pagination(
             )
         return CursorBackwardPagination(
             last=options.last,
-            cursor_order=spec.cursor_order(backward=True),
+            cursor_order=spec.backward_order,
             cursor_condition=cursor_condition,
         )
 

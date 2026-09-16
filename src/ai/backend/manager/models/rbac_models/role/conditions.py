@@ -137,38 +137,6 @@ class RoleConditions:
         return inner
 
     @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RoleRow.created_at).where(RoleRow.id == cursor_uuid).scalar_subquery()
-            )
-            return RoleRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RoleRow.created_at).where(RoleRow.id == cursor_uuid).scalar_subquery()
-            )
-            return RoleRow.created_at > subquery
-
-        return inner
-
-    @staticmethod
     def by_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleRow.id.in_(role_ids)

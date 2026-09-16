@@ -182,24 +182,6 @@ class ResourceSlotTypeConditions:
 
     by_display_name_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.display_name))
 
-    @staticmethod
-    def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor). slot_name is the primary key."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceSlotTypeRow.slot_name > cursor_slot_name
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_slot_name: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor). slot_name is the primary key."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceSlotTypeRow.slot_name < cursor_slot_name
-
-        return inner
-
 
 class AgentResourceConditions:
     """Query condition factories for filtering agent resource rows."""
@@ -318,20 +300,6 @@ class AgentResourceConditions:
     by_agent_id_in = staticmethod(make_string_in_factory(AgentResourceRow.agent_id))
     by_slot_name_in = staticmethod(make_string_in_factory(AgentResourceRow.slot_name))
 
-    @staticmethod
-    def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AgentResourceRow.slot_name > cursor_slot_name
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_slot_name: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AgentResourceRow.slot_name < cursor_slot_name
-
-        return inner
-
 
 class ResourceAllocationConditions:
     """Query condition factories for filtering resource allocation rows."""
@@ -396,20 +364,6 @@ class ResourceAllocationConditions:
         return inner
 
     by_slot_name_in = staticmethod(make_string_in_factory(ResourceAllocationRow.slot_name))
-
-    @staticmethod
-    def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceAllocationRow.slot_name > cursor_slot_name
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_slot_name: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceAllocationRow.slot_name < cursor_slot_name
-
-        return inner
 
     @staticmethod
     def by_kernel_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
@@ -498,20 +452,6 @@ class RevisionResourceSlotConditions:
         make_string_in_factory(DeploymentRevisionResourceSlotRow.slot_name)
     )
 
-    @staticmethod
-    def by_cursor_forward(cursor_rank: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceSlotTypeRow.rank > int(cursor_rank)
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_rank: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceSlotTypeRow.rank < int(cursor_rank)
-
-        return inner
-
 
 class PresetResourceSlotConditions:
     """Query condition factories for preset resource slot rows."""
@@ -576,17 +516,3 @@ class PresetResourceSlotConditions:
         return inner
 
     by_slot_name_in = staticmethod(make_string_in_factory(PresetResourceSlotRow.slot_name))
-
-    @staticmethod
-    def by_cursor_forward(cursor_rank: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceSlotTypeRow.rank > int(cursor_rank)
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_rank: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourceSlotTypeRow.rank < int(cursor_rank)
-
-        return inner

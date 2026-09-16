@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Collection
 
 import sqlalchemy as sa
@@ -145,42 +144,6 @@ class DomainFairShareConditions:
 
     by_resource_group_in = staticmethod(make_string_in_factory(DomainFairShareRow.resource_group))
     by_domain_name_in = staticmethod(make_string_in_factory(DomainFairShareRow.domain_name))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DomainFairShareRow.created_at)
-                .where(DomainFairShareRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DomainFairShareRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DomainFairShareRow.created_at)
-                .where(DomainFairShareRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DomainFairShareRow.created_at > subquery
-
-        return inner
 
     @staticmethod
     def by_domain_is_active(is_active: bool) -> QueryCondition:
@@ -333,42 +296,6 @@ class ProjectFairShareConditions:
 
     by_resource_group_in = staticmethod(make_string_in_factory(ProjectFairShareRow.resource_group))
     by_domain_name_in = staticmethod(make_string_in_factory(ProjectFairShareRow.domain_name))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ProjectFairShareRow.created_at)
-                .where(ProjectFairShareRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ProjectFairShareRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ProjectFairShareRow.created_at)
-                .where(ProjectFairShareRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ProjectFairShareRow.created_at > subquery
-
-        return inner
 
     @staticmethod
     def by_project_name_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -607,42 +534,6 @@ class UserFairShareConditions:
 
     by_resource_group_in = staticmethod(make_string_in_factory(UserFairShareRow.resource_group))
     by_domain_name_in = staticmethod(make_string_in_factory(UserFairShareRow.domain_name))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(UserFairShareRow.created_at)
-                .where(UserFairShareRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return UserFairShareRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(UserFairShareRow.created_at)
-                .where(UserFairShareRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return UserFairShareRow.created_at > subquery
-
-        return inner
 
     @staticmethod
     def by_user_username_contains(spec: StringMatchSpec) -> QueryCondition:

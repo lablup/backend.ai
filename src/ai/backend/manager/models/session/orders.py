@@ -23,7 +23,6 @@ ORDER_FIELD_MAP: dict[SessionOrderField, _OrderColumn] = {
 }
 
 DEFAULT_FORWARD_ORDER: QueryOrder = SessionRow.created_at.desc()
-DEFAULT_BACKWARD_ORDER: QueryOrder = SessionRow.created_at.asc()
 TIEBREAKER_ORDER: QueryOrder = SessionRow.id.asc()
 
 

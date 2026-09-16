@@ -34,7 +34,6 @@ SESSION_ORDER_FIELD_MAP: dict[SessionHistoryOrderField, _OrderColumn] = {
 }
 
 SESSION_DEFAULT_FORWARD_ORDER: QueryOrder = SessionSchedulingHistoryRow.created_at.desc()
-SESSION_DEFAULT_BACKWARD_ORDER: QueryOrder = SessionSchedulingHistoryRow.created_at.asc()
 SESSION_TIEBREAKER_ORDER: QueryOrder = SessionSchedulingHistoryRow.id.asc()
 
 
@@ -75,7 +74,6 @@ KERNEL_ORDER_FIELD_MAP: dict[KernelHistoryOrderField, _OrderColumn] = {
 }
 
 KERNEL_DEFAULT_FORWARD_ORDER: QueryOrder = KernelSchedulingHistoryRow.created_at.desc()
-KERNEL_DEFAULT_BACKWARD_ORDER: QueryOrder = KernelSchedulingHistoryRow.created_at.asc()
 KERNEL_TIEBREAKER_ORDER: QueryOrder = KernelSchedulingHistoryRow.id.asc()
 
 
@@ -111,7 +109,6 @@ DEPLOYMENT_ORDER_FIELD_MAP: dict[DeploymentHistoryOrderField, _OrderColumn] = {
 }
 
 DEPLOYMENT_DEFAULT_FORWARD_ORDER: QueryOrder = DeploymentHistoryRow.created_at.desc()
-DEPLOYMENT_DEFAULT_BACKWARD_ORDER: QueryOrder = DeploymentHistoryRow.created_at.asc()
 DEPLOYMENT_TIEBREAKER_ORDER: QueryOrder = DeploymentHistoryRow.id.asc()
 
 
@@ -149,7 +146,6 @@ ROUTE_ORDER_FIELD_MAP: dict[RouteHistoryOrderField, _OrderColumn] = {
 }
 
 ROUTE_DEFAULT_FORWARD_ORDER: QueryOrder = RouteHistoryRow.created_at.desc()
-ROUTE_DEFAULT_BACKWARD_ORDER: QueryOrder = RouteHistoryRow.created_at.asc()
 ROUTE_TIEBREAKER_ORDER: QueryOrder = RouteHistoryRow.id.asc()
 
 

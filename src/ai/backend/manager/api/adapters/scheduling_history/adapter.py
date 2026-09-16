@@ -67,7 +67,6 @@ from ai.backend.manager.models.replica_group_history.conditions import (
     ReplicaGroupHistoryConditions,
 )
 from ai.backend.manager.models.replica_group_history.orders import (
-    REPLICA_GROUP_DEFAULT_BACKWARD_ORDER,
     REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
     REPLICA_GROUP_TIEBREAKER_ORDER,
     resolve_replica_group_order,
@@ -79,16 +78,12 @@ from ai.backend.manager.models.scheduling_history.conditions import (
     SessionSchedulingHistoryConditions,
 )
 from ai.backend.manager.models.scheduling_history.orders import (
-    DEPLOYMENT_DEFAULT_BACKWARD_ORDER,
     DEPLOYMENT_DEFAULT_FORWARD_ORDER,
     DEPLOYMENT_TIEBREAKER_ORDER,
-    KERNEL_DEFAULT_BACKWARD_ORDER,
     KERNEL_DEFAULT_FORWARD_ORDER,
     KERNEL_TIEBREAKER_ORDER,
-    ROUTE_DEFAULT_BACKWARD_ORDER,
     ROUTE_DEFAULT_FORWARD_ORDER,
     ROUTE_TIEBREAKER_ORDER,
-    SESSION_DEFAULT_BACKWARD_ORDER,
     SESSION_DEFAULT_FORWARD_ORDER,
     SESSION_TIEBREAKER_ORDER,
     resolve_deployment_order,
@@ -154,41 +149,26 @@ from ai.backend.manager.services.scheduling_history.processors import Scheduling
 
 _SESSION_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=SESSION_DEFAULT_FORWARD_ORDER,
-    backward_order=SESSION_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_forward,
-    backward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_backward,
     tiebreaker_order=SESSION_TIEBREAKER_ORDER,
 )
 
 _KERNEL_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
-    backward_order=KERNEL_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=KernelSchedulingHistoryConditions.by_cursor_forward,
-    backward_condition_factory=KernelSchedulingHistoryConditions.by_cursor_backward,
     tiebreaker_order=KERNEL_TIEBREAKER_ORDER,
 )
 
 _DEPLOYMENT_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEPLOYMENT_DEFAULT_FORWARD_ORDER,
-    backward_order=DEPLOYMENT_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=DeploymentHistoryConditions.by_cursor_forward,
-    backward_condition_factory=DeploymentHistoryConditions.by_cursor_backward,
     tiebreaker_order=DEPLOYMENT_TIEBREAKER_ORDER,
 )
 
 _REPLICA_GROUP_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
-    backward_order=REPLICA_GROUP_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=ReplicaGroupHistoryConditions.by_cursor_forward,
-    backward_condition_factory=ReplicaGroupHistoryConditions.by_cursor_backward,
     tiebreaker_order=REPLICA_GROUP_TIEBREAKER_ORDER,
 )
 
 _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=ROUTE_DEFAULT_FORWARD_ORDER,
-    backward_order=ROUTE_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=RouteHistoryConditions.by_cursor_forward,
-    backward_condition_factory=RouteHistoryConditions.by_cursor_backward,
     tiebreaker_order=ROUTE_TIEBREAKER_ORDER,
 )
 

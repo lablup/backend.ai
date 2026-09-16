@@ -49,6 +49,7 @@ from ai.backend.common.dto.manager.deployment.types import (
 )
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.manager.api.adapters.deployment.adapter import get_route_pagination_spec
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
     ModelRevisionCreator,
@@ -365,9 +366,15 @@ class RouteAdapter(BaseFilterAdapter):
         # Add cursor conditions if provided
         if request.cursor:
             if request.cursor_direction == "forward":
-                conditions.append(RouteConditions.by_cursor_forward(request.cursor))
+                conditions.append(
+                    get_route_pagination_spec().build_cursor_condition(request.cursor)
+                )
             elif request.cursor_direction == "backward":
-                conditions.append(RouteConditions.by_cursor_backward(request.cursor))
+                conditions.append(
+                    get_route_pagination_spec().build_cursor_condition(
+                        request.cursor, backward=True
+                    )
+                )
 
         pagination = self._build_pagination(request.limit, request.offset)
 

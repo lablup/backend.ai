@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -23,7 +22,6 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -75,74 +73,6 @@ async def db_with_tables(
     """Database connection with tables created for SQLAlchemy mapper initialization."""
     async with with_tables(database_connection, _WITH_TABLES):
         yield database_connection
-
-
-class TestScalingGroupConditionsCursor:
-    """Tests for cursor-related conditions in ScalingGroupConditions."""
-
-    def test_by_cursor_forward_returns_callable(self) -> None:
-        """Test that by_cursor_forward returns a callable QueryCondition."""
-        condition = ResourceGroupConditions.by_cursor_forward(str(uuid.uuid4()))
-        assert callable(condition)
-
-    def test_by_cursor_forward_returns_column_element(self) -> None:
-        """Test that by_cursor_forward() returns a SQLAlchemy ColumnElement."""
-        condition = ResourceGroupConditions.by_cursor_forward(str(uuid.uuid4()))
-        result = condition()
-        # Result should be a SQLAlchemy expression
-        assert isinstance(result, sa.sql.expression.ColumnElement)
-
-    def test_by_cursor_forward_rejects_non_uuid_cursor(self) -> None:
-        """Test that by_cursor_forward rejects a non-UUID cursor value."""
-        with pytest.raises(ValueError):
-            ResourceGroupConditions.by_cursor_forward("not-a-uuid")
-
-    def test_by_cursor_backward_returns_callable(self) -> None:
-        """Test that by_cursor_backward returns a callable QueryCondition."""
-        condition = ResourceGroupConditions.by_cursor_backward(str(uuid.uuid4()))
-        assert callable(condition)
-
-    def test_by_cursor_backward_returns_column_element(self) -> None:
-        """Test that by_cursor_backward() returns a SQLAlchemy ColumnElement."""
-        condition = ResourceGroupConditions.by_cursor_backward(str(uuid.uuid4()))
-        result = condition()
-        # Result should be a SQLAlchemy expression
-        assert isinstance(result, sa.sql.expression.ColumnElement)
-
-    def test_by_cursor_backward_rejects_non_uuid_cursor(self) -> None:
-        """Test that by_cursor_backward rejects a non-UUID cursor value."""
-        with pytest.raises(ValueError):
-            ResourceGroupConditions.by_cursor_backward("not-a-uuid")
-
-    def test_by_cursor_forward_uses_closure(self) -> None:
-        """Test that by_cursor_forward captures the value in closure."""
-        value1 = str(uuid.uuid4())
-        value2 = str(uuid.uuid4())
-
-        condition1 = ResourceGroupConditions.by_cursor_forward(value1)
-        condition2 = ResourceGroupConditions.by_cursor_forward(value2)
-
-        # Each condition should be independent (different closures)
-        result1 = condition1()
-        result2 = condition2()
-
-        # Bound parameters should show different values
-        assert result1.compile().params != result2.compile().params
-
-    def test_by_cursor_backward_uses_closure(self) -> None:
-        """Test that by_cursor_backward captures the value in closure."""
-        value1 = str(uuid.uuid4())
-        value2 = str(uuid.uuid4())
-
-        condition1 = ResourceGroupConditions.by_cursor_backward(value1)
-        condition2 = ResourceGroupConditions.by_cursor_backward(value2)
-
-        # Each condition should be independent (different closures)
-        result1 = condition1()
-        result2 = condition2()
-
-        # Bound parameters should show different values
-        assert result1.compile().params != result2.compile().params
 
 
 class TestScalingGroupOrdersCursor:

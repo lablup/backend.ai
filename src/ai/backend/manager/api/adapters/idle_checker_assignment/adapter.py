@@ -76,9 +76,6 @@ from ai.backend.manager.services.rbac.processors import RbacProcessors
 def _get_idle_checker_assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=IdleCheckerAssignmentOrders.created_at(ascending=False),
-        backward_order=IdleCheckerAssignmentOrders.created_at(ascending=True),
-        forward_condition_factory=IdleCheckerAssignmentConditions.by_cursor_forward,
-        backward_condition_factory=IdleCheckerAssignmentConditions.by_cursor_backward,
         tiebreaker_order=IdleCheckerAssignmentOrders.id(ascending=True),
     )
 

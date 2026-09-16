@@ -86,7 +86,6 @@ from ai.backend.manager.models.deployment_revision_preset.searchers import (
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
     ALLOCATED_SLOT_PRESET_TIEBREAKER,
     resolve_allocated_slot_preset_order,
@@ -124,9 +123,6 @@ from ai.backend.manager.types import OptionalState, TriState
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DeploymentRevisionPresetOrders.created_at(ascending=False),
-        backward_order=DeploymentRevisionPresetOrders.created_at(ascending=True),
-        forward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_backward,
         tiebreaker_order=DeploymentRevisionPresetRow.id.asc(),
     )
 
@@ -134,9 +130,6 @@ def _preset_pagination_spec() -> PaginationSpec:
 def _preset_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
-        forward_condition_factory=PresetResourceSlotConditions.by_cursor_forward,
-        backward_condition_factory=PresetResourceSlotConditions.by_cursor_backward,
         tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
     )
 
