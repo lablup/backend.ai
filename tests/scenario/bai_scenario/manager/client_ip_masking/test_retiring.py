@@ -1,4 +1,4 @@
-"""마스킹 정책 삭제 — id로 지정해 누가 삭제할 수 있고, 권한 검사를 끄면 무엇이 허용되는가.
+"""마스킹 정책 삭제 — id로 지정해 누가 삭제할 수 있는가.
 
 등록은 대상으로 행을 찾고 삭제는 id로 찾는다. 하나를 읽는 호출이 없어 id는 미리 만들어 둔 행에서
 읽는다.
@@ -204,10 +204,7 @@ class EnforcementOffLetsAnyonePurge(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다. "
-            "삭제는 등록과 달리 권한 그래프로 보호되므로 스위치가 영향을 준다"
-        )
+        return "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

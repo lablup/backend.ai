@@ -24,14 +24,14 @@ status: draft
 
 호출마다 통과해야 하는 검사가 다르다.
 
-| 호출 | 검사 | 통과하는 호출자 | 거부 예외 | `rbac.enforcement_enabled=false`일 때 |
-|---|---|---|---|---|
-| `admin_upsert` | 전역 역할 | 슈퍼관리자 | `InsufficientPrivilege` | 영향 없음 |
-| `admin_search` | 전역 역할 | 슈퍼관리자, 모니터 | `InsufficientPrivilege` | 영향 없음 |
-| `admin_purge` | 그 정책에 대한 엔티티 권한 | 슈퍼관리자 | `NotEnoughPermission` | 검사를 건너뛴다 |
+| 호출 | 검사 | 통과하는 호출자 | 거부 예외 |
+|---|---|---|---|
+| `admin_upsert` | 전역 역할 | 슈퍼관리자 | `InsufficientPrivilege` |
+| `admin_search` | 전역 역할 | 슈퍼관리자, 모니터 | `InsufficientPrivilege` |
+| `admin_purge` | 그 정책에 대한 엔티티 권한 | 슈퍼관리자 | `NotEnoughPermission` |
 
 정책은 어느 스코프에도 속하지 않으므로 `admin_purge`의 엔티티 권한을 부여받을 경로가 없다. 그래서
-권한 검사 스위치를 켠 상태에서 `admin_purge`를 통과하는 호출자도 결국 슈퍼관리자뿐이다.
+`admin_purge`를 통과하는 호출자도 결국 슈퍼관리자뿐이다.
 
 ## Upsert (`admin_upsert`)
 
@@ -91,10 +91,6 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 존재하지 않는 `id`는 호출자에 따라 다른 이유로 거부된다. 권한 검사가 행 조회보다 먼저 실행되고, 없는
 행에는 부여된 권한도 없으므로 일반 사용자는 `NotEnoughPermission`을 받는다. 권한 검사를 통과하는
 슈퍼관리자만 `EntityNotFoundError`를 본다.
-
-upsert와 purge는 서로 다른 검사를 거친다. 그 결과가 마지막 시나리오다 — 권한 검사를 끄면 아무
-권한 없는 사용자가 정책을 삭제할 수는 있지만 만들 수는 없다. 이것이 의도한 동작인지는 아직
-정해지지 않았다.
 
 soft delete는 없다.
 
