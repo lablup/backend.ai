@@ -49,6 +49,9 @@ from ai.backend.common.dto.manager.v2.rbac import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
+    MyAtomicBulkScopePermissionsInput,
+    MyScopePermissionsInput,
+    PermissionTarget,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
 )
@@ -109,6 +112,11 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UserNestedFilter as UserNestedFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    MyAtomicBulkScopePermissionsPayload,
+    MyScopePermissionsPayload,
+    ScopeEntityPermission,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
@@ -139,6 +147,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
+from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.permission import (
     PermissionAlreadyGranted,
@@ -188,6 +197,9 @@ from ai.backend.manager.services.permission_contoller.actions.delete_permission 
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
+    ScopedGetHeldPermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
 )
@@ -399,6 +411,53 @@ class RBACAdapter(BaseAdapter):
         for item in found.items:
             result_map[item.role_id].append(self._permission_data_to_node(item))
         return [result_map.get(role_id, []) for role_id in role_ids]
+
+    # ------------------------------------------------------------------ held permissions
+
+    async def my_scope_permissions(
+        self, input: MyScopePermissionsInput
+    ) -> MyScopePermissionsPayload:
+        """The bits the current user holds on one entity type within one scope."""
+        items = await self._scope_permissions([input.target])
+        return MyScopePermissionsPayload(item=items[0])
+
+    async def my_atomic_bulk_scope_permissions(
+        self, input: MyAtomicBulkScopePermissionsInput
+    ) -> MyAtomicBulkScopePermissionsPayload:
+        """The same answer for several targets, resolved in one grouped pass."""
+        return MyAtomicBulkScopePermissionsPayload(
+            items=await self._scope_permissions(input.targets)
+        )
+
+    async def _scope_permissions(
+        self, targets: Sequence[PermissionTarget]
+    ) -> list[ScopeEntityPermission]:
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        user_id = UserID(me.user_id)
+        keys = [self._govern_check_key(user_id, target) for target in targets]
+        action_result = await self._permission_controller.scoped_get_held_permissions.run(
+            ScopedGetHeldPermissionsAction(user_id=user_id, keys=keys)
+        )
+        granted = action_result.granted
+        return [
+            ScopeEntityPermission(
+                scope_type=target.scope_type,
+                scope_id=target.scope_id,
+                entity_type=target.entity_type,
+                permissions=[PermissionBitDTO.of(bit) for bit in granted.get(key, Permission.NONE)],
+            )
+            for target, key in zip(targets, keys, strict=True)
+        ]
+
+    def _govern_check_key(self, user_id: UserID, target: PermissionTarget) -> GovernCheckKey:
+        scope_type = EntityType.from_name(target.scope_type)
+        return GovernCheckKey(
+            user_id=user_id,
+            scope=self._scope_identifier(scope_type, str(target.scope_id)),
+            entity_type=EntityType.from_name(target.entity_type),
+        )
 
     # ------------------------------------------------------------------ permission catalog
 

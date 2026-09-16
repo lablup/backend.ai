@@ -49,6 +49,7 @@ class TestSearchScopes:
         """Create service with mocked repository."""
         return PermissionControllerService(
             repository=mock_repository,
+            permission_check=MagicMock(),
             action_registry=processor_registry,
         )
 

@@ -25,6 +25,7 @@ from .types import (
 )
 
 __all__ = (
+    "MAX_SCOPE_PERMISSION_TARGETS",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -39,9 +40,12 @@ __all__ = (
     "DeleteRoleInput",
     "EntityFilter",
     "EntityOrderBy",
+    "MyAtomicBulkScopePermissionsInput",
+    "MyScopePermissionsInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
+    "PermissionTarget",
     "PurgeRoleInput",
     "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
@@ -431,3 +435,31 @@ class SearchRoleAssignmentsInput(BaseRequestModel):
     before: str | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+MAX_SCOPE_PERMISSION_TARGETS = 100
+
+
+class PermissionTarget(BaseRequestModel):
+    """One scope and entity type to answer the caller's permissions for."""
+
+    scope_type: str = Field(description="Type of the scope, e.g. 'project'.")
+    scope_id: UUID = Field(description="ID of the scope.")
+    entity_type: str = Field(description="Entity type the permissions are asked about.")
+
+
+class MyScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on one scope and entity type."""
+
+    target: PermissionTarget = Field(description="The scope and entity type to answer for.")
+
+
+class MyAtomicBulkScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on several scopes and entity types."""
+
+    targets: list[PermissionTarget] = Field(
+        max_length=MAX_SCOPE_PERMISSION_TARGETS,
+        description=(
+            f"The scopes and entity types to answer for, at most {MAX_SCOPE_PERMISSION_TARGETS}."
+        ),
+    )

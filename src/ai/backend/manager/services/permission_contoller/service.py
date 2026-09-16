@@ -12,9 +12,16 @@ from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     PublicGetEntityTypesAction,
     PublicGetEntityTypesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
+    ScopedGetHeldPermissionsAction,
+    ScopedGetHeldPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
@@ -62,15 +69,25 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
+    _permission_check: RbacPermissionCheckRepository
     _action_registry: ProcessorRegistry[Any]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
+        permission_check: RbacPermissionCheckRepository,
         action_registry: ProcessorRegistry[Any],
     ) -> None:
         self._repository = repository
+        self._permission_check = permission_check
         self._action_registry = action_registry
+
+    async def get_held_permissions(
+        self, action: ScopedGetHeldPermissionsAction
+    ) -> ScopedGetHeldPermissionsActionResult:
+        """The bits each key's user holds, through every scope governing the named one."""
+        granted = await self._permission_check.governed_permissions(action.keys)
+        return ScopedGetHeldPermissionsActionResult(granted=granted)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""

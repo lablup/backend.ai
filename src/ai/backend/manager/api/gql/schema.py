@@ -355,8 +355,10 @@ from .rbac import (
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    my_atomic_bulk_scope_permissions,
     my_roles,
     my_roles_v2,
+    my_scope_permissions,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
@@ -693,6 +695,8 @@ class Query:
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
+    my_scope_permissions = my_scope_permissions
+    my_atomic_bulk_scope_permissions = my_atomic_bulk_scope_permissions
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs

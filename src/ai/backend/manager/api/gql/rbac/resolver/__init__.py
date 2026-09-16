@@ -8,6 +8,8 @@ from .permission import (
     admin_permissions,
     admin_replace_role_permissions,
     admin_update_permission,
+    my_atomic_bulk_scope_permissions,
+    my_scope_permissions,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
@@ -49,6 +51,8 @@ __all__ = [
     "admin_role_assignments",
     "my_roles",
     "my_roles_v2",
+    "my_atomic_bulk_scope_permissions",
+    "my_scope_permissions",
     "project_roles",
     # Role mutations
     "admin_create_role",
