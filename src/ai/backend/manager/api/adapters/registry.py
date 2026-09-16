@@ -307,6 +307,7 @@ class Adapters:
                 processors.vfolder_file,
                 processors.vfolder_admin,
                 processors.deployment,
+                processors.vfolder_mount_policy,
             ),
             vfs_storage=VFSStorageAdapter(processors.vfs_storage),
         )

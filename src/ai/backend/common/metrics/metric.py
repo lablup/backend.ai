@@ -493,6 +493,7 @@ class LayerType(enum.StrEnum):
     SCHEDULE_REPOSITORY = "schedule_repository"
     SCHEDULER_REPOSITORY = "scheduler_repository"
     SCHEDULING_HISTORY_REPOSITORY = "scheduling_history_repository"
+    SERVICE_CATALOG_REPOSITORY = "service_catalog_repository"
     SESSION_REPOSITORY = "session_repository"
     STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
     USER_REPOSITORY = "user_repository"

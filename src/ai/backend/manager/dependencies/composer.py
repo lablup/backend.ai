@@ -247,6 +247,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 deployment_revision_preset_repository=domain.repositories.deployment_revision_preset.repository,
                 runtime_variant_repository=domain.repositories.runtime_variant.repository,
                 agent_selector=agent_selector,
+                ops_provider=domain.repositories.v2_ops_provider,
             ),
         )
 

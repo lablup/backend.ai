@@ -10,17 +10,11 @@ from ai.backend.common.dto.manager.v2.artifact_registry.response import Artifact
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.models.artifact_registries.conditions import ArtifactRegistryConditions
-from ai.backend.manager.models.artifact_registries.searchers import ArtifactRegistrySearcher
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
     GetArtifactRegistryMetasAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.common.search import (
-    SearchArtifactRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.lookup import (
     LookupArtifactRegistryAction,
@@ -75,23 +69,20 @@ class ArtifactRegistryAdapter(BaseAdapter):
 
     async def batch_load_by_ids(
         self, ids: Sequence[ArtifactRegistryID]
-    ) -> list[ArtifactRegistryGQLNode | None]:
-        """Batch load artifact registries by IDs for DataLoader use.
-
-        Returns ArtifactRegistryGQLNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[ArtifactRegistryGQLNode | Exception | None]:
+        """Batch load artifact registries by their registry ids for DataLoader use, checked per
+        registry."""
         if not ids:
             return []
-        action_result = await self._artifact_registry.search_artifact_registries.run(
-            SearchArtifactRegistriesAction(
-                searcher=ArtifactRegistrySearcher(
-                    pagination=OffsetPagination(limit=len(ids)),
-                    conditions=[ArtifactRegistryConditions.by_ids(ids)],
-                )
-            )
+        result = await self._artifact_registry.get_registry_metas.run(
+            GetArtifactRegistryMetasAction(registry_ids=list(ids))
         )
-        registry_map = {item.id: self._data_to_dto(item) for item in action_result.registries}
-        return [registry_map.get(ArtifactRegistryID(registry_id)) for registry_id in ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     @staticmethod
     def _data_to_dto(data: ArtifactRegistryData) -> ArtifactRegistryGQLNode:

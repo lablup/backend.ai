@@ -14,6 +14,7 @@ has already passed through auth_middleware.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from http import HTTPStatus
 from unittest.mock import AsyncMock, MagicMock
@@ -22,7 +23,10 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -47,7 +51,7 @@ from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionRe
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairActionResult,
 )
-from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleActionResult
+from ai.backend.manager.services.auth.actions.get_role import GetRoleActionResult
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairActionResult
 from ai.backend.manager.services.auth.actions.signout import SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupActionResult
@@ -87,6 +91,22 @@ def user_context() -> UserContext:
         is_admin=False,
         is_superadmin=False,
     )
+
+
+@pytest.fixture
+def acting_user(user_context: UserContext) -> Iterator[UserData]:
+    """The request's effective user, set in the context the way the auth middleware sets it."""
+    user = UserData(
+        user_id=user_context.user_uuid,
+        is_authorized=True,
+        is_admin=user_context.is_admin,
+        is_superadmin=user_context.is_superadmin,
+        role=user_context.user_role,
+        domain_name=user_context.user_domain,
+        domain_id=DomainID(uuid.uuid4()),
+    )
+    with with_user(user):
+        yield user
 
 
 @pytest.fixture
@@ -443,6 +463,7 @@ class TestGetRole:
         self,
         handler: AuthHandler,
         user_context: UserContext,
+        acting_user: UserData,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and roles are returned."""
@@ -450,8 +471,8 @@ class TestGetRole:
         domain_role = "user"
         query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
         query.from_query({})
-        mock_processors.auth.public_get_role.run = AsyncMock(
-            return_value=PublicGetRoleActionResult(
+        mock_processors.auth.get_role.run = AsyncMock(
+            return_value=GetRoleActionResult(
                 global_role=global_role,
                 domain_role=domain_role,
                 group_role=None,
@@ -460,7 +481,7 @@ class TestGetRole:
 
         response = await handler.get_role(query, user_context)
 
-        mock_processors.auth.public_get_role.run.assert_called_once()
+        mock_processors.auth.get_role.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
@@ -473,14 +494,15 @@ class TestGetRole:
         self,
         handler: AuthHandler,
         user_context: UserContext,
+        acting_user: UserData,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify group parameter is passed to Action."""
+        """Verify the acting user and group parameter are passed to Action."""
         group_uuid = uuid.uuid4()
         query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
         query.from_query({"group": str(group_uuid)})
-        mock_processors.auth.public_get_role.run = AsyncMock(
-            return_value=PublicGetRoleActionResult(
+        mock_processors.auth.get_role.run = AsyncMock(
+            return_value=GetRoleActionResult(
                 global_role="user",
                 domain_role="user",
                 group_role="member",
@@ -489,7 +511,8 @@ class TestGetRole:
 
         await handler.get_role(query, user_context)
 
-        action = mock_processors.auth.public_get_role.run.call_args[0][0]
+        action = mock_processors.auth.get_role.run.call_args[0][0]
+        assert action.user_id == acting_user.user_id
         assert action.group_id == group_uuid
 
 

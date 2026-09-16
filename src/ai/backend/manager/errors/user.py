@@ -3,10 +3,11 @@ from typing import override
 from aiohttp import web
 
 from ai.backend.common.data.entity.keypair import KeyPairFieldType
+from ai.backend.common.data.entity.resource_policy import UserResourcePolicyEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.exception import ErrorDetail
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode, EntityNotFoundError
 from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 
 
@@ -92,6 +93,19 @@ class UserPurgeFailure(EntityError, web.HTTPInternalServerError):
         return EntityErrorCode(
             UserEntityType(), ActionOperationType.PURGE, ErrorDetail.INTERNAL_ERROR
         )
+
+
+class UserResourcePolicyNotFound(EntityNotFoundError):
+    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
+    error_title = "The user resource policy does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, entity_type=UserResourcePolicyEntityType(), operation=operation)
 
 
 class KeyPairNotFound(FieldError, web.HTTPNotFound):

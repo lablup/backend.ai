@@ -1,5 +1,4 @@
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
@@ -88,7 +87,6 @@ class DomainProcessors:
         self,
         group: ProcessorGroup[DomainData],
         service: DomainService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup = group.public_lookup_ops(LookupDomainAction)

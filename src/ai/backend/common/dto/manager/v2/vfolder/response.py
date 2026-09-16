@@ -95,6 +95,37 @@ class VFolderInvitationNode(BaseResponseModel):
     )
 
 
+class VFolderMountPolicyNode(BaseResponseModel):
+    """The mount level one user gets on a virtual folder."""
+
+    id: UUID = Field(description="Mount policy row ID")
+    vfolder_id: UUID = Field(description="ID of the virtual folder")
+    user_id: UUID = Field(description="User the mount level is set for")
+    permission: VFolderPermissionField = Field(description="Mount level: none, ro or rw")
+    created_at: datetime = Field(description="When the row was first set")
+    updated_at: datetime = Field(description="When the level was last replaced")
+
+
+class SetVFolderMountPolicyPayload(BaseResponseModel):
+    """Payload for setting a mount policy."""
+
+    policy: VFolderMountPolicyNode = Field(description="The mount level now set")
+
+
+class UnsetVFolderMountPolicyPayload(BaseResponseModel):
+    """Payload for unsetting a mount policy."""
+
+    vfolder_id: UUID = Field(description="ID of the virtual folder")
+    user_id: UUID = Field(description="User whose mount level was taken back")
+    removed: bool = Field(description="Whether a row was removed")
+
+
+class VFolderMountPoliciesPayload(BaseResponseModel):
+    """Payload listing the mount levels set on a virtual folder."""
+
+    items: list[VFolderMountPolicyNode] = Field(description="One row per user")
+
+
 class FileEntryNode(BaseResponseModel):
     """Node model representing a file entry inside a virtual folder."""
 

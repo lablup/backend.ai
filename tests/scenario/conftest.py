@@ -13,6 +13,19 @@ from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 import pytest
+
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
+from ai.backend.manager.actions.validators.build import build_action_validators
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.testutils.bootstrap import flush_redis
+from ai.backend.testutils.scenario_steps import Configured
 from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
 from bai_scenario.db import (
     TemplateDatabase,
@@ -25,17 +38,7 @@ from bai_scenario.monitors import ActionRecorder
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
-
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.build import build_action_validators
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
-from ai.backend.testutils.scenario_steps import Configured
+from bai_scenario.valkey import ScenarioValkey
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
@@ -76,6 +79,28 @@ async def engine(template: TemplateDatabase, test_db: str) -> AsyncIterator[Any]
     await engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def valkey_addr(redis_container: tuple[str, HostPortPairModel]) -> HostPortPairModel:
+    _, addr = redis_container
+    return addr
+
+
+@pytest.fixture
+async def valkey(
+    valkey_addr: HostPortPairModel, config: ManagerConfigProvider
+) -> AsyncIterator[ScenarioValkey]:
+    """The real server, cleared of what the previous test left.
+
+    The database is copied per test; a server has no such thing, so every key goes.
+    """
+    flush_redis(valkey_addr.host, valkey_addr.port)
+    clients = await ScenarioValkey.create(config)
+    try:
+        yield clients
+    finally:
+        await clients.close()
+
+
 @pytest.fixture
 def recorder() -> ActionRecorder:
     return ActionRecorder()
@@ -86,6 +111,7 @@ def config(
     request: pytest.FixtureRequest,
     template: TemplateDatabase,
     test_db: str,
+    valkey_addr: HostPortPairModel,
 ) -> ManagerConfigProvider:
     """The config this test runs under: the base, plus what a scenario overrides.
 
@@ -96,13 +122,15 @@ def config(
     asked = callspec.params.get("scenario") if callspec is not None else None
     overrides = dict(asked.config()) if isinstance(asked, Configured) else {}
     return ScenarioConfigProvider(
-        make_config(base_config_dict(template.addr, test_db, None), overrides)
+        make_config(base_config_dict(template.addr, test_db, valkey_addr), overrides)
     )
 
 
 @pytest.fixture
 def validators(engine: Any, config: ManagerConfigProvider) -> V2ActionValidators:
-    return build_action_validators(PermissionControllerRepository(engine), config)
+    return build_action_validators(
+        RbacPermissionCheckRepository(PermissionOpsProvider(engine), config), config
+    )
 
 
 @pytest.fixture

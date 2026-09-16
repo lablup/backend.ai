@@ -46,7 +46,6 @@ async def adapter(
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
             DomainService(DomainRepository(engine, provider)),
-            [],
         ),
         ResourceGroupProcessors(
             registry.group(GroupMeta(ResourceGroupEntityType())),

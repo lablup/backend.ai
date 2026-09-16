@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Mapping, MutableMapping
-from contextlib import asynccontextmanager
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import (
     Final,
 )
@@ -30,7 +28,6 @@ from ai.backend.logging import BraceStyleAdapter
 from .client.manager import ManagerHTTPClientPool
 from .config.unified import StorageProxyUnifiedConfig
 from .context_types import ArtifactVerifierContext
-from .errors import InvalidVolumeError
 from .plugin import (
     StorageArtifactVerifierPluginContext,
 )
@@ -84,7 +81,6 @@ class RootContext:
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
-    volumes: MutableMapping[str, AbstractVolume]
     artifact_verifier_ctx: ArtifactVerifierContext
 
     async def init_storage_artifact_verifier_plugin(self) -> None:
@@ -98,32 +94,3 @@ class RootContext:
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}
-
-    @asynccontextmanager
-    async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
-        if name in self.volumes:
-            yield self.volumes[name]
-        else:
-            try:
-                volume_config = self.local_config.volume[name]
-            except KeyError as e:
-                raise InvalidVolumeError(name) from e
-            volume_cls: type[AbstractVolume] = self.backends[volume_config.backend]
-            volume_obj = volume_cls(
-                local_config=self.local_config.model_dump(by_alias=True),
-                mount_path=Path(volume_config.path),
-                options=volume_config.options or {},
-                etcd=self.etcd,
-                event_dispatcher=self.event_dispatcher,
-                event_producer=self.event_producer,
-                watcher=self.watcher,
-            )
-
-            await volume_obj.init()
-            self.volumes[name] = volume_obj
-
-            yield volume_obj
-
-    async def shutdown_volumes(self) -> None:
-        for volume in self.volumes.values():
-            await volume.shutdown()

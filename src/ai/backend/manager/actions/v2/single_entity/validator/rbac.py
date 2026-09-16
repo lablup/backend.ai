@@ -11,20 +11,20 @@ from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEnt
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.virtual_entity import OwnCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 
 
 class VirtualEntitySingleEntityActionRBACValidator(SingleEntityActionValidator):
     """Single-entity RBAC validator: the own check on the action's entity."""
 
-    _repository: PermissionControllerRepository
+    _repository: RbacPermissionCheckRepository
     _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
-        repository: PermissionControllerRepository,
+        repository: RbacPermissionCheckRepository,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._repository = repository

@@ -69,6 +69,15 @@ class V2RBACClient(BaseDomainClient):
             response_model=AdminSearchRolesPayload,
         )
 
+    async def my_search_roles(self, request: SearchRolesInput) -> AdminSearchRolesPayload:
+        """Search the roles the current authenticated user holds."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/roles/my/search",
+            request=request,
+            response_model=AdminSearchRolesPayload,
+        )
+
     async def project_search_roles(
         self, project_id: UUID, request: SearchRolesInput
     ) -> AdminSearchRolesPayload:

@@ -3,10 +3,10 @@ from typing import override
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import UnreachableError
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 
 __all__ = ("SuperAdminActionValidator",)
@@ -20,7 +20,7 @@ class SuperAdminActionValidator(GlobalActionValidator):
     """
 
     @override
-    async def validate(self, action: BaseGlobalAction, meta: BaseActionTriggerMeta) -> None:
+    async def validate(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")

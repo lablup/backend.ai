@@ -24,13 +24,12 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
-    GetScopeTypesActionResult,
+    PublicGetScopeTypesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    SearchScopesActionResult,
+    GlobalSearchScopesActionResult,
 )
 
 
@@ -52,19 +51,6 @@ def make_test_superadmin_ctx() -> UserContext:
     )
 
 
-def make_test_user_ctx() -> UserContext:
-    """Create a UserContext for a regular (non-superadmin) user."""
-    return UserContext(
-        user_uuid=uuid4(),
-        user_email="user@test.com",
-        user_domain="default",
-        user_role=UserRole.USER,
-        access_key="USERKEY",
-        is_admin=False,
-        is_superadmin=False,
-    )
-
-
 class TestGetScopeTypesHandler:
     """Tests for get_scope_types handler."""
 
@@ -74,19 +60,19 @@ class TestGetScopeTypesHandler:
     def mock_permission_controller(self) -> MagicMock:
         """Create mock permission controller processors."""
         pc = MagicMock()
-        pc.get_scope_types = MagicMock()
-        pc.get_scope_types.wait_for_complete = AsyncMock()
+        pc.public_get_scope_types = MagicMock()
+        pc.public_get_scope_types.run = AsyncMock()
         return pc
 
     async def test_get_scope_types_returns_scope_types(
         self,
         mock_permission_controller: MagicMock,
     ) -> None:
-        """Test get_scope_types returns all scope types for superadmin."""
+        """Test get_scope_types returns all scope types."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        action_result = GetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
-        mock_permission_controller.get_scope_types.wait_for_complete.return_value = action_result
+        action_result = PublicGetScopeTypesActionResult(entity_types=self.SCOPE_TYPES)
+        mock_permission_controller.public_get_scope_types.run.return_value = action_result
 
         response = await handler.get_scope_types(ctx=ctx)
 
@@ -95,17 +81,6 @@ class TestGetScopeTypesHandler:
         assert isinstance(response_json, dict)
         assert "items" in response_json
         assert response_json["items"] == self.SCOPE_TYPES
-
-    async def test_get_scope_types_rejects_non_superadmin(
-        self,
-        mock_permission_controller: MagicMock,
-    ) -> None:
-        """Test get_scope_types rejects non-superadmin users."""
-        handler = make_test_handler(mock_permission_controller)
-        ctx = make_test_user_ctx()
-
-        with pytest.raises(NotEnoughPermission):
-            await handler.get_scope_types(ctx=ctx)
 
 
 class TestSearchScopesHandler:
@@ -124,8 +99,8 @@ class TestSearchScopesHandler:
     def mock_permission_controller(self) -> MagicMock:
         """Create mock permission controller processors."""
         pc = MagicMock()
-        pc.search_scopes = MagicMock()
-        pc.search_scopes.wait_for_complete = AsyncMock()
+        pc.global_search_scopes = MagicMock()
+        pc.global_search_scopes.run = AsyncMock()
         return pc
 
     @staticmethod
@@ -146,9 +121,9 @@ class TestSearchScopesHandler:
         return param
 
     @pytest.fixture
-    def single_scope_result(self) -> SearchScopesActionResult:
+    def single_scope_result(self) -> GlobalSearchScopesActionResult:
         """Create action result with single scope item."""
-        return SearchScopesActionResult(
+        return GlobalSearchScopesActionResult(
             result=SearchResult(
                 items=[
                     ScopeData(
@@ -163,9 +138,9 @@ class TestSearchScopesHandler:
         )
 
     @pytest.fixture
-    def paginated_scope_result(self) -> SearchScopesActionResult:
+    def paginated_scope_result(self) -> GlobalSearchScopesActionResult:
         """Create action result with pagination."""
-        return SearchScopesActionResult(
+        return GlobalSearchScopesActionResult(
             result=SearchResult(
                 items=[
                     ScopeData(
@@ -181,9 +156,9 @@ class TestSearchScopesHandler:
         )
 
     @pytest.fixture
-    def empty_scope_result(self) -> SearchScopesActionResult:
+    def empty_scope_result(self) -> GlobalSearchScopesActionResult:
         """Create empty action result."""
-        return SearchScopesActionResult(
+        return GlobalSearchScopesActionResult(
             result=SearchResult(
                 items=[],
                 total_count=0,
@@ -195,14 +170,12 @@ class TestSearchScopesHandler:
     async def test_search_scopes_returns_results(
         self,
         mock_permission_controller: MagicMock,
-        single_scope_result: SearchScopesActionResult,
+        single_scope_result: GlobalSearchScopesActionResult,
     ) -> None:
         """Test search_scopes returns scope results for superadmin."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        mock_permission_controller.search_scopes.wait_for_complete.return_value = (
-            single_scope_result
-        )
+        mock_permission_controller.global_search_scopes.run.return_value = single_scope_result
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
         body = self._make_body_param()
 
@@ -219,14 +192,12 @@ class TestSearchScopesHandler:
     async def test_search_scopes_with_pagination(
         self,
         mock_permission_controller: MagicMock,
-        paginated_scope_result: SearchScopesActionResult,
+        paginated_scope_result: GlobalSearchScopesActionResult,
     ) -> None:
         """Test search_scopes returns correct pagination info."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        mock_permission_controller.search_scopes.wait_for_complete.return_value = (
-            paginated_scope_result
-        )
+        mock_permission_controller.global_search_scopes.run.return_value = paginated_scope_result
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
         body = self._make_body_param(limit=self.PAGINATION_LIMIT, offset=self.DEFAULT_OFFSET)
 
@@ -242,31 +213,18 @@ class TestSearchScopesHandler:
     async def test_search_scopes_calls_processor_with_action(
         self,
         mock_permission_controller: MagicMock,
-        empty_scope_result: SearchScopesActionResult,
+        empty_scope_result: GlobalSearchScopesActionResult,
     ) -> None:
         """Test search_scopes calls processor with correct action."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        mock_permission_controller.search_scopes.wait_for_complete.return_value = empty_scope_result
+        mock_permission_controller.global_search_scopes.run.return_value = empty_scope_result
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
         body = self._make_body_param()
 
         await handler.search_scopes(path=path, body=body, ctx=ctx)
 
-        mock_permission_controller.search_scopes.wait_for_complete.assert_called_once()
-        call_args = mock_permission_controller.search_scopes.wait_for_complete.call_args
+        mock_permission_controller.global_search_scopes.run.assert_called_once()
+        call_args = mock_permission_controller.global_search_scopes.run.call_args
         action = call_args[0][0]
         assert action.scope_type == self.TEST_SCOPE_TYPE
-
-    async def test_search_scopes_rejects_non_superadmin(
-        self,
-        mock_permission_controller: MagicMock,
-    ) -> None:
-        """Test search_scopes rejects non-superadmin users."""
-        handler = make_test_handler(mock_permission_controller)
-        ctx = make_test_user_ctx()
-        path = self._make_path_param(self.TEST_SCOPE_TYPE)
-        body = self._make_body_param()
-
-        with pytest.raises(NotEnoughPermission):
-            await handler.search_scopes(path=path, body=body, ctx=ctx)

@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-Not exercised by any scenario: admin_search_kernels, batch_load_by_ids, batch_load_fields, batch_load_kernels_by_ids, batch_resource_allocation_by_kernel, batch_resource_allocation_by_session, compute_schedule, enqueue, exclude_idle_checks, get, get_logs, gql_search_by_project, include_idle_checks, my_search, project_search, search_kernels_by_agent, search_kernels_by_session, search_sessions_by_agent, shutdown_service, start_service, terminate, update.
+Not exercised by any scenario: admin_search_kernels, batch_load_by_ids, batch_load_fields, batch_load_kernels_by_ids, batch_resource_allocation_by_kernel, batch_resource_allocation_by_session, compute_schedule, enqueue, exclude_idle_checks, get, get_logs, gql_search_by_project, include_idle_checks, my_search, project_search, scoped_search, search_kernels_by_agent, search_kernels_by_session, search_sessions_by_agent, shutdown_service, start_service, terminate, update.
 
 ### session
 
@@ -34,7 +34,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-sessions](/tests/scenario/bai_scenario/manager/session/test_session.py) — pass
 
-세션 조회는 역할이 아니라 스코프 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다
+필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다
 
 Given
 
@@ -53,5 +53,5 @@ When
 Then
 
 - 거부된다
-  - 거부: NotEnoughPermission
+  - 거부: InsufficientPrivilege
 

@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -38,12 +39,10 @@ from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
@@ -52,7 +51,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -62,6 +61,7 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -94,9 +94,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
-    VFolderInvitationRow,
-    VFolderPermissionRow,
     VFolderRow,
+    VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.vfolder.creators import ProjectVFolderCreator
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
@@ -125,7 +124,7 @@ class TestVfolderRepository:
         domain_name: str,
         group_id: uuid.UUID,
         user_id: uuid.UUID,
-        permission: VFolderMountPermission = VFolderMountPermission.READ_ONLY,
+        permission: VFolderMountPolicy = VFolderMountPolicy.READ_ONLY,
         usage_mode: VFolderUsageMode = VFolderUsageMode.MODEL,
         name: str | None = None,
     ) -> ProjectVFolderCreator:
@@ -135,7 +134,7 @@ class TestVfolderRepository:
             domain_name=domain_name,
             quota_scope_id=f"project:{group_id}",
             usage_mode=usage_mode,
-            permission=permission,
+            default_mount_permission=permission,
             host="local",
             creator_id=user_id,
             project=ProjectID(group_id),
@@ -177,7 +176,7 @@ class TestVfolderRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 EntityMembershipCapRow,
@@ -185,6 +184,7 @@ class TestVfolderRepository:
                 ScopeBindingRow,
                 EntityLabelRow,
                 PermissionRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -387,7 +387,7 @@ class TestVfolderRepository:
             domain_name=test_domain.domain_name,
             group_id=test_model_store_group,
             user_id=test_user,
-            permission=VFolderMountPermission.READ_ONLY,
+            permission=VFolderMountPolicy.READ_ONLY,
             usage_mode=VFolderUsageMode.MODEL,
         )
 
@@ -395,10 +395,67 @@ class TestVfolderRepository:
 
         vfolder_data = creation.vfolder
         assert vfolder_data.name == creator.name
-        assert vfolder_data.permission == VFolderMountPermission.READ_ONLY
+        assert vfolder_data.default_mount_permission == VFolderMountPolicy.READ_ONLY
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
+
+    async def test_a_project_folder_maker_gets_a_read_write_row(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_model_store_group: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+
+        policies = await vfolder_repository.list_user_mount_policies(creation.vfolder.id)
+        assert [(p.user_id, p.permission) for p in policies] == [
+            (test_user, VFolderMountPolicy.READ_WRITE)
+        ]
+
+    async def test_setting_a_user_mount_policy_replaces_what_stood(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_model_store_group: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
+        )
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        folder_id = creation.vfolder.id
+
+        await vfolder_repository.set_user_mount_policy(
+            folder_id, UserID(test_user), VFolderMountPolicy.NONE
+        )
+
+        held = await vfolder_repository.user_mount_policies_of(UserID(test_user), [folder_id])
+        assert held == {folder_id: VFolderMountPolicy.NONE}
+        assert len(await vfolder_repository.list_user_mount_policies(folder_id)) == 1
+
+    async def test_unsetting_a_user_mount_policy(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_model_store_group: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
+        )
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        folder_id = creation.vfolder.id
+
+        assert await vfolder_repository.unset_user_mount_policy(folder_id, UserID(test_user))
+        assert not await vfolder_repository.unset_user_mount_policy(folder_id, UserID(test_user))
+
+        assert await vfolder_repository.user_mount_policies_of(UserID(test_user), [folder_id]) == {}
 
     async def test_a_name_already_standing_in_the_project_is_refused(
         self,
@@ -879,7 +936,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         user_with_active_keypair: uuid.UUID,
     ) -> None:
         """A keypair that is not the default one does not supply the policy."""
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(KeyPairNotFound):
             await vfolder_repository.get_allowed_vfolder_hosts(
                 user_uuid=user_with_active_keypair,
                 group_uuid=None,
@@ -889,7 +946,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         self,
         vfolder_repository: VfolderRepository,
     ) -> None:
-        """Unknown user UUID raises UserNotFound rather than ObjectNotFound."""
+        """Unknown user UUID raises UserNotFound rather than KeyPairNotFound."""
         with pytest.raises(UserNotFound):
             await vfolder_repository.get_allowed_vfolder_hosts(
                 user_uuid=uuid.uuid4(),
@@ -969,6 +1026,7 @@ class TestVfolderRepositoryPurge:
                 ModelCardRow,
                 EntityFieldRow,
                 PermissionRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1082,7 +1140,7 @@ class TestVfolderRepositoryPurge:
                 domain_name=domain_name,
                 quota_scope_id=f"user:{user_id}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 max_files=0,
                 max_size=None,
                 num_files=0,
@@ -1319,8 +1377,6 @@ class TestVfolderRepositoryDeleteForever:
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
-                VFolderInvitationRow,
-                VFolderPermissionRow,
                 ResourceSlotTypeRow,
                 # Endpoint / session tables — required by the purge in-use guards
                 # (get_sessions_by_mounted_folder + active-endpoint reference check).
@@ -1338,6 +1394,7 @@ class TestVfolderRepositoryDeleteForever:
                 ModelCardRow,
                 ModelCardResourceRequirementRow,
                 EntityFieldRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1485,7 +1542,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -2296,7 +2353,7 @@ class TestVFolderRepositoryTrashAndRestore:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_uuid}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,

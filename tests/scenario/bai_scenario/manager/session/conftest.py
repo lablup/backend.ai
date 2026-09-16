@@ -1,8 +1,8 @@
 """The session adapter, assembled for one row.
 
 A session read answers through a service whose constructor demands eleven dependencies.
-Ten of them are named unwired here, so a row that reaches one fails saying which rather
-than passing against a mock that answered on its own.
+Three of them run against the real database and the real Valkey server; the other eight
+are named unwired, so a row that reaches one fails saying which.
 """
 
 from __future__ import annotations
@@ -12,15 +12,9 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from bai_scenario.fakes.storage_proxy import (
-    FakeStorageProxyManagerFacingClient,
-    FakeStorageSessionManager,
-)
-from bai_scenario.runner.unwired import unwired
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AbstractKVStore
@@ -31,21 +25,36 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -56,6 +65,12 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from bai_scenario.fakes.storage_proxy import (
+    FakeStorageProxyManagerFacingClient,
+    FakeStorageSessionManager,
+)
+from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 
 @pytest.fixture
@@ -76,6 +91,7 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
     storage: FakeStorageProxyManagerFacingClient,
+    valkey: ScenarioValkey,
 ) -> SessionAdapter:
     provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
@@ -88,14 +104,15 @@ async def adapter(
     scheduler_repository = SchedulerRepository(
         engine,
         ReconcileOpsProvider(engine),
-        unwired(ValkeyStatClient, "only a scheduling run reads the per-agent hints"),
-        unwired(ValkeyScheduleClient, "only a scheduling run marks work"),
+        valkey.stat,
+        valkey.schedule,
         config,
         FakeStorageSessionManager({"local": storage}),
+        RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
     )
     service = SessionService(
         SessionServiceArgs(
-            session_repository=SessionRepository(engine),
+            session_repository=SessionRepository(engine, provider),
             scheduler_repository=scheduler_repository,
             user_repository=unwired(UserRepository, "only writes resolve the owner"),
             agent_registry=unwired(AgentRegistry, "only session writes reach the agents"),
@@ -110,7 +127,7 @@ async def adapter(
                     config_provider=config,
                     storage_manager=FakeStorageSessionManager({"local": storage}),
                     event_producer=unwired(EventProducer, "nothing here waits on the event"),
-                    valkey_schedule=unwired(ValkeyScheduleClient, "only a run marks work"),
+                    valkey_schedule=valkey.schedule,
                     network_plugin_ctx=unwired(
                         NetworkPluginContext, "no session asks for a network"
                     ),
@@ -126,6 +143,12 @@ async def adapter(
         SessionProcessors(
             registry.group(GroupMeta(SessionEntityType())),
             registry.group(GroupMeta(ResourceGroupEntityType())),
+            registry.group(GroupMeta(SessionEntityType())).field_group(
+                FieldGroupMeta(KernelFieldType()),
+                KernelInfo,
+                LookupKernelFieldOwnerAction,
+                LookupBulkKernelOwnerAction,
+            ),
             unwired(ResourceAllocationProcessors, "only allocation reads reach it"),
             service,
         ),

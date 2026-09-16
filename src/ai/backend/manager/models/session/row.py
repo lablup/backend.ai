@@ -808,6 +808,7 @@ class SessionRow(CreatedAtMixin, Base):
             network_type=self.network_type,
             network_id=self.network_id,
             replica_id=self.replica_id,
+            created_at=self.created_at,
         )
 
     def to_session_info(self) -> SessionInfo:

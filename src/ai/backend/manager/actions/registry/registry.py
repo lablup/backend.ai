@@ -63,6 +63,62 @@ class ConcernGroups[TData: EntityData]:
     ) -> FieldGroup[TFieldData]:
         return FieldGroup(self._deps, self._records, self._concern, meta, GlobalEntityType())
 
+    def dangling_lookup_field_group[TFieldData: FieldData](
+        self,
+        meta: FieldGroupMeta,
+        data_cls: type[TFieldData],
+        owner_lookup_action_cls: type[LookupRuntimeFieldOwnerOpsAction[Any]],
+        bulk_owner_lookup_action_cls: type[LookupBulkRuntimeFieldOwnerOpsAction[Any]],
+    ) -> LookupFieldGroup[TFieldData]:
+        """The operations over a field kind whose owner is not fixed, including the ones
+        that name a single row.
+
+        :meth:`dangling_field_group` with the owner lookups built, so a row can be named
+        by its own id: the lookup reads the type beside the id, and the operation that
+        follows is answered for by the entity both name.
+        """
+        self._record_lookup(meta, owner_lookup_action_cls)
+        self._record_lookup(meta, bulk_owner_lookup_action_cls)
+        owner_lookup: OwnerLookupProcessor = LookupActionProcessor(
+            RuntimeFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.lookup,
+            validators=self._deps.validators.lookup,
+            post_validators=self._deps.validators.single_entity,
+        )
+        bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
+            BulkRuntimeFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.bulk_lookup,
+            post_validators=self._deps.validators.atomic_bulk,
+        )
+        partial_bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
+            BulkRuntimeFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.bulk_lookup,
+        )
+        return LookupFieldGroup(
+            self._deps,
+            self._records,
+            self._concern,
+            meta,
+            GlobalEntityType(),
+            owner_lookup,
+            bulk_owner_lookup,
+            partial_bulk_owner_lookup,
+            bulk_owner_lookup_action_cls,
+        )
+
+    def _record_lookup(self, meta: FieldGroupMeta, action_cls: type[Any]) -> None:
+        self._records.append(
+            WiredProcessor(
+                concern=self._concern,
+                entity_type=GlobalEntityType(),
+                field_type=meta.field_type,
+                action_cls=action_cls,
+                kind=ActionKind.LOOKUP,
+                gate=ActionGate.PERMISSION,
+                backing=ActionBacking.GENERIC,
+            )
+        )
+
 
 class ProcessorRegistry[TData: EntityData]:
     _deps: ProcessorDependencies[TData]
@@ -98,53 +154,12 @@ class ProcessorRegistry[TData: EntityData]:
         owner_lookup_action_cls: type[LookupRuntimeFieldOwnerOpsAction[Any]],
         bulk_owner_lookup_action_cls: type[LookupBulkRuntimeFieldOwnerOpsAction[Any]],
     ) -> LookupFieldGroup[TFieldData]:
-        """The operations over a field kind whose owner is not fixed, including the ones
-        that name a single row.
-
-        :meth:`dangling_field_group` with the owner lookups built, so a row can be named
-        by its own id: the lookup reads the type beside the id, and the operation that
-        follows is answered for by the entity both name.
-        """
-        self._record_lookup(meta, owner_lookup_action_cls)
-        self._record_lookup(meta, bulk_owner_lookup_action_cls)
-        owner_lookup: OwnerLookupProcessor = LookupActionProcessor(
-            RuntimeFieldOwnerLookupService(self._deps.repository).execute,
-            monitors=self._deps.monitors.lookup,
-            validators=self._deps.validators.lookup,
-            post_validators=self._deps.validators.single_entity,
-        )
-        bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
-            BulkRuntimeFieldOwnerLookupService(self._deps.repository).execute,
-            monitors=self._deps.monitors.bulk_lookup,
-            post_validators=self._deps.validators.atomic_bulk,
-        )
-        partial_bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
-            BulkRuntimeFieldOwnerLookupService(self._deps.repository).execute,
-            monitors=self._deps.monitors.bulk_lookup,
-        )
-        return LookupFieldGroup(
-            self._deps,
-            self._records,
-            meta.field_type,
-            meta,
-            GlobalEntityType(),
-            owner_lookup,
-            bulk_owner_lookup,
-            partial_bulk_owner_lookup,
-            bulk_owner_lookup_action_cls,
-        )
-
-    def _record_lookup(self, meta: FieldGroupMeta, action_cls: type[Any]) -> None:
-        self._records.append(
-            WiredProcessor(
-                concern=meta.field_type,
-                entity_type=GlobalEntityType(),
-                field_type=meta.field_type,
-                action_cls=action_cls,
-                kind=ActionKind.LOOKUP,
-                gate=ActionGate.PERMISSION,
-                backing=ActionBacking.GENERIC,
-            )
+        """:meth:`ConcernGroups.dangling_lookup_field_group` for a field kind that is its
+        own area, which its field type names."""
+        return ConcernGroups(
+            self._deps, self._records, meta.field_type
+        ).dangling_lookup_field_group(
+            meta, data_cls, owner_lookup_action_cls, bulk_owner_lookup_action_cls
         )
 
     def wired_processors(self) -> Sequence[WiredProcessor]:

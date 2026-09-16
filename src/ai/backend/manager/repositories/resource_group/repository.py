@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -25,6 +27,7 @@ from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -222,16 +225,17 @@ class ResourceGroupRepository:
     async def list_allowed_sgroups(
         self,
         *,
-        domain_name: str,
-        group: str,
-        access_key: str,
+        domain_id: DomainID,
+        project_ids: Sequence[ProjectID],
+        user_id: UserID,
     ) -> list[ResourceGroupData]:
-        """List resource groups allowed for a user."""
-        return await self._db_source.list_allowed_sgroups(
-            domain_name=domain_name,
-            group=group,
-            access_key=access_key,
+        """List the active resource groups a user may schedule on, in name order."""
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=project_ids, user_id=user_id
         )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return result.items
 
     async def get_resource_info(
         self,

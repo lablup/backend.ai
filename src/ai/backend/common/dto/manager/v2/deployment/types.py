@@ -9,9 +9,9 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import (
@@ -22,6 +22,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import (
@@ -460,3 +461,29 @@ class DeploymentStrategyInfoDTO(BaseResponseModel):
     """
 
     type: DeploymentStrategy
+
+
+class DeploymentScope(BaseRequestModel):
+    """Scope for the scoped deployment query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose deployments are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose deployments are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose deployments are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> DeploymentScope:
+        if not self.domain and not self.project and not self.user:
+            raise ValueError(
+                "DeploymentScope requires a non-empty value for 'domain', 'project' or 'user'"
+            )
+        return self

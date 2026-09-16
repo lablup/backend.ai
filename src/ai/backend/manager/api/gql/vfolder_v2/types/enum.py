@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
 
 
@@ -23,11 +24,15 @@ class VFolderUsageModeGQL(StrEnum):
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Mount permission level for a virtual folder.",
+        description=(
+            "Mount permission level for a virtual folder. "
+            f"NONE (added in {NEXT_RELEASE_VERSION}) mounts to nobody; RW_DELETE mounts as READ_WRITE."
+        ),
     ),
     name="VFolderMountPermission",
 )
 class VFolderMountPermissionGQL(StrEnum):
+    NONE = "none"
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"

@@ -8,17 +8,6 @@ from typing import override
 from uuid import UUID
 
 import pytest
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.vfolder import (
-    STORAGE_HOST,
-    AFolderMakerAndTheirDomain,
-    SomeoneWhoMayMakeFolders,
-    SomeoneWithNoGrant,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
@@ -44,6 +33,17 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.vfolder import (
+    STORAGE_HOST,
+    AFolderMakerAndTheirDomain,
+    SomeoneWhoMayMakeFolders,
+    SomeoneWithNoGrant,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 MADE = "work"
 

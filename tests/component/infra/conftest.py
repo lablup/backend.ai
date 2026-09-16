@@ -44,15 +44,16 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -136,7 +137,7 @@ def agent_processors(
         valkey_clients.live,
         valkey_clients.stat,
         config_provider,
-        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
     )
     scheduler_repo = SchedulerRepository(
         database_engine,
@@ -145,6 +146,7 @@ def agent_processors(
         valkey_clients.schedule,
         config_provider,
         MagicMock(),
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     service = AgentService(
         etcd=async_etcd,
@@ -153,12 +155,13 @@ def agent_processors(
         agent_repository=agent_repo,
         scheduler_repository=scheduler_repo,
         scheduling_controller=AsyncMock(),
-        own_check=BulkOwnCheck(PermissionControllerRepository(database_engine), config_provider),
+        own_check=BulkOwnCheck(
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider)
+        ),
     )
     return AgentProcessors(
         processor_registry.group(GroupMeta(AgentEntityType())),
         service,
-        [],
     )
 
 
@@ -223,7 +226,7 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()

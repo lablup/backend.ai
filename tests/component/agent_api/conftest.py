@@ -26,10 +26,11 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -74,7 +75,7 @@ def agent_processors(
         valkey_live=valkey_clients.live,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
-        v2_ops_provider=V2DBOpsProvider(database_engine),
+        v2_ops_provider=ShareOpsProvider(database_engine),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
@@ -83,6 +84,9 @@ def agent_processors(
         valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
         storage_manager=MagicMock(),
+        permission_check=RbacPermissionCheckRepository(
+            PermissionOpsProvider(database_engine), config_provider
+        ),
     )
     service = AgentService(
         etcd=async_etcd,
@@ -91,12 +95,13 @@ def agent_processors(
         agent_repository=agent_repository,
         scheduler_repository=scheduler_repository,
         scheduling_controller=AsyncMock(),
-        own_check=BulkOwnCheck(PermissionControllerRepository(database_engine), config_provider),
+        own_check=BulkOwnCheck(
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider)
+        ),
     )
     return AgentProcessors(
         processor_registry.group(GroupMeta(AgentEntityType())),
         service,
-        [],
     )
 
 

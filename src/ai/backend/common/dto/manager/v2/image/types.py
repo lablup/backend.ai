@@ -6,11 +6,15 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from pydantic import Field, model_validator
+
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "ImageLabelInfo",
+    "ImageScope",
     "ImageOrderField",
     "ImagePermissionType",
     "ImageResourceLimitGQLInfo",
@@ -79,3 +83,45 @@ class ImagePermissionType(BaseResponseModel):
     """A single permission entry for an image."""
 
     value: str
+
+
+class ImageScope(BaseRequestModel):
+    """Scope for the scoped image query.
+
+    Each list is OR'd internally and across lists. ``global_`` names no scope and is
+    authorized against none: a registry marked global shows its images to everyone.
+    Raises an error if every field is empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose images are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose images are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose images are being read"
+    )
+    container_registry: list[UUIDScope] | None = Field(
+        default=None, description="Container registries whose images are being read"
+    )
+    global_: bool = Field(
+        default=False,
+        alias="global",
+        description="Include the images of every registry marked global",
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> ImageScope:
+        if (
+            not self.domain
+            and not self.project
+            and not self.user
+            and not self.container_registry
+            and not self.global_
+        ):
+            raise ValueError(
+                "ImageScope requires a non-empty value for 'domain', 'project', 'user', "
+                "'container_registry' or 'global'"
+            )
+        return self

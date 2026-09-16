@@ -28,6 +28,12 @@ def register_v2_vfolder_routes(
     )
     registry.add(
         "POST",
+        "/scoped/search",
+        handler.scoped_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/projects/{project_id}/search",
         handler.project_search,
         middlewares=[auth_required],
@@ -66,6 +72,24 @@ def register_v2_vfolder_routes(
         "POST",
         "/{vfolder_id}/purge",
         handler.purge,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "PUT",
+        "/{vfolder_id}/mount-policies",
+        handler.set_mount_policy,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "DELETE",
+        "/{vfolder_id}/mount-policies/{user_id}",
+        handler.unset_mount_policy,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "GET",
+        "/{vfolder_id}/mount-policies",
+        handler.list_mount_policies,
         middlewares=[auth_required],
     )
     registry.add(

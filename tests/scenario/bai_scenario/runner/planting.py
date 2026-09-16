@@ -13,18 +13,23 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ai.backend.common.data.entity.types import FieldData
+from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Told
 from bai_scenario.seeds.ops import SeedOps
 from bai_scenario.seeds.seeder import (
     Laid,
     Seeder,
     SeedField,
+    SeedFieldWithNestedRows,
     SeedLink,
     SeedNest,
     SeedRow,
     SeedRowFrom,
     SeedRowFromThree,
     SeedRowFromTwo,
+    SeedShareAcceptance,
     lay,
 )
 
@@ -102,10 +107,25 @@ class SeedingSession:
     async def adding[A, D: FieldData](self, one: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.adding(one, owner))
 
+    async def adding_with_nested[A, D: FieldData](
+        self, one: SeedFieldWithNestedRows[A, D], owner: Laid[A], /
+    ) -> Laid[D]:
+        return await self._settle(self._seed.adding_with_nested(one, owner))
+
     async def linking[S, T](
         self, one: SeedLink[S, T], scope: Laid[S], target: Laid[T], /
     ) -> Laid[None]:
         return await self._settle(self._seed.linking(one, scope, target))
+
+    async def personal_project_of(self, user: Laid[UserData], /) -> Laid[ProjectData]:
+        row = self._seed.personal_project_of(user)
+        await lay(self._ops, [row], self._made)
+        return row
+
+    async def accepting[A](
+        self, one: SeedShareAcceptance[A], offer: Laid[A], /
+    ) -> Laid[EntityShareData]:
+        return await self._settle(self._seed.accepting(one, offer))
 
     async def granting[R, U](
         self,
@@ -116,6 +136,18 @@ class SeedingSession:
         user_id: Any,
     ) -> Laid[None]:
         return await self._settle(self._seed.granting(role, to, role_id=role_id, user_id=user_id))
+
+    async def joining[P, U](
+        self,
+        project: Laid[P],
+        member: Laid[U],
+        *,
+        project_id: Any,
+        user_id: Any,
+    ) -> Laid[None]:
+        return await self._settle(
+            self._seed.joining(project, member, project_id=project_id, user_id=user_id)
+        )
 
     async def within[D](self, nest: SeedNest[D]) -> D:
         """Lay what this nest lays, and write all of it."""

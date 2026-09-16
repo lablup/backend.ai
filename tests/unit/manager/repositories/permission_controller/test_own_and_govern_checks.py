@@ -1,5 +1,5 @@
 """
-Tests for PermissionDBSource virtual-entity-chain permission checks.
+Tests for the virtual-entity-chain permission checks of RbacPermissionCheckRepository.
 
 Covers resolution through the ``entity -> virtual_entity -> scope`` chain with
 per-hop ``permission_cap`` clipping, parallel to the direct scope-walk check.
@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -62,15 +63,20 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
-from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
-    PermissionDBSource,
-)
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+def _enforcing_check(db: ExtendedAsyncSAEngine) -> RbacPermissionCheckRepository:
+    config_provider = MagicMock()
+    config_provider.config.manager.rbac.enforcement_enabled = True
+    return RbacPermissionCheckRepository(PermissionOpsProvider(db), config_provider)
+
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -162,8 +168,8 @@ class TestCheckPermissionViaVirtualEntity:
     def db_source(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionDBSource:
-        return PermissionDBSource(db_with_rbac_tables)
+    ) -> RbacPermissionCheckRepository:
+        return _enforcing_check(db_with_rbac_tables)
 
     @pytest.fixture
     def fixture_ids(self) -> VSChainFixture:
@@ -402,7 +408,7 @@ class TestCheckPermissionViaVirtualEntity:
     )
     async def test_check_permission(
         self,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         chain: VSChainFixture,
         permission: Permission,
         expected: bool,
@@ -438,7 +444,7 @@ class TestCheckPermissionViaVirtualEntity:
     )
     async def test_resolve_effective_permission_bitmask(
         self,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         chain: VSChainFixture,
         expected: Permission,
     ) -> None:
@@ -456,7 +462,7 @@ class TestCheckPermissionViaVirtualEntity:
     )
     async def test_bulk_check_maps_each_key(
         self,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         chain: VSChainFixture,
     ) -> None:
         reachable = OwnCheckKey(
@@ -482,7 +488,7 @@ class TestCheckPermissionViaVirtualEntity:
     )
     async def test_bulk_check_requires_every_bit_of_the_mask(
         self,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         chain: VSChainFixture,
     ) -> None:
         reachable = OwnCheckKey(
@@ -499,7 +505,7 @@ class TestCheckPermissionViaVirtualEntity:
     )
     async def test_other_user_is_isolated(
         self,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         chain: VSChainFixture,
     ) -> None:
         key = OwnCheckKey(
@@ -547,7 +553,7 @@ class TestCheckPermissionViaVirtualEntity:
     async def test_grant_over_unmapped_entity_type_resolves(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         fixture_ids: VSChainFixture,
     ) -> None:
         """A grant whose entity type the legacy enum does not name is authored and
@@ -622,8 +628,8 @@ class TestUserRosterEnrollment:
     def db_source(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionDBSource:
-        return PermissionDBSource(db_with_rbac_tables)
+    ) -> RbacPermissionCheckRepository:
+        return _enforcing_check(db_with_rbac_tables)
 
     @pytest.fixture
     def roster_provider(
@@ -640,8 +646,8 @@ class TestUserRosterEnrollment:
     def repository(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionControllerRepository:
-        return PermissionControllerRepository(db_with_rbac_tables)
+    ) -> RbacPermissionCheckRepository:
+        return _enforcing_check(db_with_rbac_tables)
 
     async def _grant_on_project(
         self,
@@ -824,7 +830,7 @@ class TestUserRosterEnrollment:
     async def test_project_grant_does_not_reach_what_the_member_owns(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
@@ -853,7 +859,7 @@ class TestUserRosterEnrollment:
     async def test_project_grant_reaches_an_entity_enrolled_in_the_project(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
@@ -919,9 +925,9 @@ class TestUserRosterEnrollment:
     async def test_a_share_never_makes_the_shared_entity_a_scope(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         roster_provider: RosterOpsProvider,
-        repository: PermissionControllerRepository,
+        repository: RbacPermissionCheckRepository,
         ids: VSChainFixture,
         cap: Permission | None,
         reaches: bool,
@@ -1004,7 +1010,7 @@ class TestUserRosterEnrollment:
     async def test_a_share_answers_only_to_the_scope_it_was_shared_to(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
         cap: Permission | None,
@@ -1040,7 +1046,7 @@ class TestUserRosterEnrollment:
     async def test_roster_cap_clips_the_grant_over_the_member_user(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
+        db_source: RbacPermissionCheckRepository,
         roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:

@@ -5,6 +5,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
@@ -14,7 +15,7 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
 from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleAction
+from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.service import AuthService
 
 
@@ -75,13 +76,10 @@ async def test_get_role_simple_cases(
     expected_domain: str,
 ) -> None:
     """Test role retrieval for simple cases without group logic"""
-    action = PublicGetRoleAction(group_id=None)
+    user_id = UUID("12345678-1234-5678-1234-567812345678")
+    action = GetRoleAction(user_id=UserID(user_id), group_id=None)
 
-    user = acting_user(
-        UUID("12345678-1234-5678-1234-567812345678"),
-        is_superadmin=is_superadmin,
-        is_admin=is_admin,
-    )
+    user = acting_user(user_id, is_superadmin=is_superadmin, is_admin=is_admin)
     with with_user(user):
         result = await auth_service.get_role(action)
 
@@ -104,7 +102,7 @@ async def test_get_role_with_valid_group_membership(
         "user_id": user_id,
     }
 
-    action = PublicGetRoleAction(group_id=group_id)
+    action = GetRoleAction(user_id=UserID(user_id), group_id=group_id)
 
     with with_user(acting_user(user_id, is_superadmin=False, is_admin=False)):
         result = await auth_service.get_role(action)
@@ -127,7 +125,7 @@ async def test_get_role_without_group_membership_raises_error(
         "No such project or you are not the member of it."
     )
 
-    action = PublicGetRoleAction(group_id=invalid_group_id)
+    action = GetRoleAction(user_id=UserID(user_id), group_id=invalid_group_id)
 
     with with_user(acting_user(user_id, is_superadmin=False, is_admin=False)):
         with pytest.raises(ObjectNotFound):
@@ -142,7 +140,7 @@ async def test_get_role_verifies_correct_parameters(
     user_id = UUID("abcdef12-3456-7890-abcd-ef1234567890")
     group_id = UUID("fedcba98-7654-3210-fedc-ba9876543210")
 
-    action = PublicGetRoleAction(group_id=group_id)
+    action = GetRoleAction(user_id=UserID(user_id), group_id=group_id)
 
     mock_auth_repository.get_group_membership.return_value = {
         "group_id": group_id,
