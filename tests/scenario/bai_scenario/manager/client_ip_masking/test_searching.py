@@ -9,18 +9,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.client_ip_masking import (
-    ManyMaskingPoliciesAndACaller,
-    MaskingPoliciesOfEveryTarget,
-    MaskingPoliciesOfMixedModes,
-    OnlyTheNamedMaskingPolicyIsLeft,
-    TheLaidMaskingPoliciesAreLeft,
-    TwoMaskingPoliciesAndSomeone,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
@@ -40,6 +28,18 @@ from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMa
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.client_ip_masking import (
+    ManyMaskingPoliciesAndACaller,
+    MaskingPoliciesOfEveryTarget,
+    MaskingPoliciesOfMixedModes,
+    OnlyTheNamedMaskingPolicyIsLeft,
+    TheLaidMaskingPoliciesAreLeft,
+    TwoMaskingPoliciesAndSomeone,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchClientIPMaskingPoliciesPayload
 type SearchingStep = Scenario[

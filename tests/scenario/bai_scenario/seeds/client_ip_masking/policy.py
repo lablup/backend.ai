@@ -5,11 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRow
-
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.client_ip_masking.upserters import ClientIPMaskingPolicyUpserter
+from bai_scenario.seeds.seeder import Naming, SeedRow
 
 
 @dataclass(frozen=True)

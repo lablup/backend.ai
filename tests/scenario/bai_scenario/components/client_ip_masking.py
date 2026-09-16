@@ -11,10 +11,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.client_ip_masking.policy import SeedClientIPMaskingPolicy
-
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     AdminSearchClientIPMaskingPoliciesPayload,
@@ -35,6 +31,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.seeds.client_ip_masking.policy import SeedClientIPMaskingPolicy
 
 IPV4 = 24
 IPV6 = 48
