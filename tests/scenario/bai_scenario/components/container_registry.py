@@ -132,29 +132,25 @@ class ARegistryAndSomeone(Given[SeedingSession, ARegistryAndACaller]):
 @dataclass(frozen=True)
 class ManyRegistriesAndSomeone(Given[SeedingSession, ManyRegistriesAndACaller]):
     role: UserRole = UserRole.SUPERADMIN
-    besides: int = 1
 
     @override
     def describe(self) -> str:
-        return f"레지스트리 {self.besides + 1}개, {self.role.value} 한 명"
+        return f"레지스트리 2개, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: SeedingSession) -> ManyRegistriesAndACaller:
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         wanted = await seeding.creating(SeedContainerRegistry(name_hint="wanted"))
-        others = [
-            await seeding.creating(
-                SeedContainerRegistry(
-                    name_hint="other",
-                    registry_type=ContainerRegistryType.HARBOR2,
-                    is_global=False,
-                )
+        other = await seeding.creating(
+            SeedContainerRegistry(
+                name_hint="other",
+                registry_type=ContainerRegistryType.HARBOR2,
+                is_global=False,
             )
-            for _ in range(self.besides)
-        ]
+        )
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return ManyRegistriesAndACaller(
-            registries=tuple(seeding.made(one) for one in [wanted, *others]),
+            registries=(seeding.made(wanted), seeding.made(other)),
             matching_registry=seeding.made(wanted),
             caller=seeding.made(caller),
         )
