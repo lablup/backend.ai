@@ -69,7 +69,7 @@ DEFAULT_PAGE = 50
 
 @dataclass(frozen=True)
 class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]):
-    """오프셋만 사용하는 검색."""
+    """크기와 오프셋, 또는 커서로 페이지를 고르는 검색."""
 
     paging: Paging = field(default_factory=ByOffset)
     named_only: bool = False
@@ -586,6 +586,56 @@ class APlainUserMayNotSearch(
 
 
 @dataclass(frozen=True)
+class ACursorAloneReadsFromTheFront(
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "a-cursor-alone-answers-the-first-page-and-says-there-is-more"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+        return ManyImagesAndSomeone(count=3)
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
+        return Searching(paging=ByCursor(first=2))
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+        return OnePageComesBack(size=2)
+
+
+@dataclass(frozen=True)
+class ASizeBesideACursorPagesByOffset(
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "a-size-beside-a-cursor-pages-by-offset"
+
+    @override
+    def describe(self) -> str:
+        return "크기와 커서를 함께 지정하면 커서는 무시되고 크기대로 오프셋 페이지가 반환된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+        return ManyImagesAndSomeone(count=3)
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
+        return Searching(paging=ByTwoModesAtOnce())
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+        return OnePageComesBack(size=1)
+
+
+@dataclass(frozen=True)
 class ACursorReadsFromTheFront(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
@@ -797,6 +847,8 @@ SCENARIOS: list[Any] = [
     SearchingByStatusReturnsOnlyAliveImages(),
     OrderingAndOffsetChooseTheMiddlePage(),
     ThePageSizeDefaultsToFifty(),
+    ACursorAloneReadsFromTheFront(),
+    ASizeBesideACursorPagesByOffset(),
     APlainUserMayNotSearch(),
     ACursorReadsFromTheFront(),
     TheBaseConditionNarrowsFirst(),
