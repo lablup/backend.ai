@@ -239,10 +239,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다. "
-            "수정은 삭제와 달리 역할로 보호되므로 스위치와 무관하다"
-        )
+        return "권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다"
 
     @override
     def config(self) -> Mapping[str, Any]:

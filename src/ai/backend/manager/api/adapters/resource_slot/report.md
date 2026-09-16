@@ -259,7 +259,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다. 생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다
 
 Given
 
@@ -437,7 +437,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다. 수정은 삭제와 달리 역할로 보호되므로 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다
 
 Given
 
@@ -596,7 +596,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다. 삭제는 수정과 달리 권한 그래프로 보호되므로 스위치가 영향을 준다
+권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다
 
 Given
 
