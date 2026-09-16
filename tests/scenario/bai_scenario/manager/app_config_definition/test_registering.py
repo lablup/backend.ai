@@ -8,16 +8,6 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.app_config import ENFORCEMENT
-from bai_scenario.components.app_config_definition import (
-    ADefinitionAndACaller,
-    ADefinitionAndSomeone,
-    TheNewDefinitionNode,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
@@ -33,6 +23,16 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config import ENFORCEMENT
+from bai_scenario.components.app_config_definition import (
+    ADefinitionAndACaller,
+    ADefinitionAndSomeone,
+    TheNewDefinitionNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type RegisteringStep = Scenario[
     SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode

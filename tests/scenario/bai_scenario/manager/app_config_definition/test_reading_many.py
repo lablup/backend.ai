@@ -11,13 +11,6 @@ from typing import override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.app_config_definition import (
-    TwoDefinitionsAndACaller,
-    TwoDefinitionsAndSomeone,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.user.types import UserRole
@@ -41,6 +34,13 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.app_config_definition import (
+    TwoDefinitionsAndACaller,
+    TwoDefinitionsAndSomeone,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[AppConfigDefinitionNode | Exception | None]
 type LoadingStep = Scenario[

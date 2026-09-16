@@ -11,8 +11,6 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
-
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
@@ -22,6 +20,7 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     AppConfigFragmentUpserter,
     PublicAppConfigFragmentUpserter,
 )
+from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
 
 
 @dataclass(frozen=True)
