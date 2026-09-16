@@ -35,6 +35,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -55,7 +56,6 @@ from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -380,7 +380,7 @@ async def vfolder_factory(
             "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
-            "permission": VFolderMountPermission.READ_WRITE,
+            "default_mount_permission": VFolderMountPolicy.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
             # A folder lands in a project, which is what holds its name once.

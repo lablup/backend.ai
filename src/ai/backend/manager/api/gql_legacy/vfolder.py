@@ -32,6 +32,7 @@ from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -104,6 +105,11 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _legacy_permission(policy: VFolderMountPolicy) -> str | None:
+    """The legacy ``permission`` field has no value for a folder that mounts to no one."""
+    return None if policy == VFolderMountPolicy.NONE else policy.value
+
+
 class VFolderPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}."
@@ -174,8 +180,8 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             VFolderUsageMode,
         ),
         "permission": (
-            "permission",
-            VFolderPermission,
+            "default_mount_permission",
+            VFolderMountPolicy,
         ),
         "ownership_type": (
             "ownership_type",
@@ -201,7 +207,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         "user": ("user", None),
         "creator": ("creator", None),
         "usage_mode": ("usage_mode", None),
-        "permission": ("permission", None),
+        "permission": ("default_mount_permission", None),
         "ownership_type": ("ownership_type", None),
         "max_files": ("max_files", None),
         "max_size": ("max_size", None),
@@ -245,7 +251,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=row.permission,
+            permission=_legacy_permission(row.default_mount_permission),
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,  # in B
@@ -500,8 +506,8 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             VFolderUsageMode,
         ),
         "permission": (
-            "vfolders_permission",
-            VFolderPermission,
+            "vfolders_default_mount_permission",
+            VFolderMountPolicy,
         ),
         "ownership_type": (
             "vfolders_ownership_type",
@@ -529,7 +535,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "usage_mode": ("vfolders_usage_mode", None),
-        "permission": ("vfolders_permission", None),
+        "permission": ("vfolders_default_mount_permission", None),
         "ownership_type": ("vfolders_ownership_type", None),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -851,7 +857,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=row.permission,
+                    permission=_legacy_permission(row.default_mount_permission),
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -875,7 +881,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=row.permission,
+                    permission=_legacy_permission(row.default_mount_permission),
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -902,7 +908,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=row.permission,
+            permission=_legacy_permission(row.default_mount_permission),
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,
@@ -934,8 +940,8 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             lambda s: VFolderUsageMode(s),
         ),
         "permission": (
-            "vfolders_permission",
-            lambda s: VFolderPermission(s),
+            "vfolders_default_mount_permission",
+            lambda s: VFolderMountPolicy(s),
         ),
         "ownership_type": (
             "vfolders_ownership_type",
@@ -964,7 +970,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "usage_mode": ("vfolders_usage_mode", None),
-        "permission": ("vfolders_permission", None),
+        "permission": ("vfolders_default_mount_permission", None),
         "ownership_type": ("vfolders_ownership_type", None),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),

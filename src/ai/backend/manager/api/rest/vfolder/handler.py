@@ -107,7 +107,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
 )
 from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission
 from ai.backend.manager.dto.context import (
@@ -264,7 +264,7 @@ class VFolderHandler:
         creator: VFolderBaseCreator
         if params.unmanaged_path and ctx.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise Forbidden("Insufficient permission")
-        mount_permission = VFolderPermission(params.permission.value)
+        mount_permission = VFolderMountPolicy(params.permission.value)
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
             project_quota_scope = str(QuotaScopeID(QuotaScopeType.PROJECT, project_id))
@@ -277,7 +277,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     project=project_id,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                     unmanaged_path=params.unmanaged_path,
                 )
@@ -290,7 +290,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     project=project_id,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                 )
         else:
@@ -305,7 +305,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     user=owner,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                     unmanaged_path=params.unmanaged_path,
                 )
@@ -318,7 +318,7 @@ class VFolderHandler:
                     creator_id=ctx.user_uuid,
                     user=owner,
                     usage_mode=params.usage_mode,
-                    permission=mount_permission,
+                    default_mount_permission=mount_permission,
                     cloneable=params.cloneable,
                 )
 
@@ -339,9 +339,7 @@ class VFolderHandler:
             quota_scope_id=str(vfolder.quota_scope_id),
             host=vfolder.host,
             usage_mode=vfolder.usage_mode,
-            permission=VFolderPermissionField(
-                (vfolder.permission or VFolderPermission.READ_WRITE).value
-            ),
+            permission=VFolderPermissionField(vfolder.default_mount_permission.value),
             max_size=0,
             creator=vfolder.creator or ctx.user_email,
             ownership_type=VFolderOwnershipTypeField(vfolder.ownership_type.value),
@@ -769,9 +767,9 @@ class VFolderHandler:
             else OptionalState[bool].nop()
         )
         mount_permission = (
-            OptionalState[VFolderPermission].update(VFolderPermission(params.permission.value))
+            OptionalState[VFolderMountPolicy].update(VFolderMountPolicy(params.permission.value))
             if params.permission is not None
-            else OptionalState[VFolderPermission].nop()
+            else OptionalState[VFolderMountPolicy].nop()
         )
         await self._vfolder.update_vfolder_attribute.run(
             UpdateVFolderAttributeAction(
@@ -1565,7 +1563,7 @@ class VFolderHandler:
                 target_quota_scope_id=params.target_quota_scope_id,
                 cloneable=params.cloneable,
                 usage_mode=params.usage_mode,
-                mount_permission=VFolderPermission(params.permission.value),
+                mount_permission=VFolderMountPolicy(params.permission.value),
             )
         )
         dto = VFolderCloneInfoDTO(

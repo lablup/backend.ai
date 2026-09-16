@@ -18,10 +18,9 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -254,7 +253,7 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_a_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -277,7 +276,7 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_a_id}",
                     usage_mode=VFolderUsageMode.DATA,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -300,7 +299,7 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_a_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -323,7 +322,7 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_b_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -346,7 +345,7 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_b_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,

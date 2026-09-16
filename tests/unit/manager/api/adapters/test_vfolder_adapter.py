@@ -18,11 +18,10 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderUsageData,
@@ -66,7 +65,7 @@ class TestVFolderAdapterMySearch:
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderMountPermission.READ_WRITE,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
             max_files=0,
             max_size=None,
             num_files=0,
@@ -158,7 +157,7 @@ class TestVFolderAdapterProjectSearch:
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderMountPermission.READ_WRITE,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
             max_files=0,
             max_size=None,
             num_files=0,

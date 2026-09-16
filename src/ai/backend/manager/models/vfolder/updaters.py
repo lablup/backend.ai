@@ -11,6 +11,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,
@@ -34,8 +35,8 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
     vfolder_id: VFolderUUID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     cloneable: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-    mount_permission: OptionalState[VFolderMountPermission] = field(
-        default_factory=OptionalState[VFolderMountPermission].nop
+    mount_permission: OptionalState[VFolderMountPolicy] = field(
+        default_factory=OptionalState[VFolderMountPolicy].nop
     )
 
     @property
@@ -70,7 +71,7 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
         self.cloneable.update_dict(to_update, "cloneable")
-        self.mount_permission.update_dict(to_update, "permission")
+        self.mount_permission.update_dict(to_update, "default_mount_permission")
         return to_update
 
     @override

@@ -1643,6 +1643,30 @@ class VFolderUsageMode(CIStrEnum):
     DATA = "data"
 
 
+class VFolderMountPolicy(CIStrEnum):
+    """
+    The mount level a vfolder's default and its per-user policy rows answer with.
+
+    ``wd`` is folded to ``rw``: the agent mounts both the same way.
+    """
+
+    NONE = "none"
+    READ_ONLY = "ro"
+    READ_WRITE = "rw"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> VFolderMountPolicy | None:
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
+        match value.lower():
+            case "wd" | "rw_delete" | "owner_perm" | "read_write":
+                return cls.READ_WRITE
+            case "read_only":
+                return cls.READ_ONLY
+        return super()._missing_(value)
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str

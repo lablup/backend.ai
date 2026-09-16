@@ -61,6 +61,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
+    VFolderPermissionField,
     VFolderQuotaInfo,
     VFolderScope,
 )
@@ -74,6 +75,7 @@ from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -91,7 +93,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
@@ -241,7 +242,7 @@ class VFolderAdapter(BaseAdapter):
                 cloneable=data.cloneable,
             ),
             access_control=VFolderAccessControlInfo(
-                permission=data.permission.to_field() if data.permission else None,
+                permission=VFolderPermissionField(data.default_mount_permission.value),
                 ownership_type=data.ownership_type.to_field(),
             ),
             ownership=VFolderOwnershipInfo(
@@ -483,7 +484,7 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             user=UserID(me.user_id),
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderMountPermission(input.permission.value),
+            default_mount_permission=VFolderMountPolicy(input.permission.value),
             cloneable=input.cloneable,
         )
 
@@ -502,7 +503,7 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             project=project_id,
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderMountPermission(input.permission.value),
+            default_mount_permission=VFolderMountPolicy(input.permission.value),
             cloneable=input.cloneable,
         )
 

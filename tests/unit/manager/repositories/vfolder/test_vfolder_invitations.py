@@ -14,7 +14,12 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import (
@@ -171,7 +176,7 @@ class TestInvitationGettersInviterFields:
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, owner.uuid),
                 name=f"vf-{vfolder_id.hex[:8]}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 ownership_type=VFolderOwnershipType.USER,
                 user=owner.uuid,
             )

@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationState,
@@ -35,7 +35,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOwnerNotFound,
 )
-from ai.backend.manager.models.base import EnumValueType
+from ai.backend.manager.models.base import StrEnumType
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
@@ -76,7 +76,7 @@ class VFolderBaseCreator(GuardedEntityCreator[VFolderRow, VFolderData]):
     host: str
     creator_id: uuid.UUID
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
-    permission: VFolderMountPermission = VFolderMountPermission.READ_WRITE
+    default_mount_permission: VFolderMountPolicy | None = None
     cloneable: bool = False
     status: VFolderOperationStatus = VFolderOperationStatus.CREATING
 
@@ -152,25 +152,36 @@ class VFolderBaseCreator(GuardedEntityCreator[VFolderRow, VFolderData]):
         )
         return sa.select(sa.literal(1)).where(allowance > 0, held >= allowance)
 
+    @abstractmethod
+    def _default_mount_permission(self) -> VFolderMountPolicy:
+        """The mount level the folder answers with when the request names none."""
+        raise NotImplementedError
+
     def _build_row(
         self,
         ownership_type: VFolderOwnershipType,
         user: UserID | None,
         project: ProjectID | sa.ScalarSelect[Any],
-        permission: VFolderMountPermission | sa.Case[Any] | None = None,
+        default_mount_permission: VFolderMountPolicy | sa.Case[Any] | None = None,
     ) -> VFolderRow:
         """The row every vfolder insert writes.
 
-        ``project`` and ``permission`` take either a value or the SQL that computes one:
-        a personal folder names its project by its owner, and a model store folder takes
-        its mount mode from the project rather than from the request.
+        ``project`` and ``default_mount_permission`` take either a value or the SQL that
+        computes one: a personal folder names its project by its owner, and a model store
+        folder takes its mount level from the project rather than from the request.
         """
+        if default_mount_permission is None:
+            default_mount_permission = (
+                self._default_mount_permission()
+                if self.default_mount_permission is None
+                else self.default_mount_permission
+            )
         return VFolderRow(
             name=self.name,
             domain_name=self.domain_name,
             quota_scope_id=QuotaScopeID.parse(self.quota_scope_id),
             usage_mode=self.usage_mode,
-            permission=self.permission if permission is None else permission,
+            default_mount_permission=default_mount_permission,
             last_used=None,
             host=self.host,
             creator=self._creator_email(),
@@ -201,6 +212,10 @@ class PersonalVFolderCreator(VFolderBaseCreator):
     """
 
     user: UserID
+
+    @override
+    def _default_mount_permission(self) -> VFolderMountPolicy:
+        return VFolderMountPolicy.NONE
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
@@ -285,7 +300,12 @@ class ProjectVFolderCreator(VFolderBaseCreator):
     def build_row(self) -> VFolderRow:
         """A model store folder is read-only to everyone but whoever made it, which the
         insert reads off the project rather than the request."""
-        permission_type = EnumValueType(VFolderMountPermission)
+        policy_type = StrEnumType(VFolderMountPolicy)
+        requested = (
+            self._default_mount_permission()
+            if self.default_mount_permission is None
+            else self.default_mount_permission
+        )
         return self._build_row(
             VFolderOwnershipType.GROUP,
             None,
@@ -293,11 +313,15 @@ class ProjectVFolderCreator(VFolderBaseCreator):
             sa.case(
                 (
                     self._project_of_type(ProjectType.MODEL_STORE).exists(),
-                    sa.literal(VFolderMountPermission.READ_ONLY, permission_type),
+                    sa.literal(VFolderMountPolicy.READ_ONLY, policy_type),
                 ),
-                else_=sa.literal(self.permission, permission_type),
+                else_=sa.literal(requested, policy_type),
             ),
         )
+
+    @override
+    def _default_mount_permission(self) -> VFolderMountPolicy:
+        return VFolderMountPolicy.READ_WRITE
 
     @override
     def _owned_folders_condition(self) -> sa.sql.expression.ColumnElement[bool]:

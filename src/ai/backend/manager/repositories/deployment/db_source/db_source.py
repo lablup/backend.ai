@@ -44,6 +44,7 @@ from ai.backend.common.types import (
     MountPermission,
     SessionId,
     SlotName,
+    VFolderMountPolicy,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -2459,12 +2460,16 @@ class DeploymentDBSource:
             return {}
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
-                sa.select(VFolderRow.id, VFolderRow.permission).where(
+                sa.select(VFolderRow.id, VFolderRow.default_mount_permission).where(
                     VFolderRow.id.in_(list(vfolder_ids))
                 )
             )
-            rows = {row.id: row.permission for row in result.all()}
-            unresolved = [str(vid) for vid in vfolder_ids if vid not in rows or rows[vid] is None]
+            rows = {row.id: row.default_mount_permission for row in result.all()}
+            unresolved = [
+                str(vid)
+                for vid in vfolder_ids
+                if vid not in rows or rows[vid] == VFolderMountPolicy.NONE
+            ]
             if unresolved:
                 raise VFolderNotFound(
                     f"VFolder permission unavailable for: {', '.join(unresolved)}"

@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderUsageMode,
+    VFolderMountPolicy,
 )
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -220,7 +221,7 @@ class VFolderData(EntityData):
     domain_name: str
     quota_scope_id: QuotaScopeID | None
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission | None
+    default_mount_permission: VFolderMountPolicy
     max_files: int
     max_size: int | None
     num_files: int

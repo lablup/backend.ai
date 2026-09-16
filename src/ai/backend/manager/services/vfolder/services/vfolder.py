@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -63,7 +64,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderCloneInfo,
     VFolderOperationStatus,
     VFolderOwnershipType,
-    VFolderPermission,
     VFolderStatusSet,
     is_unmanaged,
     verify_vfolder_name,
@@ -1359,7 +1359,7 @@ class VFolderService:
 
         # Parse usage_mode and permission from action strings
         usage_mode = VFolderUsageMode(action.usage_mode)
-        mount_permission = VFolderPermission(action.permission)
+        mount_permission = VFolderMountPolicy(action.permission)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(

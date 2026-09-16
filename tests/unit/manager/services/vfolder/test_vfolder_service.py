@@ -13,11 +13,10 @@ import pytest
 import yarl
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderUsageData,
@@ -62,7 +61,7 @@ def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> VFolderData:
         domain_name="default",
         quota_scope_id=QuotaScopeID.parse(f"user:{sample_vfolder_uuid}"),
         usage_mode=VFolderUsageMode.GENERAL,
-        permission=VFolderMountPermission.READ_WRITE,
+        default_mount_permission=VFolderMountPolicy.READ_WRITE,
         max_files=0,
         max_size=None,
         num_files=0,

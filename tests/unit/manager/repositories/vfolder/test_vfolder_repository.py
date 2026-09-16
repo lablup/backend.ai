@@ -38,7 +38,6 @@ from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -125,7 +124,7 @@ class TestVfolderRepository:
         domain_name: str,
         group_id: uuid.UUID,
         user_id: uuid.UUID,
-        permission: VFolderMountPermission = VFolderMountPermission.READ_ONLY,
+        permission: VFolderMountPolicy = VFolderMountPolicy.READ_ONLY,
         usage_mode: VFolderUsageMode = VFolderUsageMode.MODEL,
         name: str | None = None,
     ) -> ProjectVFolderCreator:
@@ -135,7 +134,7 @@ class TestVfolderRepository:
             domain_name=domain_name,
             quota_scope_id=f"project:{group_id}",
             usage_mode=usage_mode,
-            permission=permission,
+            default_mount_permission=permission,
             host="local",
             creator_id=user_id,
             project=ProjectID(group_id),
@@ -388,7 +387,7 @@ class TestVfolderRepository:
             domain_name=test_domain.domain_name,
             group_id=test_model_store_group,
             user_id=test_user,
-            permission=VFolderMountPermission.READ_ONLY,
+            permission=VFolderMountPolicy.READ_ONLY,
             usage_mode=VFolderUsageMode.MODEL,
         )
 
@@ -396,7 +395,7 @@ class TestVfolderRepository:
 
         vfolder_data = creation.vfolder
         assert vfolder_data.name == creator.name
-        assert vfolder_data.permission == VFolderMountPermission.READ_ONLY
+        assert vfolder_data.default_mount_permission == VFolderMountPolicy.READ_ONLY
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
@@ -1084,7 +1083,7 @@ class TestVfolderRepositoryPurge:
                 domain_name=domain_name,
                 quota_scope_id=f"user:{user_id}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 max_files=0,
                 max_size=None,
                 num_files=0,
@@ -1488,7 +1487,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -2299,7 +2298,7 @@ class TestVFolderRepositoryTrashAndRestore:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_uuid}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,

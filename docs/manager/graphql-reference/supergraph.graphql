@@ -24872,10 +24872,13 @@ type VFolderMetadataInfo
   cloneable: Boolean!
 }
 
-"""Added in 26.4.2. Mount permission level for a virtual folder."""
+"""
+Added in 26.4.2. Mount permission level for a virtual folder. NONE (added in 26.9.0) mounts to nobody; RW_DELETE mounts as READ_WRITE.
+"""
 enum VFolderMountPermission
   @join__type(graph: STRAWBERRY)
 {
+  NONE @join__enumValue(graph: STRAWBERRY)
   READ_ONLY @join__enumValue(graph: STRAWBERRY)
   READ_WRITE @join__enumValue(graph: STRAWBERRY)
   RW_DELETE @join__enumValue(graph: STRAWBERRY)

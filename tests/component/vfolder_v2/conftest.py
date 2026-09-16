@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -32,7 +33,6 @@ from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -66,7 +66,7 @@ class VFolderFixtureData:
     domain_name: str
     quota_scope_id: str
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission
+    default_mount_permission: VFolderMountPolicy
     ownership_type: VFolderOwnershipType
     user: str
     creator: str
@@ -234,7 +234,7 @@ async def vfolder_factory(
             "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
-            "permission": VFolderMountPermission.READ_WRITE,
+            "default_mount_permission": VFolderMountPolicy.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
             "creator": "admin-test@test.local",

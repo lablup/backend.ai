@@ -13,7 +13,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
 from ai.backend.manager.models.agent import AgentRow  # noqa: F401
@@ -168,7 +173,7 @@ class TestVFolderPurgersIntegration:
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, sample_user.uuid),
                 name=f"test-vfolder-{uuid.uuid4().hex[:8]}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 ownership_type=VFolderOwnershipType.USER,
                 user=sample_user.uuid,
             )

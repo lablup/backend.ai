@@ -40,6 +40,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderMount,
     VFolderUsageMode,
+    VFolderMountPolicy,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
@@ -294,7 +295,7 @@ class VFolderCloneInfo(NamedTuple):
     target_vfolder_name: str
     target_host: str
     usage_mode: VFolderUsageMode
-    permission: VFolderPermission
+    permission: VFolderMountPolicy
     email: str
     user_id: uuid.UUID
     cloneable: bool
@@ -340,9 +341,12 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         index=True,
     )
-    permission: Mapped[VFolderPermission | None] = mapped_column(
-        "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
-    )  # legacy
+    default_mount_permission: Mapped[VFolderMountPolicy] = mapped_column(
+        "default_mount_permission",
+        StrEnumType(VFolderMountPolicy),
+        nullable=False,
+        default=VFolderMountPolicy.READ_WRITE,
+    )
     max_files: Mapped[int | None] = mapped_column("max_files", sa.Integer(), default=1000)
     max_size: Mapped[int | None] = mapped_column(
         "max_size", sa.Integer(), default=None
@@ -444,7 +448,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
             domain_name=self.domain_name,
             quota_scope_id=self.quota_scope_id,
             usage_mode=self.usage_mode,
-            permission=self.permission,
+            default_mount_permission=self.default_mount_permission,
             host=self.host,
             max_files=self.max_files or 0,
             max_size=self.max_size,
@@ -1038,14 +1042,10 @@ class VFolderPermissionContext(
                     if perm in _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP
                 }
 
-        match vfolder_row.permission:
-            case (
-                VFolderPermission.OWNER_PERM
-                | VFolderPermission.RW_DELETE
-                | VFolderPermission.READ_WRITE
-            ):
+        match vfolder_row.default_mount_permission:
+            case VFolderMountPolicy.READ_WRITE:
                 pass
-            case VFolderPermission.READ_ONLY:
+            case VFolderMountPolicy.READ_ONLY:
                 permissions -= {VFolderRBACPermission.MOUNT_RW, VFolderRBACPermission.MOUNT_WD}
         return frozenset(permissions)
 
@@ -1092,6 +1092,12 @@ class VFolderPermissionContextBuilder(
             ctx, ctx.user_id, scope.domain_name
         )
         permission_ctx.merge(_user_perm_ctx)
+            case VFolderMountPolicy.NONE:
+                permissions -= {
+                    VFolderRBACPermission.MOUNT_RO,
+                    VFolderRBACPermission.MOUNT_RW,
+                    VFolderRBACPermission.MOUNT_WD,
+                }
         _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
         permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
