@@ -116,7 +116,7 @@ class ScopedSearchingEntitiesBySuccess(When[ScopedEntities, AuditLogAdapter, Sea
 
 @dataclass(frozen=True)
 class ScopedSearchingBadId(When[ScopedEntities, AuditLogAdapter, Searched]):
-    """엔티티 id 자리에 id 형식이 아닌 문자열을 넣는다."""
+    """엔티티 id 필드에 id 형식이 아닌 문자열을 넣는다."""
 
     @override
     def operation(self) -> str:
@@ -527,8 +527,8 @@ class ARecordIsFoundByItsScopeTag(
     @override
     def describe(self) -> str:
         return (
-            "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지목해 "
-            "검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 온다"
+            "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 "
+            "검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다"
         )
 
     @override

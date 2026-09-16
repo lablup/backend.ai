@@ -1,6 +1,6 @@
-"""여러 id로 조회 — id마다 그 기록이 가리키는 엔티티의 읽기 권한을 검사하고, 자리마다 따로 답한다.
+"""여러 id로 조회 — id마다 그 기록이 가리키는 엔티티의 읽기 권한을 검사하고, 항목마다 따로 응답한다.
 
-볼 수 없는 기록은 그 자리만 거부되고 나머지는 반환된다. 없는 id는 누가 조회하든 빈 자리다. 빈
+볼 수 없는 기록은 그 항목만 거부되고 나머지는 반환된다. 없는 id는 누가 조회하든 빈 항목이다. 빈
 목록은 권한 검사도 거치지 않는다.
 """
 
@@ -126,7 +126,7 @@ class AGrantedReaderIsAnsweredPerSlot(
     def describe(self) -> str:
         return (
             "한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, "
-            "없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 자리가 온다"
+            "없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다"
         )
 
     @override
@@ -150,7 +150,7 @@ class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogA
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
+        return "슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -198,7 +198,7 @@ class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 자리마다 권한 부족으로 답한다"
+        return "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -223,7 +223,7 @@ class AUserGrantedNothingIsRefusedPerSlot(
 
     @override
     def describe(self) -> str:
-        return "읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 자리마다 권한 부족으로 답한다"
+        return "읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:

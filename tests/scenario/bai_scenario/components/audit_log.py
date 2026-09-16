@@ -698,7 +698,7 @@ class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다"
+        return "요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다"
 
     @override
     def look(self, laid: RecordsToLoad, answered: Answered[Loaded]) -> list[Verdict]:

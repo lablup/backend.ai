@@ -8,7 +8,7 @@ Not exercised by any scenario: batch_load_fields.
 
 #### [a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 자리가 온다
+한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다
 
 Given
 
@@ -33,7 +33,7 @@ When
 
 Then
 
-- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 3
   - [0].id: 무시함 — 데이터베이스가 만든다
   - [0].action_id: 무시함 — 실행마다 새로 생성된다
@@ -53,7 +53,7 @@ Then
 
 #### [a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 자리마다 권한 부족으로 답한다
+읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다
 
 Given
 
@@ -73,7 +73,7 @@ When
 
 Then
 
-- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
@@ -100,12 +100,12 @@ When
 
 Then
 
-- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 0
 
 #### [the-monitor-role-without-a-grant-is-refused-in-every-slot](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 자리마다 권한 부족으로 답한다
+아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다
 
 Given
 
@@ -125,14 +125,14 @@ When
 
 Then
 
-- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
 #### [the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
+슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
 
 Given
 
@@ -152,7 +152,7 @@ When
 
 Then
 
-- 요청한 순서대로 자리마다 노드, 거부, 또는 빈 자리가 온다
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 3
   - [0].id: 무시함 — 데이터베이스가 만든다
   - [0].action_id: 무시함 — 실행마다 새로 생성된다
@@ -186,7 +186,7 @@ Then
 
 #### [a-record-tagged-with-a-scope-is-found-by-searching-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지목해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 온다
+다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다
 
 Given
 
