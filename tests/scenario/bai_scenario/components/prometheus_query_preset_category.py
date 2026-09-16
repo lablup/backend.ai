@@ -281,7 +281,7 @@ class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로, 없는 id 자리는 비어서 반환된다"
+        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
 
     @override
     def look(
