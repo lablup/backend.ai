@@ -109,7 +109,6 @@ from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission
 from ai.backend.manager.dto.context import (
     RequestCtx,
     UserContext,
@@ -156,6 +155,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
     PurgeVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
@@ -404,7 +406,9 @@ class VFolderHandler:
                 ),
             )
         )
-        held = await self._held_permissions([vfolder.id for vfolder in result.items])
+        vfolder_ids = [vfolder.id for vfolder in result.items]
+        held = await self._held_permissions(vfolder_ids)
+        levels = await self._mount_levels(vfolder_ids)
         items: list[VFolderItemField] = []
         for vfolder in result.items:
             bits = held.get(vfolder.id, Permission.NONE)
@@ -420,7 +424,9 @@ class VFolderHandler:
                     usage_mode=vfolder.usage_mode,
                     created_at=str(vfolder.created_at),
                     is_owner=bits.covers(Permission.HARD_DELETE),
-                    permission=VFolderPermissionField(VFolderMountPermission.from_rbac(bits).value),
+                    permission=VFolderPermissionField(
+                        levels.get(vfolder.id, VFolderMountPolicy.NONE).value
+                    ),
                     user=str(vfolder.user) if vfolder.user else None,
                     group=str(vfolder.group) if vfolder.group else None,
                     creator=vfolder.creator or "",
@@ -537,6 +543,7 @@ class VFolderHandler:
         )
         vfolder = result.vfolder
         held = await self._held_permissions([vfolder.id])
+        levels = await self._mount_levels([vfolder.id])
         bits = held.get(vfolder.id, Permission.READ)
         dto = VFolderInfoDTO(
             name=vfolder.name,
@@ -552,7 +559,9 @@ class VFolderHandler:
             group=str(vfolder.group) if vfolder.group else None,
             type="user" if vfolder.user else "group",
             is_owner=bits.covers(Permission.HARD_DELETE),
-            permission=VFolderPermissionField(VFolderMountPermission.from_rbac(bits).value),
+            permission=VFolderPermissionField(
+                levels.get(vfolder.id, VFolderMountPolicy.NONE).value
+            ),
             usage_mode=vfolder.usage_mode,
             cloneable=vfolder.cloneable,
         )
@@ -567,6 +576,17 @@ class VFolderHandler:
             return {}
         result = await self._vfolder.bulk_load_permissions.run(
             BulkLoadVFolderPermissionsAction(vfolder_ids=vfolder_ids)
+        )
+        return result.values()
+
+    async def _mount_levels(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> Mapping[EntityIdentifier, VFolderMountPolicy]:
+        """The mount level the caller gets on each named vfolder."""
+        if not vfolder_ids:
+            return {}
+        result = await self._vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(vfolder_ids=vfolder_ids)
         )
         return result.values()
 

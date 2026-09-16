@@ -79,6 +79,7 @@ from ai.backend.manager.models.vfolder.scopes import (
     UserVFolderOperationScope,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -105,6 +106,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
     GlobalBatchLoadVFoldersActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
@@ -251,6 +255,43 @@ class VFolderService:
                 for vid in action.vfolder_ids
             ]
         )
+
+    async def bulk_load_mount_levels(
+        self, action: BulkLoadVFolderMountLevelsAction
+    ) -> PartialBulkResult[VFolderMountPolicy]:
+        """The mount level the caller gets on each folder named: the folder's default,
+        their own policy row, and read-write on a personal folder they own."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        user_id = UserID(me.user_id)
+        held = await self._own_check.held(action.vfolder_ids)
+        folders = await self._vfolder_repository.batch_load_by_ids(list(action.vfolder_ids))
+        policies = await self._vfolder_repository.user_mount_policies_of(
+            user_id, action.vfolder_ids
+        )
+        items: list[PartialBulkEntityResult[VFolderMountPolicy]] = []
+        for vfolder_id, folder in zip(action.vfolder_ids, folders, strict=True):
+            if folder is None:
+                items.append(
+                    PartialBulkEntityResult[VFolderMountPolicy].nothing(
+                        vfolder_id, "no such folder"
+                    )
+                )
+                continue
+            level = resolve_mount_policy(
+                user_id,
+                owner_user_id=folder.user,
+                default_mount_permission=folder.default_mount_permission,
+                held=held.get(vfolder_id, Permission.NONE),
+                user_policy=policies.get(vfolder_id),
+            )
+            items.append(
+                PartialBulkEntityResult[VFolderMountPolicy].succeeded(
+                    vfolder_id, level, description="resolved"
+                )
+            )
+        return PartialBulkResult(items=items)
 
     async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
         """Resolve one vfolder name into its id.
