@@ -18,15 +18,19 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
     BinarySize,
+    MountPermission,
     QuotaScopeID,
     ResourceSlot,
+    VFolderMount,
     VFolderMountOptions,
+    VFolderMountPolicy,
     VFolderMountRequest,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -510,3 +514,159 @@ class TestPrepareVFolderMountsSubpathFlow:
                         ),
                     ],
                 )
+
+
+class TestPrepareVFolderMountsPolicy(TestPrepareVFolderMountsSubpathFlow):
+    """The level a folder mounts at comes from its mount policy: the folder's default,
+    or the user's own row over it. Access itself is held in full here."""
+
+    @pytest.fixture
+    async def project_vfolder(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+    ) -> tuple[UUID, UUID]:
+        """A read-only project folder the user reaches as a member; yields
+        ``(user_uuid, vfolder_id)``."""
+        user_uuid, domain_name, group_id, _ = fixture_vfolder
+        vfolder_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    host="proxy:noop",
+                    domain_name=domain_name,
+                    quota_scope_id=QuotaScopeID.parse(f"project:{group_id}"),
+                    name=f"shared-{vfolder_id.hex[:6]}",
+                    ownership_type=VFolderOwnershipType.GROUP,
+                    user=None,
+                    group=group_id,
+                    default_mount_permission=VFolderMountPolicy.READ_ONLY,
+                )
+            )
+            await db_sess.flush()
+            seeder = VirtualEntitySeeder()
+            await seeder.enroll_user_in_project(db_sess, group_id, user_uuid)
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), vfolder_id, [(ProjectEntityType(), group_id)]
+            )
+        return user_uuid, vfolder_id
+
+    async def _set_policy(
+        self,
+        db: ExtendedAsyncSAEngine,
+        vfolder_id: UUID,
+        user_id: UUID,
+        level: VFolderMountPolicy,
+    ) -> None:
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                VFolderUserMountPolicyRow(vfolder_id=vfolder_id, user_id=user_id, permission=level)
+            )
+
+    async def _mount(
+        self,
+        db: ExtendedAsyncSAEngine,
+        storage_manager: MagicMock,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        vfolder_id: UUID,
+        requested: MountPermission | None,
+    ) -> Sequence[VFolderMount]:
+        user_uuid, domain_name, group_id, _ = fixture_vfolder
+        async with db.connect() as conn:
+            return await prepare_vfolder_mounts(
+                conn=conn,
+                storage_manager=storage_manager,
+                allowed_vfolder_types=["user", "group"],
+                user_scope=UserScope(
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    user_role=UserRole.USER,
+                ),
+                resource_policy={
+                    "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
+                },
+                held_permissions=_held_in_full,
+                mount_requests=[
+                    VFolderMountRequest(
+                        ref=vfolder_id,
+                        dst_path=None,
+                        options=VFolderMountOptions(permission=requested),
+                    ),
+                ],
+            )
+
+    async def test_the_default_answers_without_a_row(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        project_vfolder: tuple[UUID, UUID],
+        mock_storage_manager: MagicMock,
+    ) -> None:
+        _, vfolder_id = project_vfolder
+
+        mounts = await self._mount(
+            db_with_cleanup, mock_storage_manager, fixture_vfolder, vfolder_id, None
+        )
+
+        assert [m.mount_perm for m in mounts if m.vfid.folder_id == vfolder_id] == [
+            MountPermission.READ_ONLY
+        ]
+
+    async def test_a_request_wider_than_the_level_is_refused(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        project_vfolder: tuple[UUID, UUID],
+        mock_storage_manager: MagicMock,
+    ) -> None:
+        _, vfolder_id = project_vfolder
+
+        with pytest.raises(VFolderPermissionError):
+            await self._mount(
+                db_with_cleanup,
+                mock_storage_manager,
+                fixture_vfolder,
+                vfolder_id,
+                MountPermission.READ_WRITE,
+            )
+
+    async def test_the_users_row_raises_the_level(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        project_vfolder: tuple[UUID, UUID],
+        mock_storage_manager: MagicMock,
+    ) -> None:
+        user_uuid, vfolder_id = project_vfolder
+        await self._set_policy(
+            db_with_cleanup, vfolder_id, user_uuid, VFolderMountPolicy.READ_WRITE
+        )
+
+        mounts = await self._mount(
+            db_with_cleanup,
+            mock_storage_manager,
+            fixture_vfolder,
+            vfolder_id,
+            MountPermission.READ_WRITE,
+        )
+
+        assert [m.mount_perm for m in mounts if m.vfid.folder_id == vfolder_id] == [
+            MountPermission.READ_WRITE
+        ]
+
+    async def test_a_folder_that_mounts_to_nobody_is_refused(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        project_vfolder: tuple[UUID, UUID],
+        mock_storage_manager: MagicMock,
+    ) -> None:
+        user_uuid, vfolder_id = project_vfolder
+        await self._set_policy(db_with_cleanup, vfolder_id, user_uuid, VFolderMountPolicy.NONE)
+
+        with pytest.raises(VFolderPermissionError):
+            await self._mount(
+                db_with_cleanup, mock_storage_manager, fixture_vfolder, vfolder_id, None
+            )

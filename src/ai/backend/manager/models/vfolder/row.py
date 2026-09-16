@@ -25,8 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.defs import (
     MODEL_VFOLDER_LENGTH_LIMIT,
@@ -44,6 +44,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
@@ -70,6 +71,7 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     metadata,
 )
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
@@ -941,25 +943,19 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
 
-# TODO: Change type of `vfolder_permissions.permission` to VFolderRBACPermission
-LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
-    VFolderPermission, frozenset[VFolderRBACPermission]
+MOUNT_POLICY_TO_RBAC_PERMISSION_MAP: Mapping[
+    VFolderMountPolicy, frozenset[VFolderRBACPermission]
 ] = {
-    VFolderPermission.READ_ONLY: frozenset([
+    VFolderMountPolicy.NONE: frozenset([
+        VFolderRBACPermission.READ_ATTRIBUTE,
+        VFolderRBACPermission.READ_CONTENT,
+    ]),
+    VFolderMountPolicy.READ_ONLY: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.READ_CONTENT,
         VFolderRBACPermission.MOUNT_RO,
     ]),
-    VFolderPermission.READ_WRITE: frozenset([
-        VFolderRBACPermission.READ_ATTRIBUTE,
-        VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.READ_CONTENT,
-        VFolderRBACPermission.WRITE_CONTENT,
-        VFolderRBACPermission.DELETE_CONTENT,
-        VFolderRBACPermission.MOUNT_RO,
-        VFolderRBACPermission.MOUNT_RW,
-    ]),
-    VFolderPermission.RW_DELETE: frozenset([
+    VFolderMountPolicy.READ_WRITE: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.UPDATE_ATTRIBUTE,
         VFolderRBACPermission.READ_CONTENT,
@@ -967,10 +963,9 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
         VFolderRBACPermission.DELETE_CONTENT,
         VFolderRBACPermission.MOUNT_RO,
         VFolderRBACPermission.MOUNT_RW,
-        VFolderRBACPermission.MOUNT_WD,
     ]),
-    VFolderPermission.OWNER_PERM: frozenset(OWNER_PERMISSIONS),
 }
+
 
 _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP: Mapping[
     VFolderRBACPermission, StorageHostPermission
@@ -1162,6 +1157,47 @@ class VFolderPermissionContextBuilder(
     ) -> VFolderPermissionContext:
         return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
 
+    async def _lent_folder_permissions(
+        self,
+        user_id: uuid.UUID,
+        ownership_type: VFolderOwnershipType,
+        domain_name: str | None = None,
+    ) -> dict[VFolderUUID, frozenset[VFolderRBACPermission]]:
+        """The legacy permission set on each folder lent to the user, from the mount
+        level they get: their policy row, or the folder's default."""
+        stmt = (
+            sa.select(
+                EntityShareRow.target_entity_id,
+                sa.func.coalesce(
+                    VFolderUserMountPolicyRow.permission, VFolderRow.default_mount_permission
+                ),
+            )
+            .select_from(EntityShareRow)
+            .join(VFolderRow, VFolderRow.id == EntityShareRow.target_entity_id)
+            .outerjoin(
+                VFolderUserMountPolicyRow,
+                sa.and_(
+                    VFolderUserMountPolicyRow.vfolder_id == VFolderRow.id,
+                    VFolderUserMountPolicyRow.user_id == user_id,
+                ),
+            )
+            .where(
+                EntityShareRow.target_entity_type == VFolderEntityType(),
+                EntityShareRow.recipient_entity_type == UserEntityType(),
+                EntityShareRow.recipient_entity_id == user_id,
+                EntityShareRow.status == EntityShareStatus.ACCEPTED,
+                VFolderRow.ownership_type == ownership_type,
+            )
+        )
+        if domain_name is not None:
+            stmt = stmt.where(VFolderRow.domain_name == domain_name)
+        return {
+            VFolderUUID(row.target_entity_id): MOUNT_POLICY_TO_RBAC_PERMISSION_MAP[
+                VFolderMountPolicy(row[1])
+            ]
+            for row in (await self.db_session.execute(stmt)).all()
+        }
+
     async def _build_at_domain_scope_non_recursively(
         self,
         ctx: ClientContext,
@@ -1212,22 +1248,9 @@ class VFolderPermissionContextBuilder(
         }
         result = VFolderPermissionContext(object_id_to_additional_permission_map=own_folder_map)
 
-        _stmt = (
-            sa.select(VFolderPermissionRow)
-            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-            .where(
-                (VFolderPermissionRow.user == ctx.user_id)
-                & (
-                    VFolderRow.ownership_type == VFolderOwnershipType.USER
-                )  # filter out user vfolders
-                & (VFolderRow.domain_name == domain_name)
-            )
+        object_id_to_permission_map = await self._lent_folder_permissions(
+            ctx.user_id, VFolderOwnershipType.USER, domain_name
         )
-        object_id_to_permission_map = {
-            row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-            for row in await self.db_session.scalars(_stmt)
-            if row.permission is not None
-        }
         if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
             ctx_to_merge = VFolderPermissionContext(
                 object_id_to_additional_permission_map=object_id_to_permission_map
@@ -1247,21 +1270,9 @@ class VFolderPermissionContextBuilder(
         permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = VFolderPermissionContext(project_id_to_permission_map={project_id: permissions})
 
-        _stmt = (
-            sa.select(VFolderPermissionRow)
-            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-            .where(
-                (VFolderPermissionRow.user == ctx.user_id)
-                & (
-                    VFolderRow.ownership_type == VFolderOwnershipType.GROUP
-                )  # filter out user vfolders
-            )
+        object_id_to_permission_map = await self._lent_folder_permissions(
+            ctx.user_id, VFolderOwnershipType.GROUP
         )
-        object_id_to_permission_map = {
-            row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-            for row in await self.db_session.scalars(_stmt)
-            if row.permission is not None
-        }
         if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
         else:
@@ -1276,21 +1287,9 @@ class VFolderPermissionContextBuilder(
         permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
         result = VFolderPermissionContext(user_id_to_permission_map={user_id: permissions})
 
-        _stmt = (
-            sa.select(VFolderPermissionRow)
-            .select_from(sa.join(VFolderPermissionRow, VFolderRow))
-            .where(
-                (VFolderPermissionRow.user == ctx.user_id)
-                & (
-                    VFolderRow.ownership_type == VFolderOwnershipType.USER
-                )  # filter out user vfolders
-            )
+        object_id_to_permission_map = await self._lent_folder_permissions(
+            ctx.user_id, VFolderOwnershipType.USER
         )
-        object_id_to_permission_map = {
-            row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
-            for row in await self.db_session.scalars(_stmt)
-            if row.permission is not None
-        }
         if ctx.user_role in (UserRole.SUPERADMIN, UserRole.ADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
         else:
