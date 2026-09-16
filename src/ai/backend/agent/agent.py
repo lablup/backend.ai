@@ -867,6 +867,9 @@ class AbstractAgent[
     #: per-request one lets N concurrent sessions each run the configured number.
     kernel_creation_sema: asyncio.Semaphore
     _local_cron: LocalCron | None
+    #: Whether this node is currently telling the manager it can take work. Flipped by the
+    #: heartbeat -- see `not_serving_reason`.
+    _announcing: bool
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
@@ -962,6 +965,7 @@ class AbstractAgent[
             else None,
         )
         self._local_cron = None
+        self._announcing = True
         self.port_pool = PortPool(
             local_config.container.port_range,
             cooldown_sec=local_config.container.port_reuse_cooldown_sec,
@@ -1348,10 +1352,33 @@ class AbstractAgent[
             log.exception("unexpected error in commit status reporting")
             return
 
+    async def not_serving_reason(self) -> str | None:
+        """Why this node must not be offered work right now, or None when it may be.
+
+        A backend answers for the thing every one of its sessions depends on and that can go away
+        under a running agent. The base agent has no such thing.
+        """
+        return None
+
     async def heartbeat(self) -> None:
         """
         Send my status information and available kernel images to the manager(s).
+
+        Or do not: the manager marks a node ALIVE on a heartbeat alone, so the heartbeat IS the
+        claim that this node can take work, and it is withheld while that is not true. The node
+        is announced as restarting the moment it stops being able, rather than found lost forty
+        seconds later, and announced again by the first heartbeat after it can.
         """
+        reason = await self.not_serving_reason()
+        if reason is not None:
+            if self._announcing:
+                self._announcing = False
+                log.warning("not taking work until this is resolved: {}", reason)
+                await self.anycast_event(AgentTerminatedEvent(reason="agent-restart"))
+            return
+        if not self._announcing:
+            self._announcing = True
+            log.info("taking work again")
         slot_key_and_units: dict[ResourceSlotName, SlotTypes] = {}
         res_slots: dict[SlotName, Decimal] = {}
         try:

@@ -2309,6 +2309,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await withdraw_caps(self.etcd, str(self.id), self._boot_id)
 
     @override
+    async def not_serving_reason(self) -> str | None:
+        # On a privnet-backed node every device, rule and address -- a single-node session's
+        # bridge as much as an overlay -- is made by that process, so a node that cannot reach it
+        # can serve no session at all. Only reachability: an overlay-specific problem (an
+        # unrecovered tunnel, a helper too old to fence) is published in the capability record
+        # and keeps overlay sessions away while single-node ones still run.
+        socket = self.local_config.agent.network_privnet_socket
+        if socket is None:
+            return None
+        from ai.backend.agent.network.privnet.client import PrivNetClient
+
+        return await PrivNetClient(socket).reachable()
+
+    @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         await self._withdraw_network_identity()
         # Stop handling agent sock.
