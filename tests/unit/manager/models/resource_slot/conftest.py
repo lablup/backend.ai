@@ -33,6 +33,9 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -46,6 +49,9 @@ async def database_with_resource_slot_tables(
         database_connection,
         [
             # FK dependency order: parents before children
+            VirtualEntityRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
             DomainRow,
             ResourceGroupRow,
             UserResourcePolicyRow,
