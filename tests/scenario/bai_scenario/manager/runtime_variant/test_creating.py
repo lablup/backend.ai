@@ -200,10 +200,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 꺼도 슈퍼관리자가 아니면 변형을 생성하지 못한다. "
-            "생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다"
-        )
+        return "권한 검사를 꺼도 슈퍼관리자가 아니면 변형을 생성하지 못한다"
 
     @override
     def config(self) -> Mapping[str, Any]:
