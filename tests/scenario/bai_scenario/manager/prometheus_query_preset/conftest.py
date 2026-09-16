@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from bai_scenario.fakes.prometheus import FakePrometheusClient
 
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PrometheusQueryPresetEntityType,
@@ -36,6 +35,7 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
+from bai_scenario.fakes.prometheus import FakePrometheusClient
 
 
 @pytest.fixture

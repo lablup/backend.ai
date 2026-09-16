@@ -13,26 +13,14 @@ from typing import Any, override
 from uuid import UUID, uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.prometheus_query_preset import (
-    APresetAndACaller,
-    APresetAndSomeone,
-    APresetInOneOfTwoCategories,
-    PresetNodeAnswer,
-    ThePresetNode,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.prometheus_query_preset.preset import UNRENDERABLE
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
 )
 from ai.backend.common.exception import InvalidMetricPresetTemplate
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -47,6 +35,18 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.prometheus_query_preset import (
+    APresetAndACaller,
+    APresetAndSomeone,
+    APresetInOneOfTwoCategories,
+    PresetNodeAnswer,
+    ThePresetNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.prometheus_query_preset.preset import UNRENDERABLE
 
 RENAMED = "cpu-by-session"
 RETUNED = "sum by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}[${{window}}]))"
@@ -92,12 +92,12 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
             return f"{laid.caller.username}이 {target} 수정 (빈 요청)"
         return f"{laid.caller.username}이 {target} 수정 ({', '.join(changed)})"
 
-    def _category(self, laid: APresetAndACaller) -> UUID | Sentinel | None:
+    def _category(self, laid: APresetAndACaller) -> UUID | Unset | None:
         if self.move_elsewhere and laid.elsewhere is not None:
             return laid.elsewhere.id
         if self.under_an_unknown_category:
             return uuid4()
-        return SENTINEL
+        return UNSET
 
     @override
     async def call(
@@ -110,7 +110,7 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
                 ModifyQueryDefinitionInput(
                     name=self.named,
                     query_template=self.query_template,
-                    description=None if self.clear_description else SENTINEL,
+                    description=None if self.clear_description else UNSET,
                     category_id=self._category(laid),
                     options=(
                         ModifyQueryDefinitionOptionsInput(filter_labels=list(self.filter_labels))

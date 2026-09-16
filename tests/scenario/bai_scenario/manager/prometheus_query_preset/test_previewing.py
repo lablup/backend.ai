@@ -12,20 +12,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.prometheus_query_preset import (
-    ACatalogAndACaller,
-    JustSomeone,
-    TheQueryAnswered,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.prometheus_query_preset.preset import (
-    EMPTY_WITHOUT_LABELS,
-    TEMPLATE,
-    UNRENDERABLE,
-)
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -49,6 +35,20 @@ from ai.backend.testutils.scenario_steps import (
     Scenario,
     Then,
     When,
+)
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.prometheus_query_preset import (
+    ACatalogAndACaller,
+    JustSomeone,
+    TheQueryAnswered,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.prometheus_query_preset.preset import (
+    EMPTY_WITHOUT_LABELS,
+    TEMPLATE,
+    UNRENDERABLE,
 )
 
 SERVER_WINDOW_PATH = "metric.timewindow"

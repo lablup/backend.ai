@@ -6,19 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.prometheus_query_preset import (
-    APresetAlone,
-    APresetAndNobody,
-    EveryLaidPresetIsFound,
-    ManyPresetsAndACaller,
-    ManyPresetsAndSomeone,
-    OnePageOfThemComesBack,
-    PresetsInTwoCategories,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -43,6 +30,19 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.prometheus_query_preset import (
+    APresetAlone,
+    APresetAndNobody,
+    EveryLaidPresetIsFound,
+    ManyPresetsAndACaller,
+    ManyPresetsAndSomeone,
+    OnePageOfThemComesBack,
+    PresetsInTwoCategories,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchQueryDefinitionsPayload
 type SearchingStep = Scenario[

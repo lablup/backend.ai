@@ -12,6 +12,14 @@ from typing import override
 from uuid import UUID, uuid4
 
 import pytest
+
+from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
+    PrometheusQueryPresetAdapter,
+)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
     APresetAlone,
@@ -24,14 +32,6 @@ from bai_scenario.components.prometheus_query_preset import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
-    PrometheusQueryPresetAdapter,
-)
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 type ReadingStep = Scenario[
     SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer

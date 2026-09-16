@@ -13,20 +13,6 @@ from typing import Any, override
 from uuid import UUID, uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.prometheus_query_preset import (
-    ACatalogAndACaller,
-    ACategoryAndSomeone,
-    APresetAndACaller,
-    APresetAndSomeone,
-    JustSomeone,
-    PresetNodeAnswer,
-    TheNewPresetNode,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.prometheus_query_preset.preset import METRIC, TEMPLATE, UNRENDERABLE
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -47,6 +33,20 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.prometheus_query_preset import (
+    ACatalogAndACaller,
+    ACategoryAndSomeone,
+    APresetAndACaller,
+    APresetAndSomeone,
+    JustSomeone,
+    PresetNodeAnswer,
+    TheNewPresetNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.prometheus_query_preset.preset import METRIC, TEMPLATE, UNRENDERABLE
 
 MADE = "cpu-by-kernel"
 WINDOW = "5m"
