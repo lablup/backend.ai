@@ -463,10 +463,7 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다. "
-            "이 조회는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다"
-        )
+        return "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

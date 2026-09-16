@@ -490,7 +490,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-granted-nothing-read](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다. 이 조회는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다
+권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다
 
 Given
 
