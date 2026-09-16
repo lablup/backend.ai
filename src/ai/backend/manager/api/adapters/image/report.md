@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/image/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+Not exercised by any scenario: batch_load_fields, scoped_search.
 
 ### aliasing
 
@@ -260,14 +260,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -315,14 +315,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='2', max='4'), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -370,14 +370,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -425,14 +425,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
   - is_local = True
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'updated-image'
   - identity.namespace = 'team/updated-image'
   - identity.architecture = 'aarch64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
   - metadata.size_bytes = 2048
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -480,14 +480,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -560,14 +560,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = 'cuda'
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -748,14 +748,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -765,9 +765,9 @@ Then
   - requirements.supported_accelerators = ['*']
   - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
-#### [restoring-a-forgotten-image-cannot-reach-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [restoring-a-forgotten-image-brings-it-back-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-삭제된 이미지를 복원하려 하면 대상을 찾을 수 없어 거부된다. ID로 이미지를 조회하는 지점이 살아 있는 것만 대상으로 삼기 때문이다
+슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다
 
 Given
 
@@ -787,8 +787,38 @@ When
 
 Then
 
-- 거부된다
-  - 거부: ImageNotFound
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 #### [restoring-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
@@ -853,14 +883,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -914,14 +944,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -958,9 +988,9 @@ Then
 
 ### reading
 
-#### [a-plain-user-loading-many-alias-ids-is-refused-as-a-whole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [a-plain-user-loading-many-alias-ids-is-refused-per-element](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 아닌 사용자가 별칭 ID 여러 개를 한 번에 조회하려 하면 요청 전체가 슈퍼관리자 권한 부족으로 거부된다
+아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, 있는 별칭 자리에는 권한 부족 거부가 오고 없는 ID 자리는 비어 있다
 
 Given
 
@@ -981,12 +1011,14 @@ When
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 있는 별칭 자리에는 권한 부족 거부가, 없는 ID 자리에는 빈 값이 온다
+  - length = 2
+  - 거부: NotEnoughPermission
+  - [1] = None
 
-#### [a-plain-user-loading-many-image-ids-is-refused-as-a-whole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [a-plain-user-loading-many-image-ids-is-refused-per-element](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 아닌 사용자가 ID 여러 개를 한 번에 조회하려 하면, 요청 전체가 슈퍼관리자 권한 부족으로 거부된다
+아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 온다
 
 Given
 
@@ -1007,8 +1039,11 @@ When
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 원소마다 권한 부족 거부가 입력 순서대로 온다
+  - length = 3
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
 
 #### [an-empty-alias-id-list-answers-with-an-empty-list](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
@@ -1117,7 +1152,7 @@ Then
 
 #### [loading-many-image-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다
+슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다
 
 Given
 
@@ -1138,9 +1173,11 @@ When
 
 Then
 
-- 요청한 순서대로 반환되고 없는 ID 위치는 비어 있다
+- 요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다
   - length = 3
-  - names = ['image-0-1', None, 'image-1-1']
+  - [0].name = 'image-0-1'
+  - [1]: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - [2].name = 'image-1-1'
 
 ### retiring
 
@@ -1239,14 +1276,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -1319,14 +1356,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다
@@ -1380,14 +1417,14 @@ Then
   - tags = []
   - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
   - accelerators = None
-  - config_digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
-  - metadata.digest: 미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - metadata.size_bytes = 0
   - metadata.created_at: 이 실행이 쓴 시각
   - metadata.last_used_at: 노드의 last_used_at 필드와 같다

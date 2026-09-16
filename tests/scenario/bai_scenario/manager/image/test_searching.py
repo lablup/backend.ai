@@ -6,26 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.image import (
-    AliasesAndACaller,
-    AliasesOnTwoImagesAndSomeone,
-    AnAliasAndACaller,
-    AnAliasAndSomeone,
-    ByABrokenCursor,
-    ByCursor,
-    ByOffset,
-    ByTwoModesAtOnce,
-    Filled,
-    ImagesInTwoRegistries,
-    ImagesWithTwoStatuses,
-    ManyImagesAndACaller,
-    ManyImagesAndSomeone,
-    Paging,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -62,6 +42,26 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.image import (
+    AliasesAndACaller,
+    AliasesOnTwoImagesAndSomeone,
+    AnAliasAndACaller,
+    AnAliasAndSomeone,
+    ByABrokenCursor,
+    ByCursor,
+    ByOffset,
+    ByTwoModesAtOnce,
+    Filled,
+    ImagesInTwoRegistries,
+    ImagesWithTwoStatuses,
+    ManyImagesAndACaller,
+    ManyImagesAndSomeone,
+    Paging,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 50
 """요청이 크기를 생략했을 때 어댑터가 채우는 한 페이지의 크기."""

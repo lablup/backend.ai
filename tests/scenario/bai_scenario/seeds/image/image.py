@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedField, SeedRowFrom
-
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.user import UserID
@@ -18,6 +16,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator, ImageCreator
+from bai_scenario.seeds.seeder import Naming, SeedField, SeedRowFrom
 
 
 @dataclass(frozen=True)

@@ -6,6 +6,20 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.image.request import PurgeImageInput
+from ai.backend.common.dto.manager.v2.image.response import ImageNode
+from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Scenario,
+    Then,
+    When,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
     AnAliasAndACaller,
@@ -22,20 +36,6 @@ from bai_scenario.components.image import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.image.request import PurgeImageInput
-from ai.backend.common.dto.manager.v2.image.response import ImageNode
-from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
-from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
-from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    Given,
-    Scenario,
-    Then,
-    When,
-)
 
 
 @dataclass(frozen=True)
