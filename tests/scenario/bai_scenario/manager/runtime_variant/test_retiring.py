@@ -312,6 +312,56 @@ class AUserGrantedNothingMayNotDeleteMany(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+# TODO(BA-7931): enable once the preset seed from #14536 has landed and the ORM column
+# carries the foreign key its migration declares. Until then the row cannot import its
+# seed, and a schema built by ``metadata.create_all()`` does not cascade the presets.
+# The Given moves to ``components/runtime_variant.py`` next to ``AVariantAndSomeone``.
+#
+# @dataclass(frozen=True)
+# class AVariantWithAPresetAndSomeone(Given[Any, AVariantAndACaller]):
+#     """변형 하나, 그 변형의 preset 하나, 사용자 한 명."""
+#
+#     role: UserRole = UserRole.USER
+#
+#     @override
+#     def describe(self) -> str:
+#         return f"preset 하나가 딸린 런타임 변형 하나와, {role_named(self.role)} 한 명"
+#
+#     @override
+#     async def lay(self, seeding: Any) -> AVariantAndACaller:
+#         variant = await seeding.creating(
+#             SeedRuntimeVariant(name_hint="variant", description=DESCRIBED)
+#         )
+#         await seeding.creating_from(SeedRuntimeVariantPreset(), variant)
+#         caller = await lay_a_caller(seeding, self.role)
+#         return AVariantAndACaller(seeding.made(variant), seeding.made(caller))
+#
+#
+# @dataclass(frozen=True)
+# class AVariantWithAPresetGoesWithIt(
+#     Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]
+# ):
+#     @override
+#     def summary(self) -> str:
+#         return "deleting-a-variant-takes-its-preset-with-it"
+#
+#     @override
+#     def describe(self) -> str:
+#         return "슈퍼관리자가 preset이 딸린 변형을 삭제하면 preset도 함께 사라지고, 삭제한 변형의 id가 반환된다"
+#
+#     @override
+#     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+#         return AVariantWithAPresetAndSomeone(role=UserRole.SUPERADMIN)
+#
+#     @override
+#     def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
+#         return Deleting()
+#
+#     @override
+#     def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantPayload]:
+#         return TheDeletedVariantId()
+
+
 SCENARIOS: list[RetiringStep] = [
     TheSuperadminDeletesAVariant(),
     AnIdNothingAnswersToIsNotFound(),
@@ -320,6 +370,7 @@ SCENARIOS: list[RetiringStep] = [
     ManyAreDeletedAtOnce(),
     AnUnknownIdInTheListIsNotFound(),
     AUserGrantedNothingMayNotDeleteMany(),
+    # AVariantWithAPresetGoesWithIt(),  # TODO(BA-7931)
 ]
 
 
