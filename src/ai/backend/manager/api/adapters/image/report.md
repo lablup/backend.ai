@@ -1152,7 +1152,7 @@ Then
 
 #### [loading-many-image-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
 
-슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다
+슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다
 
 Given
 
@@ -1173,10 +1173,10 @@ When
 
 Then
 
-- 요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다
+- 요청한 순서대로 반환되고 없는 ID 위치는 비어 있다
   - length = 3
   - [0].name = 'image-0-1'
-  - [1]: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - [1] = None
   - [2].name = 'image-1-1'
 
 ### retiring

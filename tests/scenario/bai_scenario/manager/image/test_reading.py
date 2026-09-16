@@ -22,7 +22,6 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     Scenario,
-    Skipped,
     Then,
     Verdict,
     When,
@@ -102,24 +101,24 @@ class LoadingAliases(When[AnAliasAndACaller, ImageAdapter, LoadedAliases]):
 
 @dataclass(frozen=True)
 class TheImageOrderIsKept(Then[ManyImagesAndACaller, LoadedImages]):
-    """요청한 순서대로 반환되고, 있는 ID 자리에는 그 이미지가 온다."""
+    """요청한 순서대로 반환되고, 없는 ID 위치는 비어 있다."""
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다"
+        return "요청한 순서대로 반환되고 없는 ID 위치는 비어 있다"
 
     @override
     def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
-        first, _, third = got
+        first, second, third = got
         return [
             Same("length", len(got), 3),
             Same(
                 "[0].name", first.name if isinstance(first, ImageNode) else None, laid.laid[0].name
             ),
-            Skipped("[1]", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"),
+            Same("[1]", second, None),
             Same(
                 "[2].name", third.name if isinstance(third, ImageNode) else None, laid.laid[1].name
             ),
@@ -255,7 +254,7 @@ class LoadingKeepsTheOrderAndLeavesHoles(
     def describe(self) -> str:
         return (
             "슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 "
-            "조회하면, 요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다"
+            "조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다"
         )
 
     @override
