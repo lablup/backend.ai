@@ -577,6 +577,8 @@ class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
         project_policy = seed.once(SeedProjectPolicy())
         user_policy = seed.creating(SeedUserPolicy())
         keypair_policy = seed.creating(SeedKeypairPolicy())
+        # TODO(BA-7935): the report line for this user does not say it is inactive;
+        # SeedUserOf.detail() reports only an explicit status.
         user = seed.provisioning(
             SeedUserOf(role=self.role, is_active=self.active),
             self.domain,
