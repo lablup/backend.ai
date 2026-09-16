@@ -188,11 +188,11 @@ class AMergeAndACaller:
 
 @dataclass(frozen=True)
 class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
-    """설정 이름 하나에 세 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
+    """설정 이름 하나에 도메인·프로젝트·사용자 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
 
     값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 허용 목록 항목은 조각과 함께
     만들어진다. 다른 사용자와 다른 도메인의 조각은 같은 이름에 만들어 두되 반환하지 않으므로,
-    병합에 섞이면 그 자리에서 불일치가 드러난다.
+    병합에 섞이면 바로 불일치가 드러난다.
     """
 
     public: Mapping[str, Any] | None = None
@@ -327,13 +327,13 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
 
 @dataclass(frozen=True)
 class NotRefused(Verdict):
-    """답이 와야 한다. 거부되면 그 이름을 문제로 적는다."""
+    """응답이 반환되어야 한다. 거부되면 그 예외 이름을 문제로 적는다."""
 
     raised: BaseException | None
 
     @override
     def told(self) -> Told:
-        says = "답이 온다"
+        says = "응답이 반환된다"
         if self.raised is None:
             return Told(says)
         return Told(says, problems=(f"{says} 이어야 하는데 {type(self.raised).__name__}",))

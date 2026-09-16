@@ -728,7 +728,7 @@ Then
 
 #### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py) — pass
 
-슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id 자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
+슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
 
 Given
 
@@ -758,7 +758,7 @@ When
 
 Then
 
-- 있는 둘은 노드로, 없는 id 자리는 비어서 반환된다
+- 있는 둘은 노드로 반환되고, 없는 id에 해당하는 항목은 비어 있다
   - items = 3
   - items[0].id: 미리 만들어 둔 자기 조각와 같다
   - items[1].id: 미리 만들어 둔 남의 조각와 같다

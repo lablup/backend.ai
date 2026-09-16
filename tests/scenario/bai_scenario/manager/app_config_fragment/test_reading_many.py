@@ -108,7 +108,7 @@ class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로, 없는 id 자리는 비어서 반환된다"
+        return "있는 둘은 노드로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -190,8 +190,8 @@ class TheSuperadminSeesBoth(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id "
-            "자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
+            "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 "
+            "해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
         )
 
     @override

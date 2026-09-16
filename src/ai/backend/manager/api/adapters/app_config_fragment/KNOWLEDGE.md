@@ -160,7 +160,7 @@ status: draft
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | 있는 것, 없는 것, 볼 수 없는 것을 섞어 조회한다 | 자기 조각 하나, 다른 사용자의 조각 하나, 자기 스코프에만 읽기 권한 있음 | 그 둘과 없는 id 하나를 한 번에 | 목록 순서대로. 자기 것은 노드, 남의 것과 없는 id는 그 항목만 거부 |
-| 슈퍼관리자가 섞어 조회한다 | 조각 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 노드, 없는 id 자리는 비어 있음 |
+| 슈퍼관리자가 섞어 조회한다 | 조각 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 노드, 없는 id에 해당하는 항목은 비어 있음 |
 | 빈 목록을 준다 | 조각 하나 | 빈 id 목록 | 빈 응답. 하위 계층을 호출하지 않는다 |
 
 없는 id도 슈퍼관리자가 아닌 사용자에게는 거부 원소다. 권한 검사가 원소마다 먼저 실행되는데 없는
@@ -199,5 +199,7 @@ status: draft
 
 ## 아직 적지 않은 것
 
-어댑터가 제공하는 열 호출이 모두 위에 있다. 실행 결과에 남는 `batch_load_fields`는 어댑터 공통
-기반 클래스가 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 호출할 일이 없다.
+어댑터가 제공하는 `scoped_upsert_app_config_fragments`, `my_upsert_app_config_fragments`, `get`,
+`purge`, `bulk_purge`, `batch_load_by_ids`, `scoped_app_config_fragments_by_names`,
+`my_app_config_fragments_by_names`, `admin_search`, `scoped_search`가 모두 위에 있다. 실행 결과에
+남는 `batch_load_fields`는 어댑터 공통 기반 클래스가 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 호출할 일이 없다.
