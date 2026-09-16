@@ -37,6 +37,8 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
+    "EntityFilter",
+    "EntityOrderBy",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
@@ -335,6 +337,21 @@ class RoleAssignmentFilter(BaseRequestModel):
 RoleAssignmentFilter.model_rebuild()
 
 
+class EntityFilter(BaseRequestModel):
+    """Filter for the deprecated `Role.scopes` connection. Accepted and ignored."""
+
+    entity_type: StringFilter | None = None
+    entity_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: StringFilter | None = None
+    AND: list[EntityFilter] | None = None
+    OR: list[EntityFilter] | None = None
+    NOT: list[EntityFilter] | None = None
+
+
+EntityFilter.model_rebuild()
+
+
 class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
@@ -358,6 +375,13 @@ class RoleOrderBy(BaseRequestModel):
 
 class RoleAssignmentOrderBy(BaseRequestModel):
     """Order by specification for role assignments."""
+
+    field: str
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class EntityOrderBy(BaseRequestModel):
+    """Order of the deprecated `Role.scopes` connection. Accepted and ignored."""
 
     field: str
     direction: OrderDirection = OrderDirection.DESC
