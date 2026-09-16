@@ -1144,7 +1144,7 @@ async def populate_fixture(
         if not isinstance(table, sa.Table):
             raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
-            return
+            continue
         log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
         from .hasher.types import PasswordColumn
 
@@ -1282,6 +1282,13 @@ async def populate_fixture(
                                 ) from e
                         update_data.append(update_row)
                     await conn.execute(update_stmt, update_data)
+
+    # After every table, so a node this fixture wrote itself is already there and the
+    # edges naming it stand. Imported here: the module is declared over this one's rows.
+    from .virtual_entity.fixture import provision_fixture_entities
+
+    async with engine.begin() as conn:
+        await provision_fixture_entities(conn, fixture_data.keys())
 
 
 async def _resolve_fixture_references(
