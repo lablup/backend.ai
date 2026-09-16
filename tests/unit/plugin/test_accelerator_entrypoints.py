@@ -21,11 +21,11 @@ from pathlib import Path
 
 import pytest
 
-from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript
+from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript, find_build_root
 
 ACCELERATOR_GROUP = "backendai_accelerator_v21"
 
-REPO_ROOT = Path(__file__).parents[3]
+REPO_ROOT = find_build_root()
 ACCELERATOR_ROOT = REPO_ROOT / "src/ai/backend/accelerator"
 
 
