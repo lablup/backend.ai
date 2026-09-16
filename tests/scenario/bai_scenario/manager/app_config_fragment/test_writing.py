@@ -349,10 +349,7 @@ class EnforcementOffLetsAnyoneWrite(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다. "
-            "자기 조각 쓰기는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다"
-        )
+        return "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:
@@ -463,10 +460,7 @@ class EnforcementOffDoesNotOpenPublic(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다. "
-            "공개 쓰기는 권한 그래프가 아니라 역할로 보호되기 때문이다"
-        )
+        return "권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다"
 
     @override
     def config(self) -> Mapping[str, Any]:

@@ -1445,7 +1445,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-granted-nothing-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다. 자기 조각 쓰기는 역할이 아니라 권한 그래프로 보호되므로 스위치가 영향을 준다
+권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다
 
 Given
 
@@ -1480,7 +1480,7 @@ Then
 
 #### [turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다. 공개 쓰기는 권한 그래프가 아니라 역할로 보호되기 때문이다
+권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다
 
 Given
 
