@@ -100,7 +100,12 @@ async def db(
         yield database_connection
 
 
-def _project(project_id: uuid.UUID, name: str, domain_name: str) -> ProjectRow:
+def _project(
+    project_id: uuid.UUID,
+    name: str,
+    domain_name: str,
+    project_type: ProjectType = ProjectType.GENERAL,
+) -> ProjectRow:
     return ProjectRow(
         id=project_id,
         name=name,
@@ -109,7 +114,7 @@ def _project(project_id: uuid.UUID, name: str, domain_name: str) -> ProjectRow:
         total_resource_slots=ResourceSlot(),
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
         dotfiles=b"",
-        type=ProjectType.GENERAL,
+        type=project_type,
         resource_policy="default",
     )
 
@@ -334,6 +339,8 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
         *(
             ("project", group["id"], f"role_project_{group['id'][:8]}_{kind}", kind == "member")
             for group in accounts["groups"]
+            # A personal project postdates the data migrations, so none made it a role.
+            if group["type"] != ProjectType.PERSONAL
             for kind in ("admin", "member")
         ),
         *(
@@ -397,7 +404,12 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
             )
         await session.flush()
         for group in accounts["groups"]:
-            project = _project(uuid.UUID(group["id"]), group["name"], domain["name"])
+            project = _project(
+                uuid.UUID(group["id"]),
+                group["name"],
+                domain["name"],
+                ProjectType(group["type"]),
+            )
             if group.get("creator_id") is not None:
                 project.creator_id = UserID(uuid.UUID(group["creator_id"]))
             session.add(project)
