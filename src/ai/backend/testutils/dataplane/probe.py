@@ -161,6 +161,16 @@ async def interface_address(node: Node, pid: str, ifname: str) -> str:
     raise AssertionError(f"no IPv4 address on {ifname} in pid {pid}: {out.stdout!r}")
 
 
+async def interface_mac(node: Node, pid: str, ifname: str = "baimulti0") -> str:
+    """The MAC of one interface inside a kernel's netns -- the OVERLAY one by default, which is
+    what a peer node's FDB carries."""
+    out = await node.run(["nsenter", "-t", pid, "-n", "ip", "-o", "link", "show", ifname])
+    tokens = out.stdout.split()
+    if "link/ether" in tokens:
+        return tokens[tokens.index("link/ether") + 1]
+    raise AssertionError(f"no MAC on {ifname} in pid {pid}: {out.stdout!r}")
+
+
 async def default_gateway(node: Node, pid: str) -> str:
     """The default gateway inside a kernel's netns (its LOCAL bridge, i.e. the host)."""
     out = await node.run(["nsenter", "-t", pid, "-n", "ip", "-o", "-4", "route", "show", "default"])

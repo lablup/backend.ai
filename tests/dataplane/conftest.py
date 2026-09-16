@@ -519,6 +519,19 @@ def privnet_control(
 
 
 @pytest.fixture
+async def node_addresses(etcd: AsyncEtcd, agent_ids: tuple[str, ...]) -> Sequence[str]:
+    """Each node's underlay address, in node order: the VTEP its agent published, which is the
+    address the other nodes and the manager reach it on."""
+    addresses: list[str] = []
+    for agent_id in agent_ids:
+        vtep = await etcd.get(f"network/agent/{agent_id}/vtep")
+        if not vtep:
+            _unavailable(f"agent {agent_id} has published no VTEP; cannot address its node")
+        addresses.append(str(vtep))
+    return addresses
+
+
+@pytest.fixture
 def node_controls(
     raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig
 ) -> Sequence[tuple[AgentController, PrivnetController]]:
