@@ -2916,7 +2916,7 @@ Then
   - [0].container.container_gids = None
   - [0].timestamps.created_at: 이 실행이 쓴 시각
   - [0].timestamps.modified_at: 이 실행이 쓴 시각
-  - [1]: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - [1] = None
 
 ### retiring
 

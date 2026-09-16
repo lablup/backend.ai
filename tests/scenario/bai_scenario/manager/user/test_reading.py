@@ -23,7 +23,6 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     Scenario,
-    Skipped,
     Then,
     Verdict,
     When,
@@ -245,7 +244,7 @@ class TheNodeThenNothing(Then[AReaderAndATarget, Answer]):
             seen.extend(UserNodeLook(self.started).verdicts(first, laid.target, at="[0]."))
         else:
             seen.append(Same("[0]", type(first).__name__, "UserNode"))
-        seen.append(Skipped("[1]", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"))
+        seen.append(Same("[1]", second, None))
         return seen
 
 
