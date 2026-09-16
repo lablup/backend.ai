@@ -7,6 +7,16 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.image.request import ForgetImageInput, RestoreImageInput
+from ai.backend.common.dto.manager.v2.image.response import ImageNode
+from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
     AnIdThatHoldsNothing,
@@ -21,16 +31,6 @@ from bai_scenario.components.image import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.image.request import ForgetImageInput, RestoreImageInput
-from ai.backend.common.dto.manager.v2.image.response import ImageNode
-from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
-from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
-from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
@@ -139,19 +139,16 @@ class TheMakerOfACustomImageMayForgetIt(
 
 
 @dataclass(frozen=True)
-class AForgottenImageCannotBeReached(
+class RestoringBringsAForgottenImageBack(
     Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
-        return "restoring-a-forgotten-image-cannot-reach-it"
+        return "restoring-a-forgotten-image-brings-it-back-alive"
 
     @override
     def describe(self) -> str:
-        return (
-            "삭제된 이미지를 복원하려 하면 대상을 찾을 수 없어 거부된다. "
-            "ID로 이미지를 조회하는 지점이 살아 있는 것만 대상으로 삼기 때문이다"
-        )
+        return "슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, AnImageAndACaller]:
@@ -163,7 +160,7 @@ class AForgottenImageCannotBeReached(
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheCallIsRefused(ImageNotFound)
+        return TheImageNode(status=ImageStatus.ALIVE)
 
 
 @dataclass(frozen=True)
@@ -380,7 +377,7 @@ class AnImageBeingPurgedIsNotVisible(
 SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
     ForgettingMarksItDeletedAndKeepsTheRow(),
     TheMakerOfACustomImageMayForgetIt(),
-    AForgottenImageCannotBeReached(),
+    RestoringBringsAForgottenImageBack(),
     RestoringWhatWasNeverForgotten(),
     ForgettingWhatIsNotThere(),
     RestoringWhatIsNotThere(),

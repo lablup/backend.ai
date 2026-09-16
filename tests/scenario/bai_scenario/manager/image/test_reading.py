@@ -1,4 +1,4 @@
-"""ID 여러 개로 조회 — 순서와 빈 항목, 그리고 권한이 없을 때."""
+"""ID 여러 개로 조회 — 순서와 빈 항목, 그리고 원소마다 오는 거부."""
 
 from __future__ import annotations
 
@@ -7,7 +7,26 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
+
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.image.response import ImageAliasNode, ImageNode
+from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Held,
+    Refused,
+    Same,
+    Scenario,
+    Skipped,
+    Then,
+    Verdict,
+    When,
+)
 from bai_scenario.components.image import (
     AnAliasAndACaller,
     AnAliasAndSomeone,
@@ -19,29 +38,11 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.image.response import ImageAliasNode, ImageNode
-from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    Answered,
-    Given,
-    Held,
-    Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
-)
-
 MISSING_IMAGE = ImageID(uuid.UUID("00000000-0000-0000-0000-0000000000ff"))
 MISSING_ALIAS = ImageAliasID(uuid.UUID("00000000-0000-0000-0000-0000000000fe"))
 
-type LoadedImages = list[ImageNode | None]
-type LoadedAliases = list[ImageAliasNode | None]
+type LoadedImages = list[ImageNode | Exception | None]
+type LoadedAliases = list[ImageAliasNode | Exception | None]
 
 
 @dataclass(frozen=True)
@@ -101,24 +102,45 @@ class LoadingAliases(When[AnAliasAndACaller, ImageAdapter, LoadedAliases]):
 
 @dataclass(frozen=True)
 class TheImageOrderIsKept(Then[ManyImagesAndACaller, LoadedImages]):
-    """요청한 순서대로 반환되고, 없는 ID 위치는 비어 있다."""
+    """요청한 순서대로 반환되고, 있는 ID 자리에는 그 이미지가 온다."""
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고 없는 ID 위치는 비어 있다"
+        return "요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다"
 
     @override
     def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
+        first, _, third = got
         return [
             Same("length", len(got), 3),
             Same(
-                "names",
-                [one.name if one is not None else None for one in got],
-                [laid.laid[0].name, None, laid.laid[1].name],
+                "[0].name", first.name if isinstance(first, ImageNode) else None, laid.laid[0].name
             ),
+            Skipped("[1]", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"),
+            Same(
+                "[2].name", third.name if isinstance(third, ImageNode) else None, laid.laid[1].name
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class EachImageIsRefused(Then[ManyImagesAndACaller, LoadedImages]):
+    """원소마다 권한 부족 거부가 온다."""
+
+    @override
+    def says(self) -> str:
+        return "원소마다 권한 부족 거부가 입력 순서대로 온다"
+
+    @override
+    def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
+        got = answered.response
+        if got is None:
+            return [Held("응답", answered.response, Filled())]
+        return [Same("length", len(got), 3)] + [
+            Refused(NotEnoughPermission, one if isinstance(one, Exception) else None) for one in got
         ]
 
 
@@ -171,7 +193,7 @@ class TheDuplicateImageIsReturnedTwice(Then[ManyImagesAndACaller, LoadedImages])
             Same("length", len(got), 2),
             Same(
                 "names",
-                [one.name if one is not None else None for one in got],
+                [one.name if isinstance(one, ImageNode) else None for one in got],
                 [str(laid.named.name), str(laid.named.name)],
             ),
         ]
@@ -179,7 +201,7 @@ class TheDuplicateImageIsReturnedTwice(Then[ManyImagesAndACaller, LoadedImages])
 
 @dataclass(frozen=True)
 class TheAliasOrderIsKept(Then[AnAliasAndACaller, LoadedAliases]):
-    """별칭도 같은 형태로 응답한다."""
+    """별칭은 요청한 순서대로 반환되고 없는 ID 위치는 비어 있다."""
 
     @override
     def says(self) -> str:
@@ -194,9 +216,30 @@ class TheAliasOrderIsKept(Then[AnAliasAndACaller, LoadedAliases]):
             Same("length", len(got), 2),
             Same(
                 "aliases",
-                [one.alias if one is not None else None for one in got],
+                [one.alias if isinstance(one, ImageAliasNode) else None for one in got],
                 [laid.alias.alias, None],
             ),
+        ]
+
+
+@dataclass(frozen=True)
+class TheAliasIsRefusedAndTheHoleStays(Then[AnAliasAndACaller, LoadedAliases]):
+    """있는 별칭 자리에는 권한 부족 거부가, 없는 ID 자리에는 빈 값이 온다."""
+
+    @override
+    def says(self) -> str:
+        return "있는 별칭 자리에는 권한 부족 거부가, 없는 ID 자리에는 빈 값이 온다"
+
+    @override
+    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[Verdict]:
+        got = answered.response
+        if got is None:
+            return [Held("응답", answered.response, Filled())]
+        first, second = got
+        return [
+            Same("length", len(got), 2),
+            Refused(NotEnoughPermission, first if isinstance(first, Exception) else None),
+            Same("[1]", second, None),
         ]
 
 
@@ -212,7 +255,7 @@ class LoadingKeepsTheOrderAndLeavesHoles(
     def describe(self) -> str:
         return (
             "슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 "
-            "조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다"
+            "조회하면, 요청한 순서대로 반환되고 있는 ID 자리에는 그 이미지가 온다"
         )
 
     @override
@@ -254,18 +297,18 @@ class AnEmptyListAsksNothing(
 
 
 @dataclass(frozen=True)
-class APlainUserIsRefusedWholesale(
+class APlainUserIsRefusedPerElement(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
-        return "a-plain-user-loading-many-image-ids-is-refused-as-a-whole"
+        return "a-plain-user-loading-many-image-ids-is-refused-per-element"
 
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아닌 사용자가 ID 여러 개를 한 번에 조회하려 하면, "
-            "요청 전체가 슈퍼관리자 권한 부족으로 거부된다"
+            "아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, "
+            "요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 온다"
         )
 
     @override
@@ -278,7 +321,7 @@ class APlainUserIsRefusedWholesale(
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, LoadedImages]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return EachImageIsRefused()
 
 
 @dataclass(frozen=True)
@@ -335,16 +378,19 @@ class LoadingAliasesKeepsTheOrderToo(
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotLoadAliases(
+class APlainUserIsRefusedPerAlias(
     Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
-        return "a-plain-user-loading-many-alias-ids-is-refused-as-a-whole"
+        return "a-plain-user-loading-many-alias-ids-is-refused-per-element"
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 별칭 ID 여러 개를 한 번에 조회하려 하면 요청 전체가 슈퍼관리자 권한 부족으로 거부된다"
+        return (
+            "아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, "
+            "있는 별칭 자리에는 권한 부족 거부가 오고 없는 ID 자리는 비어 있다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
@@ -356,7 +402,7 @@ class APlainUserMayNotLoadAliases(
 
     @override
     def then(self) -> Then[AnAliasAndACaller, LoadedAliases]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheAliasIsRefusedAndTheHoleStays()
 
 
 @dataclass(frozen=True)
@@ -388,10 +434,10 @@ SCENARIOS: list[Any] = [
     LoadingKeepsTheOrderAndLeavesHoles(),
     AnEmptyListAsksNothing(),
     DuplicateImageIdsKeepBothPositions(),
-    APlainUserIsRefusedWholesale(),
+    APlainUserIsRefusedPerElement(),
     LoadingAliasesKeepsTheOrderToo(),
     AnEmptyAliasListAsksNothing(),
-    APlainUserMayNotLoadAliases(),
+    APlainUserIsRefusedPerAlias(),
 ]
 
 

@@ -7,23 +7,6 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.image import (
-    DEFAULT_LIMITS,
-    DEFAULT_LIMITS_GQL,
-    Accelerators,
-    AnIdThatHoldsNothing,
-    AnImageAndACaller,
-    AnImageAndSomeone,
-    NoAccelerator,
-    OneAccelerator,
-    Target,
-    TheImageNode,
-    TheLaidImage,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.image.request import UpdateImageInput
@@ -43,6 +26,23 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.image import (
+    DEFAULT_LIMITS,
+    DEFAULT_LIMITS_GQL,
+    Accelerators,
+    AnIdThatHoldsNothing,
+    AnImageAndACaller,
+    AnImageAndSomeone,
+    NoAccelerator,
+    OneAccelerator,
+    Target,
+    TheImageNode,
+    TheLaidImage,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 A_NEW_TAG = "moved"
 UPDATED_DIGEST = f"sha256:{'f' * 64}"

@@ -13,13 +13,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, override
 
-from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.image import SeedAlias, SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.user import UserID
@@ -46,6 +39,12 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.image.image import SeedAlias, SeedImage
+from bai_scenario.seeds.image.registry import SeedContainerRegistry
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 
 NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """어느 행도 가리키지 않는 ID. 대상이 없을 때 무엇이 반환되는지 확인하려고 지정한다."""
@@ -414,21 +413,6 @@ class SomeoneReachingImages(SeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class PaddedDigest(Condition[str | None]):
-    """미리 만들어 둔 다이제스트. 컬럼 폭이 고정이라 뒤에 공백이 채워져 반환된다."""
-
-    planted: str
-
-    @override
-    def says(self) -> str:
-        return "미리 만들어 둔 다이제스트 뒤에 공백이 채워진 값"
-
-    @override
-    def holds(self, got: str | None) -> bool:
-        return got == self.planted.ljust(72)
-
-
-@dataclass(frozen=True)
 class Filled(Condition[Any]):
     """값이 채워져 반환된다. 비어 있으면 그 안의 필드를 확인할 수 없다."""
 
@@ -510,11 +494,10 @@ class TheImageNode(Then[Any, ImageNode]):
             Same("name", node.name, name),
             Same("image", node.image, namespace),
             Same("registry", node.registry, registry),
-            # 두 id는 `EntityIdentifier`의 종류가 서로 다르고, 그 동등성은 종류까지 비교한다.
             Held(
                 "registry_id",
-                node.registry_id.int,
-                SameAs(image.registry_id.int, "미리 만들어 둔 레지스트리의 ID"),
+                node.registry_id,
+                SameAs(image.registry_id, "미리 만들어 둔 레지스트리의 ID"),
             ),
             Same("project", node.project, image.project),
             Same("tag", node.tag, tag),
@@ -530,14 +513,14 @@ class TheImageNode(Then[Any, ImageNode]):
                 resource_limits,
             ),
             Same("accelerators", node.accelerators, self.accelerators.named()),
-            Held("config_digest", node.config_digest, PaddedDigest(config_digest)),
+            Same("config_digest", node.config_digest, config_digest),
             Same("is_local", node.is_local, is_local),
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
             Same("identity.canonical_name", identity.canonical_name, name),
             Same("identity.namespace", identity.namespace, namespace),
             Same("identity.architecture", identity.architecture, architecture),
-            Held("metadata.digest", metadata.digest, PaddedDigest(config_digest)),
+            Same("metadata.digest", metadata.digest, config_digest),
             Same("metadata.size_bytes", metadata.size_bytes, size_bytes),
             Held("metadata.created_at", metadata.created_at, written),
             Held(
