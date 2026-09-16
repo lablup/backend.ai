@@ -368,7 +368,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다. 생성은 권한 그래프가 아니라 역할로 보호되므로 스위치와 무관하다
+권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다
 
 Given
 
@@ -556,7 +556,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다. 수정은 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다
 
 Given
 
@@ -690,7 +690,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다. 조회는 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다
 
 Given
 
@@ -842,7 +842,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-delete-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다. 삭제는 역할이 아니라 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다
 
 Given
 
