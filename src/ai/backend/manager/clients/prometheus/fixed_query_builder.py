@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -13,6 +13,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     MetricType,
+    resolve_container_metric_unit_hint,
 )
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
@@ -31,6 +32,36 @@ _DIFF_TEMPLATE: Final[str] = (
     + CONTAINER_UTILIZATION_METRIC_NAME
     + "{${{labels}}}[${{window}}]))"
 )
+# pct = current / capacity * 100. The `> 0` on capacity drops the series
+# instead of dividing by zero.
+_PCT_CURRENT_SELECTOR: Final[str] = (
+    CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="current"}'
+)
+_PCT_CAPACITY_SELECTOR: Final[str] = (
+    CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="capacity"}'
+)
+# `current` is a gauge already in the unit of capacity (percent, bytes).
+_PCT_TEMPLATE: Final[str] = (
+    "label_replace("
+    "sum by (${{group_by}})(" + _PCT_CURRENT_SELECTOR + ")"
+    " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
+    ' * 100, "value_type", "pct", "", "")'
+)
+# `current` is a cumulative counter (CPU msec); rate() makes it per second,
+# the unit capacity is reported in.
+_PCT_RATE_TEMPLATE: Final[str] = (
+    "label_replace("
+    "sum by (${{group_by}})(rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}]))"
+    " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
+    ' * 100, "value_type", "pct", "", "")'
+)
+# Unit hints served as a per-second rate of a cumulative counter (CPU time).
+_COUNTER_UNIT_HINTS: Final[frozenset[str]] = frozenset({"millicores"})
+_SERIES_TEMPLATES: Final[Mapping[MetricType, str]] = {
+    MetricType.GAUGE: _GAUGE_TEMPLATE,
+    MetricType.RATE: _RATE_TEMPLATE,
+    MetricType.DIFF: _DIFF_TEMPLATE,
+}
 _LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
 _LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
@@ -94,7 +125,6 @@ class ContainerMetricQueryBuilder:
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> MetricPreset:
-        metric_type = self.get_container_metric_type(metric_name, label)
         querier = ContainerMetricQuerier(
             metric_name=metric_name,
             value_type=ValueType(label.value_type.value),
@@ -105,20 +135,23 @@ class ContainerMetricQueryBuilder:
             project_id=label.project_id,
         )
         return MetricPreset(
-            template=self._get_template(metric_type),
+            template=self._get_template(metric_name, label),
             labels=querier.labels(),
             group_by=querier.group_by_labels(),
             window=self._timewindow,
         )
 
-    def _get_template(self, metric_type: MetricType) -> str:
-        match metric_type:
-            case MetricType.GAUGE:
-                return _GAUGE_TEMPLATE
-            case MetricType.RATE:
-                return _RATE_TEMPLATE
-            case MetricType.DIFF:
-                return _DIFF_TEMPLATE
+    def _get_template(self, metric_name: str, label: ContainerMetricOptionalLabel) -> str:
+        match label.value_type:
+            case ValueType.CURRENT | ValueType.CAPACITY:
+                return _SERIES_TEMPLATES[self.get_container_metric_type(metric_name, label)]
+            case ValueType.PCT:
+                return self._get_pct_template(metric_name)
+
+    def _get_pct_template(self, metric_name: str) -> str:
+        if resolve_container_metric_unit_hint(metric_name) in _COUNTER_UNIT_HINTS:
+            return _PCT_RATE_TEMPLATE
+        return _PCT_TEMPLATE
 
 
 class ContainerLiveStatQueryBuilder:
