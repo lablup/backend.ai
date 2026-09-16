@@ -7,13 +7,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.app_config import UNREGISTERED
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
-from bai_scenario.seeds.app_config.definition import SeedDefinition
-from bai_scenario.seeds.app_config.fragment import SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
-
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
@@ -35,6 +28,12 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.app_config import UNREGISTERED
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import SeedDefinition
+from bai_scenario.seeds.app_config.fragment import SeedPublicFragment
+from bai_scenario.seeds.domain.domain import SeedDomain
 
 
 def _who(role: UserRole) -> str:

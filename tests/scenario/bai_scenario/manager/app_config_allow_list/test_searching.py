@@ -6,23 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.app_config_allow_list import (
-    EntriesComeInRankOrder,
-    EntriesLaidAcross,
-    EveryLaidEntryIsFound,
-    ManyEntriesAndACaller,
-    OnlyOneKindsEntriesAreFound,
-    OnlyTheNamedNamesEntriesAreFound,
-    TenEntriesComeWithANextPage,
-    TheEntryAfterTheCursorIsFound,
-    TheMiddleOffsetPageIsFound,
-    TwoNamedEntriesAreFound,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.user.types import UserRole
@@ -48,6 +31,23 @@ from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config_allow_list import (
+    EntriesComeInRankOrder,
+    EntriesLaidAcross,
+    EveryLaidEntryIsFound,
+    ManyEntriesAndACaller,
+    OnlyOneKindsEntriesAreFound,
+    OnlyTheNamedNamesEntriesAreFound,
+    TenEntriesComeWithANextPage,
+    TheEntryAfterTheCursorIsFound,
+    TheMiddleOffsetPageIsFound,
+    TwoNamedEntriesAreFound,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type Searched = SearchAppConfigAllowListPayload
 type SearchingStep = Scenario[

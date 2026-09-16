@@ -10,11 +10,6 @@ from typing import override
 from uuid import UUID, uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.app_config_allow_list import AnEntryAndACaller, AnEntryAndSomeone
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.user.types import UserRole
@@ -41,6 +36,11 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config_allow_list import AnEntryAndACaller, AnEntryAndSomeone
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Purged = PurgeAppConfigAllowListPayload
 type PurgingStep = Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]

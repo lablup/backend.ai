@@ -5,14 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
-
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
     AppConfigDefinitionData,
 )
 from ai.backend.manager.models.app_config_allow_list.creators import AppConfigAllowListCreator
+from bai_scenario.seeds.seeder import Naming, SeedRowFrom
 
 SCOPE_NAMES = {
     AppConfigScopeType.PUBLIC: "공개",
