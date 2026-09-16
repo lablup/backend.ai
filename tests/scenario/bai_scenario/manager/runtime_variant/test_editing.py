@@ -9,6 +9,17 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.runtime_variant.request import UpdateRuntimeVariantInput
+from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
+from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -22,17 +33,6 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.runtime_variant.request import UpdateRuntimeVariantInput
-from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
-from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
-
 RENAMED = "renamed"
 
 type EditingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
@@ -43,7 +43,7 @@ class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode
     """미리 만들어 둔 변형을 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str | None = None
-    described: str | Sentinel | None = SENTINEL
+    described: str | Unset | None = UNSET
     unknown: bool = False
 
     @override
@@ -56,7 +56,7 @@ class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode
         changing = []
         if self.named is not None:
             changing.append("이름")
-        if not isinstance(self.described, Sentinel):
+        if not isinstance(self.described, Unset):
             changing.append("설명")
         return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
 

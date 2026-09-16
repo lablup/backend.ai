@@ -1,4 +1,7 @@
-"""The runtime variant adapter, assembled for one row. Every call runs against ops."""
+"""The runtime variant adapter, assembled for one row.
+
+Every call but the purge runs against ops; the purge goes through the service.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +17,9 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 
 
 @pytest.fixture
@@ -23,13 +28,15 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
 ) -> RuntimeVariantAdapter:
+    provider = V2DBOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
             validators=validators,
-            repository=OpsRepository(V2DBOpsProvider(engine)),
+            repository=OpsRepository(provider),
         )
     )
+    service = RuntimeVariantService(RuntimeVariantRepository(engine, provider))
     return RuntimeVariantAdapter(
-        RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())))
+        RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())), service)
     )

@@ -12,6 +12,15 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.runtime_variant.request import CreateRuntimeVariantInput
+from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.resource import RuntimeVariantConflict
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -22,15 +31,6 @@ from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.runtime_variant.request import CreateRuntimeVariantInput
-from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
-from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.resource import RuntimeVariantConflict
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 MADE = "vllm"
 DESCRIBED = "새로 지정한 설명"

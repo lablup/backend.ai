@@ -9,18 +9,6 @@ from typing import Any, override
 from uuid import UUID, uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.runtime_variant import (
-    AVariantAndACaller,
-    AVariantAndSomeone,
-    ManyVariantsAndACaller,
-    ManyVariantsAndSomeone,
-    TheVariantNode,
-    TheVariantsInTheOrderAsked,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
@@ -39,6 +27,18 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.runtime_variant import (
+    AVariantAndACaller,
+    AVariantAndSomeone,
+    ManyVariantsAndACaller,
+    ManyVariantsAndSomeone,
+    TheVariantNode,
+    TheVariantsInTheOrderAsked,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[RuntimeVariantNode | Exception | None]
 type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, Any]

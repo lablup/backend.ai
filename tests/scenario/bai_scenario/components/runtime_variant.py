@@ -12,10 +12,6 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
-
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
@@ -39,6 +35,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
 
 DESCRIBED = "미리 만들어 둔 런타임 변형"
 """시드가 미리 만들어 두는 변형의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
@@ -79,7 +78,9 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AVariantAndACaller:
-        variant = await seeding.creating(SeedRuntimeVariant(description=self.described))
+        variant = await seeding.creating(
+            SeedRuntimeVariant(name_hint="variant", description=self.described)
+        )
         caller = await lay_a_caller(seeding, self.role)
         return AVariantAndACaller(seeding.made(variant), seeding.made(caller))
 
@@ -97,9 +98,11 @@ class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyVariantsAndACaller:
-        wanted = await seeding.creating(SeedRuntimeVariant(name_hint="wanted"))
+        wanted = await seeding.creating(
+            SeedRuntimeVariant(name_hint="wanted", description=DESCRIBED)
+        )
         others = [
-            await seeding.creating(SeedRuntimeVariant(name_hint="other"))
+            await seeding.creating(SeedRuntimeVariant(name_hint="other", description=DESCRIBED))
             for _ in range(self.besides)
         ]
         caller = await lay_a_caller(seeding, self.role)
