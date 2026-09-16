@@ -158,11 +158,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         self,
         input: UpdateContainerRegistryInput,
     ) -> UpdateContainerRegistryPayload:
-        """Update an existing container registry (superadmin only).
-
-        The allowed projects ride with the update rather than being written before it,
-        so an update this refuses leaves them as they were.
-        """
+        """Update an existing container registry and its allowed projects (superadmin only)."""
         updater = ContainerRegistryUpdater(
             registry_id=ContainerRegistryID(input.id),
             url=(OptionalState.update(input.url) if input.url is not None else OptionalState.nop()),
@@ -200,7 +196,6 @@ class ContainerRegistryAdapter(BaseAdapter):
 
     @staticmethod
     def _links(asked: AllowedGroupsInput | None) -> RegistryProjectChange | None:
-        """What the request said to allow and stop allowing, as project ids."""
         if asked is None:
             return None
         return RegistryProjectChange(

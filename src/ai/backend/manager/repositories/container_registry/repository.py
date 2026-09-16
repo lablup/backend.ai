@@ -84,11 +84,8 @@ class ContainerRegistryRepository:
         updater: ContainerRegistryUpdater,
         links: RegistryProjectChange | None = None,
     ) -> ContainerRegistryData:
-        """Update the registry, and the projects allowed on it, in one transaction.
-
-        The links used to be written by a separate call before this one, in a
-        transaction of its own, so an update refused here left them changed.
-        """
+        """Update the registry and the projects allowed on it in one transaction, so a
+        refusal of either leaves both as they were."""
         registry_id = updater.registry_id
         async with self._ops_provider.write_ops() as w:
             data = await w.update_data(updater)
@@ -112,12 +109,8 @@ class ContainerRegistryRepository:
         target: ContainerRegistryID,
         links: RegistryProjectChange,
     ) -> None:
-        """Link and unlink the projects the update named, on the open session.
-
-        A pair already linked is left as it stands, so naming one twice is not an
-        error. Unlinking is refused only when none of the named pairs was linked,
-        which is what the caller asked about.
-        """
+        """A pair already linked is left as it stands; unlinking is refused only when
+        none of the named pairs was linked."""
         if links.add:
             await w.create_relations(
                 ContainerRegistryProjectCreator(), [(scope, target) for scope in links.add]

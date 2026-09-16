@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -18,10 +18,16 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    RegistryProjectChange,
+)
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryURL
 from ai.backend.manager.errors.image import (
+    ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
 )
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -125,6 +131,15 @@ class _RegistryWithGroups:
 
     registry: ContainerRegistryData
     group_ids: list[ProjectID]
+
+
+@dataclass(frozen=True)
+class _RefusedEdit:
+    """An update refused by its row or by its links; ``unlink`` indexes ``all_group_ids``."""
+
+    url: OptionalState[str]
+    unlink: Sequence[int]
+    refusal: type[BackendAIError]
 
 
 class TestContainerRegistryRepository:
@@ -1213,6 +1228,83 @@ class TestContainerRegistryRepository:
                 )
             ).all()
             assert set(linked) == set(registry_with_associated_groups.group_ids)
+
+    async def test_modify_registry_writes_the_links_with_the_row(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_partial_groups: _RegistryWithPartialGroups,
+    ) -> None:
+        """The projects an update names to allow and stop allowing land with the row."""
+        group_ids = registry_with_partial_groups.all_group_ids
+        registry_id = ContainerRegistryID(registry_with_partial_groups.registry.id)
+
+        result = await repository.modify_registry(
+            ContainerRegistryUpdater(registry_id=registry_id, username=TriState.update("edited")),
+            RegistryProjectChange(add=[group_ids[2]], remove=[group_ids[0]]),
+        )
+
+        assert result.username == "edited"
+        async with db_with_cleanup.begin_readonly_session() as session:
+            linked = (
+                await session.scalars(
+                    sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
+                        AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                    )
+                )
+            ).all()
+        assert set(linked) == {group_ids[1], group_ids[2]}
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RefusedEdit(
+                url=OptionalState.update("http://"),
+                unlink=[0],
+                refusal=InvalidContainerRegistryURL,
+            ),
+            _RefusedEdit(
+                url=OptionalState.nop(),
+                unlink=[3],
+                refusal=ContainerRegistryGroupsAssociationNotFound,
+            ),
+        ],
+        ids=lambda case: case.refusal.__name__,
+    )
+    async def test_modify_registry_refused_leaves_the_row_and_the_links_alone(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_partial_groups: _RegistryWithPartialGroups,
+        case: _RefusedEdit,
+    ) -> None:
+        """A refusal, whether of the row or of the links, rolls back the whole update."""
+        registry = registry_with_partial_groups.registry
+        group_ids = registry_with_partial_groups.all_group_ids
+        registry_id = ContainerRegistryID(registry.id)
+
+        with pytest.raises(case.refusal):
+            await repository.modify_registry(
+                ContainerRegistryUpdater(
+                    registry_id=registry_id, url=case.url, username=TriState.update("edited")
+                ),
+                RegistryProjectChange(
+                    add=[group_ids[2]], remove=[group_ids[i] for i in case.unlink]
+                ),
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            row = await session.get_one(ContainerRegistryRow, registry_id)
+            linked = (
+                await session.scalars(
+                    sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
+                        AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                    )
+                )
+            ).all()
+            assert row.url == registry.url
+            assert row.username == registry.username
+        assert set(linked) == set(registry_with_partial_groups.initially_associated_group_ids)
 
     async def test_allowed_project_reads_the_registry_and_is_read_by_it(
         self,

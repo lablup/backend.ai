@@ -59,11 +59,7 @@ class PerProjectContainerRegistryInfo:
 
 @dataclass(frozen=True)
 class RegistryProjectChange:
-    """Which projects an update starts allowing on a registry, and which it stops.
-
-    Carried with the update rather than applied beside it: the two writes share the
-    registry's own transaction, so a refused update leaves the links as they were.
-    """
+    """Which projects an update starts allowing on a registry, and which it stops."""
 
     add: Sequence[ProjectID] = ()
     remove: Sequence[ProjectID] = ()
