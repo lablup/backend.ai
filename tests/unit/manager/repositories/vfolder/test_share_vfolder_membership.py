@@ -25,9 +25,10 @@ from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
@@ -49,8 +50,8 @@ from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
-    VFolderPermissionRow,
     VFolderRow,
+    VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -59,12 +60,14 @@ from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
 from ai.backend.manager.models.virtual_entity.entity_membership_field import (
     EntityMembershipFieldRow,
 )
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder import repository as vfolder_repo_module
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 REQUESTER_EMAIL = "requester@example.com"
 DOMAIN_NAME_FIXED = "test-domain-share"
@@ -113,12 +116,14 @@ class TestShareVfolderWithUsersMembership:
                 KeyPairRow,
                 ProjectRow,
                 VFolderRow,
-                VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
                 EntityMembershipCapRow,
                 EntityMembershipFieldRow,
                 EntityLabelRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -221,6 +226,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, ProjectEntityType(), project)
         yield ve_id
 
     @pytest.fixture
@@ -284,6 +290,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, VFolderEntityType(), vfolder_id)
         yield vfolder_id
 
     @pytest.fixture
@@ -324,6 +331,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, UserEntityType(), user_uuid)
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
@@ -352,6 +360,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, ProjectEntityType(), personal_project_id)
         yield email
 
     @pytest.fixture
@@ -420,6 +429,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, UserEntityType(), user_uuid)
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
@@ -472,6 +482,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, ProjectEntityType(), other_project)
         yield ve_id
 
     @pytest.fixture
@@ -511,6 +522,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
+            await VirtualEntitySeeder().provision(sess, UserEntityType(), user_uuid)
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=other_project_scope_id,
@@ -567,9 +579,9 @@ class TestShareVfolderWithUsersMembership:
         vfolder: UUID,
         non_member_user_email: str,
     ) -> None:
-        """A user without a virtual-entity membership triggers ObjectNotFound."""
+        """A user without a virtual-entity membership triggers UserNotFound."""
         repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(UserNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
                     vfolder, project, requester, domain_fixture, [non_member_user_email]
@@ -588,7 +600,7 @@ class TestShareVfolderWithUsersMembership:
     ) -> None:
         """When some emails are not project members, the call must reject the whole batch."""
         repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(UserNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
                     vfolder,
@@ -610,7 +622,7 @@ class TestShareVfolderWithUsersMembership:
     ) -> None:
         """Membership in a different project does not satisfy this folder's group filter."""
         repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(UserNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
                     vfolder,
@@ -632,7 +644,7 @@ class TestShareVfolderWithUsersMembership:
     ) -> None:
         """Membership alone is not enough — inactive users are excluded by status filter."""
         repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(UserNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
                     vfolder,

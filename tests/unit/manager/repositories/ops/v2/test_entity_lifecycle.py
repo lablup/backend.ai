@@ -49,13 +49,16 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     EntityCreator,
@@ -65,6 +68,7 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -347,6 +351,10 @@ async def database(
             RoleRow,
             PermissionRow,
             EntityLifecycleTestRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
         yield database_connection
@@ -870,6 +878,8 @@ class TestEntityPurge:
         assert await _self_binding_exists(database, data.id) is False
         assert await _scope_roles(database, data.id) == {}
         assert await _role_permissions(database, role.id) == set()
+        # The role goes with the scope by FK; its own node goes with it too.
+        assert await _virtual_entity_id(database, role.id, RoleEntityType()) is None
 
     async def test_purge_removes_edges_in_joined_scopes(
         self,

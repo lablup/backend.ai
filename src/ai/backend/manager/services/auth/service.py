@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import (
     InvalidAPIParameters,
     UnreachableError,
-    UserResourcePolicyNotFound,
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
@@ -49,7 +48,7 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
-from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
@@ -83,8 +82,8 @@ from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.get_role import (
-    PublicGetRoleAction,
-    PublicGetRoleActionResult,
+    GetRoleAction,
+    GetRoleActionResult,
 )
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
@@ -94,10 +93,6 @@ from ai.backend.manager.services.auth.actions.logout import LogoutAction, Logout
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
     PublicResolveAccessKeyScopeResult,
-)
-from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    PublicResolveUserScopeAction,
-    PublicResolveUserScopeResult,
 )
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
     GlobalRevokeLoginSessionAction,
@@ -189,7 +184,7 @@ class AuthService:
         keypair = await self._auth_repository.default_keypair(self._acting_user().user_id)
         return AccessKey(keypair.access_key)
 
-    async def get_role(self, action: PublicGetRoleAction) -> PublicGetRoleActionResult:
+    async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         acting = self._acting_user()
         group_role = None
         if action.group_id is not None:
@@ -209,7 +204,7 @@ class AuthService:
                         object_name="project (user group)",
                     ) from e
 
-        return PublicGetRoleActionResult(
+        return GetRoleActionResult(
             global_role="superadmin" if acting.is_superadmin else "user",
             domain_role="admin" if acting.is_admin else "user",
             group_role=group_role,
@@ -810,41 +805,6 @@ class AuthService:
         return PublicResolveAccessKeyScopeResult(
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
-        )
-
-    async def resolve_user_scope(
-        self, action: PublicResolveUserScopeAction
-    ) -> PublicResolveUserScopeResult:
-        acting = self._acting_user()
-        if action.owner_user_email is None:
-            return PublicResolveUserScopeResult(
-                owner_uuid=acting.user_id,
-                owner_role=acting.role,
-            )
-        if not acting.is_superadmin:
-            raise InvalidAPIParameters("Only superadmins may have user scopes.")
-        try:
-            (
-                owner_uuid,
-                owner_role,
-                owner_domain,
-            ) = await self._auth_repository.get_delegation_target_by_email(
-                action.owner_user_email,
-            )
-        except ValueError as e:
-            raise InvalidAPIParameters(str(e)) from e
-        try:
-            check_if_requester_is_eligible_to_act_as_target_user(
-                acting.role,
-                acting.domain_name,
-                owner_role,
-                owner_domain,
-            )
-        except RuntimeError as e:
-            raise GenericForbidden(str(e)) from e
-        return PublicResolveUserScopeResult(
-            owner_uuid=owner_uuid,
-            owner_role=owner_role,
         )
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:

@@ -19,7 +19,6 @@ import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.docker_client import DockerClient
 from testcontainers.core.waiting_utils import wait_for_logs
-from testcontainers.minio import MinioContainer
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.testutils.pants import get_parallel_slot
@@ -28,7 +27,6 @@ from ai.backend.testutils.pants import get_parallel_slot
 RedisContainerFixture = tuple[str, HostPortPairModel]
 EtcdContainerFixture = tuple[str, HostPortPairModel]
 PostgresContainerFixture = tuple[str, HostPortPairModel]
-MinioContainerFixture = tuple[str, HostPortPairModel]
 PrometheusContainerFixture = tuple[str, HostPortPairModel]
 
 log = logging.getLogger(__spec__.name)
@@ -82,7 +80,7 @@ def _wait_redis_health_check(host: str, port: int, timeout: float = 60.0) -> Non
             continue
 
 
-def _flush_redis(host: str, port: int) -> None:
+def flush_redis(host: str, port: int) -> None:
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.connect((host, port))
         s.send(b"*1\r\n$8\r\nFLUSHALL\r\n")
@@ -361,7 +359,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
             # Extra grace period to avoid intermittent connection failure
             time.sleep(0.5)
         # The previous process in this slot leaves its keys behind.
-        _flush_redis(addr.host, addr.port)
+        flush_redis(addr.host, addr.port)
         yield addr.host, addr
 
 
@@ -372,34 +370,6 @@ def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
             # pg_isready answers slightly before connections are accepted
             time.sleep(0.2)
         yield addr.host, addr
-
-
-@pytest.fixture(scope="session", autouse=False)
-def minio_container() -> Iterator[tuple[str, HostPortPairModel]]:
-    # Spawn a single-node MinIO container for a testing session.
-    random_id = secrets.token_hex(8)
-
-    container = (
-        MinioContainer("minio/minio:latest", access_key="minioadmin", secret_key="minioadmin")
-        .with_name(f"test--minio-slot-{get_parallel_slot()}-{random_id}")
-        .with_exposed_ports(9000)
-        .with_exposed_ports(9090)
-        .with_kwargs(tmpfs={"/data": ""})
-        .with_command("server /data --console-address :9090")
-    )
-
-    log.info("spawning minio container (parallel slot: %d)", get_parallel_slot())
-    container.start()
-    api_port = int(container.get_exposed_port(9000))
-    _ = int(container.get_exposed_port(9090))
-
-    try:
-        # MinioContainer automatically waits for MinIO to be ready, but add grace period
-        time.sleep(0.2)
-
-        yield container.get_container_host_ip(), HostPortPairModel(host="127.0.0.1", port=api_port)
-    finally:
-        container.stop()
 
 
 @pytest.fixture(scope="session", autouse=False)

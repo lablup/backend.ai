@@ -26,6 +26,7 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -115,6 +116,7 @@ class TestKeypairResourcePolicyOps:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection

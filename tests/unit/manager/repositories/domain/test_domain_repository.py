@@ -38,6 +38,7 @@ from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -106,6 +107,7 @@ class TestDomainRepository:
                 ScopeBindingRow,
                 EntityLabelRow,
                 UserRow,
+                EntityShareRow,
                 KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,

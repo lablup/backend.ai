@@ -30,7 +30,6 @@ current, see `AGENTS.md` in this directory.
 | `generate-graphql-schema.sh` | Dumps the GraphQL v1/v2 schemas and composes the supergraph | person; `install-dev.sh`, `release.sh`, `refresh-graphql-gateway.sh` |
 | `refresh-graphql-gateway.sh` | Regenerates the schema, copies it to the root, restarts the Apollo Router (`--recreate` to recreate the container so config updates apply) | person |
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
-| `generate-rbac-fixture-permissions.py` | Re-emits the managed permission rows of `fixtures/manager/example-roles.json` | person |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
 | `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 

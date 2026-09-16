@@ -13,6 +13,9 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     EntityUpserter                  -> upsert_entity
     GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
+
+Taking a share is an update too, but the settle and the share are one operation, so it
+has its own entry: ``accepting`` runs ``accept_share``.
 """
 
 from __future__ import annotations
@@ -23,23 +26,31 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, cast
 
-from bai_scenario.seeds.ops import SeedOps
-
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.specs.creator import (
     FieldCreator,
+    FieldToCreate,
     GlobalEntityCreator,
     GuardedEntityCreator,
+    NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import EntityUpserter, GlobalEntityUpserter
-from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
+from ai.backend.manager.repositories.ops.v2.user.write import (
+    FullUserCreator,
+    FullUserCreatorResult,
+)
+from bai_scenario.seeds.ops import SeedOps
 
 type WriteSpec[D] = (
     GlobalEntityCreator[Any, D]
@@ -123,13 +134,39 @@ class SeedUser[A, B, C](Seed, ABC):
         raise NotImplementedError
 
 
+class SeedFieldWithNestedRows[A, D: FieldData](ABC):
+    """A field row together with the rows it owns, written in one transaction.
+
+    A monitor that records a scope action writes the record and its scope rows atomically;
+    a seed that lays such a record takes that whole write rather than splitting it. Like
+    :class:`SeedField`, the row's name and report line come from the owner it is laid under.
+    """
+
+    @abstractmethod
+    def kind(self) -> str:
+        """이 필드를 가진 주인이 무엇을 할 수 있게 되는지."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def owner_id(self, owner: A) -> Any:
+        raise NotImplementedError
+
+    @abstractmethod
+    def field(self) -> FieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def nested(self) -> Sequence[NestedFieldCreator[Any, Any, Any]]:
+        raise NotImplementedError
+
+
 class SeedNest[D](ABC):
     """seed 여러 개를 함께 심어 전제 하나를 준비한다.
 
     단위가 행 하나가 아니라 "폴더를 만들 수 있는 사용자" 같은 전제다. 무엇을 준비하는지는
     ``kind``가 말하고, 어떤 seed와 어떤 nest를 딛는지는 ``lay`` 안이 보여준다.
 
-    ``Seeder``를 받지만 그 다섯 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
+    ``Seeder``를 받지만 그 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
     길은 없다.
     """
 
@@ -187,6 +224,22 @@ class SeedLink[S, T](ABC):
 
     @abstractmethod
     def seed(self) -> RelationCreator[Any, Any, Any]:
+        raise NotImplementedError
+
+
+class SeedShareAcceptance[A](ABC):
+    """The recipient taking an offer the scenario already laid.
+
+    The settle and the share it grants are one operation, and a seed takes it whole.
+    """
+
+    @abstractmethod
+    def kind(self) -> str:
+        """받는 쪽이 무엇을 하는지."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def seed(self, offer: A) -> EntityShareAcceptUpdater:
         raise NotImplementedError
 
 
@@ -263,6 +316,7 @@ class Seeder:
     _counts: dict[str, int] = field(default_factory=dict)
     _laid: list[Laid[Any]] = field(default_factory=list)
     _singletons: dict[type[Any], Laid[Any]] = field(default_factory=dict)
+    _provisioned: dict[Laid[Any], Laid[Any]] = field(default_factory=dict)
     _nesting: list[str] = field(default_factory=list)
     _started: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -358,17 +412,63 @@ class Seeder:
         """Provision what the manager provisions as one operation."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> UserData:
-            result = await ops.create_user(seed.seed(name, *values))
-            return result.user
+        async def provision(ops: SeedOps, values: Sequence[Any]) -> FullUserCreatorResult:
+            return await ops.create_user(seed.seed(name, *values))
 
-        return self._remember(self._given(seed, name, (a, b, c), write, _there_is(seed, name)))
+        async def user(ops: SeedOps, values: Sequence[Any]) -> UserData:
+            return cast("FullUserCreatorResult", values[0]).user
+
+        provisioned = self._given(seed, name, (a, b, c), provision, _there_is(seed, name))
+        row = self._remember(self._given(seed, name, (provisioned,), user, _there_is(seed, name)))
+        self._provisioned[row] = provisioned
+        return row
+
+    def personal_project_of(self, user: Laid[UserData], /) -> Laid[ProjectData]:
+        """The personal project provisioning made for this user. It writes nothing of its own."""
+        provisioned = self._provisioned[user]
+
+        async def project(ops: SeedOps, values: Sequence[Any]) -> ProjectData:
+            return cast("FullUserCreatorResult", values[0]).personal_project
+
+        return Laid(
+            name=user.name,
+            kind=user.kind,
+            nest=tuple(self._nesting),
+            describe=f"{user.describe}의 개인 프로젝트",
+            states="",
+            sources=(provisioned,),
+            write=project,
+        )
 
     def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         """Lay one field row under the owner the scenario already laid."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
             return await ops.create_field(seed.owner_id(values[0]), seed.seed())
+
+        return self._remember(
+            Laid(
+                name=owner.name,
+                kind=owner.kind,
+                nest=tuple(self._nesting),
+                describe=f"{owner.describe}({seed.kind()})",
+                states=f"{owner.describe}: {seed.kind()}",
+                sources=(owner,),
+                write=write,
+            )
+        )
+
+    def adding_with_nested[A, D: FieldData](
+        self, seed: SeedFieldWithNestedRows[A, D], owner: Laid[A], /
+    ) -> Laid[D]:
+        """Lay one field row and the rows it owns, in the one write a monitor uses."""
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+            created = await ops.atomic_create_fields_with_nested(
+                [FieldToCreate(owner_id=seed.owner_id(values[0]), creator=seed.field())],
+                list(seed.nested()),
+            )
+            return created[0]
 
         return self._remember(
             Laid(
@@ -402,6 +502,29 @@ class Seeder:
             )
         )
 
+    def accepting[A](
+        self, seed: SeedShareAcceptance[A], offer: Laid[A], /
+    ) -> Laid[EntityShareData]:
+        """Take the offer the way its recipient would."""
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> EntityShareData:
+            taken = await ops.accept_share(seed.seed(values[0]))
+            if taken is None:
+                raise LookupError("the offer was not open to its recipient")
+            return taken
+
+        return self._remember(
+            Laid(
+                name=offer.name,
+                kind=offer.kind,
+                nest=tuple(self._nesting),
+                describe=offer.describe,
+                states=f"{offer.describe}: {seed.kind()}",
+                sources=(offer,),
+                write=write,
+            )
+        )
+
     def granting[R, U](
         self,
         role: Laid[R],
@@ -423,6 +546,31 @@ class Seeder:
                 describe=to.describe,
                 states=f"{to.describe}: {role.describe} 보유",
                 sources=(role, to),
+                write=write,
+            )
+        )
+
+    def joining[P, U](
+        self,
+        project: Laid[P],
+        member: Laid[U],
+        *,
+        project_id: Callable[[P], ProjectID],
+        user_id: Callable[[U], UserID],
+    ) -> Laid[None]:
+        """Put the user on the project's roster, the way an operator would."""
+
+        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+            await ops.join_member(project_id(values[0]), user_id(values[1]))
+
+        return self._remember(
+            Laid(
+                name=member.name,
+                kind=member.kind,
+                nest=tuple(self._nesting),
+                describe=member.describe,
+                states=f"{member.describe}: {project.describe} 명부에 오름",
+                sources=(project, member),
                 write=write,
             )
         )

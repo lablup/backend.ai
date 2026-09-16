@@ -41,7 +41,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
 
@@ -68,7 +68,7 @@ class AgentRepository:
     _cache_source: AgentCacheSource
     _stateful_source: AgentStatefulSource
     _config_provider: ManagerConfigProvider
-    _v2_ops: V2DBOpsProvider
+    _v2_ops: ShareOpsProvider
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class AgentRepository:
         valkey_live: ValkeyLiveClient,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
-        v2_ops_provider: V2DBOpsProvider,
+        v2_ops_provider: ShareOpsProvider,
     ) -> None:
         self._db_source = AgentDBSource(db, v2_ops_provider)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)

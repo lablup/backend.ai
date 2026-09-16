@@ -11,11 +11,9 @@ from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_entity import OwnCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 
 
@@ -24,47 +22,26 @@ class BulkOwnCheck:
 
     The check itself, kept apart from what a shape does with the answer: one shape
     refuses the whole run on any entity not owned, the other carries those into its
-    result. Enforcement off or a superadmin answers every entity as owned.
+    result.
     """
 
-    _repository: PermissionControllerRepository
-    _config_provider: ManagerConfigProvider
+    _repository: RbacPermissionCheckRepository
 
-    def __init__(
-        self,
-        repository: PermissionControllerRepository,
-        config_provider: ManagerConfigProvider,
-    ) -> None:
+    def __init__(self, repository: RbacPermissionCheckRepository) -> None:
         self._repository = repository
-        self._config_provider = config_provider
 
     async def held(
         self, entity_ids: Sequence[EntityIdentifier]
     ) -> Mapping[EntityIdentifier, Permission]:
         """The bits the caller holds on each entity, as this check sees them.
 
-        Enforcement off or a superadmin holds everything; anyone else holds what the
-        own check answers. What a domain shows as the caller's permissions is read
-        from here, so it cannot disagree with what the check would allow.
+        What a domain shows as the caller's permissions is read from here, so it cannot
+        disagree with what the check would allow.
         """
-        if not self._config_provider.config.manager.rbac.enforcement_enabled:
-            return dict.fromkeys(entity_ids, Permission.full())
-
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")
-        if user.is_superadmin:
-            return dict.fromkeys(entity_ids, Permission.full())
-
-        keys = [
-            OwnCheckKey(
-                user_id=UserID(user.user_id),
-                entity=entity_id,
-            )
-            for entity_id in entity_ids
-        ]
-        owned = await self._repository.owned_permissions(keys)
-        return {key.entity: owned.get(key, Permission.NONE) for key in keys}
+        return await self._repository.held_permissions(UserID(user.user_id), entity_ids)
 
     async def check(self, meta: BulkActionTriggerMeta) -> Mapping[EntityIdentifier, bool]:
         permission = meta.operation_type.to_permission()
@@ -81,12 +58,8 @@ class VirtualEntityAtomicBulkActionRBACValidator(AtomicBulkActionValidator):
 
     _check: BulkOwnCheck
 
-    def __init__(
-        self,
-        repository: PermissionControllerRepository,
-        config_provider: ManagerConfigProvider,
-    ) -> None:
-        self._check = BulkOwnCheck(repository, config_provider)
+    def __init__(self, repository: RbacPermissionCheckRepository) -> None:
+        self._check = BulkOwnCheck(repository)
 
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> None:
@@ -102,20 +75,22 @@ class VirtualEntityPartialBulkActionRBACValidator(PartialBulkActionValidator):
     """The check answered per entity, so the run keeps going without the denied ones.
 
     A denied entity becomes one failed item of the result, told apart from an id that
-    matched no row by the error it carries.
+    matched no row by the error it carries. A superadmin is denied nothing, so an id
+    that matched no row reaches the operation and comes back as the miss it is.
     """
 
     _check: BulkOwnCheck
 
-    def __init__(
-        self,
-        repository: PermissionControllerRepository,
-        config_provider: ManagerConfigProvider,
-    ) -> None:
-        self._check = BulkOwnCheck(repository, config_provider)
+    def __init__(self, repository: RbacPermissionCheckRepository) -> None:
+        self._check = BulkOwnCheck(repository)
 
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> Mapping[EntityIdentifier, Exception]:
+        user = current_user()
+        if user is None:
+            raise UnreachableError("User context is not available")
+        if user.is_superadmin:
+            return {}
         owned = await self._check.check(meta)
         return {
             entity_id: NotEnoughPermission(

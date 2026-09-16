@@ -6,9 +6,12 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     DeleteInvitationReq,
@@ -20,8 +23,9 @@ from ai.backend.common.dto.manager.vfolder import (
     VFolderGetInfoResponse,
     VFolderListResponse,
 )
-from ai.backend.manager.data.vfolder.types import VFolderInvitationState, VFolderMountPermission
-from ai.backend.manager.models.vfolder import vfolder_invitations
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -123,13 +127,19 @@ class TestVFolderLifecycle:
         inv_id = uuid.uuid4()
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.insert(vfolder_invitations).values(
+                pg_insert(VirtualEntityRow.__table__)
+                .values(entity_type=VFolderEntityType(), entity_id=vf["id"])
+                .on_conflict_do_nothing()
+            )
+            await conn.execute(
+                sa.insert(EntityShareRow.__table__).values(
                     id=inv_id,
-                    permission=VFolderMountPermission.READ_ONLY,
-                    inviter="someone@test.local",
-                    invitee="admin@test.local",
-                    state=VFolderInvitationState.PENDING,
-                    vfolder=vf["id"],
+                    permission_cap=Permission.READ,
+                    sharer_user_id=None,
+                    recipient_email="admin@test.local",
+                    status=EntityShareStatus.PENDING,
+                    target_entity_type=VFolderEntityType(),
+                    target_entity_id=vf["id"],
                 )
             )
 

@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
@@ -42,6 +41,8 @@ from ai.backend.common.data.entity.fair_share import (
 )
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
+from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -77,9 +78,9 @@ from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEnti
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -110,6 +111,8 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.image.types import ImageAliasData
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
@@ -150,18 +153,44 @@ from ai.backend.manager.services.artifact.revision.processors import ArtifactRev
 from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
     GetArtifactRegistryMetasAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
+    BulkGetHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
+    BulkGetReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
+from ai.backend.manager.services.audit_log.actions.lookup_owner import (
+    LookupAuditLogOwnerAction,
+    LookupBulkAuditLogOwnerAction,
+)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+)
 from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
     BulkGetAccessTokensAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_auto_scaling_rules import (
+    BulkGetAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupBulkAutoScalingRuleOwnerAction,
     LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkReplicaGroupOwnerAction,
     LookupBulkReplicaOwnerAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revisions import (
@@ -170,6 +199,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revi
 from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
     BulkGetReplicasAction,
 )
+from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
+    BulkGetReplicaGroupsAction,
+)
 from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
     BulkGetRoutesAction,
 )
@@ -177,6 +209,9 @@ from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
+    BulkGetDeploymentPresetsAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
@@ -193,11 +228,20 @@ from ai.backend.manager.services.entity_label.processors import EntityLabelProce
 from ai.backend.manager.services.entity_share.processors import (
     EntityShareProcessors,
 )
+from ai.backend.manager.services.export.actions.get_report import GetReportAction
+from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+from ai.backend.manager.services.idle_checker.actions.bulk_get import BulkGetIdleCheckersAction
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker_assignment.processors import (
     IdleCheckerAssignmentProcessors,
+)
+from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
+from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
+from ai.backend.manager.services.image.actions.lookup_alias_owner import (
+    LookupBulkImageAliasOwnerAction,
+    LookupImageAliasOwnerAction,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -223,6 +267,7 @@ from ai.backend.manager.services.object_storage.processors import ObjectStorageP
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
@@ -279,8 +324,16 @@ from ai.backend.manager.services.scheduling_history.processors import (
 )
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -290,15 +343,20 @@ from ai.backend.manager.services.storage_namespace.processors import (
     StorageNamespaceProcessors,
 )
 from ai.backend.manager.services.template.processors import TemplateProcessors
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import (
+    VFolderMountPolicyProcessors,
+)
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
+from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
@@ -346,6 +404,15 @@ def _ops_registry() -> ProcessorRegistry[Any]:
     )
 
 
+def _kernels(registry: ProcessorRegistry[Any]) -> LookupFieldGroup[KernelInfo]:
+    return registry.group(GroupMeta(SessionEntityType())).field_group(
+        FieldGroupMeta(KernelFieldType()),
+        KernelInfo,
+        LookupKernelFieldOwnerAction,
+        LookupBulkKernelOwnerAction,
+    )
+
+
 def test_every_defined_v2_action_is_wired() -> None:
     # One shared registry, as in the production wiring: every v2 package registers
     # through it, so its wired_actions() is the complete catalog of registered actions.
@@ -361,7 +428,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
     resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     agent_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(agent_groups.group(GroupMeta(AgentEntityType())), MagicMock(), [])
+    AgentProcessors(agent_groups.group(GroupMeta(AgentEntityType())), MagicMock())
     AppConfigProcessors(
         registry.group(GroupMeta(AppConfigEntityType())),
         registry.group(GroupMeta(AppConfigDefinitionEntityType())),
@@ -399,9 +466,8 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
         MagicMock(),
         MagicMock(),
-        [],
     )
-    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())))
+    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())), MagicMock())
     ObjectStorageProcessors(
         registry.group(GroupMeta(ObjectStorageEntityType())),
         artifact_revisions,
@@ -426,7 +492,12 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(RuntimeVariantPresetEntityType())), MagicMock()
     )
     AuditLogProcessors(
-        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData)
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(AuditLogFieldType()),
+            AuditLogData,
+            LookupAuditLogOwnerAction,
+            LookupBulkAuditLogOwnerAction,
+        )
     )
     SecretProcessors(
         registry.concern(ConcernMeta(Concern.SYSTEM)).dangling_field_group(
@@ -447,15 +518,19 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     StorageNamespaceProcessors(registry.group(GroupMeta(StorageNamespaceEntityType())))
     DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
-    PermissionControllerProcessors(registry.group(GroupMeta(RoleEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    PermissionControllerProcessors(
+        registry.group(GroupMeta(RoleEntityType())),
+        registry.group(GroupMeta(UserEntityType())),
+        MagicMock(),
+    )
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     UserProcessors(
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
     AuthProcessors(
-        registry.group(GroupMeta(AuthEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
@@ -483,12 +558,26 @@ def test_every_defined_v2_action_is_wired() -> None:
         ),
         MagicMock(),
     )
-    ArtifactRegistryProcessors(registry.group(GroupMeta(ArtifactRegistryEntityType())), MagicMock())
+    ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        MagicMock(),
+    )
     ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), MagicMock())
     ContainerRegistryProcessors(
         registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
     )
-    ImageProcessors(registry.group(GroupMeta(ImageEntityType())), MagicMock())
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
     ExportProcessors(
         registry.group(GroupMeta(UserEntityType())),
         registry.group(GroupMeta(SessionEntityType())),
@@ -507,6 +596,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
         resource_allocation_groups.group(GroupMeta(ResourceGroupEntityType())),
+        _kernels(registry),
         ResourceAllocationProcessors(
             resource_allocation_groups.group(GroupMeta(UserEntityType())),
             resource_allocation_groups.group(GroupMeta(ProjectEntityType())),
@@ -522,8 +612,9 @@ def test_every_defined_v2_action_is_wired() -> None:
     VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderInviteProcessors(registry.group(GroupMeta(VFolderInvitationEntityType())), MagicMock())
+    VFolderInviteProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderMountPolicyProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     ModelServingProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     ModelServingAutoScalingProcessors(
         registry.group(GroupMeta(DeploymentEntityType())), MagicMock()
@@ -599,6 +690,45 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
     assert recorded == judged
 
 
+def test_export_report_reads_keep_their_judged_gates() -> None:
+    """The report route stays superadmin-only; exports scoped to a caller read the report publicly."""
+    registry = _ops_registry()
+    ExportProcessors(
+        registry.group(GroupMeta(UserEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
+        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
+        MagicMock(),
+    )
+
+    judged = {
+        GetReportAction: (GlobalEntityType(), ActionKind.GLOBAL, ActionGate.PERMISSION),
+        PublicGetReportAction: (GlobalEntityType(), ActionKind.GLOBAL, ActionGate.PUBLIC),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
+
+
+def test_deployment_bulk_deletes_are_checked_per_owning_deployment() -> None:
+    """Rules and access tokens deleted in bulk are judged per deployment, not superadmin-only."""
+    registry = _ops_registry()
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkDeleteAutoScalingRulesAction] == partial
+    assert recorded[BulkDeleteAccessTokensAction] == partial
+
+
 def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
     """Pins the five reads BA-7673 ruled on, so a rewiring has to restate the ruling.
 
@@ -607,11 +737,12 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
     """
     registry = _ops_registry()
     resource_group_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(resource_group_groups.group(GroupMeta(AgentEntityType())), MagicMock(), [])
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    AgentProcessors(resource_group_groups.group(GroupMeta(AgentEntityType())), MagicMock())
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
         resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
+        _kernels(registry),
         ResourceAllocationProcessors(
             resource_group_groups.group(GroupMeta(UserEntityType())),
             resource_group_groups.group(GroupMeta(ProjectEntityType())),
@@ -681,9 +812,15 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
 
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
-    """The named registries are read one permission check per registry, not superadmin-only."""
+    """The named artifact, HuggingFace and Reservoir registries are read one permission check
+    per registry, not superadmin-only."""
     registry = _ops_registry()
-    ArtifactRegistryProcessors(registry.group(GroupMeta(ArtifactRegistryEntityType())), MagicMock())
+    ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        registry.group(GroupMeta(ArtifactRegistryEntityType())),
+        MagicMock(),
+    )
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
@@ -694,12 +831,22 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+    assert recorded[BulkGetHuggingFaceRegistriesAction] == (
+        ArtifactRegistryEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetReservoirRegistriesAction] == (
+        ArtifactRegistryEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
 
 
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:
     """The domains a resource group serves are read within the resource-group scope."""
     registry = _ops_registry()
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
@@ -751,8 +898,10 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     partial = (DeploymentEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[BulkGetRevisionsAction] == partial
     assert recorded[BulkGetReplicasAction] == partial
+    assert recorded[BulkGetReplicaGroupsAction] == partial
     assert recorded[BulkGetRoutesAction] == partial
     assert recorded[BulkGetAccessTokensAction] == partial
+    assert recorded[BulkGetAutoScalingRulesAction] == partial
     assert recorded[BulkGetDeploymentPoliciesAction] == partial
     assert recorded[BulkGetDeploymentHistoriesAction] == partial
     assert recorded[BulkGetRouteHistoriesAction] == partial
@@ -775,6 +924,8 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     for owner_lookup in (
         LookupBulkReplicaOwnerAction,
         LookupBulkDeploymentAccessTokenOwnerAction,
+        LookupBulkAutoScalingRuleOwnerAction,
+        LookupBulkReplicaGroupOwnerAction,
         LookupBulkSessionSchedulingHistoryOwnerAction,
         LookupBulkKernelSchedulingHistoryOwnerAction,
     ):
@@ -782,13 +933,44 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
         assert (owner_lookup, ActionGate.PERMISSION) in lookup_gates
 
 
+def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
+    """The session DataLoader reads per named session, the kernel one per owning session."""
+    registry = _ops_registry()
+    SessionProcessors(
+        registry.group(GroupMeta(SessionEntityType())),
+        registry.group(GroupMeta(ResourceGroupEntityType())),
+        _kernels(registry),
+        MagicMock(),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (SessionEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkGetSessionsAction] == partial
+    assert recorded[BulkGetKernelsAction] == partial
+
+    lookup_gates = {
+        (record.action_cls, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.LOOKUP
+    }
+    assert (LookupBulkKernelOwnerAction, ActionGate.PUBLIC) in lookup_gates
+    assert (LookupBulkKernelOwnerAction, ActionGate.PERMISSION) in lookup_gates
+
+
 def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:
-    """The resource group, notification and artifact DataLoaders read per named
-    entity; the domain one is public, since a regular user holds no read on domains.
+    """The resource group, notification, artifact, user and project DataLoaders read per
+    named entity; the domain one is public, since a regular user holds no read on domains.
     """
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
+    ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
         registry.group(GroupMeta(NotificationRuleEntityType())),
@@ -810,11 +992,33 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ),
         MagicMock(),
     )
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
+    DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
+    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
 
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[BulkGetDeploymentsAction] == (
+        DeploymentEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetDeploymentPresetsAction] == (
+        DeploymentPresetEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetResourceGroupsAction] == (
         ResourceGroupEntityType(),
         ActionKind.BULK,
@@ -845,6 +1049,16 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+    assert recorded[BulkGetImagesAction] == (
+        ImageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetImageAliasesAction] == (
+        ImageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetDomainsAction] == (
         DomainEntityType(),
         ActionKind.BULK,
@@ -855,3 +1069,130 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ActionKind.LOOKUP,
         ActionGate.PUBLIC,
     )
+    assert recorded[BulkGetUsersAction] == (
+        UserEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetProjectsAction] == (
+        ProjectEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
+    """The VFS storage DataLoader reads per named storage, not superadmin-only."""
+    registry = _ops_registry()
+    VFSStorageProcessors(registry.group(GroupMeta(VFSStorageEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFSStoragesAction] == (
+        VFSStorageEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_container_registry_loader_read_is_a_partial_permission_read() -> None:
+    """The container registry DataLoader reads per named registry, not superadmin-only."""
+    registry = _ops_registry()
+    ContainerRegistryProcessors(
+        registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetContainerRegistriesAction] == (
+        ContainerRegistryEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_idle_checker_loader_read_is_a_partial_permission_read() -> None:
+    """The idle checker DataLoader reads per named checker, not superadmin-only."""
+    registry = _ops_registry()
+    IdleCheckerProcessors(
+        registry.group(GroupMeta(IdleCheckerEntityType())),
+        registry.group(GroupMeta(SessionEntityType())),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetIdleCheckersAction] == (
+        IdleCheckerEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
+    """The audit log DataLoader reads per named record, checked per entity each is about."""
+    registry = _ops_registry()
+    AuditLogProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(AuditLogFieldType()),
+            AuditLogData,
+            LookupAuditLogOwnerAction,
+            LookupBulkAuditLogOwnerAction,
+        )
+    )
+
+    recorded = {
+        record.action_cls: (record.kind, record.gate) for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetAuditLogsAction] == (ActionKind.BULK, ActionGate.PERMISSION)
+
+
+def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern() -> None:
+    """Built from a concern, the lookups name that concern; built from the registry,
+    they name the field type, as the entity label wiring always has."""
+    registry = _ops_registry()
+    AuditLogProcessors(
+        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_lookup_field_group(
+            FieldGroupMeta(AuditLogFieldType()),
+            AuditLogData,
+            LookupAuditLogOwnerAction,
+            LookupBulkAuditLogOwnerAction,
+        )
+    )
+    EntityLabelProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(EntityLabelFieldType()),
+            EntityLabelData,
+            LookupEntityLabelOwnerAction,
+            LookupBulkEntityLabelOwnerAction,
+        )
+    )
+
+    recorded: dict[type[Any], set[tuple[object, ActionKind, ActionGate]]] = {}
+    for record in registry.wired_processors():
+        if record.kind == ActionKind.LOOKUP:
+            recorded.setdefault(record.action_cls, set()).add((
+                record.concern,
+                record.kind,
+                record.gate,
+            ))
+    assert recorded[LookupAuditLogOwnerAction] == {
+        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION)
+    }
+    # The partial bulk get records its owner lookup public beside the gated one.
+    assert recorded[LookupBulkAuditLogOwnerAction] == {
+        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION),
+        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PUBLIC),
+    }
+    assert recorded[LookupEntityLabelOwnerAction] == {
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
+    }
+    assert recorded[LookupBulkEntityLabelOwnerAction] == {
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
+    }

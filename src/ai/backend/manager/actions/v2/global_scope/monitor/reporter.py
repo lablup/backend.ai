@@ -4,11 +4,11 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.result import GlobalActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
 from ai.backend.manager.reporters.hub import ReporterHub
 
@@ -24,7 +24,7 @@ class GlobalActionReporterMonitor(GlobalActionMonitor):
         self._reporter_hub = reporter_hub
 
     @override
-    async def prepare(self, action: BaseGlobalAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
         # triggered_by = the caller who triggered the request; acted_as = the effective
         # (acting) subject. They differ only while a super admin is impersonating.
         trigger = triggered_user()

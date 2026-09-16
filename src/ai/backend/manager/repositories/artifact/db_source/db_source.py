@@ -22,9 +22,9 @@ from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
-    ArtifactNotVerified,
     ArtifactRevisionNotFoundError,
-    ArtifactUpdateError,
+    ArtifactRevisionNotVerified,
+    ArtifactRevisionUpdateError,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
@@ -171,9 +171,9 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError()
 
             if row.status == ArtifactStatus.AVAILABLE:
-                raise ArtifactNotVerified("Artifacts already approved")
+                raise ArtifactRevisionNotVerified("Artifacts already approved")
             if row.status != ArtifactStatus.NEEDS_APPROVAL:
-                raise ArtifactNotVerified("Only verified artifacts could be approved")
+                raise ArtifactRevisionNotVerified("Only verified artifacts could be approved")
 
             update_stmt = (
                 sa.update(ArtifactRevisionRow)
@@ -190,7 +190,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(update_stmt)
             updated_row = result.scalars().one_or_none()
             if updated_row is None:
-                raise ArtifactUpdateError()
+                raise ArtifactRevisionUpdateError()
 
             return updated_row.to_dataclass()
 
@@ -213,7 +213,7 @@ class ArtifactDBSource:
             result = await db_sess.execute(update_stmt)
             updated_row = result.scalars().one_or_none()
             if updated_row is None:
-                raise ArtifactUpdateError()
+                raise ArtifactRevisionUpdateError()
 
             return updated_row.to_dataclass()
 

@@ -17,7 +17,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import (
     BaseLookupAction,
@@ -27,6 +26,7 @@ from ai.backend.manager.actions.v2.lookup.base import (
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.user import UserNotFound
 
@@ -88,7 +88,7 @@ class _RecordingMonitor(LookupActionMonitor):
         self.done_results: list[LookupActionProcessResult] = []
 
     @override
-    async def prepare(self, action: BaseLookupAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseLookupAction, meta: ActionTriggerMeta) -> None:
         return
 
     @override

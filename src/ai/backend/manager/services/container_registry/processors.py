@@ -1,9 +1,13 @@
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
 )
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -87,6 +91,8 @@ class ContainerRegistryProcessors:
     search_container_registries: GlobalActionProcessor[
         SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
     ]
+    # What the DataLoader reads: checked per registry.
+    bulk_get: PartialBulkActionProcessor[BulkGetContainerRegistriesAction, ContainerRegistryData]
     handle_harbor_webhook: AnonymousGlobalActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
     ]
@@ -129,6 +135,7 @@ class ContainerRegistryProcessors:
         self.search_container_registries = group.global_scope(
             SearchContainerRegistriesAction, service.search_container_registries
         )
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetContainerRegistriesAction)
         # Harbor holds no keypair; the service checks its webhook secret instead.
         self.handle_harbor_webhook = group.anonymous_global(
             HandleHarborWebhookAction, service.handle_harbor_webhook

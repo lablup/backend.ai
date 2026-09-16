@@ -1,21 +1,23 @@
 import asyncio
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
+from functools import partial
 from typing import Any, cast
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
-from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -45,12 +47,17 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
+from ai.backend.manager.data.resource_group.types import (
+    ResourceGroupData as ResourceGroupEntityData,
+)
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, ServiceUnavailable
-from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
-from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable, DomainNotFound
+from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -63,10 +70,11 @@ from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
-from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import resource_groups
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -74,7 +82,7 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.base import (
@@ -83,6 +91,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.manager.repositories.vfolder.mount import query_reachable_vfolders
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -106,49 +118,35 @@ model_serving_repository_resilience = Resilience(
 class ModelServingRepository:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
+    _permission_check: RbacPermissionCheckRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        permission_check: RbacPermissionCheckRepository,
+    ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
+        self._permission_check = permission_check
 
-    async def _check_inference_resource_group(
+    def _check_inference_resource_group(
         self,
-        conn: AsyncConnection,
+        candidates: Sequence[ResourceGroupEntityData],
         resource_group: str,
-        owner_access_key: AccessKey,
-        target_domain: str,
-        target_project: str | ProjectID,
     ) -> str:
         """
-        Wrapper of ``registry.check_scaling_group()`` with additional guards flavored for
+        Wrapper of ``registry.check_resource_group()`` with additional guards flavored for
         model service included.
         """
-        checked_resource_group = await registry_check_resource_group(
-            conn,
-            resource_group,
-            SessionTypes.INFERENCE,
-            owner_access_key,
-            target_domain,
-            target_project,
+        checked_resource_group = registry_check_resource_group(
+            candidates, resource_group, SessionTypes.INFERENCE
         )
-
-        query = (
-            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
-            .select_from(resource_groups)
-            .where(resource_groups.c.name == checked_resource_group)
-        )
-
-        result = await conn.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise ServiceUnavailable("Scaling group not found")
-        wsproxy_addr = sgroup.wsproxy_addr
-        if not wsproxy_addr:
+        sgroup = next(rg for rg in candidates if rg.name == checked_resource_group)
+        if not sgroup.network.wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-
-        if not sgroup.wsproxy_api_token:
+        if not sgroup.network.wsproxy_api_token:
             raise ServiceUnavailable("Scaling group not ready to start model service")
-
         return checked_resource_group
 
     @model_serving_repository_resilience.apply()
@@ -601,7 +599,7 @@ class ModelServingRepository:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 return rule.to_data()
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return None
 
     @model_serving_repository_resilience.apply()
@@ -667,7 +665,7 @@ class ModelServingRepository:
             try:
                 # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return None
             if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
@@ -689,7 +687,7 @@ class ModelServingRepository:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 await session.delete(rule)
                 return True
-            except ObjectNotFound:
+            except AutoScalingRuleNotFound:
                 return False
 
     @model_serving_repository_resilience.apply()
@@ -721,18 +719,6 @@ class ModelServingRepository:
                 return None
 
     @model_serving_repository_resilience.apply()
-    async def resolve_image_for_endpoint_creation(
-        self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
-    ) -> ImageRow:
-        """
-        Resolve image for endpoint creation.
-        This is a special case where we need the actual ImageRow object
-        because EndpointRow constructor requires it.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await ImageRow.resolve(session, identifiers)
-
-    @model_serving_repository_resilience.apply()
     async def get_image_by_id(self, image_id: uuid.UUID) -> ImageData:
         """Look up image data by its UUID.
 
@@ -743,7 +729,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
-                raise ObjectNotFound(f"Image {image_id} not found")
+                raise ImageNotFound(f"Image {image_id} not found")
             return image_row.to_dataclass()
 
     @model_serving_repository_resilience.apply()
@@ -801,27 +787,24 @@ class ModelServingRepository:
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
-                default_access_key = await db_session.scalar(
-                    sa.select(KeyPairRow.access_key).where(
-                        (KeyPairRow.user == session_owner.uuid) & KeyPairRow.is_default
-                    )
-                )
-                if default_access_key is None:
-                    raise InvalidAPIParameters("Session owner has no access key")
                 if session_owner.role is None:
                     raise InvalidAPIParameters("Session owner has no role")
 
-                conn = await db_session.connection()
-                if conn is None:
-                    raise DatabaseConnectionUnavailable("Database connection is not available")
-
-                await self._check_inference_resource_group(
-                    conn,
-                    endpoint_row.resource_group,
-                    AccessKey(default_access_key),
-                    endpoint_row.domain,
-                    ProjectID(endpoint_row.project),
-                )
+                async with self._v2_ops.read_ops() as r:
+                    domain_id = await r.lookup_entity_id(
+                        DomainNameLookup(name=DomainName(endpoint_row.domain))
+                    )
+                    if domain_id is None:
+                        raise DomainNotFound(f"Domain not found (name: {endpoint_row.domain})")
+                    search = AllowedResourceGroupsSearch(
+                        domain_id=domain_id,
+                        project_ids=[ProjectID(endpoint_row.project)],
+                        user_id=UserID(session_owner.uuid),
+                    )
+                    allowed = await r.search_with_scopes(
+                        search.operation_scopes(), search.searcher()
+                    )
+                self._check_inference_resource_group(allowed.items, endpoint_row.resource_group)
 
                 await db_session.commit()
 
@@ -941,14 +924,6 @@ class ModelServingRepository:
         used by ``SchedulerRepository.prepare_vfolder_mounts``.
         """
         async with self._db.begin_readonly() as conn:
-            checked_resource_group = await self._check_inference_resource_group(
-                conn,
-                resource_group,
-                owner_access_key,
-                domain_name,
-                group_name,
-            )
-
             try:
                 user_info = await query_userinfo(
                     conn,
@@ -968,37 +943,43 @@ class ModelServingRepository:
             resource_policy = user_info.resource_policy
             owner_role = user_info.owner_role
 
-            allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
-            try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(model)
-                matched_vfolders = await query_accessible_vfolders(
-                    conn,
-                    owner_uuid,
-                    user_role=owner_role,
-                    domain_name=domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=extra_vf_conds,
+            target_domain = domain_name or requester_domain
+            async with self._v2_ops.read_ops() as r:
+                domain_id = await r.lookup_entity_id(
+                    DomainNameLookup(name=DomainName(target_domain))
                 )
-            except Exception as e:
-                if isinstance(e, (ValueError, VFolderNotFound)):
-                    try:
-                        extra_vf_conds = (vfolders.c.name == model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
-                        )
-                        matched_vfolders = await query_accessible_vfolders(
-                            conn,
-                            owner_uuid,
-                            user_role=owner_role,
-                            domain_name=domain_name,
-                            allowed_vfolder_types=allowed_vfolder_types,
-                            extra_vf_conds=extra_vf_conds,
-                        )
-                    except VFolderNotFound as e:
-                        raise VFolderNotFound("Cannot find model folder") from e
-                else:
-                    raise
+                if domain_id is None:
+                    raise DomainNotFound(f"Domain not found (name: {target_domain})")
+                search = AllowedResourceGroupsSearch(
+                    domain_id=domain_id,
+                    project_ids=[ProjectID(group_id)],
+                    user_id=UserID(owner_uuid),
+                )
+                allowed = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+            checked_resource_group = self._check_inference_resource_group(
+                allowed.items, resource_group
+            )
+
+            allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
+            owner_scope = UserScope(
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=owner_uuid,
+                user_role=owner_role,
+            )
+            owner_held = partial(self._permission_check.held_permissions, UserID(owner_uuid))
+            model_condition: sa.ColumnElement[bool]
+            try:
+                model_condition = vfolders.c.id == uuid.UUID(model)
+            except ValueError:
+                model_condition = (vfolders.c.name == model) & (
+                    vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                )
+            matched_vfolders = await query_reachable_vfolders(
+                conn, owner_scope, model_condition, owner_held
+            )
             if len(matched_vfolders) == 0:
-                raise VFolderNotFound
+                raise VFolderNotFound("Cannot find model folder")
             folder_row = matched_vfolders[0]
             if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
                 raise InvalidAPIParameters("Selected VFolder is not a model folder")
@@ -1012,13 +993,9 @@ class ModelServingRepository:
                 model_id,
                 model_mount_destination,
                 extra_mounts,
-                UserScope(
-                    domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=owner_uuid,
-                    user_role=owner_role,
-                ),
+                owner_scope,
                 resource_policy,
+                owner_held,
             )
 
             reads_vfolder_config_files = await conn.scalar(

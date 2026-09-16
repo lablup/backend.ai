@@ -46,10 +46,41 @@
 - Use `strawberry.lazy()` for cross-entity node references to avoid circular imports
   (for the `Annotated[T, lazy(...)] | None` syntax, see `/api-guide`).
 
+## Relations
+
+Rules for a table row joining two entities with neither an entity type nor a field type declared for it
+(user↔role, scope↔idle checker, session↔idle checker). Background: `KNOWLEDGE.md`.
+
+- Expose a relation row as a relation type, NOT a Node. It has no `id` field and no `node(id)` lookup.
+- A relation type carries both end entities as Node fields and the relation values as plain fields. One per
+  relation, whichever direction it is read from (`SessionIdleCheck`).
+- Name a relation type after the relation's Data and DTO names, not its table. Append `V2` when the name is
+  taken (`RoleAssignmentV2`).
+- Put a connection of the relation type on both end entity Nodes, or on neither. Do NOT add a connection
+  joining the two entities directly.
+- Add a root scoped query per relation type. Its scope takes lists of both end entities, OR'd together
+  (`scopedSessionIdleChecks(scope: {session, checker})`).
+- `filter` and `order_by` on relation connections and root queries are the relation type's Filter and OrderBy.
+  They carry relation value conditions and end entity conditions (`checker: IdleCheckerFilter`), with
+  `AND`/`OR`/`NOT`.
+- The cursor encodes the row's key: its surrogate key if it has one, its primary key columns otherwise.
+- A relation type has no data loader. Its end entity fields load through that entity's bulk data loader.
+- A mutation creating, removing or changing a relation takes the pair of end ids and returns the changed
+  relation type object.
+- A row declared as an entity type (`EntityShare`) is an entity, not a relation, and is a Node.
+- Keep an already published relation Node (`RoleAssignment`) deprecated and add no fields to it.
+- Do NOT change connections published before this rule that join two entities directly (`DomainV2.users`,
+  `UserV2.projects`, ...).
+
 ## N+1 prevention
 
 - Do NOT fetch related entities via individual fetch functions inside a resolver.
 - Always use `info.context.data_loaders.*` for cross-entity loading.
+- A data loader reads its ids through a bulk action (`partial_bulk_get_ops`, `public_partial_bulk_get_ops` for a
+  public entity, `batch_load_fields` for field rows). Do NOT read them through a global search with an id condition.
+- A global search is gated on SUPERADMIN, so a regular user following a node they can read has the whole batch refused.
+- One batch mixes ids from several resolvers. A bulk action answers per id: only the field awaiting a denied id
+  errors, and a missing id stays `None`.
 
 ## Calling services
 
@@ -116,6 +147,28 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 - admin-only entities: a single `admin_` mutation/query.
 - both admin and user, with different behavior: split `admin_` and non-admin (different input types).
 - differing only in permission checks: a single one — admins already have access.
+
+## Bulk field naming
+
+**Telling atomic from partial** — does a per-item failure path actually exist.
+A write where one item can fail while the rest commit is partial; anything else is
+atomic. A read is atomic by default.
+
+**The rule that follows**:
+- An atomic field carries no `failed` / `errors` channel. A field that carries one is partial.
+- This must agree with whether the action subclasses `BasePartialBulkAction` (`actions/v2/bulk/base.py`).
+
+**Naming**: `AtomicBulk` or `PartialBulk` goes after the access prefix, and the rest of
+the name is identical to the single form, with no pluralisation —
+`myScopePermissions` / `myAtomicBulkScopePermissions`.
+
+**Where the existing surface stands**: 22 payloads carry a `failed` or an `errors` field
+and the names say nothing about which behaviour they have. 17 are genuinely partial.
+4 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
+`BulkAssignRolePayload`, `ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
+The remaining one, `ScanProjectModelCardsV2Payload`, reports a scan summary in `errors`
+rather than a per-item channel. Renaming the 22 is breaking, so this states the policy
+and the migration is judged separately.
 
 ## Legacy
 

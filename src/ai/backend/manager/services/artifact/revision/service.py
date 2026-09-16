@@ -50,9 +50,9 @@ from ai.backend.manager.dto.request import (
     ImportArtifactsOptions,
 )
 from ai.backend.manager.errors.artifact import (
-    ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
     ArtifactImportBadRequestError,
+    ArtifactRevisionDeletionBadRequestError,
     RemoteReservoirArtifactImportError,
 )
 from ai.backend.manager.errors.artifact_registry import (
@@ -607,7 +607,7 @@ class ArtifactRevisionService:
         )
 
         if revision_data.status in [ArtifactStatus.SCANNED, ArtifactStatus.PULLING]:
-            raise ArtifactDeletionBadRequestError(
+            raise ArtifactRevisionDeletionBadRequestError(
                 "Artifact revision status not ready to be deleted"
             )
 

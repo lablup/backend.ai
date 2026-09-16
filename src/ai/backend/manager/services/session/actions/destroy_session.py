@@ -35,7 +35,3 @@ class DestroySessionActionResult:
     # TODO: Add proper type
     result: Any
     session_ids: list[SessionId] = field(default_factory=list)
-
-    # TODO: Change this to `entity_ids` once BaseActionResultMeta supports
-    # multiple ids; until then, comma-join so audit logs capture every
-    # affected session (recursive destroy can target several).

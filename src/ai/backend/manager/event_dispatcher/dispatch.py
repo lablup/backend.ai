@@ -247,7 +247,9 @@ class Dispatchers:
             args.storage_manager,
             args.config_provider,
         )
-        self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
+        self._service_catalog_event_handler = ServiceCatalogEventHandler(
+            args.db, args.repositories.service_catalog.repository
+        )
         self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:

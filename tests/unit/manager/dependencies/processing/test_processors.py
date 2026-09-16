@@ -23,7 +23,7 @@ class TestProcessorsDependency:
         mock_create_processors.return_value = mock_bundle
 
         mock_service_args = MagicMock()
-        mock_monitors = ActionMonitors(legacy=[MagicMock(), MagicMock()])
+        mock_monitors = ActionMonitors(single_entity=[MagicMock(), MagicMock()])
 
         dependency = ProcessorsDependency()
         processors_input = ProcessorsProviderInput(

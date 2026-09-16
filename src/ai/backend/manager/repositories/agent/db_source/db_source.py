@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Collection, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
@@ -25,6 +23,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow, agents
+from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -32,7 +31,7 @@ from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -44,9 +43,9 @@ class AgentDBSource:
     """Database source for agent-related operations."""
 
     _db: ExtendedAsyncSAEngine
-    _v2_ops: V2DBOpsProvider
+    _v2_ops: ShareOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: ShareOpsProvider) -> None:
         self._db = db
         self._v2_ops = v2_ops
 
@@ -122,21 +121,31 @@ class AgentDBSource:
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
-            if row is None:
-                await self._insert_new_agent(session, upsert_data)
-            else:
+            if row is not None:
                 await session.execute(
                     sa.update(agents)
                     .where(agents.c.id == upsert_data.metadata.id)
                     .values(upsert_data.update_fields)
                 )
+                return upsert_result
+            resource_group_id, resource_group_name = await self._resolve_resource_group(
+                session, upsert_data.metadata.resource_group
+            )
+        # A concurrent registration inserting first is answered by the upsert's conflict key.
+        async with self._v2_ops.write_ops() as w:
+            await w.upsert_entity(
+                AgentHeartbeatUpserter(
+                    upsert_data=upsert_data,
+                    resource_group_id=resource_group_id,
+                    resource_group_name=resource_group_name,
+                )
+            )
+        return upsert_result
 
-            return upsert_result
-
-    async def _insert_new_agent(
-        self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
-    ) -> None:
-        resource_group_name = upsert_data.metadata.resource_group
+    async def _resolve_resource_group(
+        self, session: AsyncSession, resource_group_name: str | None
+    ) -> tuple[ResourceGroupID, str]:
+        """The group a new agent joins: the named one, else the default one."""
         group_filter: sa.ColumnElement[bool]
         group_order: sa.ColumnElement[Any]
         if resource_group_name is not None:
@@ -148,35 +157,15 @@ class AgentDBSource:
         else:
             group_filter = ResourceGroupRow.is_default.is_(True)
             group_order = sa.asc(ResourceGroupRow.name)
-        group_select = (
-            sa.select(
-                *[
-                    sa.literal(value, type_=agents.c[key].type).label(key)
-                    for key, value in upsert_data.insert_fields.items()
-                ],
-                ResourceGroupRow.name.label("scaling_group"),
-                ResourceGroupRow.id.label("resource_group_id"),
+        resolved = (
+            await session.execute(
+                sa.select(ResourceGroupRow.id, ResourceGroupRow.name)
+                .where(group_filter)
+                .order_by(group_order)
+                .limit(1)
             )
-            .select_from(ResourceGroupRow)
-            .where(group_filter)
-            .order_by(group_order)
-            .limit(1)
-        )
-        stmt = (
-            pg_insert(agents)
-            .from_select(
-                [*upsert_data.insert_fields.keys(), "scaling_group", "resource_group_id"],
-                group_select,
-            )
-            # Guard a rare race where a concurrent registration inserted first
-            .on_conflict_do_update(
-                index_elements=["id"],
-                set_={**upsert_data.update_fields},
-            )
-            .returning(agents.c.id)
-        )
-        affected = (await session.execute(stmt)).scalar_one_or_none()
-        if affected is None:
+        ).first()
+        if resolved is None:
             if resource_group_name is not None:
                 raise UnresolvableResourceGroup(
                     f"Scaling group '{resource_group_name}' not found "
@@ -185,6 +174,7 @@ class AgentDBSource:
             raise UnresolvableResourceGroup(
                 "No initial resource group name is configured and no default scaling group is set."
             )
+        return ResourceGroupID(resolved.id), resolved.name
 
     async def update_resource_group(
         self,
@@ -199,7 +189,8 @@ class AgentDBSource:
         Finds the active kernels on the agent. If any exist and ``force`` is not
         set, raises without changing anything. Otherwise updates the agent's group
         (name + id columns) and returns those kernels so the caller can transition
-        their sessions. The lookup, the check, and the update run in one transaction.
+        their sessions. The lookup, the check, and the update run in one transaction; the
+        agent's own and govern edges move to the new group after it.
         Raises ScalingGroupNotFound when no resource group matches
         ``resource_group_id``, and AgentNotFound when no agent row matches
         ``agent_id``.
@@ -213,6 +204,15 @@ class AgentDBSource:
             )
             if resource_group_name is None:
                 raise ResourceGroupNotFound(str(resource_group_id))
+            agent = (
+                await session.execute(
+                    sa.select(AgentRow.uuid, AgentRow.resource_group_id).where(
+                        AgentRow.id == agent_id
+                    )
+                )
+            ).first()
+            if agent is None:
+                raise AgentNotFound(f"Agent with id {agent_id} not found")
 
             rows = (
                 (
@@ -231,7 +231,7 @@ class AgentDBSource:
                 distinct_sessions = len({kernel.session.session_id for kernel in kernels})
                 raise AgentHasConflictingSessions(agent_id, distinct_sessions)
 
-            result = await session.execute(
+            await session.execute(
                 sa.update(agents)
                 .where(agents.c.id == agent_id)
                 .values(
@@ -239,8 +239,13 @@ class AgentDBSource:
                     scaling_group=resource_group_name,
                 )
             )
-            if cast(CursorResult[Any], result).rowcount == 0:
-                raise AgentNotFound(f"Agent with id {agent_id} not found")
+        if agent.resource_group_id != resource_group_id:
+            async with self._v2_ops.write_ops() as w:
+                await w.transfer(
+                    [ResourceGroupID(agent.resource_group_id)],
+                    [resource_group_id],
+                    AgentUUID(agent.uuid),
+                )
         return kernels
 
     async def search_agents(

@@ -115,6 +115,23 @@ class TestParseDistroFromLddOutput:
                 "alpine3.8",
                 id="musl-banner-after-ld-preload-errors",
             ),
+            pytest.param(
+                "GNU C Library (Debian GLIBC 2.41-12+deb13u3) stable release version 2.41.\n"
+                "Copyright (C) 2025 Free Software Foundation, Inc.",
+                "ubuntu24.04",
+                id="glibc-library-run-directly",
+            ),
+            pytest.param(
+                "GNU C Library (GNU libc) stable release version 2.17, by Roland McGrath et al.",
+                "centos7.6",
+                id="glibc-library-run-directly-old-style",
+            ),
+            pytest.param(
+                "musl libc (aarch64)\nVersion 1.2.6\nDynamic Program Loader\n"
+                "Usage: /lib/ld-musl-aarch64.so.1 [options] [--] pathname [args]",
+                "alpine3.8",
+                id="musl-loader-run-directly",
+            ),
         ],
     )
     def test_detects_distro_from_libc_banner(self, output: str, expected: str) -> None:

@@ -16,6 +16,11 @@ from typing import Any
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
@@ -29,7 +34,6 @@ from ai.backend.manager.data.retention.types import (
     RetentionPurgeResult,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import VFolderInvitationState
 from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedError
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
@@ -62,7 +66,6 @@ from ai.backend.manager.models.scheduling_history.row import (
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.ops.v2.retention.write import (
     RetentionDrain,
@@ -169,14 +172,7 @@ class RetentionDBSource:
                     RoleRow.deleted_at,
                     threshold,
                     conditions=(RoleRow.status == RoleStatus.DELETED,),
-                ),
-                RetentionDrain(
-                    VFolderInvitationRow,
-                    VFolderInvitationRow.updated_at,
-                    threshold,
-                    conditions=(
-                        VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),
-                    ),
+                    entity=RoleEntityType(),
                 ),
                 # An offer that ran out is settled by its own moment rather than by
                 # age, so it is drained on that; what ended some other way is history
@@ -186,12 +182,14 @@ class RetentionDBSource:
                     EntityShareRow.expires_at,
                     threshold,
                     conditions=(EntityShareRow.status == EntityShareStatus.PENDING,),
+                    entity=EntityShareEntityType(),
                 ),
                 RetentionDrain(
                     EntityShareRow,
                     EntityShareRow.updated_at,
                     threshold,
                     conditions=(EntityShareRow.status.in_(EntityShareStatus.terminal_statuses()),),
+                    entity=EntityShareEntityType(),
                 ),
             ),
             RetentionCategory.USAGE_RECORDS: (
@@ -213,6 +211,7 @@ class RetentionDBSource:
                         ~session_has_kernel,
                         ~session_has_routing,
                     ),
+                    entity=SessionEntityType(),
                 ),
             ),
             # deployment_revisions carry no ON DELETE to endpoints, so they are
@@ -247,6 +246,7 @@ class RetentionDBSource:
                     EndpointRow.destroyed_at,
                     threshold,
                     conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
+                    entity=DeploymentEntityType(),
                 ),
                 RetentionDrain(EndpointTokenRow, EndpointTokenRow.expires_at, threshold),
                 # session_groups is the parent side of
@@ -264,6 +264,7 @@ class RetentionDBSource:
                     SessionGroupRow.created_at,
                     threshold,
                     conditions=(~group_has_replica_group,),
+                    entity=SessionGroupEntityType(),
                 ),
             ),
             # Each bucket kind is purged on its own period_end, with its FK-less

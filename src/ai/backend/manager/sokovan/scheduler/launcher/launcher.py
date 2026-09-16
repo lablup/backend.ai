@@ -32,6 +32,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -295,9 +296,10 @@ class SessionLauncher:
 
             # Convert ImageConfigData to ImageConfig format for agents
             # Build a mapping from image ID to agent-compatible ImageConfig
+            auto_pull = AutoPullBehavior(self._config_provider.config.docker.image.auto_pull.value)
             image_configs_by_id: dict[UUID, ImageConfig] = {}
             for img_id, img_cfg in image_configs.items():
-                image_configs_by_id[img_id] = img_cfg.to_image_config(AutoPullBehavior.DIGEST)
+                image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
             # Create kernels on each agent
             async def create_kernels_on_agent(
@@ -372,10 +374,14 @@ class SessionLauncher:
                         ],
                         "package_directory": tuple(),
                         "idle_timeout": int(idle_timeout),
-                        "bootstrap_script": k.bootstrap_script,
+                        "bootstrap_script": (
+                            normalize_newlines(k.bootstrap_script)
+                            if k.bootstrap_script is not None
+                            else None
+                        ),
                         "startup_command": k.startup_command,
                         "internal_data": k.internal_data,
-                        "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),
+                        "auto_pull": auto_pull,
                         "preopen_ports": k.preopen_ports or [],
                         "allocated_host_ports": [],  # Will be populated by agent
                         "agent_addr": k.agent_addr or "",

@@ -9,6 +9,7 @@ from typing import override
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
@@ -18,12 +19,14 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.models.user.searchers import UserSearcher
 
 __all__ = (
     "DomainUserScopeItem",
     "ProjectUserScopeItem",
+    "RoleUserScopeItem",
     "ScopedSearchUsersAction",
     "UserScopeItem",
 )
@@ -61,6 +64,21 @@ class ProjectUserScopeItem(UserScopeItem):
     @override
     def operation_scope(self) -> OperationScope:
         return ProjectUserOperationScope(project_id=self.project_id)
+
+
+@dataclass(frozen=True)
+class RoleUserScopeItem(UserScopeItem):
+    """The users holding one role."""
+
+    role_id: RoleID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.role_id
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return RoleUserOperationScope(role_id=self.role_id)
 
 
 @dataclass(frozen=True)

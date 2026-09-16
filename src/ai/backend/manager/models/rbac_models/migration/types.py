@@ -1,3 +1,9 @@
+"""Frozen row shapes for the RBAC data migrations.
+
+Deprecated: read only by `models/alembic/versions/`. These do not track the live
+models; a migration keeps reading what it was written against.
+"""
+
 import uuid
 from dataclasses import dataclass
 from typing import Any

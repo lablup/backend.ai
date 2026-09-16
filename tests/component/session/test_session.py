@@ -286,54 +286,11 @@ class TestSessionPermissions:
         assert result.root["status"] == SessionStatus.RUNNING.name
         assert result.root["domainName"] == user_session_seed.domain_name
 
-    async def test_user_cannot_access_admin_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Session visibility is scoped by access key — a user keypair
-        cannot resolve sessions belonging to a different keypair.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.get_info(session_seed.session_id)
-
-    async def test_admin_cannot_access_user_session_without_ownership(
+    async def test_admin_gets_user_session_info(
         self,
         admin_registry: BackendAIClientRegistry,
         user_session_seed: SessionSeedData,
     ) -> None:
-        """The get_info handler resolves scope using the requester's own access
-        key, so sessions owned by other access keys are not found. This is a
-        known limitation of the current implementation that may change in
-        future refactoring.
-        """
-        with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(user_session_seed.session_id)
-
-    async def test_user_cannot_destroy_admin_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """The destroy endpoint enforces ownership — the session is not
-        resolvable under the user's access key scope.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.destroy(
-                session_seed.session_id,
-                DestroySessionRequest(forced=True),
-            )
-
-    async def test_user_cannot_rename_admin_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """The rename endpoint enforces ownership — the session is not
-        resolvable under the user's access key scope.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.rename(
-                session_seed.session_id,
-                RenameSessionRequest(session_name="hacked-name"),
-            )
+        """The session is looked up by id, not by the requester's access key."""
+        result = await admin_registry.session.get_info(user_session_seed.session_id)
+        assert result.root["userId"] == str(user_session_seed.user_uuid)

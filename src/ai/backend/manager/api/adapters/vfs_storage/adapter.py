@@ -22,10 +22,10 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.vfs_storage.conditions import VFSStorageConditions
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
+from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
@@ -78,22 +78,24 @@ class VFSStorageAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def batch_load_by_ids(self, ids: Sequence[VFSStorageID]) -> list[VFSStorageNode | None]:
-        """Batch load VFS storages by IDs for DataLoader use.
+    async def batch_load_by_ids(
+        self, ids: Sequence[VFSStorageID]
+    ) -> list[VFSStorageNode | Exception | None]:
+        """Batch load VFS storages by id for DataLoader use.
 
-        Returns VFSStorageNode DTOs in the same order as the input ids list.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        searcher = VFSStorageSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[VFSStorageConditions.by_ids(ids)],
-        )
-        action_result = await self._vfs_storage.global_search_vfs_storages.run(
-            SearchVFSStoragesAction(searcher=searcher)
-        )
-        storage_map = {item.id: self._vfs_storage_data_to_dto(item) for item in action_result.items}
-        return [storage_map.get(VFSStorageID(storage_id)) for storage_id in ids]
+        entity_ids = [VFSStorageID(value) for value in ids]
+        result = await self._vfs_storage.bulk_get.run(BulkGetVFSStoragesAction(ids=entity_ids))
+        return [
+            self._vfs_storage_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def get(self, storage_id: UUID) -> VFSStorageNode:
         """Retrieve a single VFS storage by ID."""

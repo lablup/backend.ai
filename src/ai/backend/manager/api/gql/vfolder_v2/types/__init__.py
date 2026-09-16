@@ -13,6 +13,13 @@ from .filters import (
     VFolderOrderFieldGQL,
     VFolderUsageModeFilterGQL,
 )
+from .mount_policy import (
+    SetVFolderMountPolicyInputGQL,
+    SetVFolderMountPolicyPayloadGQL,
+    UnsetVFolderMountPolicyPayloadGQL,
+    VFolderMountPoliciesPayloadGQL,
+    VFolderMountPolicyGQL,
+)
 from .mutations import (
     CloneVFolderInputGQL,
     CloneVFolderPayloadGQL,
@@ -45,6 +52,12 @@ __all__ = [
     # Enum types
     "VFolderUsageModeGQL",
     "VFolderMountPermissionGQL",
+    # Mount policy types
+    "SetVFolderMountPolicyInputGQL",
+    "SetVFolderMountPolicyPayloadGQL",
+    "UnsetVFolderMountPolicyPayloadGQL",
+    "VFolderMountPoliciesPayloadGQL",
+    "VFolderMountPolicyGQL",
     "VFolderOwnershipTypeGQL",
     "VFolderOperationStatusGQL",
     # Enum filters

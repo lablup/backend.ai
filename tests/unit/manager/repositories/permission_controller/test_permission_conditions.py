@@ -12,6 +12,7 @@ from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     PermissionConditions,
 )
+from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 
 
 class TestPermissionConditions:
@@ -100,3 +101,17 @@ class TestExistsPermissionCombined:
         assert "scope_id" not in compiled
         assert "entity_type" not in compiled
         assert "operation" not in compiled
+
+
+class TestRoleExistsPermissionCombined:
+    """Tests for RoleConditions.exists_permission_combined."""
+
+    def test_it_correlates_on_the_role_row(self) -> None:
+        condition = RoleConditions.exists_permission_combined([
+            PermissionConditions.by_permissions([Permission.READ]),
+        ])
+
+        compiled = str(condition().compile(compile_kwargs={"literal_binds": True}))
+
+        assert "permissions.role_id = roles.id" in compiled
+        assert "permissions.permission IN" in compiled

@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.common.metrics.metric import ActionMetricObserver
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.result import ScopeActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 __all__ = ("ScopeActionPrometheusMonitor",)
 
@@ -26,7 +26,7 @@ class ScopeActionPrometheusMonitor(ScopeActionMonitor):
         self._observer = ActionMetricObserver.instance()
 
     @override
-    async def prepare(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         return
 
     @override

@@ -32,6 +32,7 @@ from ai.backend.manager.errors.idle_checker import (
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerAssignmentCreator,
@@ -119,6 +120,7 @@ class TestIdleCheckerAssignmentRepository:
                 PermissionRow,
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection

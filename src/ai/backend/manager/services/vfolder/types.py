@@ -5,37 +5,10 @@ from typing import (
     Any,
 )
 
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.models.vfolder import (
-    QuotaScopeID,
     VFolderInvitationState,
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderUsageMode,
 )
-from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
-
-
-@dataclass
-class VFolderBaseInfo:
-    id: uuid.UUID
-    quota_scope_id: QuotaScopeID | None
-    name: str
-    host: str
-    status: VFolderOperationStatus
-    unmanaged_path: str | None
-    mount_permission: VFolderMountPermission
-    usage_mode: VFolderUsageMode
-    created_at: datetime
-    cloneable: bool
-
-
-@dataclass
-class VFolderOwnershipInfo:
-    creator_email: str | None
-    is_owner: bool
-    ownership_type: VFolderOwnershipType
-    user_uuid: uuid.UUID | None
-    group_uuid: uuid.UUID | None
 
 
 @dataclass
@@ -52,7 +25,7 @@ class VFolderInvitationInfo:
     invitee_user_email: str
     inviter_user_email: str
     inviter_username: str | None
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
     created_at: datetime
     modified_at: datetime | None
     status: VFolderInvitationState

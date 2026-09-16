@@ -83,7 +83,6 @@ def server_module_registries(
     domain = DomainProcessors(
         config_registry.group(GroupMeta(DomainEntityType())),
         DomainService(DomainRepository(database_engine, v2_ops)),
-        [],
     )
     project = ProjectProcessors(
         config_registry.group(GroupMeta(ProjectEntityType())),
