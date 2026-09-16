@@ -12,21 +12,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
-from bai_scenario.components.audit_log import (
-    ActorRecords,
-    ARecordScopedToAProject,
-    OneProjectManyRecords,
-    OneProjectMixedStatus,
-    ProjectRecords,
-    ScopedActors,
-    ScopedEntities,
-    ThePageIsCapped,
-    TheRecordsAnswered,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.user.types import UserRole
@@ -50,6 +35,21 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.audit_log import (
+    ActorRecords,
+    ARecordScopedToAProject,
+    OneProjectManyRecords,
+    OneProjectMixedStatus,
+    ProjectRecords,
+    ScopedActors,
+    ScopedEntities,
+    ThePageIsCapped,
+    TheRecordsAnswered,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAuditLogsPayload
 type EntityStep = Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
@@ -418,10 +418,7 @@ class EnforcementOffReadsWithoutAGrant(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 "
-            "검색할 수 있다. 이 검색은 권한 그래프로 보호되기 때문이다"
-        )
+        return "권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

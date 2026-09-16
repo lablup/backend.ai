@@ -656,7 +656,7 @@ Then
 
 #### [turning-enforcement-off-reads-a-named-entitys-records-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다. 이 검색은 권한 그래프로 보호되기 때문이다
+권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다
 
 Given
 
@@ -1009,7 +1009,7 @@ Then
 
 #### [turning-enforcement-off-does-not-let-a-plain-user-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다. 이 검색은 권한 그래프가 아니라 역할로 보호된다
+권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다
 
 Given
 

@@ -1,7 +1,7 @@
 """감사 기록 전체 검색 — 전역 역할이 필요하지만, 읽기 연산이라 모니터 역할도 통과한다.
 
 모니터 역할은 통과하지만 슈퍼관리자가 아닌 사용자는 거부된다. 이 검색은 권한 그래프가 아니라
-역할로 보호되므로 권한 검사 스위치와 무관하다.
+역할로 보호된다.
 """
 
 from __future__ import annotations
@@ -11,19 +11,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.audit_log import (
-    ManyRecordsGlobally,
-    MixedStatusGlobally,
-    RecordsAndACaller,
-    ThePageIsCapped,
-    TheRecordsAnswered,
-    TwoActorsGlobally,
-    TwoRecordsGlobally,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter
@@ -45,6 +32,19 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.audit_log import (
+    ManyRecordsGlobally,
+    MixedStatusGlobally,
+    RecordsAndACaller,
+    ThePageIsCapped,
+    TheRecordsAnswered,
+    TwoActorsGlobally,
+    TwoRecordsGlobally,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAuditLogsPayload
 type SearchingStep = Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
@@ -258,10 +258,7 @@ class EnforcementOffStillNeedsTheRole(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다. "
-            "이 검색은 권한 그래프가 아니라 역할로 보호된다"
-        )
+        return "권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다"
 
     @override
     def config(self) -> Mapping[str, Any]:

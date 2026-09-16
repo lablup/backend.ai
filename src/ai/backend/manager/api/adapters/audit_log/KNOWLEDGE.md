@@ -3,7 +3,7 @@ name: audit-log-adapter-scenarios
 type: reference
 description: what the audit log adapter guarantees, as scenarios; the superadmin role on the whole-table search and the by-id read that a monitor passes, the per-entity read permission on the scoped search that refuses the whole page when one named entity is unreadable, the two axes a scope item names (the entity a record is about, the user who triggered it)
 scope: src/ai/backend/manager/api/adapters/audit_log
-keywords: [audit log, scenario, adapter, superadmin, monitor, scoped search, triggered by, entity scope, enforcement]
+keywords: [audit log, scenario, adapter, superadmin, monitor, scoped search, triggered by, entity scope]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
@@ -42,9 +42,6 @@ status: draft
 
 모니터 시나리오는 이 경로가 읽기에 한해 모니터 역할을 통과시킨다는 것을 고정한다. 범위 지정
 검색의 모니터 시나리오와 짝이고 결과가 반대다.
-
-권한 검사를 끄는 시나리오는 이 경로가 권한 그래프가 아니라 역할을 검사하므로 스위치와 무관하다는
-것을 고정한다. 범위 지정 검색의 같은 시나리오와 결과가 반대다.
 
 요청 타입은 대상 엔티티 id 필터를 받지만 어댑터가 쓰지 않는다. 지금은 조용히 무시된다. 시나리오를
 적기 전에 무시할지 사용할지 정한다.
