@@ -1,10 +1,7 @@
 """카테고리 삭제 — 누가 삭제할 수 있는가.
 
-이 어댑터에는 soft delete가 없다.
-
-TODO: 정의가 참조하는 카테고리를 삭제하는 행이 없다. 지금은 충돌 검사 없이 삭제되고 그 정의의
-카테고리 필드가 비는데, 그건 버그로 보고 참조 중이면 거부하도록 고친다. 고쳐지면 정의 하나를
-심고 거부를 보는 행을 여기 추가한다. 정의 seed는 prometheus_query_preset 시나리오가 들여온다.
+이 어댑터에는 soft delete가 없다. 정의가 참조하는 카테고리를 삭제하는 행은 아래에 주석으로
+있다.
 """
 
 from __future__ import annotations
@@ -175,6 +172,54 @@ class AnUnknownIdIsNotFoundForASuperadmin(
     @override
     def then(self) -> Then[ACategoryAndACaller, Removed]:
         return TheCallIsRefused(EntityNotFoundError)
+
+
+# TODO: 정의가 참조하는 카테고리를 삭제하면 거부되어야 하는데, 지금은 충돌 검사 없이 삭제되고
+# 그 정의의 카테고리 필드가 비어서 이 행이 실패한다. 삭제가 거부되도록 고쳐지면 주석을 풀어
+# SCENARIOS에 넣는다. 정의 seed(SeedPresetIn)는 prometheus_query_preset 시나리오가 들여오고,
+# 거부 예외의 이름은 고칠 때 정한다.
+#
+# @dataclass(frozen=True)
+# class AReferencedCategoryAndSomeone(Given[Any, ACategoryAndACaller]):
+#     """카테고리 하나와 그것을 참조하는 정의 하나, 호출자 한 명."""
+#
+#     role: UserRole = UserRole.USER
+#
+#     @override
+#     def describe(self) -> str:
+#         return f"카테고리 하나와 그것을 참조하는 정의 하나, {self.role.value} 한 명"
+#
+#     @override
+#     async def lay(self, seeding: Any) -> ACategoryAndACaller:
+#         category = await seeding.creating(SeedCategory())
+#         await seeding.creating_from(SeedPresetIn(), category)
+#         caller = await lay_someone(seeding, self.role)
+#         return ACategoryAndACaller(category=seeding.made(category), caller=seeding.made(caller))
+#
+#
+# @dataclass(frozen=True)
+# class AReferencedCategoryIsNotRemoved(
+#     Scenario[SeedingSession, ACategoryAndACaller, Adapter, Removed]
+# ):
+#     @override
+#     def summary(self) -> str:
+#         return "a-category-a-preset-still-points-at-is-not-removed"
+#
+#     @override
+#     def describe(self) -> str:
+#         return "정의가 참조하는 카테고리를 슈퍼관리자가 삭제하면, 아직 참조 중이라는 이유로 거부된다"
+#
+#     @override
+#     def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+#         return AReferencedCategoryAndSomeone(role=UserRole.SUPERADMIN)
+#
+#     @override
+#     def when(self) -> When[ACategoryAndACaller, Adapter, Removed]:
+#         return Removing()
+#
+#     @override
+#     def then(self) -> Then[ACategoryAndACaller, Removed]:
+#         return TheCallIsRefused(PrometheusQueryPresetCategoryInUse)
 
 
 SCENARIOS: list[PurgingStep] = [
