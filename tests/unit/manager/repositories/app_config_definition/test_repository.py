@@ -252,7 +252,7 @@ class TestAdminSearch:
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
-                    cursor_condition=_PAGINATION_SPEC.cursor_condition(str(cursor)),
+                    cursor_condition=_PAGINATION_SPEC.build_cursor_condition(str(cursor)),
                 )
             )
         )

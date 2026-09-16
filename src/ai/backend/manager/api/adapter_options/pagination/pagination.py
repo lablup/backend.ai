@@ -91,7 +91,7 @@ class PaginationSpec:
             return self.backward_order
         return _reverse_order(self.forward_order)
 
-    def cursor_condition(self, cursor_id: str, *, backward: bool = False) -> QueryCondition:
+    def build_cursor_condition(self, cursor_id: str, *, backward: bool = False) -> QueryCondition:
         """Rows past the cursor row in ``(forward_order, tiebreaker_order)``; before it when
         ``backward``. ``cursor_id`` is the decoded cursor, the value of the tiebreaker column."""
         factory = self.backward_condition_factory if backward else self.forward_condition_factory
@@ -153,7 +153,7 @@ def build_pagination(
             raise InvalidGraphQLParameters(f"first must be positive, got {options.first}")
         cursor_condition = None
         if options.after is not None:
-            cursor_condition = spec.cursor_condition(decode_cursor(options.after))
+            cursor_condition = spec.build_cursor_condition(decode_cursor(options.after))
         return CursorForwardPagination(
             first=options.first,
             cursor_order=spec.forward_order,
@@ -165,7 +165,9 @@ def build_pagination(
             raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
         cursor_condition = None
         if options.before is not None:
-            cursor_condition = spec.cursor_condition(decode_cursor(options.before), backward=True)
+            cursor_condition = spec.build_cursor_condition(
+                decode_cursor(options.before), backward=True
+            )
         return CursorBackwardPagination(
             last=options.last,
             cursor_order=spec.cursor_order(backward=True),
