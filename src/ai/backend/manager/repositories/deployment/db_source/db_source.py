@@ -41,7 +41,6 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
-    MountPermission,
     SessionId,
     SlotName,
     VFolderMountPolicy,
@@ -182,7 +181,7 @@ from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -197,6 +196,7 @@ from ai.backend.manager.repositories.deployment.types import (
 )
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.write import ReconcileTransition
+from ai.backend.manager.repositories.vfolder.mount_policy import MountPolicyInputs
 from ai.backend.manager.types import OptionalState
 from ai.backend.manager.utils import query_userinfo_from_session
 
@@ -2439,42 +2439,43 @@ class DeploymentDBSource:
                 return None
             return active_rev.model_definition.health_check_config()
 
-    async def resolve_vfolder_permissions(
-        self, vfolder_ids: Sequence[VFolderUUID]
-    ) -> dict[VFolderUUID, MountPermission]:
-        """Return each vfolder's stored permission projected as a
-        ``MountPermission``.
-
-        Intentionally minimal: only the ``permission`` column is read,
-        without RBAC / host-permission / cross-project checks — those
-        apply at session creation (``prepare_vfolder_mounts``), not at
-        revision write. Used to snapshot the vfolder permission when
-        resolving ``MountInfo.mount_perm=None`` (inherit) into a
-        concrete ``MountInfoEntry.mount_perm`` before persisting.
-
-        Raises ``VFolderNotFound`` if any requested id is missing or its
-        ``permission`` column is NULL — both indicate the caller cannot
-        ground an inherited permission against this vfolder.
-        """
+    async def vfolder_mount_policy_inputs(
+        self, user_id: UserID, vfolder_ids: Sequence[VFolderUUID]
+    ) -> dict[VFolderUUID, MountPolicyInputs]:
+        """Each named vfolder's owner and default mount level, with the user's own
+        policy row over it. A missing id is absent from the mapping."""
         if not vfolder_ids:
             return {}
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(
-                sa.select(VFolderRow.id, VFolderRow.default_mount_permission).where(
-                    VFolderRow.id.in_(list(vfolder_ids))
+            rows = (
+                await db_sess.execute(
+                    sa.select(
+                        VFolderRow.id,
+                        VFolderRow.user,
+                        VFolderRow.default_mount_permission,
+                        VFolderUserMountPolicyRow.permission,
+                    )
+                    .select_from(VFolderRow)
+                    .outerjoin(
+                        VFolderUserMountPolicyRow,
+                        sa.and_(
+                            VFolderUserMountPolicyRow.vfolder_id == VFolderRow.id,
+                            VFolderUserMountPolicyRow.user_id == user_id,
+                        ),
+                    )
+                    .where(VFolderRow.id.in_(list(vfolder_ids)))
                 )
-            )
-            rows = {row.id: row.default_mount_permission for row in result.all()}
-            unresolved = [
-                str(vid)
-                for vid in vfolder_ids
-                if vid not in rows or rows[vid] == VFolderMountPolicy.NONE
-            ]
-            if unresolved:
-                raise VFolderNotFound(
-                    f"VFolder permission unavailable for: {', '.join(unresolved)}"
+            ).all()
+            return {
+                VFolderUUID(row.id): MountPolicyInputs(
+                    owner_user_id=row.user,
+                    default_mount_permission=VFolderMountPolicy(row.default_mount_permission),
+                    user_policy=VFolderMountPolicy(row.permission)
+                    if row.permission is not None
+                    else None,
                 )
-            return {VFolderUUID(vid): MountPermission(perm.value) for vid, perm in rows.items()}
+                for row in rows
+            }
 
     async def get_default_architecture_from_resource_group(
         self, resource_group_name: str

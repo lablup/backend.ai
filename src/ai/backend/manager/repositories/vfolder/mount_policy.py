@@ -7,11 +7,22 @@ the folder, and the folder's default with the per-user policy rows answer how it
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import VFolderMountPolicy
 
-__all__ = ("resolve_mount_policy",)
+__all__ = ("MountPolicyInputs", "resolve_mount_policy")
+
+
+@dataclass(frozen=True)
+class MountPolicyInputs:
+    """What one folder contributes to a user's mount level: its owner, its default,
+    and the user's own row over it when one stands."""
+
+    owner_user_id: uuid.UUID | None
+    default_mount_permission: VFolderMountPolicy
+    user_policy: VFolderMountPolicy | None
 
 
 def resolve_mount_policy(

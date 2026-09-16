@@ -30,7 +30,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     SearchAllocatedResourceSlotsPayload,
 )
-from ai.backend.common.types import ClusterMode, IntrinsicSlotNames
+from ai.backend.common.types import ClusterMode, IntrinsicSlotNames, VFolderMountPolicy
 from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionData
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.permission.types import Permission
@@ -59,6 +59,7 @@ from bai_scenario.components.deployment import (
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.vfolder import STORAGE_HOST, SomeoneReadingFoldersIn
 from bai_scenario.seeds.deployment.revision import SeedRevisionOf
+from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
 from bai_scenario.seeds.image.image import SeedImage
 from bai_scenario.seeds.image.registry import SeedContainerRegistry
 from bai_scenario.seeds.project.project import SeedProject
@@ -118,13 +119,15 @@ class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
     """리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입.
 
     모델 폴더는 ``folder_owner``의 개인 폴더다. ``folder_readable``이면 그 사람이 자기 개인
-    프로젝트에서 폴더를 읽을 수 있고, 마운트는 읽기 전용으로 잡힌다. 슬롯 타입은 리비전의
-    슬롯 행이 가리키므로 함께 심는다.
+    프로젝트에서 폴더를 읽을 수 있고, 자기 폴더라 읽고 쓰기로 마운트된다. ``lender``를 대면
+    폴더는 그 사람의 것이고, ``folder_owner``에게 읽기로 공유되어 읽기 전용으로 마운트된다.
+    슬롯 타입은 리비전의 슬롯 행이 가리키므로 함께 심는다.
     """
 
     folder_owner: Laid[UserData]
     folder_readable: bool = True
     cpu_required: bool = False
+    lender: Laid[UserData] | None = None
 
     @override
     def kind(self) -> str:
@@ -134,7 +137,7 @@ class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
     def lay(self, seed: Seeder) -> LaidMaterials:
         registry = seed.creating(SeedContainerRegistry())
         image = seed.creating_from(SeedImage(), registry)
-        folder = seed.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), self.folder_owner)
+        folder = self._folder(seed)
         if self.folder_readable:
             own = seed.personal_project_of(self.folder_owner)
             seed.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), self.folder_owner))
@@ -142,6 +145,21 @@ class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
         seed.creating(SeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
         seed.creating(SeedSlotType(IntrinsicSlotNames.MEMORY))
         return LaidMaterials(image=image, folder=folder, runtime=runtime)
+
+    def _folder(self, seed: Seeder) -> Laid[VFolderData]:
+        if self.lender is None:
+            return seed.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), self.folder_owner)
+        folder = seed.creating_from(
+            SeedPersonalVFolder(
+                host=STORAGE_HOST, default_mount_permission=VFolderMountPolicy.READ_ONLY
+            ),
+            self.lender,
+        )
+        offer = seed.creating_from_three(
+            SeedVFolderShare(cap=Permission.READ), self.lender, folder, self.folder_owner
+        )
+        seed.accepting(SeedShareTaken(), offer)
+        return folder
 
 
 async def lay_revisions(
@@ -198,7 +216,8 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
     """배포 하나와 거기 딸린 리비전들, 그리고 그 프로젝트 안의 사용자 한 명.
 
     모델 폴더는 부르는 사람의 것이다. ``folder_readable``이면 부르는 사람은 그 폴더를 읽을
-    수만 있고, 거짓이면 그 폴더에 아무 권한도 없다.
+    수 있고, 거짓이면 그 폴더에 아무 권한도 없다. ``folder_lent``면 모델 폴더는 남의 것이고,
+    부르는 사람에게 읽기로 공유되어 읽기 전용으로 마운트된다.
     """
 
     granted: tuple[Permission, ...] = ()
@@ -206,6 +225,7 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
     revisions: int = 0
     folder_readable: bool = True
     cpu_required: bool = False
+    folder_lent: bool = False
 
     @override
     def describe(self) -> str:
@@ -214,18 +234,28 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
             if self.granted
             else "아무 배포 권한도 받지 않은 사용자 한 명"
         )
-        folder = "읽을 수만 있는" if self.folder_readable else "읽을 권한이 없는"
-        return f"리비전 {self.revisions}개가 딸린 배포 하나와, 자기 모델 폴더를 {folder} {who}"
+        if self.folder_lent:
+            folder = "남의 모델 폴더를 읽기 전용으로 빌린"
+        else:
+            readable = "읽을 수 있는" if self.folder_readable else "읽을 권한이 없는"
+            folder = f"자기 모델 폴더를 {readable}"
+        return f"리비전 {self.revisions}개가 딸린 배포 하나와, {folder} {who}"
 
     @override
     async def lay(self, seeding: Any) -> RevisionsAndACaller:
         place = await lay_a_place(seeding, granted=self.granted, role=self.role)
         deployment = await lay_a_deployment(seeding, place)
+        lender = (
+            await seeding.within(SomeoneOf(place.domain, vfolder_hosts=[STORAGE_HOST]))
+            if self.folder_lent
+            else None
+        )
         materials = await seeding.within(
             WhatARevisionStandsOn(
                 place.caller,
                 folder_readable=self.folder_readable,
                 cpu_required=self.cpu_required,
+                lender=lender,
             )
         )
         made = await lay_revisions(seeding, place, deployment, materials, self.revisions)

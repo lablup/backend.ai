@@ -11,7 +11,7 @@ from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderMountPolicy
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOperationStatus
@@ -28,6 +28,7 @@ class SeedPersonalVFolder(SeedRowFrom[UserData, VFolderData]):
 
     host: str
     name_hint: str = "folder"
+    default_mount_permission: VFolderMountPolicy | None = None
 
     @override
     def kind(self) -> str:
@@ -35,7 +36,12 @@ class SeedPersonalVFolder(SeedRowFrom[UserData, VFolderData]):
 
     @override
     def detail(self) -> str:
-        return "그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다"
+        mount = (
+            f", 남에게는 {self.default_mount_permission.value}로 마운트된다"
+            if self.default_mount_permission is not None
+            else ""
+        )
+        return f"그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다{mount}"
 
     @override
     def name(self, naming: Naming) -> str:
@@ -51,6 +57,7 @@ class SeedPersonalVFolder(SeedRowFrom[UserData, VFolderData]):
             creator_id=source.id,
             status=VFolderOperationStatus.READY,
             user=UserID(source.id),
+            default_mount_permission=self.default_mount_permission,
         )
 
 
