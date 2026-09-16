@@ -3,7 +3,7 @@ name: app-config-definition-adapter-scenarios
 type: reference
 description: app config definition adapter authorization, search, batch loading, and purge contracts covered by scenario tests
 scope: src/ai/backend/manager/api/adapters/app_config_definition
-keywords: [app config definition, scenario, adapter, superadmin, pagination, cascade]
+keywords: [app config definition, scenario, adapter, superadmin, cascade]
 generated:
   by: codex/gpt-5
   at: 2026-09-14
@@ -59,24 +59,14 @@ status: draft
 한 ID의 권한 실패는 배치 전체를 중단하지 않는다. 존재하지 않는 ID가 `None`인지 권한 오류인지는
 그 ID에 대한 권한 검사를 먼저 통과했는지에 따라 달라진다.
 
-## 검색은 필터, 정렬, 두 페이지네이션 방식을 지원한다
+## 전체 검색은 슈퍼관리자에게만 열려 있다
 
 | 상황 | 요청 | 결과 |
 |---|---|---|
 | 슈퍼관리자 | 필터 없음 | 모든 정의와 전체 개수 반환 |
-| 슈퍼관리자 | 이름 일치 필터 | 일치하는 정의만 반환 |
-| 슈퍼관리자 | 두 이름을 묶은 OR 필터 | 둘 중 하나와 일치하는 정의만 반환 |
-| 슈퍼관리자 | 이름 오름차순 | 이름순 반환 |
-| 슈퍼관리자 | `limit=2`, `offset=1` | 중간 두 항목과 앞뒤 페이지 표시 반환 |
-| 슈퍼관리자 | 커서와 오프셋 방식 혼용 | `InvalidGraphQLParameters` |
-| 슈퍼관리자 | 페이지 크기 생략 | 최대 10건과 다음 페이지 표시 반환 |
 | 일반 사용자 | 검색 | `InsufficientPrivilege` |
 
-검색 DTO는 이름의 부분 일치 조건, 생성·수정 시각 조건, AND·OR·NOT 조합도 제공한다. 현재
-시나리오는 이름 일치와 OR 조합을 대표로 검증한다.
-
-커서로 다음 페이지를 조회하는 시나리오는 없다. 커서 조건이 `created_at`만 비교해 같은 시각에
-만들어진 행을 건너뛰므로(BA-7878), 그 수정이 들어온 뒤에 적는다.
+필터·정렬·페이지네이션은 검색 공통 계약이라 이 어댑터의 시나리오로 검증하지 않는다.
 
 ## 영구 삭제는 정의 행과 RBAC 노드를 제거한다
 

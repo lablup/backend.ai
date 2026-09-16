@@ -87,11 +87,10 @@ class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
 
 @dataclass(frozen=True)
 class ManyDefinitionsAndACaller:
-    """검색 대상 설정 정의 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
+    """검색 대상 설정 정의 여럿과, 검색을 호출할 사용자."""
 
     caller: UserData
     laid: tuple[AppConfigDefinitionData, ...]
-    named: AppConfigDefinitionData
 
 
 @dataclass(frozen=True)
@@ -108,15 +107,14 @@ class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyDefinitionsAndACaller:
         home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        wanted = await seeding.creating(SeedDefinition(name_hint="wanted"))
-        others = [
-            await seeding.creating(SeedDefinition(name_hint="other")) for _ in range(self.count - 1)
+        laid = [
+            await seeding.creating(SeedDefinition(name_hint="definition"))
+            for _ in range(self.count)
         ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ManyDefinitionsAndACaller(
             caller=seeding.made(caller),
-            laid=tuple(seeding.made(one) for one in [wanted, *others]),
-            named=seeding.made(wanted),
+            laid=tuple(seeding.made(one) for one in laid),
         )
 
 
@@ -231,141 +229,4 @@ class EveryLaidDefinitionIsFound(
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyTheNamedDefinitionIsFound(
-    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
-):
-    """필터에 맞는 하나만 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "이름 필터에 맞는 설정 정의만 반환된다"
-
-    @override
-    def look(
-        self,
-        laid: ManyDefinitionsAndACaller,
-        answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("items", [one.config_name for one in payload.items], [laid.named.config_name]),
-            Same("total_count", payload.total_count, 1),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class DefinitionsComeInNameOrder(
-    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
-):
-    """이름 오름차순으로 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "이름 순서대로 반환된다"
-
-    @override
-    def look(
-        self,
-        laid: ManyDefinitionsAndACaller,
-        answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same(
-                "items",
-                [one.config_name for one in payload.items],
-                sorted(one.config_name for one in laid.laid),
-            ),
-            Same("total_count", payload.total_count, len(laid.laid)),
-        ]
-
-
-@dataclass(frozen=True)
-class TenComeWithANextPage(Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]):
-    """크기를 지정하지 않으면 10건까지 반환되고 다음 페이지가 있다고 응답한다."""
-
-    @override
-    def says(self) -> str:
-        return "10건까지 반환되고 다음 페이지가 있다고 응답한다"
-
-    @override
-    def look(
-        self,
-        laid: ManyDefinitionsAndACaller,
-        answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("items", len(payload.items), 10),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class TwoNamedDefinitionsAreFound(
-    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
-):
-    """OR 이름 필터에 맞는 두 정의만 이름순으로 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "두 이름 중 하나와 일치하는 설정 정의만 반환된다"
-
-    @override
-    def look(
-        self,
-        laid: ManyDefinitionsAndACaller,
-        answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        wanted = sorted(one.config_name for one in laid.laid[:2])
-        return [
-            Same("items", [one.config_name for one in payload.items], wanted),
-            Same("total_count", payload.total_count, 2),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class TheMiddleOffsetPageIsFound(
-    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
-):
-    """이름순 두 번째 페이지와 앞뒤 페이지 표시를 확인한다."""
-
-    @override
-    def says(self) -> str:
-        return "중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다"
-
-    @override
-    def look(
-        self,
-        laid: ManyDefinitionsAndACaller,
-        answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        wanted = sorted(one.config_name for one in laid.laid)[1:3]
-        return [
-            Same("items", [one.config_name for one in payload.items], wanted),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, True),
-            Same("has_previous_page", payload.has_previous_page, True),
         ]

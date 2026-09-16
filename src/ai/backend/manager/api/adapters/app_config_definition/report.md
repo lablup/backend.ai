@@ -421,36 +421,6 @@ Then
 
 ### searching
 
-#### [a-middle-offset-page-reports-both-directions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-설정 정의 넷을 이름순으로 두 번째 항목부터 두 건 조회하면, 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다
-
-Given
-
-- 설정 정의 4개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-3: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 이름순 결과의 두 번째 항목부터 두 건 조회
-
-Then
-
-- 중간 두 항목과 앞뒤 페이지가 모두 있다고 응답한다
-  - items = ['other-2', 'other-3']
-  - total_count = 4
-  - has_next_page = True
-  - has_previous_page = True
-
 #### [a-user-who-is-not-the-superadmin-may-not-search-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
 일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다
@@ -459,9 +429,9 @@ Given
 
 - 설정 정의 3개와, 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 definition-3: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
@@ -477,154 +447,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-#### [an-or-filter-keeps-either-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-설정 정의 셋이 있고 슈퍼관리자가 두 이름을 OR로 묶어 검색하면, 두 이름 중 하나와 일치하는 정의만 반환된다
-
-Given
-
-- 설정 정의 3개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 wanted-1 또는 other-1인 정의 조회
-
-Then
-
-- 두 이름 중 하나와 일치하는 설정 정의만 반환된다
-  - items = ['other-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [cursor-and-offset-pagination-may-not-be-mixed](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-슈퍼관리자가 커서와 오프셋 페이지네이션을 함께 지정하면, 서로 다른 방식을 섞었다는 이유로 거부된다
-
-Given
-
-- 설정 정의 3개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 커서와 오프셋 페이지네이션을 함께 지정해 조회
-
-Then
-
-- 거부된다
-  - 거부: InvalidGraphQLParameters
-
-#### [filtering-by-name-keeps-only-that-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-이름이 다른 설정 정의 여럿이 있고 슈퍼관리자가 이름 필터로 검색하면, 그 이름의 정의만 반환된다
-
-Given
-
-- 설정 정의 3개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 wanted-1 이름 필터로 조회
-
-Then
-
-- 이름 필터에 맞는 설정 정의만 반환된다
-  - items = ['wanted-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [leaving-the-page-size-out-answers-ten-with-a-next-page](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-설정 정의 11개가 있고 슈퍼관리자가 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
-
-Given
-
-- 설정 정의 11개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-3: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-4: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-5: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-6: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-7: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-8: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-9: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-10: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 필터 없이 전체 조회
-
-Then
-
-- 10건까지 반환되고 다음 페이지가 있다고 응답한다
-  - items = 10
-  - total_count = 11
-  - has_next_page = True
-  - has_previous_page = False
-
-#### [ordering-by-name-answers-in-name-order](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
-
-설정 정의 셋이 있고 슈퍼관리자가 이름 오름차순으로 검색하면, 이름 순서대로 반환된다
-
-Given
-
-- 설정 정의 3개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigDefinitionAdapter.admin_search — user-1이 이름 오름차순으로 전체 조회
-
-Then
-
-- 이름 순서대로 반환된다
-  - items = ['other-1', 'other-2', 'wanted-1']
-  - total_count = 3
-
 #### [the-superadmin-counts-every-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py) — pass
 
 설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다
@@ -633,9 +455,9 @@ Given
 
 - 설정 정의 3개와, 슈퍼관리자 한 명
   - 도메인 home-1
-  - 설정 정의 wanted-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 other-2: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 definition-3: 이 이름의 설정이 등록돼 있다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
@@ -649,7 +471,7 @@ When
 Then
 
 - 미리 만들어 둔 설정 정의가 모두, 그리고 그것만 집계된다
-  - items = ['other-1', 'other-2', 'wanted-1']
+  - items = ['definition-1', 'definition-2', 'definition-3']
   - total_count = 3
   - has_next_page = False
   - has_previous_page = False
