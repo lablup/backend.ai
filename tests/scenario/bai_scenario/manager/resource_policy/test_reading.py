@@ -171,10 +171,7 @@ class EnforcementOffOpensTheRead(
 
     @override
     def describe(self) -> str:
-        return (
-            f"권한 검사를 끄면 아무 권한도 없는 사용자도 {self.family.kind}을 "
-            "이름으로 조회할 수 있다. 이 호출은 역할이 아니라 권한 그래프로 보호되기 때문이다"
-        )
+        return f"권한 검사를 끄면 아무 권한도 없는 사용자도 {self.family.kind}을 이름으로 조회할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

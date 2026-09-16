@@ -233,10 +233,7 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return (
-            f"권한 검사를 꺼도 {self.family.kind} 생성은 여전히 거부된다. "
-            "생성은 권한 그래프가 아니라 역할로 보호되기 때문이다"
-        )
+        return f"권한 검사를 꺼도 {self.family.kind} 생성은 여전히 거부된다"
 
     @override
     def config(self) -> Mapping[str, Any]:
