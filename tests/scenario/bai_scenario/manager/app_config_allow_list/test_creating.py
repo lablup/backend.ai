@@ -227,10 +227,7 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return (
-            "RBAC 강제를 꺼도 일반 사용자의 허용 목록 항목 생성은 거부된다. "
-            "생성에는 별도의 슈퍼관리자 검사가 적용된다"
-        )
+        return "RBAC 강제를 꺼도 일반 사용자의 허용 목록 항목 생성은 거부된다"
 
     @override
     def config(self) -> Mapping[str, Any]:

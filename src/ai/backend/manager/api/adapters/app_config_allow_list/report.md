@@ -196,7 +196,7 @@ Then
 
 #### [turning-enforcement-off-still-does-not-let-a-user-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
 
-RBAC 강제를 꺼도 일반 사용자의 허용 목록 항목 생성은 거부된다. 생성에는 별도의 슈퍼관리자 검사가 적용된다
+RBAC 강제를 꺼도 일반 사용자의 허용 목록 항목 생성은 거부된다
 
 Given
 
@@ -517,7 +517,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
 
-RBAC 강제를 끄면 권한이 없는 일반 사용자도 허용 목록 항목을 조회할 수 있다. 개별 조회는 엔티티 권한 검사를 사용한다
+RBAC 강제를 끄면 권한이 없는 일반 사용자도 허용 목록 항목을 조회할 수 있다
 
 Given
 

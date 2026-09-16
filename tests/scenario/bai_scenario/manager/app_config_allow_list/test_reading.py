@@ -165,10 +165,7 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "RBAC 강제를 끄면 권한이 없는 일반 사용자도 허용 목록 항목을 조회할 수 있다. "
-            "개별 조회는 엔티티 권한 검사를 사용한다"
-        )
+        return "RBAC 강제를 끄면 권한이 없는 일반 사용자도 허용 목록 항목을 조회할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:
