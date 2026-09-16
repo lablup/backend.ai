@@ -10,6 +10,15 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.resource_slot.request import UpdateResourceSlotTypeInput
+from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
+from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -20,15 +29,6 @@ from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.resource_slot.request import UpdateResourceSlotTypeInput
-from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
-from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 
 RENAMED = "GPU shares"
 UNKNOWN = "no-such-slot"

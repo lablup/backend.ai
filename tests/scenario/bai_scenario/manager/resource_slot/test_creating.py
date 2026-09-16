@@ -7,16 +7,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.resource_slot import (
-    ASlotTypeAndACaller,
-    ASlotTypeAndSomeone,
-    TheNewSlotTypeNode,
-)
-from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_slot.request import CreateResourceSlotTypeInput
@@ -28,6 +18,16 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_slot import (
+    ASlotTypeAndACaller,
+    ASlotTypeAndSomeone,
+    TheNewSlotTypeNode,
+)
+from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 MADE = "cuda.shares"
 BINARY_ROUNDED = NumberFormatInfo(binary=True, round_length=2)

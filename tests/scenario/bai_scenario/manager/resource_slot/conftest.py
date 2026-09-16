@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bai_scenario.runner.unwired import unwired
 
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
@@ -26,6 +25,7 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
+from bai_scenario.runner.unwired import unwired
 
 
 @pytest.fixture

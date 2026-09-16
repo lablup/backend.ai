@@ -10,9 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
-
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceSlotTypesPayload,
@@ -33,6 +30,8 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
 
 DISPLAYED = "미리 만들어 둔 슬롯"
 """시드가 미리 만들어 두는 슬롯 종류의 표시 이름. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
