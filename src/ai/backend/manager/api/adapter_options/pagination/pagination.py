@@ -6,11 +6,18 @@ both the GQL adapter (BaseGQLAdapter) and domain adapters (BaseAdapter).
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
+from typing import Any
+
+import sqlalchemy as sa
+from sqlalchemy.sql import operators
+from sqlalchemy.sql.expression import UnaryExpression
 
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
-from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.models.base import GUID
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -34,31 +41,84 @@ class PaginationOptions:
     offset: int | None = None
 
 
+def _order_column(order: QueryOrder) -> sa.ColumnElement[Any]:
+    if isinstance(order, UnaryExpression):
+        return order.element
+    return order
+
+
+def _is_descending(order: QueryOrder) -> bool:
+    return isinstance(order, UnaryExpression) and order.modifier is operators.desc_op
+
+
+def _reverse_order(order: QueryOrder) -> QueryOrder:
+    column = _order_column(order)
+    return column.asc() if _is_descending(order) else column.desc()
+
+
+def _parse_cursor_id(id_column: sa.ColumnElement[Any], cursor_id: str) -> Any:
+    if isinstance(id_column.type, GUID):
+        try:
+            return uuid.UUID(cursor_id)
+        except ValueError as e:
+            raise InvalidCursor(f"Invalid cursor value: {cursor_id}") from e
+    return cursor_id
+
+
 @dataclass(frozen=True)
 class PaginationSpec:
-    """Domain-specific configuration for cursor-based pagination.
+    """Cursor pagination contract of one entity.
 
-    For typical "newest first" lists:
-    - Forward (first/after): DESC order, shows newer items first
-    - Backward (last/before): ASC order, fetches older items first (reversed for display)
+    ``forward_order`` is the page order of ``first``/``after``; ``last``/``before`` walks
+    its reverse. ``tiebreaker_order`` comes last in both directions (reversed for backward)
+    and its column is the row identity a cursor encodes, so it must be unique.
     """
 
     forward_order: QueryOrder
-    """Order for forward pagination (e.g., created_at DESC for newest first).
-    Also used as default order for offset pagination when order is not provided."""
-
-    backward_order: QueryOrder
-    """Order for backward pagination (e.g., created_at ASC, results reversed for display)."""
-
-    forward_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for forward pagination (e.g., created_at < cursor)."""
-
-    backward_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
-
     tiebreaker_order: QueryOrder
-    """Tiebreaker order for deterministic pagination (e.g., RowClass.id.asc()).
-    Applied as the last ORDER BY clause to ensure stable ordering."""
+    backward_order: QueryOrder | None = None
+    forward_condition_factory: CursorConditionFactory | None = None
+    backward_condition_factory: CursorConditionFactory | None = None
+
+    @property
+    def backward_tiebreaker_order(self) -> QueryOrder:
+        return _reverse_order(self.tiebreaker_order)
+
+    def cursor_order(self, *, backward: bool = False) -> QueryOrder:
+        if not backward:
+            return self.forward_order
+        if self.backward_order is not None:
+            return self.backward_order
+        return _reverse_order(self.forward_order)
+
+    def build_cursor_condition(self, cursor_id: str, *, backward: bool = False) -> QueryCondition:
+        """Rows past the cursor row in ``(forward_order, tiebreaker_order)``; before it when
+        ``backward``. ``cursor_id`` is the decoded cursor, the value of the tiebreaker column."""
+        factory = self.backward_condition_factory if backward else self.forward_condition_factory
+        if factory is not None:
+            try:
+                return factory(cursor_id)
+            except ValueError as e:
+                raise InvalidCursor(f"Invalid cursor value: {cursor_id}") from e
+        sort_column = _order_column(self.forward_order)
+        id_column = _order_column(self.tiebreaker_order)
+        cursor_value = _parse_cursor_id(id_column, cursor_id)
+        sort_less = _is_descending(self.forward_order) != backward
+        id_less = _is_descending(self.tiebreaker_order) != backward
+
+        def inner() -> sa.ColumnElement[bool]:
+            sort_at_cursor = (
+                sa.select(sort_column).where(id_column == cursor_value).scalar_subquery()
+            )
+            return sa.or_(
+                sort_column < sort_at_cursor if sort_less else sort_column > sort_at_cursor,
+                sa.and_(
+                    sort_column == sort_at_cursor,
+                    id_column < cursor_value if id_less else id_column > cursor_value,
+                ),
+            )
+
+        return inner
 
 
 def build_pagination(
@@ -67,13 +127,13 @@ def build_pagination(
 ) -> QueryPagination:
     """Build QueryPagination from pagination arguments and domain spec.
 
-    For cursor-based pagination (first/after or last/before), condition factories
-    and orders are taken from the spec. For offset pagination, returns OffsetPagination.
+    For cursor-based pagination (first/after or last/before), the cursor condition
+    and order come from the spec. For offset pagination, returns OffsetPagination.
     If no parameters are provided, returns a default OffsetPagination.
 
     Args:
         options: Flat pagination arguments (first/after/last/before/limit/offset).
-        spec: Domain-specific pagination specification (orders, condition factories).
+        spec: Domain-specific pagination specification (orders).
 
     Raises:
         InvalidGraphQLParameters: If multiple pagination modes are requested
@@ -93,11 +153,7 @@ def build_pagination(
             raise InvalidGraphQLParameters(f"first must be positive, got {options.first}")
         cursor_condition = None
         if options.after is not None:
-            cursor_value = decode_cursor(options.after)
-            try:
-                cursor_condition = spec.forward_condition_factory(cursor_value)
-            except ValueError as e:
-                raise InvalidCursor(f"Invalid cursor value: {options.after}") from e
+            cursor_condition = spec.build_cursor_condition(decode_cursor(options.after))
         return CursorForwardPagination(
             first=options.first,
             cursor_order=spec.forward_order,
@@ -109,14 +165,12 @@ def build_pagination(
             raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
         cursor_condition = None
         if options.before is not None:
-            cursor_value = decode_cursor(options.before)
-            try:
-                cursor_condition = spec.backward_condition_factory(cursor_value)
-            except ValueError as e:
-                raise InvalidCursor(f"Invalid cursor value: {options.before}") from e
+            cursor_condition = spec.build_cursor_condition(
+                decode_cursor(options.before), backward=True
+            )
         return CursorBackwardPagination(
             last=options.last,
-            cursor_order=spec.backward_order,
+            cursor_order=spec.cursor_order(backward=True),
             cursor_condition=cursor_condition,
         )
 

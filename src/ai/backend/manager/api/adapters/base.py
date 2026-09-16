@@ -181,7 +181,8 @@ class BaseAdapter(BaseFilterAdapter):
         Handles pagination mode selection (cursor forward/backward/offset/default)
         via the shared ``build_pagination()`` utility. Domain adapters supply
         pre-converted ``conditions`` and ``orders`` from their private conversion
-        methods; cursor and tiebreaker orders are taken from ``pagination_spec``.
+        methods; the cursor condition, cursor order and tiebreaker order come from
+        ``pagination_spec`` (both orders reversed for ``last``/``before``).
 
         The optional ``base_conditions`` are prepended before ``conditions``
         (e.g., a foreign-key scope filter applied before user-supplied filters).
@@ -208,7 +209,10 @@ class BaseAdapter(BaseFilterAdapter):
         all_orders: list[QueryOrder] = list(orders)
         if not all_orders and not is_cursor_pagination:
             all_orders.append(pagination_spec.forward_order)
-        all_orders.append(pagination_spec.tiebreaker_order)
+        if last is not None:
+            all_orders.append(pagination_spec.backward_tiebreaker_order)
+        else:
+            all_orders.append(pagination_spec.tiebreaker_order)
 
         pagination = build_pagination(
             PaginationOptions(
