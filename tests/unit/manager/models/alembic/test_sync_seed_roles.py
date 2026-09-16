@@ -313,11 +313,10 @@ async def _holders(db: ExtendedAsyncSAEngine, role_id: uuid.UUID) -> set[uuid.UU
 _REPOSITORY = pathlib.Path(__file__).resolve().parents[5]
 
 
-def _seed_files() -> tuple[dict[str, Any], dict[str, Any]]:
+def _seed_files() -> dict[str, Any]:
     base = _REPOSITORY / "fixtures" / "manager"
-    accounts = json.loads((base / "example-users.json").read_text(encoding="utf-8"))
-    presets = json.loads((base / "example-role-presets.json").read_text(encoding="utf-8"))
-    return accounts, presets
+    accounts: dict[str, Any] = json.loads((base / "example-users.json").read_text(encoding="utf-8"))
+    return accounts
 
 
 @pytest.fixture
@@ -325,7 +324,7 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
     """The seed's accounts carrying the roles the data migrations made for them: no
     preset link, the permission rows those migrations left, and none of the assignments a
     scope hands out on its own. Expected rows are keyed by preset and scope."""
-    accounts, presets = _seed_files()
+    accounts = _seed_files()
     domain = accounts["domains"][0]
     roster = {(row["group_id"], row["user_id"]) for row in accounts["association_groups_users"]}
     creators = {
@@ -428,13 +427,13 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                     entity_id=uuid.UUID(entity["entity_id"]),
                 )
             )
-        for preset in presets["role_presets"]:
+        for preset in _PRESETS:
             session.add(
                 RolePresetRow(
-                    id=uuid.UUID(preset["id"]),
-                    name=f"preset_{preset['name']}",
-                    scope_type=preset["scope_type"],
-                    auto_assign=preset["auto_assign"],
+                    id=uuid.UUID(preset.id),
+                    name=f"preset_{preset.name}",
+                    scope_type=preset.scope_type,
+                    auto_assign=preset.auto_assign,
                     deleted=True,
                 )
             )
@@ -492,8 +491,15 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
             ),
         },
         "expected_preset_permissions": {
-            (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
-            for row in presets["role_permission_presets"]
+            (
+                _identify("role_permission_preset", preset.id, entity_type, str(bit)),
+                preset.id,
+                entity_type,
+                bit,
+            )
+            for preset in _PRESETS
+            for entity_type, bits in preset.grants
+            for bit in bits
         },
     }
 

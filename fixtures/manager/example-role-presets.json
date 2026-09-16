@@ -12,6 +12,16 @@
             "updated_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "76616aa7-6597-5b11-8629-adff5d5640c2",
+            "name": "domain_member",
+            "role_name_template": null,
+            "scope_type": "domain",
+            "auto_assign": true,
+            "deleted": false,
+            "created_at": "2025-09-12 09:51:58.265582+00",
+            "updated_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "name": "project_admin",
             "role_name_template": null,
@@ -741,6 +751,13 @@
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "vfolder",
             "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7ec7-bd6e-89b2384b8207",
+            "role_preset_id": "76616aa7-6597-5b11-8629-adff5d5640c2",
+            "entity_type": "resource_group",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
