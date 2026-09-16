@@ -285,14 +285,14 @@ When
 
 Then
 
-- 중복 ID의 두 자리에 같은 설정 정의가 반환된다
+- 중복 ID의 두 항목에 같은 설정 정의가 반환된다
   - items = 2
   - items[0].ID: 미리 만들어 둔 첫 번째 설정 정의와 같다
   - items[1].ID: 미리 만들어 둔 첫 번째 설정 정의와 같다
 
 #### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py) — pass
 
-슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID 자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
+슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
 
 Given
 
@@ -312,7 +312,7 @@ When
 
 Then
 
-- 있는 둘은 노드로, 없는 ID 자리는 비어서 반환된다
+- 있는 둘은 노드로 반환되고, 없는 ID에 해당하는 항목은 비어 있다
   - items = 3
   - items[0].ID: 미리 만들어 둔 첫째 설정 정의와 같다
   - items[1].ID: 미리 만들어 둔 둘째 설정 정의와 같다

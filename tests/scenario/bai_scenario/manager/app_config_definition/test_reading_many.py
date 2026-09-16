@@ -115,7 +115,7 @@ class TwoNodesOneMissing(Then[TwoDefinitionsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로, 없는 ID 자리는 비어서 반환된다"
+        return "있는 둘은 노드로 반환되고, 없는 ID에 해당하는 항목은 비어 있다"
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -159,11 +159,11 @@ class NothingIsAnswered(Then[TwoDefinitionsAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class TheDuplicateIdKeepsBothPositions(Then[TwoDefinitionsAndACaller, Loaded]):
-    """같은 ID를 두 번 요청하면 두 자리에 같은 노드가 반환된다."""
+    """같은 ID를 두 번 요청하면 두 항목에 같은 노드가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "중복 ID의 두 자리에 같은 설정 정의가 반환된다"
+        return "중복 ID의 두 항목에 같은 설정 정의가 반환된다"
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -227,8 +227,8 @@ class TheSuperadminSeesBoth(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID "
-            "자리는 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
+            "슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 "
+            "해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
         )
 
     @override

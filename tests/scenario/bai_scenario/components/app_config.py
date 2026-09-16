@@ -189,11 +189,11 @@ class AMergeAndACaller:
 
 @dataclass(frozen=True)
 class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
-    """설정 이름 하나에 세 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
+    """설정 이름 하나에 도메인·프로젝트·사용자 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
 
     값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 허용 목록 항목은 조각과 함께
     만들어진다. 다른 사용자와 다른 도메인의 조각은 같은 이름에 만들어 두되 반환하지 않으므로,
-    병합에 섞이면 그 자리에서 불일치가 드러난다.
+    병합에 섞이면 바로 불일치가 드러난다.
     """
 
     public: Mapping[str, Any] | None = None
