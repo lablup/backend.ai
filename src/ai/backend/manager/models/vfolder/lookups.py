@@ -12,6 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityType, FieldType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import OperationScope
@@ -20,11 +21,13 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderPermissionRow,
     VFolderRow,
     VFolderStatusSet,
+    VFolderUserMountPolicyRow,
     vfolder_status_map,
 )
 
 __all__ = (
     "VFolderMountPermissionLookup",
+    "VFolderMountPolicyLookup",
     "VFolderNameLookup",
 )
 
@@ -86,6 +89,33 @@ class VFolderMountPermissionLookup(FieldKeyLookup[VFolderPermissionID, VFolderUU
     @override
     def to_field_id(self, value: UUID) -> VFolderPermissionID:
         return VFolderPermissionID(value)
+
+    @override
+    def to_entity_id(self, value: UUID) -> VFolderUUID:
+        return VFolderUUID(value)
+
+
+@dataclass
+class VFolderMountPolicyLookup(FieldKeyLookup[VFolderMountPolicyID, VFolderUUID]):
+    """Resolves a folder and a user into the mount policy row standing between them."""
+
+    vfolder_id: VFolderUUID
+    user_id: uuid.UUID
+
+    @override
+    def field_type(self) -> FieldType:
+        return VFolderMountPolicyID.field_type()
+
+    @override
+    def build_query(self) -> sa.sql.Select[Any]:
+        return sa.select(VFolderUserMountPolicyRow.id, VFolderUserMountPolicyRow.vfolder_id).where(
+            VFolderUserMountPolicyRow.vfolder_id == self.vfolder_id,
+            VFolderUserMountPolicyRow.user_id == self.user_id,
+        )
+
+    @override
+    def to_field_id(self, value: UUID) -> VFolderMountPolicyID:
+        return VFolderMountPolicyID(value)
 
     @override
     def to_entity_id(self, value: UUID) -> VFolderUUID:

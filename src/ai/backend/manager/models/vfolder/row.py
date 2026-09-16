@@ -27,6 +27,7 @@ from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationsh
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.defs import (
     MODEL_VFOLDER_LENGTH_LIMIT,
     RESERVED_VFOLDER_PATTERNS,
@@ -39,8 +40,8 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
-    VFolderUsageMode,
     VFolderMountPolicy,
+    VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
@@ -50,6 +51,7 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationState,
+    VFolderMountPolicyData,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -545,6 +547,49 @@ class VFolderPermissionRow(Base):
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use VFolderPermissionRow class directly for new code.
 vfolder_permissions = VFolderPermissionRow.__table__
+
+
+class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
+    """The mount level one user gets on a vfolder, set by whoever may update the folder.
+
+    Stands apart from access: it takes effect only while the user can read the folder,
+    and a share ending leaves it in place.
+    """
+
+    __tablename__ = "vfolder_user_mount_policies"
+    __table_args__ = (sa.UniqueConstraint("vfolder_id", "user_id"),)
+
+    id: Mapped[VFolderMountPolicyID] = mapped_column(
+        "id",
+        GUID(VFolderMountPolicyID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
+    )
+    vfolder_id: Mapped[VFolderUUID] = mapped_column(
+        "vfolder_id",
+        GUID(VFolderUUID),
+        sa.ForeignKey("vfolders.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UserID] = mapped_column(
+        "user_id",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="CASCADE"),
+        nullable=False,
+    )
+    permission: Mapped[VFolderMountPolicy] = mapped_column(
+        "permission", StrEnumType(VFolderMountPolicy), nullable=False
+    )
+
+    def to_data(self) -> VFolderMountPolicyData:
+        return VFolderMountPolicyData(
+            id=VFolderMountPolicyID(self.id),
+            vfolder_id=VFolderUUID(self.vfolder_id),
+            user_id=self.user_id,
+            permission=self.permission,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 def is_unmanaged(unmanaged_path: str | None) -> bool:
@@ -1047,6 +1092,12 @@ class VFolderPermissionContext(
                 pass
             case VFolderMountPolicy.READ_ONLY:
                 permissions -= {VFolderRBACPermission.MOUNT_RW, VFolderRBACPermission.MOUNT_WD}
+            case VFolderMountPolicy.NONE:
+                permissions -= {
+                    VFolderRBACPermission.MOUNT_RO,
+                    VFolderRBACPermission.MOUNT_RW,
+                    VFolderRBACPermission.MOUNT_WD,
+                }
         return frozenset(permissions)
 
 
@@ -1092,12 +1143,6 @@ class VFolderPermissionContextBuilder(
             ctx, ctx.user_id, scope.domain_name
         )
         permission_ctx.merge(_user_perm_ctx)
-            case VFolderMountPolicy.NONE:
-                permissions -= {
-                    VFolderRBACPermission.MOUNT_RO,
-                    VFolderRBACPermission.MOUNT_RW,
-                    VFolderRBACPermission.MOUNT_WD,
-                }
         _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
         permission_ctx.merge(_project_perm_ctx)
         return permission_ctx

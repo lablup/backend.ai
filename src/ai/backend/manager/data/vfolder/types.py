@@ -9,6 +9,7 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
@@ -21,8 +22,8 @@ from ai.backend.common.types import (
     QuotaScopeID,
     VFolderHostPermissionMap,
     VFolderID,
-    VFolderUsageMode,
     VFolderMountPolicy,
+    VFolderUsageMode,
 )
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -263,6 +264,18 @@ class VFolderPermissionData(FieldData):
     vfolder: uuid.UUID
     user: uuid.UUID
     permission: VFolderMountPermission
+
+
+@dataclass
+class VFolderMountPolicyData(FieldData):
+    """The mount level one user gets on a vfolder."""
+
+    id: VFolderMountPolicyID
+    vfolder_id: VFolderUUID
+    user_id: uuid.UUID
+    permission: VFolderMountPolicy
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass

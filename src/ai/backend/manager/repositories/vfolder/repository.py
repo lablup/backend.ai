@@ -26,6 +26,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderID,
+    VFolderMountPolicy,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -41,6 +42,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationData,
     VFolderMountPermission,
+    VFolderMountPolicyData,
     VFolderPermissionData,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -83,6 +85,7 @@ from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
@@ -127,10 +130,15 @@ from ai.backend.manager.models.vfolder.lookups import (
 from ai.backend.manager.models.vfolder.purgers import (
     VFolderInvitationBatchPurger,
     VFolderPurger,
+    VFolderUserMountPolicyBatchPurger,
     VFolderUserPermissionBatchPurger,
 )
-from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
+from ai.backend.manager.models.vfolder.queriers import (
+    VFolderQuerier,
+    VFolderUserMountPolicyQuerier,
+)
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
     VFolderMountPermissionUpdater,
@@ -138,6 +146,7 @@ from ai.backend.manager.models.vfolder.updaters import (
     VFolderSoftDeleteUpdater,
     VFolderTrashUpdater,
 )
+from ai.backend.manager.models.vfolder.upserters import VFolderUserMountPolicyUpserter
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
 )
@@ -454,6 +463,16 @@ class VfolderRepository:
         limits = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)
+            if isinstance(creator, ProjectVFolderCreator):
+                # A project folder has no owner; its maker mounts it read-write through a
+                # policy row the project may later change or take back.
+                await w.upsert_field_entity(
+                    created.id,
+                    VFolderUserMountPolicyUpserter(
+                        user_id=UserID(creator.creator_id),
+                        permission=VFolderMountPolicy.READ_WRITE,
+                    ),
+                )
             return VFolderCreation(
                 vfolder=created,
                 max_quota_scope_size=limits[0],
@@ -1744,6 +1763,49 @@ class VfolderRepository:
             for user_id in users_to_unshare:
                 await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
         return emails
+
+    @vfolder_repository_resilience.apply()
+    async def set_user_mount_policy(
+        self, vfolder_id: VFolderUUID, user_id: UserID, permission: VFolderMountPolicy
+    ) -> VFolderMountPolicyData:
+        """Set the mount level one user gets on the folder, replacing what stood."""
+        async with self._v2_ops.write_ops() as w:
+            return await w.upsert_field_entity(
+                vfolder_id,
+                VFolderUserMountPolicyUpserter(user_id=user_id, permission=permission),
+            )
+
+    @vfolder_repository_resilience.apply()
+    async def unset_user_mount_policy(self, vfolder_id: VFolderUUID, user_id: UserID) -> bool:
+        """Take back the mount level one user was given; False when they had none."""
+        async with self._v2_ops.write_ops() as w:
+            purged = await w.batch_purge_field_entities(
+                vfolder_id, VFolderUserMountPolicyBatchPurger(user_id=user_id)
+            )
+            return bool(purged)
+
+    @vfolder_repository_resilience.apply()
+    async def list_user_mount_policies(
+        self, vfolder_id: VFolderUUID
+    ) -> list[VFolderMountPolicyData]:
+        """The mount levels set on the folder, one row per user."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                VFolderUserMountPolicySearcher(pagination=NoPagination(), vfolder_id=vfolder_id)
+            )
+            return result.items
+
+    @vfolder_repository_resilience.apply()
+    async def user_mount_policies_of(
+        self, user_id: UserID, vfolder_ids: Sequence[VFolderUUID]
+    ) -> Mapping[VFolderUUID, VFolderMountPolicy]:
+        """The mount level rows one user holds, keyed by folder; a folder without one
+        is absent."""
+        async with self._v2_ops.read_ops() as r:
+            rows = await r.query_owned_fields(
+                VFolderUserMountPolicyQuerier(user_id=user_id), vfolder_ids
+            )
+            return {vfolder_id: data.permission for vfolder_id, data in rows.items()}
 
     @vfolder_repository_resilience.apply()
     async def list_shared_vfolder_permissions(

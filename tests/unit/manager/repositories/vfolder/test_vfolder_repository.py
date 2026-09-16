@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -96,6 +97,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,
+    VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.vfolder.creators import ProjectVFolderCreator
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
@@ -177,6 +179,7 @@ class TestVfolderRepository:
                 RoutingRow,
                 ResourcePresetRow,
                 VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 EntityMembershipCapRow,
@@ -399,6 +402,63 @@ class TestVfolderRepository:
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
+
+    async def test_a_project_folder_maker_gets_a_read_write_row(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_model_store_group: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+
+        policies = await vfolder_repository.list_user_mount_policies(creation.vfolder.id)
+        assert [(p.user_id, p.permission) for p in policies] == [
+            (test_user, VFolderMountPolicy.READ_WRITE)
+        ]
+
+    async def test_setting_a_user_mount_policy_replaces_what_stood(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_model_store_group: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
+        )
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        folder_id = creation.vfolder.id
+
+        await vfolder_repository.set_user_mount_policy(
+            folder_id, UserID(test_user), VFolderMountPolicy.NONE
+        )
+
+        held = await vfolder_repository.user_mount_policies_of(UserID(test_user), [folder_id])
+        assert held == {folder_id: VFolderMountPolicy.NONE}
+        assert len(await vfolder_repository.list_user_mount_policies(folder_id)) == 1
+
+    async def test_unsetting_a_user_mount_policy(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_model_store_group: uuid.UUID,
+        test_user: uuid.UUID,
+    ) -> None:
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
+        )
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        folder_id = creation.vfolder.id
+
+        assert await vfolder_repository.unset_user_mount_policy(folder_id, UserID(test_user))
+        assert not await vfolder_repository.unset_user_mount_policy(folder_id, UserID(test_user))
+
+        assert await vfolder_repository.user_mount_policies_of(UserID(test_user), [folder_id]) == {}
 
     async def test_a_name_already_standing_in_the_project_is_refused(
         self,
