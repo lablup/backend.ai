@@ -127,11 +127,11 @@ class TheImageOrderIsKept(Then[ManyImagesAndACaller, LoadedImages]):
 
 @dataclass(frozen=True)
 class EachImageIsRefused(Then[ManyImagesAndACaller, LoadedImages]):
-    """원소마다 권한 부족 거부가 온다."""
+    """원소마다 권한 부족 거부가 반환된다."""
 
     @override
     def says(self) -> str:
-        return "원소마다 권한 부족 거부가 입력 순서대로 온다"
+        return "원소마다 권한 부족 거부가 입력 순서대로 반환된다"
 
     @override
     def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
@@ -223,11 +223,11 @@ class TheAliasOrderIsKept(Then[AnAliasAndACaller, LoadedAliases]):
 
 @dataclass(frozen=True)
 class TheAliasIsRefusedAndTheHoleStays(Then[AnAliasAndACaller, LoadedAliases]):
-    """있는 별칭 자리에는 권한 부족 거부가, 없는 ID 자리에는 빈 값이 온다."""
+    """있는 별칭 위치에는 권한 부족 거부가, 없는 ID 위치에는 빈 값이 반환된다."""
 
     @override
     def says(self) -> str:
-        return "있는 별칭 자리에는 권한 부족 거부가, 없는 ID 자리에는 빈 값이 온다"
+        return "있는 별칭 위치에는 권한 부족 거부가, 없는 ID 위치에는 빈 값이 반환된다"
 
     @override
     def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[Verdict]:
@@ -307,7 +307,7 @@ class APlainUserIsRefusedPerElement(
     def describe(self) -> str:
         return (
             "아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, "
-            "요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 온다"
+            "요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다"
         )
 
     @override
@@ -388,7 +388,7 @@ class APlainUserIsRefusedPerAlias(
     def describe(self) -> str:
         return (
             "아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, "
-            "있는 별칭 자리에는 권한 부족 거부가 오고 없는 ID 자리는 비어 있다"
+            "있는 별칭 위치에는 권한 부족 거부가 반환되고 없는 ID 위치는 비어 있다"
         )
 
     @override
