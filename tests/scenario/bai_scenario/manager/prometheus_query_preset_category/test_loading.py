@@ -10,6 +10,15 @@ from typing import override
 from uuid import uuid4
 
 import pytest
+
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
+    PrometheusQueryPresetCategoryAdapter,
+)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.prometheus_query_preset_category import (
     LoadedCategory,
     ManyCategoriesAndACaller,
@@ -20,15 +29,6 @@ from bai_scenario.components.prometheus_query_preset_category import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryID,
-)
-from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
-    PrometheusQueryPresetCategoryAdapter,
-)
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
 type Loaded = list[LoadedCategory]
