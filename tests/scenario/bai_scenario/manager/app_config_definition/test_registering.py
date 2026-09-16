@@ -175,10 +175,7 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return (
-            "RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다. "
-            "등록에는 RBAC 그래프와 별개로 슈퍼관리자 검사가 적용된다"
-        )
+        return "RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다"
 
     @override
     def config(self) -> Mapping[str, Any]:

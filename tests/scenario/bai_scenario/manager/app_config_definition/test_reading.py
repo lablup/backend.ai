@@ -1,7 +1,7 @@
 """설정 정의 조회 — 개별 엔티티 권한 검사를 확인한다.
 
 설정 정의는 도메인·프로젝트·사용자 스코프에 자동 귀속되지 않는다. 따라서 현재 기본 역할로는
-도달할 수 없고, 슈퍼관리자나 RBAC 강제를 끈 사용자만 조회할 수 있다.
+도달할 수 없고, 슈퍼관리자만 조회할 수 있다.
 """
 
 from __future__ import annotations
@@ -176,10 +176,7 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다. "
-            "개별 조회의 엔티티 권한 검사가 비활성화되기 때문이다"
-        )
+        return "RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다"
 
     @override
     def config(self) -> Mapping[str, Any]:

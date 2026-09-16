@@ -183,7 +183,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py) — pass
 
-RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다. 개별 조회의 엔티티 권한 검사가 비활성화되기 때문이다
+RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다
 
 Given
 
@@ -397,7 +397,7 @@ Then
 
 #### [turning-enforcement-off-still-does-not-let-a-user-register-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py) — pass
 
-RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다. 등록에는 RBAC 그래프와 별개로 슈퍼관리자 검사가 적용된다
+RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다
 
 Given
 
