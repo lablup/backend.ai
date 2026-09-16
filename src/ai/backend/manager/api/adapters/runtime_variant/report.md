@@ -483,7 +483,7 @@ Then
 
 #### [variants-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant/test_reading.py) — pass
 
-있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다
+있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
 
 Given
 
@@ -503,7 +503,7 @@ When
 
 Then
 
-- 요청한 순서대로, 없는 id 자리는 비어서 반환된다
+- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다
   - len(items) = 3
   - items[0].id: 무시함 — 데이터베이스가 만든다
   - items[0].name = 'wanted-1'

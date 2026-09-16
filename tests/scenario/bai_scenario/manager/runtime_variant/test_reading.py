@@ -278,7 +278,7 @@ class MixedIdsComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 자리는 비어 있다"
+        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
