@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.permission.types import Permission
@@ -29,6 +30,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.models.alembic.versions.c3f8a1d6e920_move_pending_vfolder_invitations_to_shares import (
     move_pending_invitations_to_shares,
 )
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -41,7 +43,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -53,6 +55,25 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import HasTable, with_tables
 
+# The table the migration copies from, gone from the models after it ran.
+legacy_invitations = sa.Table(
+    "vfolder_invitations",
+    sa.MetaData(),
+    sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")),
+    sa.Column("permission", postgresql.ENUM("ro", "rw", "wd", name="vfoldermountpermission")),
+    sa.Column("inviter", sa.String(length=256)),
+    sa.Column("invitee", sa.String(length=256), nullable=False),
+    sa.Column(
+        "state",
+        postgresql.ENUM(
+            "pending", "canceled", "accepted", "rejected", name="vfolderinvitationstate"
+        ),
+    ),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+    sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+    sa.Column("vfolder", GUID, nullable=False),
+)
+
 _TABLES: list[Table | type[HasTable]] = [
     DomainRow,
     UserResourcePolicyRow,
@@ -62,7 +83,7 @@ _TABLES: list[Table | type[HasTable]] = [
     KeyPairRow,
     ProjectRow,
     VFolderRow,
-    VFolderInvitationRow,
+    legacy_invitations,
     VirtualEntityRow,
     ScopeBindingRow,
     EntityMembershipRow,
@@ -199,17 +220,16 @@ async def _add_invitation(
     permission: VFolderMountPermission = VFolderMountPermission.READ_ONLY,
     state: VFolderInvitationState = VFolderInvitationState.PENDING,
 ) -> None:
-    async with db.begin_session() as session:
-        session.add(
-            VFolderInvitationRow(
+    async with db.begin() as conn:
+        await conn.execute(
+            legacy_invitations.insert().values(
                 vfolder=fx.vfolder_id,
                 inviter=inviter if inviter is not None else fx.inviter_email,
                 invitee=invitee,
-                permission=permission,
-                state=state,
+                permission=permission.value,
+                state=state.value,
             )
         )
-        await session.commit()
 
 
 async def _run(db: ExtendedAsyncSAEngine) -> None:

@@ -232,13 +232,13 @@ class AMountBeyondTheFolderIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "모델 폴더를 읽을 수만 있는 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, "
-            "폴더 권한을 넘는다는 이유로 거부된다"
+            "남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 "
+            "더하면, 폴더 권한을 넘는다는 이유로 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
-        return ADeploymentToRevise(granted=(Permission.CREATE,))
+        return ADeploymentToRevise(granted=(Permission.CREATE,), folder_lent=True)
 
     @override
     def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:

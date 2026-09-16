@@ -12,10 +12,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderSearchResult,
@@ -58,7 +57,7 @@ class TestVFolderAdminServiceAdminSearchVFolders:
             domain_name="default",
             quota_scope_id=QuotaScopeID.parse(f"user:{user_id}"),
             usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderMountPermission.READ_WRITE,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
             max_files=0,
             max_size=None,
             num_files=0,
@@ -85,7 +84,7 @@ class TestVFolderAdminServiceAdminSearchVFolders:
             domain_name="default",
             quota_scope_id=QuotaScopeID.parse(f"user:{user_id}"),
             usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderMountPermission.READ_WRITE,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
             max_files=0,
             max_size=None,
             num_files=0,

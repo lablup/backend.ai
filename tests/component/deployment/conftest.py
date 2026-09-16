@@ -17,7 +17,12 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
@@ -30,7 +35,6 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -316,7 +320,7 @@ async def vfolder_factory(
                     domain_name=domain_fixture.domain_name,
                     quota_scope_id=str(quota_scope_id),
                     usage_mode=VFolderUsageMode.MODEL,
-                    permission=VFolderMountPermission.READ_ONLY,
+                    default_mount_permission=VFolderMountPolicy.READ_ONLY,
                     ownership_type=VFolderOwnershipType.USER,
                     user=str(user_uuid),
                     creator="admin-test@test.local",

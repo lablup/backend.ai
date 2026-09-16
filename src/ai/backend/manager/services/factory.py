@@ -65,7 +65,6 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -267,12 +266,14 @@ from ai.backend.manager.services.user_resource_policy.processors import UserReso
 from ai.backend.manager.services.vfolder.processors import (
     VFolderFileProcessors,
     VFolderInviteProcessors,
+    VFolderMountPolicyProcessors,
     VFolderProcessors,
     VFolderSharingProcessors,
 )
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
@@ -362,6 +363,10 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             args.config_provider,
             repositories.vfolder.repository,
             repositories.user.repository,
+        ),
+        vfolder_mount_policy=VFolderMountPolicyService(
+            repositories.vfolder.repository,
+            repositories.rbac.permission_check,
         ),
         session=SessionService(
             SessionServiceArgs(
@@ -661,11 +666,14 @@ def create_processors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_file
         ),
         vfolder_invite=VFolderInviteProcessors(
-            vfolder_groups.group(GroupMeta(VFolderInvitationEntityType())),
+            vfolder_groups.group(GroupMeta(VFolderEntityType())),
             services.vfolder_invite,
         ),
         vfolder_sharing=VFolderSharingProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_sharing
+        ),
+        vfolder_mount_policy=VFolderMountPolicyProcessors(
+            vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
         ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),

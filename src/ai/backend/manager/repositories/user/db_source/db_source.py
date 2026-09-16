@@ -87,7 +87,6 @@ from ai.backend.manager.models.user.purgers import (
     UserKeyPairPurger,
     UserPurger,
     UserSessionGroupPurger,
-    UserVFolderPermissionPurger,
 )
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -95,11 +94,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
-    vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.purgers import VFolderUserPermissionBatchPurger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
@@ -531,7 +528,6 @@ class UserDBSource:
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
-            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,
@@ -751,8 +747,8 @@ class UserDBSource:
     async def _revoke_shared_vfolders(
         self, user_uuid: UUID, vfolder_ids: Sequence[UUID] | None = None
     ) -> None:
-        """Take back what a user was lent: the legacy mount rows, the shares settled from
-        invitations, and the share caps.
+        """Take back what a user was lent: the shares settled from invitations and the
+        share caps. Their mount policy rows stay.
 
         Without ``vfolder_ids`` every folder they hold goes. What a person is lent lands
         in the project that is theirs alone (BEP-1077 5.5), which is the scope the caps
@@ -761,7 +757,7 @@ class UserDBSource:
         user_id = UserID(user_uuid)
         if vfolder_ids is not None and not vfolder_ids:
             return
-        held = sa.select(EntityShareRow.id).where(
+        held = sa.select(EntityShareRow.id, EntityShareRow.target_entity_id).where(
             EntityShareRow.target_entity_type == VFolderEntityType(),
             EntityShareRow.status == EntityShareStatus.ACCEPTED,
             EntityShareRow.recipient_entity_type == UserEntityType(),
@@ -770,20 +766,20 @@ class UserDBSource:
         if vfolder_ids is not None:
             held = held.where(EntityShareRow.target_entity_id.in_(vfolder_ids))
         async with self._db.begin_readonly_session() as session:
-            share_ids = [EntityShareID(share_id) for share_id in await session.scalars(held)]
+            shares = [
+                (EntityShareID(row.id), VFolderUUID(row.target_entity_id))
+                for row in (await session.execute(held)).all()
+            ]
         async with self._share_ops.write_ops() as w:
-            if vfolder_ids is None:
-                taken = await w.batch_purge_field_entities(user_id, UserVFolderPermissionPurger())
-            else:
-                taken = []
-                for vfolder_id in vfolder_ids:
-                    await w.batch_purge_field_entities(
-                        VFolderUUID(vfolder_id),
-                        VFolderUserPermissionBatchPurger(user_id=user_uuid),
-                    )
-                    taken.append(VFolderUUID(vfolder_id))
-            for share_id in share_ids:
+            taken: list[VFolderUUID] = (
+                [VFolderUUID(vfolder_id) for vfolder_id in vfolder_ids]
+                if vfolder_ids is not None
+                else []
+            )
+            for share_id, target in shares:
                 await w.revoke_share(EntityShareRevokeUpdater(share_id=share_id))
+                if target not in taken:
+                    taken.append(target)
             if not taken:
                 return
             personal_project = await w.lookup_entity_id(
@@ -816,14 +812,15 @@ class UserDBSource:
         # Migrate shared virtual folders.
         # If virtual folder's name collides with target user's folder,
         # append random string to the name of the migrating folder.
-        j = vfolder_permissions.join(
-            vfolders,
-            vfolder_permissions.c.vfolder == vfolders.c.id,
+        lent = sa.select(sa.literal(1)).where(
+            EntityShareRow.target_entity_type == VFolderEntityType(),
+            EntityShareRow.target_entity_id == vfolders.c.id,
+            EntityShareRow.status == EntityShareStatus.ACCEPTED,
         )
         query = (
             sa.select(vfolders.c.id, vfolders.c.name)
-            .select_from(j)
-            .where(vfolders.c.user == deleted_user_uuid)
+            .select_from(vfolders)
+            .where(vfolders.c.user == deleted_user_uuid, lent.exists())
         )
         migrate_updates = []
         async for row in await conn.stream(query):

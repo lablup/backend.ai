@@ -14,11 +14,15 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.domain import DomainRow
@@ -31,7 +35,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -66,6 +70,7 @@ class TestInvitationGettersInviterFields:
                 UserRow,
                 KeyPairRow,
                 VFolderRow,
+                VFolderUserMountPolicyRow,
                 EntityShareRow,
             ],
         ):
@@ -171,7 +176,7 @@ class TestInvitationGettersInviterFields:
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, owner.uuid),
                 name=f"vf-{vfolder_id.hex[:8]}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 ownership_type=VFolderOwnershipType.USER,
                 user=owner.uuid,
             )
@@ -237,7 +242,8 @@ class TestInvitationGettersInviterFields:
         assert result.inviter == normal_inviter.email
         assert result.inviter_username == normal_inviter.username
         assert result.invitee == invitee_user.email
-        assert result.permission == VFolderMountPermission.READ_ONLY
+        # No policy row stands for the invitee, so the folder's default answers.
+        assert result.permission == VFolderMountPolicy.READ_WRITE
 
     async def test_get_invitation_by_id_without_sharer(
         self,

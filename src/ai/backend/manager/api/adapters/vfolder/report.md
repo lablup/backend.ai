@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-Not exercised by any scenario: admin_search, batch_load_by_ids, batch_load_fields, batch_load_permissions, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get_folder_usage, list_files, mkdir, move_file, purge, restore, scoped_search.
+Not exercised by any scenario: admin_search, batch_load_by_ids, batch_load_fields, batch_load_permissions, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get_folder_usage, list_files, list_mount_policies, mkdir, move_file, purge, restore, scoped_search, set_mount_policy, unset_mount_policy.
 
 ### reaching
 

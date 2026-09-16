@@ -26,7 +26,6 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
@@ -35,6 +34,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -55,7 +55,6 @@ from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -68,11 +67,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    vfolder_invitations,
-    vfolder_permissions,
-    vfolders,
-)
+from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -220,7 +215,7 @@ def vfolder_invite_processors(
         user_repository=user_repository,
     )
     return VFolderInviteProcessors(
-        processor_registry.group(GroupMeta(VFolderInvitationEntityType())), service
+        processor_registry.group(GroupMeta(VFolderEntityType())), service
     )
 
 
@@ -380,7 +375,7 @@ async def vfolder_factory(
             "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
-            "permission": VFolderMountPermission.READ_WRITE,
+            "default_mount_permission": VFolderMountPolicy.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
             # A folder lands in a project, which is what holds its name once.
@@ -463,12 +458,6 @@ async def vfolder_factory(
                     VirtualEntityRow.__table__.c.entity_type == VFolderEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == vid,
                 )
-            )
-            await conn.execute(
-                vfolder_invitations.delete().where(vfolder_invitations.c.vfolder == vid)
-            )
-            await conn.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.vfolder == vid)
             )
             await conn.execute(vfolders.delete().where(vfolders.c.id == vid))
 

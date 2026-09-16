@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     MountPermission,
     SessionId,
     SlotName,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -87,9 +88,8 @@ from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, Rout
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -118,6 +118,7 @@ from ai.backend.manager.repositories.ops.v2.reconciler.provider import Reconcile
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
+from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
@@ -540,42 +541,46 @@ class DeploymentRepository:
         return await self._storage_source.fetch_model_definition(vfolder_location, candidates)
 
     @deployment_repository_resilience.apply()
-    async def resolve_vfolder_permissions(
-        self,
-        vfolder_ids: Sequence[VFolderUUID],
-    ) -> dict[VFolderUUID, MountPermission]:
-        """Snapshot the stored permission of each vfolder as a ``MountPermission``.
-
-        Used at revision-write time to resolve caller-supplied
-        ``MountInfo.mount_perm=None`` (inherit) into a concrete value
-        before persisting — see
-        ``DeploymentDBSource.resolve_vfolder_permissions`` for the exact
-        (minimal) check set.
-        """
-        return await self._db_source.resolve_vfolder_permissions(vfolder_ids)
-
-    @deployment_repository_resilience.apply()
     async def resolve_user_vfolder_permissions(
         self,
         user_id: uuid.UUID,
         vfolder_ids: Sequence[VFolderUUID],
     ) -> dict[VFolderUUID, MountPermission]:
-        """The mount permission the requester's RBAC bits answer as on each vfolder.
+        """The level the requester mounts each vfolder at, frozen onto the revision.
 
-        Raises ``VFolderNotFound`` for any vfolder the requester may not read.
+        Raises ``VFolderNotFound`` for a vfolder the requester may not read and
+        ``VFolderPermissionError`` for one that mounts to them at no level.
         """
-        held = await self._permission_check.held_permissions(UserID(user_id), vfolder_ids)
+        requester = UserID(user_id)
+        held = await self._permission_check.held_permissions(requester, vfolder_ids)
+        inputs = await self._db_source.vfolder_mount_policy_inputs(requester, vfolder_ids)
         permissions: dict[VFolderUUID, MountPermission] = {}
         unreadable: list[str] = []
+        unmountable: list[str] = []
         for vfolder_id in vfolder_ids:
             bits = held.get(vfolder_id, Permission.NONE)
-            if not bits.covers(Permission.READ):
+            folder = inputs.get(vfolder_id)
+            if folder is None or not bits.covers(Permission.READ):
                 unreadable.append(str(vfolder_id))
                 continue
-            permissions[vfolder_id] = MountPermission(VFolderMountPermission.from_rbac(bits).value)
+            level = resolve_mount_policy(
+                requester,
+                owner_user_id=folder.owner_user_id,
+                default_mount_permission=folder.default_mount_permission,
+                held=bits,
+                user_policy=folder.user_policy,
+            )
+            if level == VFolderMountPolicy.NONE:
+                unmountable.append(str(vfolder_id))
+                continue
+            permissions[vfolder_id] = MountPermission(level.value)
         if unreadable:
             raise VFolderNotFound(
                 f"VFolder not accessible by user {user_id}: {', '.join(unreadable)}"
+            )
+        if unmountable:
+            raise VFolderPermissionError(
+                f"VFolder not mountable by user {user_id}: {', '.join(unmountable)}"
             )
         return permissions
 

@@ -1,7 +1,7 @@
 """
 Tests for VfolderRepository.search_user_vfolders() functionality.
 Verifies that user-scoped vfolder search includes vfolders where the user is the owner
-(VFolderRow.user) or has been granted permission (via VFolderPermissionRow).
+(VFolderRow.user) or has been lent it through the share graph.
 """
 
 from __future__ import annotations
@@ -19,10 +19,9 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -41,7 +40,10 @@ from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import (
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+)
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
@@ -91,7 +93,7 @@ class TestVfolderSearchUserVfolders:
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
-                VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
@@ -270,7 +272,7 @@ class TestVfolderSearchUserVfolders:
                         domain_name=domain_name,
                         quota_scope_id=f"user:{user_id}",
                         usage_mode=VFolderUsageMode.GENERAL,
-                        permission=VFolderMountPermission.READ_WRITE,
+                        default_mount_permission=VFolderMountPolicy.READ_WRITE,
                         max_files=0,
                         max_size=None,
                         num_files=0,
@@ -473,7 +475,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -496,7 +498,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"project:{project_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -739,7 +741,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_a_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -762,7 +764,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_b_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -785,7 +787,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_b_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -890,14 +892,13 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
     ) -> None:
-        """When a user owns a vfolder AND has a permission row for it, it appears only once."""
-        # Add a permission row for user_a on their own vfolder
+        """When a user owns a vfolder AND has a mount policy row for it, it appears only once."""
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                VFolderPermissionRow(
-                    permission=VFolderMountPermission.READ_ONLY,
-                    vfolder=permission_data["vfolder_owned_id"],
-                    user=permission_data["user_a_id"],
+                VFolderUserMountPolicyRow(
+                    permission=VFolderMountPolicy.READ_ONLY,
+                    vfolder_id=permission_data["vfolder_owned_id"],
+                    user_id=permission_data["user_a_id"],
                 )
             )
             await db_sess.flush()

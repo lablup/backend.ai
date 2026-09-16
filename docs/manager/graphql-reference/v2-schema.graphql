@@ -9549,6 +9549,16 @@ type Mutation {
   """
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload
 
+  """
+  Added in 26.9.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
+  """
+  setVFolderMountPolicy(vfolderId: UUID!, input: SetVFolderMountPolicyInput!): SetVFolderMountPolicyPayload
+
+  """
+  Added in 26.9.0. Take back the mount level one user was given on a virtual folder.
+  """
+  unsetVFolderMountPolicy(vfolderId: UUID!, input: UnsetVFolderMountPolicyInput!): UnsetVFolderMountPolicyPayload
+
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload
 
@@ -12192,6 +12202,11 @@ type Query {
   Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+
+  """
+  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+  """
+  vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
@@ -15478,6 +15493,25 @@ enum SessionV2Type {
   SYSTEM
 }
 
+"""
+Added in 26.9.0. Input for setting the mount level one user gets on a virtual folder.
+"""
+input SetVFolderMountPolicyInput {
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """
+  Mount level: NONE, READ_ONLY or READ_WRITE. RW_DELETE is stored as READ_WRITE.
+  """
+  permission: VFolderMountPermission!
+}
+
+"""Added in 26.9.0. Payload returned after setting a mount policy."""
+type SetVFolderMountPolicyPayload {
+  """The mount level now set."""
+  policy: VFolderMountPolicy!
+}
+
 """Added in 26.4.2. Slider UI config."""
 type SliderOption {
   """Minimum value."""
@@ -15795,6 +15829,26 @@ Added in 26.8.0. What the caller could change so an unschedulable kernel would f
 type UnschedulableReasonHint {
   """Subtract these slots to fit the best-fitting node."""
   requiredReduction: [ResourceSlotEntry!]
+}
+
+"""
+Added in 26.9.0. Input for taking back the mount level one user was given on a virtual folder.
+"""
+input UnsetVFolderMountPolicyInput {
+  """User whose mount level is taken back."""
+  userId: UUID!
+}
+
+"""Added in 26.9.0. Payload returned after unsetting a mount policy."""
+type UnsetVFolderMountPolicyPayload {
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User whose mount level was taken back."""
+  userId: UUID!
+
+  """Whether a row was removed."""
+  removed: Boolean!
 }
 
 """Added in 26.8.0. Input for changing the resource group of an agent."""
@@ -18170,11 +18224,43 @@ type VFolderMetadataInfo {
   cloneable: Boolean!
 }
 
-"""Added in 26.4.2. Mount permission level for a virtual folder."""
+"""
+Added in 26.4.2. Mount permission level for a virtual folder. NONE (added in 26.9.0) mounts to nobody; RW_DELETE mounts as READ_WRITE.
+"""
 enum VFolderMountPermission {
+  NONE
   READ_ONLY
   READ_WRITE
   RW_DELETE
+}
+
+"""
+Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+"""
+type VFolderMountPoliciesPayload {
+  """One row per user."""
+  items: [VFolderMountPolicy!]!
+}
+
+"""Added in 26.9.0. The mount level one user gets on a virtual folder."""
+type VFolderMountPolicy {
+  """Mount policy row ID."""
+  id: UUID!
+
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """Mount level: NONE, RO or RW."""
+  permission: VFolderMountPermission!
+
+  """When the row was first set."""
+  createdAt: DateTime!
+
+  """When the level was last replaced."""
+  updatedAt: DateTime!
 }
 
 """Added in 26.4.2. Operation status of a virtual folder."""
