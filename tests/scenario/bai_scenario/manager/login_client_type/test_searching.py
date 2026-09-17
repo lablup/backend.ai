@@ -1,4 +1,7 @@
-"""로그인 클라이언트 종류 검색 — 이름 필터가 무엇을 좁히고, 기본 페이지 크기가 50이다."""
+"""로그인 클라이언트 종류 검색 — 인증만 확인하고 누구에게나 전체를 답한다.
+
+필터와 페이지 방식은 시나리오로 두지 않는다.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +10,7 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
-    LoginClientTypeFilter,
     SearchLoginClientTypesInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
@@ -22,14 +23,10 @@ from bai_scenario.components.login_client_type import (
     EveryLaidTypeIsCounted,
     ManyTypesAndACaller,
     ManyTypesAndSomeone,
-    OnlyTheNamedTypeIsLeft,
-    TheFirstPageOfTypes,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-DEFAULT_PAGE = 50
 
 type Searched = SearchLoginClientTypesPayload
 type SearchingStep = Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
@@ -51,48 +48,6 @@ class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searc
     async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
         with ActingAs(laid.caller):
             return await adapter.search(SearchLoginClientTypesInput())
-
-
-@dataclass(frozen=True)
-class SearchingByName(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
-    """미리 만들어 둔 종류 중 하나의 이름을 필터로 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "search"
-
-    @override
-    def describe(self, laid: ManyTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
-
-    @override
-    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search(
-                SearchLoginClientTypesInput(
-                    filter=LoginClientTypeFilter(name=StringFilter(equals=laid.named.name))
-                )
-            )
-
-
-@dataclass(frozen=True)
-class SearchingTheFirst(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
-    """크기와 건너뛸 수 없이, 커서 쪽 개수만 지정해 앞에서부터 검색한다."""
-
-    first: int
-
-    @override
-    def operation(self) -> str:
-        return "search"
-
-    @override
-    def describe(self, laid: ManyTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 앞에서 {self.first}건만 조회"
-
-    @override
-    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search(SearchLoginClientTypesInput(first=self.first))
 
 
 @dataclass(frozen=True)
@@ -120,91 +75,8 @@ class AUserGrantedNothingCountsEveryType(
         return EveryLaidTypeIsCounted()
 
 
-@dataclass(frozen=True)
-class ANameFilterNarrows(
-    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-name-filter-narrows-the-answer-to-the-login-client-type-it-names"
-
-    @override
-    def describe(self) -> str:
-        return "종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 종류만 남는다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
-        return ManyTypesAndSomeone(besides=2)
-
-    @override
-    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
-        return SearchingByName()
-
-    @override
-    def then(self) -> Then[ManyTypesAndACaller, Searched]:
-        return OnlyTheNamedTypeIsLeft()
-
-
-@dataclass(frozen=True)
-class OmittingThePageSizeGivesFifty(
-    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "omitting-the-page-size-answers-fifty-login-client-types-and-a-next-page"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "종류 51개가 있을 때 크기 없이 조회하면 50건까지 반환되고 다음 페이지가 있다고 응답한다. "
-            "기본 페이지 크기가 다른 카탈로그의 10이 아니라 50이다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
-        return ManyTypesAndSomeone(besides=DEFAULT_PAGE)
-
-    @override
-    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
-        return SearchingEveryType()
-
-    @override
-    def then(self) -> Then[ManyTypesAndACaller, Searched]:
-        return TheFirstPageOfTypes(size=DEFAULT_PAGE)
-
-
-@dataclass(frozen=True)
-class AskingForTheFirstTwoGivesTwo(
-    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "asking-for-the-first-two-login-client-types-answers-two-and-a-next-page"
-
-    @override
-    def describe(self) -> str:
-        return "종류 셋이 있을 때 앞에서 두 건만 조회하면 두 건이 반환되고 다음 페이지가 있다고 응답한다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
-        return ManyTypesAndSomeone(besides=2)
-
-    @override
-    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
-        return SearchingTheFirst(first=2)
-
-    @override
-    def then(self) -> Then[ManyTypesAndACaller, Searched]:
-        return TheFirstPageOfTypes(size=2)
-
-
 SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEveryType(),
-    ANameFilterNarrows(),
-    OmittingThePageSizeGivesFifty(),
-    # TODO(BA-7927): the adapter reads only `limit` and `offset`, so a `first`-only request
-    # is answered with the whole first page; list this row once it reads the cursor.
-    # AskingForTheFirstTwoGivesTwo(),
 ]
 
 

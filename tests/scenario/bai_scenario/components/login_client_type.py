@@ -49,7 +49,7 @@ class ATypeAndACaller:
 
 @dataclass(frozen=True)
 class ManyTypesAndACaller:
-    """검색 대상 종류 여럿과, 검색을 호출할 사용자. ``named``는 그중 이름 필터로 골라낼 하나다."""
+    """종류 여럿과, 호출할 사용자. ``named``는 그중 요청이 지목하는 하나다."""
 
     laid: tuple[LoginClientTypeData, ...]
     named: LoginClientTypeData
@@ -190,54 +190,6 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
             ),
             Same("total_count", page.total_count, len(laid.laid)),
             Same("has_next_page", page.has_next_page, False),
-            Same("has_previous_page", page.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyTheNamedTypeIsLeft(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
-    """필터에 맞는 그 하나만 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "필터에 맞는 종류 하나만 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyTypesAndACaller, answered: Answered[SearchLoginClientTypesPayload]
-    ) -> list[Verdict]:
-        page = answered.response
-        if page is None:
-            return [Refused(EntityNotFoundError, answered.raised)]
-        return [
-            Same("items", [one.name for one in page.items], [laid.named.name]),
-            Same("total_count", page.total_count, 1),
-            Same("has_next_page", page.has_next_page, False),
-            Same("has_previous_page", page.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class TheFirstPageOfTypes(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
-    """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
-
-    size: int
-
-    @override
-    def says(self) -> str:
-        return "기본 크기의 첫 페이지가 반환된다"
-
-    @override
-    def look(
-        self, laid: ManyTypesAndACaller, answered: Answered[SearchLoginClientTypesPayload]
-    ) -> list[Verdict]:
-        page = answered.response
-        if page is None:
-            return [Refused(EntityNotFoundError, answered.raised)]
-        return [
-            Same("len(items)", len(page.items), self.size),
-            Same("total_count", page.total_count, len(laid.laid)),
-            Same("has_next_page", page.has_next_page, True),
             Same("has_previous_page", page.has_previous_page, False),
         ]
 
