@@ -21,7 +21,7 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -55,10 +55,10 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
     Background task handler for rescanning container images.
     """
 
-    _processors: Processors
+    _container_registry_service: ContainerRegistryService
 
-    def __init__(self, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, container_registry_service: ContainerRegistryService) -> None:
+        self._container_registry_service = container_registry_service
 
     @classmethod
     @override
@@ -74,17 +74,16 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
     async def execute(self, manifest: RescanImagesManifest) -> RescanImagesTaskResult:
         # TODO: Import actual result types when available
         # For now using placeholder types
+        # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.
         loaded_registries = []
 
         if manifest.registry is None:
-            all_registries = (
-                await self._processors.container_registry.load_all_container_registries.run(
-                    LoadAllContainerRegistriesAction()
-                )
+            all_registries = await self._container_registry_service.load_all_container_registries(
+                LoadAllContainerRegistriesAction()
             )
             loaded_registries = all_registries.registries
         else:
-            registries = await self._processors.container_registry.load_container_registries.run(
+            registries = await self._container_registry_service.load_container_registries(
                 LoadContainerRegistriesAction(
                     registry=manifest.registry,
                     project=manifest.project,
@@ -95,7 +94,7 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
         rescanned_images = []
         errors = []
         for registry_data in loaded_registries:
-            action_result = await self._processors.container_registry.rescan_images.run(
+            action_result = await self._container_registry_service.rescan_images(
                 RescanImagesAction(
                     registry=registry_data.registry_name,
                     project=registry_data.project,
