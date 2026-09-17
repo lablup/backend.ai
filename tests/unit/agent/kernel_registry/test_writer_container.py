@@ -197,6 +197,76 @@ class TestSaveKernelRegistry:
             await writer.save_kernel_registry(kernel_registry_data, metadata)
         assert registered_meanwhile in kernel_registry_data
 
+    async def test_destroyed_kernel_is_not_saved_from_snapshot(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        registry_with_destroyable_kernel: tuple[KernelId, Path],
+        serialized_recovery_data: KernelRecoveryScratchData,
+    ) -> None:
+        destroyed_kernel_id, destroyed_config_path = registry_with_destroyable_kernel
+        original_save = ScratchConfig.save_json_recovery_data
+        save_count = 0
+
+        async def _destroy_after_first_save(
+            config: ScratchConfig,
+            data: KernelRecoveryScratchData,
+            *,
+            create_config_dir: bool = True,
+        ) -> None:
+            nonlocal save_count
+            await original_save(config, data, create_config_dir=create_config_dir)
+            save_count += 1
+            if save_count == 1:
+                del kernel_registry_data[destroyed_kernel_id]
+                destroyed_config_path.rmdir()
+
+        with (
+            patch.object(
+                writer,
+                "_parse_recovery_data_from_kernel",
+                return_value=MagicMock(),
+            ),
+            patch.object(
+                KernelRecoveryScratchData,
+                "from_kernel_recovery_data",
+                return_value=serialized_recovery_data,
+            ),
+            patch.object(
+                ScratchConfig,
+                "save_json_recovery_data",
+                new=_destroy_after_first_save,
+            ),
+        ):
+            await writer.save_kernel_registry(kernel_registry_data, metadata)
+
+        assert not destroyed_config_path.exists()
+
+    async def test_saves_recovery_data_to_existing_config_dir(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        existing_config_path: Path,
+        serialized_recovery_data: KernelRecoveryScratchData,
+    ) -> None:
+        with (
+            patch.object(
+                writer,
+                "_parse_recovery_data_from_kernel",
+                return_value=MagicMock(),
+            ),
+            patch.object(
+                KernelRecoveryScratchData,
+                "from_kernel_recovery_data",
+                return_value=serialized_recovery_data,
+            ),
+        ):
+            await writer.save_kernel_registry(kernel_registry_data, metadata)
+
+        assert (existing_config_path / "recovery.json").is_file()
+
     async def test_save_kernel_registry_skips_none_recovery_data(
         self,
         writer: ContainerBasedKernelRegistryWriter,
