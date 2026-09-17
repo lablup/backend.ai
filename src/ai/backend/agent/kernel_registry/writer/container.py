@@ -47,7 +47,10 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
     async def save_kernel_registry(
         self, data: MutableMapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
     ) -> None:
-        for kernel_id, kernel in data.items():
+        # `data` is the live registry and the loop awaits per kernel; a create or destroy on
+        # this node meanwhile would change its size under the iteration.
+        snapshot = list(data.items())
+        for kernel_id, kernel in snapshot:
             config_path = ScratchUtils.get_scratch_kernel_config_dir(self._scratch_root, kernel_id)
             config_mgr = ScratchConfig(config_path)
             try:
