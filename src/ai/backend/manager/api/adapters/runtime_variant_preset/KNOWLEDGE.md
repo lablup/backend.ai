@@ -28,7 +28,6 @@ status: draft
 | 슈퍼관리자가 필수 항목만 지정해 생성한다 | `runtime_variant` 하나, 해당 `runtime_variant`에 프리셋이 없음, 슈퍼관리자 | 이름과 `runtime_variant_id`·`preset_target`·`value_type`·`key` 필드만 지정하여 생성 | `rank` 값은 100이고 `required` 값은 false이며, 나머지 선택 항목은 비어 있음 |
 | 같은 `runtime_variant`에 하나 더 생성한다 | 해당 `runtime_variant`에 프리셋 하나, 슈퍼관리자 | 생성 | 새 프리셋의 `rank` 값이 기존 프리셋보다 100 큼 |
 | `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정하여 생성 | 지정한 `preset_target`·`value_type`·`default_value`·`key` 값이 `target_spec` 하나로 묶여 반환됨 |
-| `value_type` 값마다 올바른 `default_value` 값을 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `value_type` 값 `str`, `int`, `float`, `bool`, `flag` 각각에 맞는 `default_value` 값으로 생성 | 생성됨 |
 | `ui_option` 필드를 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `ui_option`에 `slider` 옵션을 추가하여 생성 | `ui_option` 필드에서 읽은 `ui_type` 값이 응답 노드에 함께 포함됨 |
 | 같은 `runtime_variant` 안에서 이름이 중복된다 | 해당 `runtime_variant`에 같은 이름의 프리셋이 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
 | 다른 `runtime_variant`에 속하면 같은 이름을 쓸 수 있다 | `runtime_variant` 둘, 한쪽에만 프리셋 하나, 슈퍼관리자 | 다른 `runtime_variant`에 같은 이름으로 생성 | 생성됨 |
@@ -43,10 +42,9 @@ status: draft
 `ui_type` 값이 응답에 포함되고, 필수 항목만 지정해 생성하는 시나리오처럼 `ui_option` 필드를 생략하면
 `ui_type` 값도 비어 있다.
 
-`value_type` 값이 `flag`인데 `preset_target` 값이 `args`가 아닌 요청과 `value_type` 값에 맞지 않는
-`default_value` 값을 지정한 요청은 생성 시나리오에 포함하지 않는다. 생성 요청 타입에서 거부하므로
-어댑터가 보장하는 동작이 아니기 때문이다. 수정 시에는 서비스가 저장된 값과 요청을 합쳐 같은 규칙을
-다시 검사하므로 시나리오에 포함한다.
+`value_type` 값이 `flag`이면 `preset_target` 값이 `args`여야 하고 `default_value` 값은 `value_type`
+값에 맞아야 한다는 규칙은 생성 시나리오에 두지 않는다. 받아들이는 쪽도 거부하는 쪽도 생성 요청
+타입이 판단하며, 요청 타입의 단위 테스트가 `value_type` 값마다 검사한다.
 
 존재하지 않는 `runtime_variant_id` 값으로 생성하는 시나리오는 아직 포함하지 않는다. 프리셋의
 `runtime_variant` 컬럼에 외래 키가 마이그레이션에는 있지만 ORM에는 없다. 따라서 마이그레이션으로
@@ -93,18 +91,13 @@ status: draft
 | 설명을 지운다 | 설명이 있는 프리셋, 슈퍼관리자 | 설명을 비우도록 수정 | 설명이 없어짐 |
 | `rank` 값을 바꾼다 | 프리셋 하나, 슈퍼관리자 | `rank` 값 수정 | `rank` 값이 변경된 노드 |
 | 변경할 값을 지정하지 않는다 | 프리셋 하나, 슈퍼관리자 | 빈 수정 요청 | 아무것도 바뀌지 않은 노드 |
-| `value_type` 값만 `flag`로 바꾼다 | `preset_target` 값이 `env`인 프리셋, 슈퍼관리자 | `value_type` 값을 `flag`로 수정 | 잘못된 입력으로 거부 |
-| `default_value` 값만 바꿔 `value_type` 값과 어긋나게 한다 | `value_type` 값이 `int`인 프리셋, 슈퍼관리자 | `default_value` 값을 숫자가 아닌 문자열로 수정 | 잘못된 입력으로 거부 |
 | 존재하지 않는 ID를 수정한다 | 다른 프리셋만 있음, 슈퍼관리자 | 이름 수정 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 수정한다 | 해당 프리셋에 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 변경된 노드 |
 
-`value_type` 값만 `flag`로 바꾸는 요청에는 `preset_target` 값이 없고, `default_value` 값만 문자열로
-바꾸는 요청에는 `value_type` 값이 없다. 따라서 요청 타입만으로는 저장된 값과의 조합을 검증할 수
-없다. 이 요청들은 모두 타입 검증을 통과하지만 서비스가 저장된 행과 요청을 합쳐 검사한 뒤 거부한다.
-`value_type` 값이 `flag`이면 `preset_target` 값이 `args`여야 하고 `default_value` 값은 `value_type`
-값에 맞아야 한다는 규칙을 생성 요청은 요청 타입에서, 수정 요청은 서비스에서 검사하므로 별도
-시나리오로 둔다.
+수정 요청에는 `preset_target` 값이나 `value_type` 값이 빠질 수 있어 요청 타입만으로는 저장된 값과의
+조합을 검증할 수 없다. 서비스가 저장된 행과 요청을 합쳐 같은 규칙을 검사하는데, 그 검사는 시나리오로
+두지 않는다. 어댑터와 데이터베이스가 결과를 바꾸지 않고, 서비스의 단위 테스트가 검사한다.
 
 `value_type` 값만 바꾸는 요청은 저장된 `default_value` 값을 다시 검사하지 않는다. 현재는
 `default_value` 값이 새 `value_type` 값과 어긋난 상태로 수정된다. 이를 거부할지 정한 뒤 시나리오를

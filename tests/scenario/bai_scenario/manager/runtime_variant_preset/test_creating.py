@@ -317,38 +317,6 @@ class FourValuesComeBackAsOneSpec(
 
 
 @dataclass(frozen=True)
-class ADefaultValueOfEachType(
-    Scenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
-    ]
-):
-    started: datetime
-    target: PresetTargetSpec
-
-    @override
-    def summary(self) -> str:
-        return f"a-{self.target.value_type.value}-default-value-that-fits-its-type-is-accepted"
-
-    @override
-    def describe(self) -> str:
-        return f"값 종류를 {self.target.value_type.value} 값으로 설정하고 올바른 기본값을 지정하면 생성된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
-        return AVariantAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
-        return Creating(target=self.target)
-
-    @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantPresetNode]:
-        return TheNewPresetNode(started=self.started, named=MADE, target=self.target)
-
-
-@dataclass(frozen=True)
 class AUiOptionCarriesItsType(
     Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
@@ -506,51 +474,6 @@ SCENARIOS: list[CreatingStep] = [
     TheFirstPresetIsRankedAHundred(started=datetime.now(UTC)),
     TheSecondPresetIsRankedAHundredHigher(started=datetime.now(UTC)),
     FourValuesComeBackAsOneSpec(started=datetime.now(UTC)),
-    ADefaultValueOfEachType(
-        started=datetime.now(UTC),
-        target=PresetTargetSpec(
-            preset_target=PresetTarget.ENV,
-            value_type=PresetValueType.STR,
-            default_value="abc",
-            key=KEY,
-        ),
-    ),
-    ADefaultValueOfEachType(
-        started=datetime.now(UTC),
-        target=PresetTargetSpec(
-            preset_target=PresetTarget.ENV,
-            value_type=PresetValueType.INT,
-            default_value="4",
-            key=KEY,
-        ),
-    ),
-    ADefaultValueOfEachType(
-        started=datetime.now(UTC),
-        target=PresetTargetSpec(
-            preset_target=PresetTarget.ENV,
-            value_type=PresetValueType.FLOAT,
-            default_value="0.5",
-            key=KEY,
-        ),
-    ),
-    ADefaultValueOfEachType(
-        started=datetime.now(UTC),
-        target=PresetTargetSpec(
-            preset_target=PresetTarget.ENV,
-            value_type=PresetValueType.BOOL,
-            default_value="true",
-            key=KEY,
-        ),
-    ),
-    ADefaultValueOfEachType(
-        started=datetime.now(UTC),
-        target=PresetTargetSpec(
-            preset_target=PresetTarget.ARGS,
-            value_type=PresetValueType.FLAG,
-            default_value="true",
-            key=KEY,
-        ),
-    ),
     AUiOptionCarriesItsType(started=datetime.now(UTC)),
     ANameTakenInTheSameVariantIsRefused(),
     TheSameNameIsFreeInAnotherVariant(started=datetime.now(UTC)),

@@ -17,8 +17,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     RuntimeVariantPresetNode,
 )
-from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import PresetValueType
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
@@ -202,72 +200,6 @@ class AnEmptyEditChangesNothing(
 
 
 @dataclass(frozen=True)
-class FlagOnAnEnvPresetIsRefusedByTheService(
-    Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "changing-only-the-value-type-to-flag-on-an-env-preset-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "대상이 env인 프리셋의 값 종류만 flag로 수정하면 잘못된 입력으로 요청이 거부된다. "
-            "대상을 생략한 요청은 타입 검증을 통과하지만 서비스가 저장된 대상과 합쳐 검사한 뒤 거부한다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
-        return Editing({"value_type": PresetValueType.FLAG})
-
-    @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
-        return TheCallIsRefused(InvalidAPIParameters)
-
-
-@dataclass(frozen=True)
-class ADefaultThatDoesNotFitTheStoredTypeIsRefused(
-    Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "changing-only-the-default-to-one-that-does-not-fit-the-stored-type-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "값 종류가 정수인 프리셋의 기본값만 숫자가 아닌 문자열로 수정하면 잘못된 입력으로 "
-            "요청이 거부된다. 서비스가 저장된 값 종류를 기준으로 새 기본값을 검사한다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(
-            role=UserRole.SUPERADMIN, value_type=PresetValueType.INT, default_value="4"
-        )
-
-    @override
-    def when(
-        self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
-        return Editing({"default_value": "four"})
-
-    @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
-        return TheCallIsRefused(InvalidAPIParameters)
-
-
-@dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
     Scenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
@@ -369,8 +301,6 @@ SCENARIOS: list[EditingStep] = [
     ClearingTheDescription(started=datetime.now(UTC)),
     RerankingMovesIt(started=datetime.now(UTC)),
     AnEmptyEditChangesNothing(started=datetime.now(UTC)),
-    FlagOnAnEnvPresetIsRefusedByTheService(),
-    ADefaultThatDoesNotFitTheStoredTypeIsRefused(),
     TheSuperadminEditingAnUnknownIdIsNotFound(),
     AUserGrantedNothingMayNotEdit(),
     EnforcementOffLetsAnyoneEdit(started=datetime.now(UTC)),
