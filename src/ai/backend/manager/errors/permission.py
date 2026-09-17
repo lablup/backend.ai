@@ -128,8 +128,8 @@ class NotEnoughPermission(BackendAIError, web.HTTPForbidden):
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.ROLE,
-            operation=ErrorOperation.CREATE,
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
