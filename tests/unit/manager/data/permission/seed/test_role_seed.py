@@ -8,6 +8,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.cli.permissions import _REPOSITORY, _render
@@ -133,6 +134,41 @@ class TestOperationVocabulary:
                 "permissions": {},
                 "role_name_template": "role_{name}",
             })
+
+
+class TestScope:
+    """A global role names the one global entity it is created in."""
+
+    def _header(self, scope_type: str, **extra: str) -> dict[str, object]:
+        return {
+            "id": str(uuid.uuid4()),
+            "name": "member",
+            "scope_type": scope_type,
+            "auto_assign": True,
+            "permissions": {},
+            **extra,
+        }
+
+    def test_a_global_role_reads_its_scope_name(self) -> None:
+        seed = RoleSeed.model_validate(self._header("global", scope="public"))
+        assert seed.scope is GlobalEntityName.PUBLIC
+
+    def test_a_global_role_without_a_scope_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="names its scope"):
+            RoleSeed.model_validate(self._header("global"))
+
+    def test_an_unknown_scope_name_is_refused(self) -> None:
+        with pytest.raises(ValidationError):
+            RoleSeed.model_validate(self._header("global", scope="everyone"))
+
+    def test_a_scope_on_another_type_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="every project"):
+            RoleSeed.model_validate(self._header("project", scope="public"))
+
+    def test_the_public_member_role_is_created_in_public(self, seeds: list[RoleSeed]) -> None:
+        seed = next(seed for seed in seeds if seed.name == "public_member")
+        assert seed.scope is GlobalEntityName.PUBLIC
+        assert seed.auto_assign
 
 
 class TestChecker:

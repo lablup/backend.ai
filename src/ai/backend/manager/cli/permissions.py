@@ -17,6 +17,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.registry.types import WiredProcessor
 from ai.backend.manager.actions.types import ActionGate
 from ai.backend.manager.cli.role_fixture import RoleFixture
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.seed.check import RoleSeedChecker
 from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
@@ -149,6 +150,11 @@ def _load() -> list[RoleSeed]:
     return RoleSeedLoader().load()
 
 
+def _column(seed: RoleSeed) -> str:
+    """The role's column header, naming the scope a scoped role is created in."""
+    return seed.name if seed.scope is None else f"{seed.name}@{seed.scope}"
+
+
 def _rows(seeds: Sequence[RoleSeed], entity: str | None, granted_only: bool) -> list[str]:
     kinds = sorted({kind for seed in seeds for kind in seed.permissions})
     if entity is not None:
@@ -179,7 +185,7 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
     Print the seed roles as a grid: one row per kind, one column per role.
 
     The role files are the declaration; this prints them side by side, which is where
-    two roles are compared.
+    two roles are compared. A role created in one named scope is headed `name@scope`.
 
     Examples:
 
@@ -199,7 +205,7 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
                         {
                             "entity_type": kind,
                             **{
-                                seed.name: _cell(seed.permissions.get(kind, Permission.NONE))
+                                _column(seed): _cell(seed.permissions.get(kind, Permission.NONE))
                                 for seed in seeds
                             },
                         }
@@ -209,18 +215,18 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
                 )
             )
         case "tsv":
-            print("\t".join(["entity_type", *(seed.name for seed in seeds)]))
+            print("\t".join(["entity_type", *(_column(seed) for seed in seeds)]))
             for kind in kinds:
                 cells = (_cell(seed.permissions.get(kind, Permission.NONE)) for seed in seeds)
                 print("\t".join([kind, *cells]))
         case _:
             width = max((len(kind) for kind in kinds), default=0)
             width = max(width, len("entity type"))
-            header = "  ".join(seed.name for seed in seeds)
+            header = "  ".join(_column(seed) for seed in seeds)
             print(f"{'entity type':<{width}}  {header}")
             for kind in kinds:
                 row = "  ".join(
-                    _cell(seed.permissions.get(kind, Permission.NONE)).ljust(len(seed.name))
+                    _cell(seed.permissions.get(kind, Permission.NONE)).ljust(len(_column(seed)))
                     for seed in seeds
                 )
                 print(f"{kind:<{width}}  {row}")
@@ -386,8 +392,9 @@ def provision(cli_ctx: CLIContext) -> None:
     """
     Instantiate the presets in every domain, project and user that lacks their role.
 
-    Grants what each scope assigns on its own, and the project admin role to a project's
-    creator still on its roster. Running it again changes nothing.
+    A preset whose role file names a scope is pointed at that scope's id first and
+    instantiated there alone. Grants what each scope assigns on its own, and the project
+    admin role to a project's creator still on its roster. Running it again changes nothing.
 
     Examples:
 
@@ -400,7 +407,8 @@ def provision(cli_ctx: CLIContext) -> None:
     from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
     from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 
-    creator_preset_ids = [seed.id for seed in _load() if seed.name == _CREATOR_PRESET]
+    seeds = _load()
+    creator_preset_ids = [seed.id for seed in seeds if seed.name == _CREATOR_PRESET]
 
     async def _provision() -> None:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
@@ -408,8 +416,11 @@ def provision(cli_ctx: CLIContext) -> None:
         ensure_all_tables_registered()
         async with connect_database(bootstrap_config.db) as db:
             await GlobalEntityIDLoader(db).load()
+            preset_scopes = {
+                seed.id: global_entity_id(seed.scope) for seed in seeds if seed.scope is not None
+            }
             repository = RolePresetRepository(RolePresetOpsProvider(db))
-            await repository.provision_roles(creator_preset_ids)
+            await repository.provision_roles(creator_preset_ids, preset_scopes)
 
     asyncio.run(_provision())
     print("Provisioned the preset roles.")
