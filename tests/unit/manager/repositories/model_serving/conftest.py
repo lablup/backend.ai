@@ -16,12 +16,12 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -61,7 +61,9 @@ def mock_db_engine() -> MagicMock:
 def model_serving_repository(mock_db_engine: MagicMock) -> ModelServingRepository:
     """Create a ModelServingRepository instance with mocked database."""
     return ModelServingRepository(
-        db=mock_db_engine, v2_ops_provider=V2DBOpsProvider(mock_db_engine)
+        db=mock_db_engine,
+        v2_ops_provider=V2DBOpsProvider(mock_db_engine),
+        permission_check=MagicMock(),
     )
 
 
@@ -175,7 +177,7 @@ def sample_vfolder() -> VFolderRow:
     vfolder.last_used = datetime.now(UTC)
     vfolder.unmanaged_path = ""
     vfolder.usage_mode = VFolderUsageMode.MODEL
-    vfolder.permission = VFolderMountPermission.READ_WRITE
+    vfolder.default_mount_permission = VFolderMountPolicy.READ_WRITE
     vfolder.status = VFolderOperationStatus.READY
     return vfolder
 
@@ -246,12 +248,6 @@ def patch_user_get(mocker: MockerFixture) -> AsyncMock:
 def patch_vfolder_get(mocker: MockerFixture) -> AsyncMock:
     """Patch VFolderRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
-
-
-@pytest.fixture
-def patch_image_resolve(mocker: MockerFixture) -> AsyncMock:
-    """Patch ImageRow.resolve method using mocker."""
-    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
 
 
 @pytest.fixture

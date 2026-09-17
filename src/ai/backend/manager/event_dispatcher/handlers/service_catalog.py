@@ -11,7 +11,6 @@ from datetime import timedelta
 from typing import cast
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.events.event_types.service_discovery.anycast import (
@@ -21,11 +20,11 @@ from ai.backend.common.events.event_types.service_discovery.anycast import (
 )
 from ai.backend.common.types import AgentId, ServiceCatalogStatus
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.service_catalog.row import (
-    ServiceCatalogEndpointRow,
-    ServiceCatalogRow,
-)
+from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.service_catalog.repository import ServiceCatalogRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -33,8 +32,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ServiceCatalogEventHandler:
     """Handles SD events by persisting to service_catalog tables."""
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    _db: ExtendedAsyncSAEngine
+    _repository: ServiceCatalogRepository
+
+    def __init__(self, db: ExtendedAsyncSAEngine, repository: ServiceCatalogRepository) -> None:
         self._db = db
+        self._repository = repository
 
     async def handle_registered(
         self,
@@ -42,61 +45,29 @@ class ServiceCatalogEventHandler:
         _source: AgentId,
         event: ServiceRegisteredEvent,
     ) -> None:
-        """Upsert service_catalog row and replace endpoints."""
-        async with self._db.begin_session() as session:
-            # Upsert service catalog row
-            insert_stmt = pg_insert(ServiceCatalogRow).values(
+        """Upsert the service catalog entry and replace its endpoints."""
+        await self._repository.register(
+            ServiceCatalogUpserter(
                 service_group=event.service_group,
                 instance_id=event.instance_id,
                 display_name=event.display_name,
                 version=event.version,
                 labels=event.labels,
-                status=ServiceCatalogStatus.HEALTHY,
                 startup_time=event.startup_time,
-                last_heartbeat=sa.func.now(),
                 config_hash=event.config_hash,
-            )
-            upsert_stmt = insert_stmt.on_conflict_do_update(
-                constraint="uq_service_catalog_service_group_instance_id",
-                set_={
-                    "display_name": insert_stmt.excluded.display_name,
-                    "version": insert_stmt.excluded.version,
-                    "labels": insert_stmt.excluded.labels,
-                    "status": ServiceCatalogStatus.HEALTHY,
-                    "startup_time": insert_stmt.excluded.startup_time,
-                    "last_heartbeat": sa.func.now(),
-                    "config_hash": insert_stmt.excluded.config_hash,
-                },
-            ).returning(ServiceCatalogRow.id)
-
-            result = await session.execute(upsert_stmt)
-            service_id = result.scalar_one()
-
-            # Delete existing endpoints for this service
-            await session.execute(
-                sa.delete(ServiceCatalogEndpointRow).where(
-                    ServiceCatalogEndpointRow.service_id == service_id,
+            ),
+            [
+                ServiceCatalogEndpointCreator(
+                    role=ep.role,
+                    scope=ep.scope,
+                    address=ep.address,
+                    port=ep.port,
+                    protocol=ep.protocol,
+                    metadata=ep.metadata,
                 )
-            )
-
-            # Insert new endpoints from event
-            if event.endpoints:
-                await session.execute(
-                    sa.insert(ServiceCatalogEndpointRow),
-                    [
-                        {
-                            "service_id": service_id,
-                            "role": ep.role,
-                            "scope": ep.scope,
-                            "address": ep.address,
-                            "port": ep.port,
-                            "protocol": ep.protocol,
-                            "metadata": ep.metadata,
-                        }
-                        for ep in event.endpoints
-                    ],
-                )
-
+                for ep in event.endpoints
+            ],
+        )
         log.debug(
             "Upserted service catalog entry: {}/{}",
             event.service_group,

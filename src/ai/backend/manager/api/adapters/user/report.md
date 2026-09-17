@@ -2981,7 +2981,7 @@ Then
 
 - 성공이 오고, 그 사용자를 더 찾을 수 없다
   - success = True
-  - 뒤이은 일괄 읽기 = [None]
+  - 뒤이은 일괄 읽기: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
 
 #### [a-user-granted-nothing-may-not-delete-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
 

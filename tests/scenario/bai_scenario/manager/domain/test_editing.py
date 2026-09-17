@@ -7,15 +7,6 @@ from datetime import UTC, datetime
 from typing import override
 
 import pytest
-from bai_scenario.components.domain import (
-    ADomainAndACaller,
-    ADomainAndSomeone,
-    TheCallIsRefused,
-    TheDomainNode,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import UpdateDomainInput
@@ -25,6 +16,15 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from bai_scenario.components.domain import (
+    ADomainAndACaller,
+    ADomainAndSomeone,
+    TheCallIsRefused,
+    TheDomainNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 EDITED = "고쳐 쓴 설명"
 

@@ -13,6 +13,9 @@ from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 
 
@@ -27,6 +30,9 @@ class TestRuntimeVariantPresetFixture:
         async with with_tables(
             database_connection,
             [
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
                 RuntimeVariantRow,
                 RuntimeVariantPresetRow,
             ],

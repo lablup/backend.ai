@@ -498,16 +498,15 @@ class DeploymentController:
         DEPLOYING lifecycle.
         """
         # Snapshot each extra mount's permission at revision-write time.
-        # The vfolder's current stored permission is always read and caps
-        # the caller's request so a mount cannot be elevated beyond what
-        # the vfolder grants (``vfolder_perm.cap(user_perm)``). Entries
-        # with ``mount_perm is None`` fall through to the vfolder's own
-        # permission. The resolved ``MountInfoEntry`` is frozen on the
-        # row so later vfolder permission changes cannot retroactively
-        # alter sessions spawned from this revision.
-        vfolder_perms = await self._deployment_repository.resolve_vfolder_permissions([
-            m.vfolder_id for m in revision.mounts.extra_mounts
-        ])
+        # The level the requester mounts the folder at caps the caller's
+        # request so a mount cannot be elevated beyond it
+        # (``vfolder_perm.cap(user_perm)``). Entries with ``mount_perm is
+        # None`` fall through to that level. The resolved ``MountInfoEntry``
+        # is frozen on the row so later mount policy changes cannot
+        # retroactively alter sessions spawned from this revision.
+        vfolder_perms = await self._deployment_repository.resolve_user_vfolder_permissions(
+            requester_id, [m.vfolder_id for m in revision.mounts.extra_mounts]
+        )
         extra_mount_entries = [
             MountInfoEntry(
                 vfolder_id=m.vfolder_id,

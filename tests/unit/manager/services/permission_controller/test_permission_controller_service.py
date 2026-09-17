@@ -136,6 +136,7 @@ class TestGetRoleDetail:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
+            permission_check=MagicMock(),
             action_registry=processor_registry,
         )
 
@@ -171,6 +172,7 @@ class TestSearchRoles:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
+            permission_check=MagicMock(),
             action_registry=processor_registry,
         )
 
@@ -251,6 +253,7 @@ class TestSearchUsersAssignedToRole:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
+            permission_check=MagicMock(),
             action_registry=processor_registry,
         )
 
@@ -320,6 +323,7 @@ class TestSearchPermissions:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
+            permission_check=MagicMock(),
             action_registry=processor_registry,
         )
 
@@ -380,6 +384,7 @@ class TestPermissionCatalog:
     ) -> PermissionControllerService:
         service = PermissionControllerService(
             repository=MagicMock(),
+            permission_check=MagicMock(),
             action_registry=processor_registry,
         )
         # Wiring the package registers its operations in the same registry the service

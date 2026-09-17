@@ -1,6 +1,6 @@
 import logging
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
@@ -28,16 +29,11 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    Permission,
     ScopeData,
     ScopeListResult,
 )
-from ai.backend.manager.data.permission.virtual_entity import (
-    GovernCheckKey,
-    OwnCheckKey,
-)
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import (
+    PermissionNotFound,
     RoleAlreadyAssigned,
     RoleNotAssigned,
     RoleNotFound,
@@ -91,13 +87,14 @@ class PermissionDBSource:
         Delete a permission entry.
 
         Raises:
-            ObjectNotFound: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
             if data is None:
-                raise ObjectNotFound(
-                    f"Permission with ID {purger.target_id_value()} does not exist."
+                raise PermissionNotFound(
+                    f"Permission with ID {purger.target_id_value()} does not exist.",
+                    operation=ActionOperationType.PURGE,
                 )
             return data
 
@@ -109,13 +106,14 @@ class PermissionDBSource:
         Update a permission entry.
 
         Raises:
-            ObjectNotFound: If permission does not exist
+            PermissionNotFound: If permission does not exist
         """
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise ObjectNotFound(
-                    f"Permission with ID {updater.target_id_value()} does not exist."
+                raise PermissionNotFound(
+                    f"Permission with ID {updater.target_id_value()} does not exist.",
+                    operation=ActionOperationType.UPDATE,
                 )
             return data
 
@@ -433,28 +431,6 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    # ------------------------------------------------ virtual-entity-chain checks
-
-    async def owned_permissions(
-        self,
-        keys: Collection[OwnCheckKey],
-    ) -> Mapping[OwnCheckKey, Permission]:
-        """The bits each user holds on each entity; the walk is
-        :meth:`PermissionReadOps.owned_permissions`."""
-        if not keys:
-            return {}
-        async with self._ops.read_ops() as r:
-            return await r.owned_permissions(keys)
-
-    async def governed_permissions(
-        self,
-        keys: Collection[GovernCheckKey],
-    ) -> Mapping[GovernCheckKey, Permission]:
-        if not keys:
-            return {}
-        async with self._ops.read_ops() as r:
-            return await r.governed_permissions(keys)
 
     async def bulk_assign_role(
         self,

@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
@@ -79,7 +78,6 @@ from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEnti
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
@@ -352,6 +350,9 @@ from ai.backend.manager.services.user_resource_policy.processors import (
 )
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import (
+    VFolderMountPolicyProcessors,
+)
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
@@ -466,7 +467,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
         MagicMock(),
     )
-    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())))
+    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())), MagicMock())
     ObjectStorageProcessors(
         registry.group(GroupMeta(ObjectStorageEntityType())),
         artifact_revisions,
@@ -529,7 +530,7 @@ def test_every_defined_v2_action_is_wired() -> None:
         MagicMock(),
     )
     AuthProcessors(
-        registry.group(GroupMeta(AuthEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
         registry.group(GroupMeta(UserEntityType())),
         MagicMock(),
     )
@@ -611,8 +612,9 @@ def test_every_defined_v2_action_is_wired() -> None:
     VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderInviteProcessors(registry.group(GroupMeta(VFolderInvitationEntityType())), MagicMock())
+    VFolderInviteProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderMountPolicyProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     ModelServingProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     ModelServingAutoScalingProcessors(
         registry.group(GroupMeta(DeploymentEntityType())), MagicMock()

@@ -96,7 +96,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|---|---|
 | 전역 역할 | `global_scope`, `global_search_ops` | `InsufficientPrivilege` | 통과. 모니터는 GET/SEARCH/LOOKUP만 통과 | 그대로 막는다 | `actions/v2/global_scope/processor.py:51`, `superadmin.py:22-34`, `actions/types.py:106` |
 | 엔티티 권한 | `single_entity`, field `single_field` | `NotEnoughPermission` | 통과 | 통과 | `actions/v2/single_entity/validator/rbac.py:33-54` |
-| 엔티티 권한, 소유자 조회 단계 | `key_field_lookup_ops`, `key_owner_lookup_ops` | `GenericBadRequest`. 없는 키와 권한 없음이 같은 예외다 | 통과 | 권한은 통과, 없는 키는 여전히 `GenericBadRequest` | `actions/v2/lookup/processor.py:97-103,125-139` |
+| 엔티티 권한, 소유자 조회 단계 | `key_field_lookup_ops`, `key_owner_lookup_ops` | `GenericBadRequest`. 없는 키와 권한 없음이 같은 예외다 | 통과. 없는 키는 `FieldNotFoundError` | 권한은 통과, 없는 키는 여전히 `GenericBadRequest` | `actions/v2/lookup/processor.py:99-110,132-146` |
 | 스코프 권한 | `scope`, `scope_search_ops`, field `search_ops` | `NotEnoughPermission`. 여러 스코프 중 하나라도 막히면 전부 거부 | 통과 | 통과 | `actions/v2/scope/validator/rbac.py:38-66` |
 | 입력 검증 | 없음. 서비스와 리포지토리가 실행 중에 낸다 | 경우마다 다르다 | 해당 없음 | 해당 없음 | 아래 표 |
 
@@ -459,7 +459,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 
 ## 10. 열린 질문
 
-1. **auth 7건은 어댑터를 거치지 않는 것이 다섯이다.** 로그인 세션 어댑터가 부르는 것은 `global_revoke_login_session`, `global_unblock_user` 둘이다(`api/adapters/login_session/adapter.py:136,145`). 나머지 다섯은 REST 핸들러가 프로세서를 바로 부른다. `authorize`, `public_get_role`, `update_password_no_auth`는 `api/rest/auth/handler.py:110,137,268`, `public_resolve_access_key_scope`는 `api/rest/session/handler.py` 등 넷, `public_resolve_user_scope`는 `api/rest/vfolder/handler.py:350`이다. `authorize`와 `update_password_no_auth`는 액션이 요청 객체를 싣는다(`services/auth/actions/authorize.py`). 이번 작업은 핸들러 호출을 어댑터로 옮기지 않고, 다섯의 시나리오는 뒤로 미룬다.
+1. **auth 7건은 어댑터를 거치지 않는 것이 다섯이다.** 로그인 세션 어댑터가 부르는 것은 `global_revoke_login_session`, `global_unblock_user` 둘이다(`api/adapters/login_session/adapter.py:136,145`). 나머지 다섯은 REST 핸들러가 프로세서를 바로 부른다. `authorize`, `get_role`, `update_password_no_auth`는 `api/rest/auth/handler.py`, `public_resolve_access_key_scope`는 `api/rest/session/handler.py` 등 셋이다. vfolder 목록의 이메일 위임은 `LookupUserAction`을 부른다(`api/rest/vfolder/handler.py`). `authorize`와 `update_password_no_auth`는 액션이 요청 객체를 싣는다(`services/auth/actions/authorize.py`). 이번 작업은 핸들러 호출을 어댑터로 옮기지 않고, 다섯의 시나리오는 뒤로 미룬다.
 2. **로그인 세션과 로그인 이력의 write spec을 더한다.** 지금은 인증 흐름의 raw insert만 있다(`repositories/auth/db_source/db_source.py:557-597`). 사용자가 소유하는 필드 creator 둘을 `models/login_session/` 아래에 두고, 시나리오는 `adding`으로 심는다. 추가 범위는 구현 단계에서 따로 설명한다.
 3. **역할 스코프 항목의 권한 대상.** 스코프 검색에 역할 스코프를 주면 역할 id를 스코프로 삼아 사용자 READ를 검사한다(`services/user/actions/scoped_search.py:70-77`). 역할을 다스리는 스코프에 준 권한이 그 검사를 통과하는지 확인하지 못해 9절에 행을 두지 않았다.
 4. **소속 프로젝트 자리에 빈 값을 주면 아무 일도 없다.** 요청 설명은 "빈 값이면 비운다"(`common/dto/manager/v2/user/request.py:149`)인데 어댑터는 무시한다(`adapter.py:615-619`). 9절은 지금 동작을 행으로 고정했다. 설명과 동작 중 어느 쪽을 고칠지 정해야 한다.

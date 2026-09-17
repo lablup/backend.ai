@@ -34,7 +34,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-sessions](/tests/scenario/bai_scenario/manager/session/test_session.py) — pass
 
-세션 조회는 역할이 아니라 스코프 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다
+필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다
 
 Given
 
@@ -53,5 +53,5 @@ When
 Then
 
 - 거부된다
-  - 거부: NotEnoughPermission
+  - 거부: InsufficientPrivilege
 

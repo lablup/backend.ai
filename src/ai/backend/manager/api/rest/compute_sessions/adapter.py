@@ -1,5 +1,5 @@
 """
-Adapters to convert compute session DTOs to repository BatchQuerier objects.
+Adapters to convert compute session DTOs to session and kernel searchers.
 Handles conversion of filter, order, and pagination parameters.
 Also provides data-to-DTO conversion functions.
 """
@@ -25,28 +25,29 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import SessionOrders
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 
 class ComputeSessionsAdapter(BaseFilterAdapter):
     """Adapter for converting compute session requests to repository queries."""
 
-    def build_session_querier(self, request: SearchComputeSessionsRequest) -> BatchQuerier:
-        """Build a BatchQuerier for compute sessions from search request."""
+    def build_session_searcher(self, request: SearchComputeSessionsRequest) -> SessionSearcher:
+        """Build a SessionSearcher for compute sessions from search request."""
         conditions = self._convert_session_filter(request.filter) if request.filter else []
         orders = [self._convert_session_order(o) for o in request.order] if request.order else []
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return SessionSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
-    def build_kernel_querier_for_sessions(self, session_ids: list[SessionId]) -> BatchQuerier:
-        """Build a BatchQuerier for kernels belonging to the given sessions."""
+    def build_kernel_searcher_for_sessions(self, session_ids: list[SessionId]) -> KernelSearcher:
+        """Build a KernelSearcher for kernels belonging to the given sessions."""
         conditions: list[QueryCondition] = [KernelConditions.by_session_ids(session_ids)]
-        return BatchQuerier(conditions=conditions, orders=[], pagination=NoPagination())
+        return KernelSearcher(conditions=conditions, orders=[], pagination=NoPagination())
 
     def group_kernels_by_session(self, kernels: list[KernelInfo]) -> dict[UUID, list[KernelInfo]]:
         """Group kernel info list by session ID."""

@@ -476,9 +476,9 @@ class ModelServingService:
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=AccessKey(service_prepare_ctx.owner_access_key),
-                domain_name=action.domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(service_prepare_ctx.group_id),
+                user_id=UserID(created_user.uuid),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id

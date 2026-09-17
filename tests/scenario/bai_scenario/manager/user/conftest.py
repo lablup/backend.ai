@@ -9,11 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bai_scenario.runner.unwired import unwired
-from bai_scenario.valkey import ScenarioValkey
 
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -51,6 +49,8 @@ from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 
 def _registry(
@@ -107,7 +107,7 @@ async def auth(
     registry = _registry(engine, validators, monitors)
     key_pool = _key_pool()
     return AuthProcessors(
-        registry.group(GroupMeta(AuthEntityType())),
+        registry.group(GroupMeta(GlobalEntityType())),
         registry.group(GroupMeta(UserEntityType())),
         AuthService(
             unwired(HookPluginContext, "only the login flow runs hooks"),

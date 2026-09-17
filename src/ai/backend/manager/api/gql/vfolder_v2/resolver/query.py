@@ -25,6 +25,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types import (
     VFolderGQL,
     VFolderOrderByGQL,
 )
+from ai.backend.manager.api.gql.vfolder_v2.types.mount_policy import VFolderMountPoliciesPayloadGQL
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
 from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL
 
@@ -227,3 +228,17 @@ async def my_vfolders(
         ),
         count=result.total_count,
     )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The mount levels set on a virtual folder, one row per user.",
+    )
+)  # type: ignore[misc]
+async def vfolder_mount_policies(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+) -> VFolderMountPoliciesPayloadGQL | None:
+    payload = await info.context.adapters.vfolder.list_mount_policies(vfolder_id)
+    return VFolderMountPoliciesPayloadGQL.from_pydantic(payload)

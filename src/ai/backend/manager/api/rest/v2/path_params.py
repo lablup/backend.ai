@@ -114,6 +114,11 @@ class VFolderIdPathParam(BaseRequestModel):
     vfolder_id: UUID = Field(description="VFolder UUID")
 
 
+class VFolderUserPathParam(BaseRequestModel):
+    vfolder_id: UUID = Field(description="VFolder UUID")
+    user_id: UUID = Field(description="User UUID")
+
+
 class TokenIdPathParam(BaseRequestModel):
     token_id: UUID = Field(description="Token UUID")
 

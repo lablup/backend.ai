@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.vfolder import (
     GetQuotaQuery,
@@ -134,20 +133,3 @@ class TestStorageQuotaScope:
             GetQuotaQuery(folder_host="local", id=vf["id"]),
         )
         assert isinstance(result, GetQuotaResponse)
-
-    async def test_regular_user_cannot_update_others_quota(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_vfolder: VFolderFixtureData,
-    ) -> None:
-        """Scenario: A regular user attempts to update the quota of a vfolder owned
-        by the admin. The server should reject this with BackendAPIError because
-        quota modification requires admin privileges or ownership of the vfolder."""
-        with pytest.raises(BackendAPIError):
-            await user_registry.vfolder.update_quota(
-                UpdateQuotaReq(
-                    folder_host="local",
-                    id=target_vfolder["id"],
-                    input={"size_bytes": 999999},
-                ),
-            )

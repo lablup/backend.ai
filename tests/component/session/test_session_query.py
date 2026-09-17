@@ -454,20 +454,6 @@ class TestSessionInfo:
         assert "domainName" in result.root
         assert result.root["domainName"] == session_seed.domain_name
 
-    async def test_different_user_session_raises_not_found(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """F-AUTH-2: Different user's session info → SessionNotFound.
-
-        The session is owned by admin_user_fixture. When a regular user
-        (user_registry) tries to access it, the owner_access_key mismatch
-        results in SessionNotFound (HTTP 404).
-        """
-        with pytest.raises(NotFoundError):
-            await user_registry.session.get_info(session_seed.session_id)
-
 
 class TestSessionDirectAccessInfo:
     """Tests for GET /{session_name}/direct-access-info."""

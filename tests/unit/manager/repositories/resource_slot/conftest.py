@@ -10,6 +10,9 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
@@ -23,6 +26,9 @@ async def database_with_resource_slot_tables(
     async with with_tables(
         database_connection,
         [
+            VirtualEntityRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
             ResourceSlotTypeRow,
         ],
     ):

@@ -11,7 +11,6 @@ from .row import (
     ImageLoadFilter,
     ImageRow,
     PublicImageLoadFilter,
-    bulk_get_image_configs,
 )
 from .row import (
     get_permission_ctx as get_permission_ctx,
@@ -27,5 +26,4 @@ __all__ = (
     "ImageType",
     "PublicImageLoadFilter",
     "Resources",
-    "bulk_get_image_configs",
 )

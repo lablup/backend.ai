@@ -66,6 +66,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
@@ -75,6 +76,9 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -173,6 +177,9 @@ def permission_controller_processors(
     perm_repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
         perm_repo,
+        permission_check=RbacPermissionCheckRepository(
+            PermissionOpsProvider(database_engine), config_provider
+        ),
         action_registry=processor_registry,
     )
     return PermissionControllerProcessors(

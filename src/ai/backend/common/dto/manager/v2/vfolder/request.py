@@ -350,6 +350,21 @@ class UnshareVFolderInput(BaseRequestModel):
     emails: list[str] = Field(description="Email addresses of users to unshare from")
 
 
+class SetVFolderMountPolicyInput(BaseRequestModel):
+    """Input for setting the mount level one user gets on a virtual folder."""
+
+    user_id: UUID = Field(description="User the mount level is set for")
+    permission: VFolderPermissionField = Field(
+        description="Mount level: none, ro or rw. wd is stored as rw."
+    )
+
+
+class UnsetVFolderMountPolicyInput(BaseRequestModel):
+    """Input for taking back the mount level one user was given on a virtual folder."""
+
+    user_id: UUID = Field(description="User whose mount level is taken back")
+
+
 class AcceptInvitationInput(BaseRequestModel):
     """Input for accepting a virtual folder invitation."""
 

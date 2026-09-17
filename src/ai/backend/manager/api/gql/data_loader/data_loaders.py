@@ -72,6 +72,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.types import AgentId
 
 if TYPE_CHECKING:
@@ -350,6 +351,17 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [VF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def vfolder_permission_loader(
+        self,
+    ) -> DataLoader[VFolderUUID, list[PermissionBitDTO]]:
+        adapter = self._adapters.vfolder
+
+        async def load_fn(ids: list[VFolderUUID]) -> list[list[PermissionBitDTO] | Exception]:
+            return await adapter.batch_load_permissions(ids)
 
         return DataLoader(load_fn=load_fn)
 

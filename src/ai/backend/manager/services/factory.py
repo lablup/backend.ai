@@ -9,7 +9,6 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
-from ai.backend.common.data.entity.auth import AuthEntityType
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
@@ -66,7 +65,6 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -233,6 +231,7 @@ from ai.backend.manager.services.retention_policy.processors import RetentionPol
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
 )
@@ -267,12 +266,14 @@ from ai.backend.manager.services.user_resource_policy.processors import UserReso
 from ai.backend.manager.services.vfolder.processors import (
     VFolderFileProcessors,
     VFolderInviteProcessors,
+    VFolderMountPolicyProcessors,
     VFolderProcessors,
     VFolderSharingProcessors,
 )
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
@@ -290,9 +291,11 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
-            BulkOwnCheck(repositories.rbac.permission_check, args.config_provider),
+            BulkOwnCheck(repositories.rbac.permission_check),
         ),
-        app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
+        app_config=AppConfigService(
+            OpsRepository(repositories.v2_ops_provider), repositories.app_config.repository
+        ),
         domain=DomainService(repositories.domain.repository),
         etcd_config=EtcdConfigService(
             repository=repositories.etcd_config.repository,
@@ -340,6 +343,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.user.repository,
             args.valkey_stat_client,
+            BulkOwnCheck(repositories.rbac.permission_check),
         ),
         vfolder_admin=VFolderAdminService(
             vfolder_admin_repository=repositories.vfolder.admin_repository,
@@ -359,6 +363,10 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             args.config_provider,
             repositories.vfolder.repository,
             repositories.user.repository,
+        ),
+        vfolder_mount_policy=VFolderMountPolicyService(
+            repositories.vfolder.repository,
+            repositories.rbac.permission_check,
         ),
         session=SessionService(
             SessionServiceArgs(
@@ -410,6 +418,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         entity_share=EntityShareService(
             repositories.entity_share.repository,
         ),
+        runtime_variant=RuntimeVariantService(repositories.runtime_variant.repository),
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
             OpsRepository(repositories.v2_ops_provider),
@@ -473,6 +482,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            permission_check=repositories.rbac.permission_check,
             action_registry=action_registry,
         ),
         vfs_storage=VFSStorageService(
@@ -656,11 +666,14 @@ def create_processors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_file
         ),
         vfolder_invite=VFolderInviteProcessors(
-            vfolder_groups.group(GroupMeta(VFolderInvitationEntityType())),
+            vfolder_groups.group(GroupMeta(VFolderEntityType())),
             services.vfolder_invite,
         ),
         vfolder_sharing=VFolderSharingProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_sharing
+        ),
+        vfolder_mount_policy=VFolderMountPolicyProcessors(
+            vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
         ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),
@@ -722,7 +735,7 @@ def create_processors(
             rbac_groups.group(GroupMeta(RolePresetEntityType())), services.role_preset
         ),
         runtime_variant=RuntimeVariantProcessors(
-            system_groups.group(GroupMeta(RuntimeVariantEntityType()))
+            system_groups.group(GroupMeta(RuntimeVariantEntityType())), services.runtime_variant
         ),
         client_ip_masking=ClientIPMaskingProcessors(
             system_groups.group(GroupMeta(ClientIPMaskingPolicyEntityType()))
@@ -778,7 +791,7 @@ def create_processors(
             services.model_serving_auto_scaling,
         ),
         auth=AuthProcessors(
-            organization_groups.group(GroupMeta(AuthEntityType())),
+            organization_groups.group(GroupMeta(GlobalEntityType())),
             organization_groups.group(GroupMeta(UserEntityType())),
             services.auth,
         ),

@@ -16,10 +16,9 @@ from sqlalchemy import Row
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
-from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -219,7 +218,7 @@ class TestVfolderSearchInProject:
                         domain_name=domain_name,
                         quota_scope_id=f"project:{group_id}",
                         usage_mode=VFolderUsageMode.GENERAL,
-                        permission=VFolderMountPermission.READ_WRITE,
+                        default_mount_permission=VFolderMountPolicy.READ_WRITE,
                         max_files=0,
                         max_size=None,
                         num_files=0,

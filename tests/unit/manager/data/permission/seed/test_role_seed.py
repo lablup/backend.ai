@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.cli.permissions import _REPOSITORY, _TARGETS
+from ai.backend.manager.cli.permissions import _REPOSITORY, _render
 from ai.backend.manager.cli.role_fixture import RoleFixture
 from ai.backend.manager.data.permission.seed.check import RoleSeedChecker
 from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
@@ -165,89 +165,54 @@ class TestChecker:
 
 
 class TestFixture:
-    """The seed fixture is what the declaration renders, never edited by hand."""
+    """The preset fixture is what the declaration renders, never edited by hand."""
 
-    def test_the_written_files_are_current(self, seeds: list[RoleSeed]) -> None:
-        body = json.dumps(
-            RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render(), indent=4
-        )
-        for target in _TARGETS:
+    def test_the_written_file_is_current(self, seeds: list[RoleSeed]) -> None:
+        for target, rendered in _render(seeds).items():
             written = (_REPOSITORY / target).read_text(encoding="utf-8")
-            assert written == body + "\n", f"{target} is stale; run `mgr permissions emit`"
+            assert written == json.dumps(rendered, indent=4) + "\n", (
+                f"{target} is stale; run `mgr permissions emit`"
+            )
 
     def test_rendering_twice_is_the_same(self, seeds: list[RoleSeed]) -> None:
-        fixtures = _REPOSITORY / "fixtures" / "manager"
-        assert RoleFixture(seeds, fixtures).render() == RoleFixture(seeds, fixtures).render()
+        assert _render(seeds) == _render(seeds)
 
     def test_every_permission_row_holds_one_bit(self, seeds: list[RoleSeed]) -> None:
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
-        for row in rendered["permissions"]:
+        for row in RoleFixture(seeds).render_presets()["role_permission_presets"]:
             bit = row["permission"]
             assert bit > 0 and bit & (bit - 1) == 0
 
-    def test_every_role_is_reachable_from_a_preset(self, seeds: list[RoleSeed]) -> None:
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
-        role_ids = {role["id"] for role in rendered["roles"]}
-        assert {row["role_id"] for row in rendered["permissions"]} <= role_ids
-        assert {row["role_id"] for row in rendered["user_roles"]} <= role_ids
-        assert not any(preset["deleted"] for preset in rendered["role_presets"])
+    def test_no_preset_is_deleted(self, seeds: list[RoleSeed]) -> None:
+        presets = RoleFixture(seeds).render_presets()["role_presets"]
+        assert not any(preset["deleted"] for preset in presets)
 
     def test_every_row_fits_its_table(self, seeds: list[RoleSeed]) -> None:
         """A generated row names the columns its table has, and misses none it needs."""
         ensure_all_tables_registered()
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
-        for name, rows in rendered.items():
-            if name.startswith("__"):
-                continue
-            table = metadata.tables.get(name)
-            assert table is not None, f"{name} is not a table"
-            columns = {column.name for column in table.columns}
-            needed = {
-                column.name
-                for column in table.columns
-                if not column.nullable and column.default is None and column.server_default is None
-            }
-            for row in rows:
-                assert not set(row) - columns, f"{name}: {sorted(set(row) - columns)}"
-                assert not needed - set(row), f"{name}: {sorted(needed - set(row))}"
+        for rendered in _render(seeds).values():
+            for name, rows in rendered.items():
+                if name.startswith("__"):
+                    continue
+                table = metadata.tables.get(name)
+                assert table is not None, f"{name} is not a table"
+                columns = {column.name for column in table.columns}
+                needed = {
+                    column.name
+                    for column in table.columns
+                    if not column.nullable
+                    and column.default is None
+                    and column.server_default is None
+                }
+                for row in rows:
+                    assert not set(row) - columns, f"{name}: {sorted(set(row) - columns)}"
+                    assert not needed - set(row), f"{name}: {sorted(needed - set(row))}"
 
     def test_a_preset_carries_the_id_its_file_states(self, seeds: list[RoleSeed]) -> None:
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
         declared = {str(seed.id) for seed in seeds}
-        assert {preset["id"] for preset in rendered["role_presets"]} == declared
-        assert {role["role_preset_id"] for role in rendered["roles"]} <= declared
+        presets = RoleFixture(seeds).render_presets()["role_presets"]
+        assert {preset["id"] for preset in presets} == declared
 
     def test_a_derived_id_is_a_uuid7(self, seeds: list[RoleSeed]) -> None:
         """Only the stated preset ids keep the version they were minted with."""
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
-        for name in ("roles", "user_roles", "permissions", "virtual_entities"):
-            for row in rendered[name]:
-                assert uuid.UUID(row["id"]).version == 7, f"{name}: {row['id']}"
-
-
-class TestAssignments:
-    """A role is held from within its scope, so everyone holding one is on its roster."""
-
-    def test_every_project_role_is_held_from_inside_the_project(
-        self, seeds: list[RoleSeed]
-    ) -> None:
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
-        accounts = json.loads(
-            (_REPOSITORY / "fixtures/manager/example-users.json").read_text(encoding="utf-8")
-        )
-        roster = {(row["group_id"], row["user_id"]) for row in accounts["association_groups_users"]}
-        by_id = {role["id"]: role for role in rendered["roles"]}
-        for row in rendered["user_roles"]:
-            role = by_id[row["role_id"]]
-            if role["scope_type"] != "project":
-                continue
-            assert (role["scope_id"], row["user_id"]) in roster, role["name"]
-
-    def test_a_user_role_is_held_by_that_user(self, seeds: list[RoleSeed]) -> None:
-        rendered = RoleFixture(seeds, _REPOSITORY / "fixtures" / "manager").render()
-        by_id = {role["id"]: role for role in rendered["roles"]}
-        for row in rendered["user_roles"]:
-            role = by_id[row["role_id"]]
-            if role["scope_type"] != "user":
-                continue
-            assert role["scope_id"] == row["user_id"], role["name"]
+        for row in RoleFixture(seeds).render_presets()["role_permission_presets"]:
+            assert uuid.UUID(row["id"]).version == 7, row["id"]

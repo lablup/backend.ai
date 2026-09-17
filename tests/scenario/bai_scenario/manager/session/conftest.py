@@ -12,12 +12,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from bai_scenario.fakes.storage_proxy import (
-    FakeStorageProxyManagerFacingClient,
-    FakeStorageSessionManager,
-)
-from bai_scenario.runner.unwired import unwired
-from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.kernel import KernelFieldType
@@ -45,8 +39,12 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -67,6 +65,12 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from bai_scenario.fakes.storage_proxy import (
+    FakeStorageProxyManagerFacingClient,
+    FakeStorageSessionManager,
+)
+from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 
 @pytest.fixture
@@ -104,10 +108,11 @@ async def adapter(
         valkey.schedule,
         config,
         FakeStorageSessionManager({"local": storage}),
+        RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
     )
     service = SessionService(
         SessionServiceArgs(
-            session_repository=SessionRepository(engine),
+            session_repository=SessionRepository(engine, provider),
             scheduler_repository=scheduler_repository,
             user_repository=unwired(UserRepository, "only writes resolve the owner"),
             agent_registry=unwired(AgentRegistry, "only session writes reach the agents"),

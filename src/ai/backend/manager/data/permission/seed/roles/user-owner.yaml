@@ -1,7 +1,7 @@
 id: 776c1366-dcf3-5abd-b8de-bc3ad3b759ad
 name: user_owner
 scope_type: user
-auto_assign: false
+auto_assign: true
 
 permissions:
   agent:                            [read]
@@ -11,7 +11,6 @@ permissions:
   app_config_fragment:              [read, update, create, soft_delete, hard_delete]
   artifact:                         []
   artifact_registry:                []
-  auth:                             []
   client_ip_masking_policy:         []
   container_registry:               [read]
   deployment:                       [read, update, create, soft_delete, hard_delete]
@@ -49,5 +48,4 @@ permissions:
   user:                             [read, update, soft_delete, hard_delete]
   user_resource_policy:             [read]
   vfolder:                          [read, update, create, soft_delete, hard_delete]
-  vfolder_invitation:               []
   vfs_storage:                      []

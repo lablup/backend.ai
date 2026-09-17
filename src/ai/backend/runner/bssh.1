@@ -1,6 +1,6 @@
 .\" Manpage for bssh
 .\" Contact the maintainers to correct errors or typos.
-.TH BSSH 1 "July 2026" "v2.3.0" "bssh Manual"
+.TH BSSH 1 "September 2026" "v3.0.1" "bssh Manual"
 
 .SH NAME
 bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabilities
@@ -14,16 +14,16 @@ bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabiliti
 
 .SH DESCRIPTION
 .B bssh
-is a high-performance SSH client that can be used as a drop-in replacement for standard SSH while also providing
-powerful parallel execution capabilities for cluster management. Built with Rust, it supports both single-host
-SSH connections (SSH compatibility mode) and multi-server operations (cluster mode).
+is a high-performance SSH client that provides measured compatibility with common OpenSSH client behavior while
+also offering powerful parallel execution capabilities for cluster management. Built with Rust, it supports both
+single-host SSH connections (SSH compatibility mode) and multi-server operations (cluster mode).
 
 .B SSH Compatibility Mode:
 When used with a single destination (e.g., bssh user@host), bssh behaves like standard SSH, supporting
 common SSH options and automatically starting an interactive shell when no command is provided.
 
 .B Multi-Server Mode:
-When used with clusters (-C) or multiple hosts (-H), bssh executes commands across multiple nodes
+When used with clusters (--cluster) or multiple hosts (-H), bssh executes commands across multiple nodes
 simultaneously with real-time output monitoring. In interactive terminals, bssh automatically
 launches a Terminal User Interface (TUI) with multiple view modes (Summary, Detail, Split, Diff)
 for real-time monitoring. The TUI can be disabled with --stream (real-time text output) or
@@ -36,6 +36,52 @@ multi-node session environments.
 .SH OPTIONS
 
 .SS SSH-Compatible Options
+.PP
+The following seven short options use their OpenSSH meanings in the 3.0
+command-line contract. Scripts that used the former bssh meanings must migrate
+to the long options documented under Multi-Server Options. See
+.BR docs/openssh-short-flags-migration.md .
+
+.TP
+.BR \-N
+Do not execute a remote command. This is normally used with port forwarding.
+
+.TP
+.BR \-f
+Go to the background after authentication. Authentication and requested
+forward setup complete before the foreground process exits.
+
+.TP
+.BR \-C
+Enable SSH transport compression. Equivalent to
+.IR "Compression yes" .
+
+.TP
+.BR \-A
+Enable forwarding of the authentication agent connection. This is distinct
+from
+.BR \-\-use\-agent ,
+which selects an agent for authenticating the local bssh client.
+
+.TP
+.BR \-S " " \fIcontrol_path\fR
+Use the specified connection-multiplexing control socket path. Equivalent to
+the
+.I ControlPath
+SSH configuration directive.
+
+.TP
+.BR \-k
+Disable forwarding of GSSAPI credentials. Equivalent to
+.IR "GSSAPIDelegateCredentials no" .
+
+.TP
+.BR \-b " " \fIbind_address\fR
+Bind the client side of the SSH connection to the specified source address.
+Equivalent to the
+.I BindAddress
+SSH configuration directive.
+
 .TP
 .BR \-i " " \fIidentity_file\fR
 SSH private key file path (same as ssh -i)
@@ -79,12 +125,30 @@ Example: -J jump1@proxy1,jump2@proxy2
 Query SSH configuration options (cipher, kex, mac, key, protocol-version, help)
 
 .TP
-.BR \-4
-Force use of IPv4 addresses only
+.BR \-4 ", " \-\-ipv4
+Force use of IPv4 addresses only. Equivalent to
+.I AddressFamily inet
+in the SSH configuration, and overrides it when both are present.
+Mutually exclusive with
+.BR \-6 .
+See
+.B ADDRESS FAMILY SELECTION
+below for exactly which connections this affects.
 
 .TP
-.BR \-6
-Force use of IPv6 addresses only
+.BR \-6 ", " \-\-ipv6
+Force use of IPv6 addresses only. Equivalent to
+.I AddressFamily inet6
+in the SSH configuration, and overrides it when both are present.
+Mutually exclusive with
+.BR \-4 .
+Also changes the default listen address of
+.B \-L
+and
+.B \-D
+forwards from 127.0.0.1 to ::1. See
+.B ADDRESS FAMILY SELECTION
+below.
 
 .TP
 .BR \-x
@@ -106,6 +170,7 @@ Example: -R 8080:localhost:80 (remote:8080 → localhost:80)
 .BR \-D " " \fI[bind_address:]port[/socks_version]\fR
 Dynamic port forwarding (SOCKS proxy). Creates a local SOCKS proxy that dynamically forwards connections via SSH.
 Supports SOCKS4 and SOCKS5 protocols. Default is SOCKS5.
+SOCKS5 accepts IPv4 literals, domain names, and IPv6 literals.
 Multiple -D options can be specified for multiple SOCKS proxies.
 Example: -D 1080 (SOCKS5 proxy on localhost:1080), -D *:1080/4 (SOCKS4 on all interfaces)
 
@@ -134,12 +199,18 @@ Hostlist expressions (range expansion):
 .IP \[bu] 2
 -H "admin@web[1-3]:22" \[->] expands with user and port preserved
 .IP \[bu] 2
+-H "[2001:db8::1]:2222" \[->] one IPv6 host with an explicit port
+.IP \[bu] 2
+-H "user@[::1]" \[->] the IPv6 loopback address with an explicit user
+.IP \[bu] 2
 -H "^/path/to/hostfile" \[->] read hosts from file
+.PP
+IPv6 address literals must be enclosed in brackets. A bracket group is interpreted as IPv6 only when its complete contents are a syntactically valid IPv6 address; numeric groups such as [1] and [1-3] remain hostlist ranges. Bare forms such as ::1 are rejected with guidance to use [::1], because a trailing numeric IPv6 segment cannot otherwise be distinguished from a port.
 .RE
 
 .TP
-.BR \-C ", " \-\-cluster " " \fICLUSTER\fR
-Cluster name from configuration file (uppercase C for multi-server mode)
+.BR \-\-cluster " " \fICLUSTER\fR
+Cluster name from the bssh configuration file.
 
 .TP
 .BR \-\-config " " \fICONFIG\fR
@@ -147,7 +218,7 @@ Configuration file path (default: ~/.config/bssh/config.yaml)
 
 
 .TP
-.BR \-A ", " \-\-use\-agent
+.BR \-\-use\-agent
 Use SSH agent for authentication (Unix/Linux/macOS only).
 When this option is specified, bssh will attempt to use the SSH agent
 for authentication. Falls back to key file authentication if the agent
@@ -166,7 +237,7 @@ prompting interactively (not recommended; see
 This is useful for systems that don't have SSH keys configured.
 
 .TP
-.BR \-S ", " \-\-sudo\-password
+.BR \-\-sudo\-password
 Prompt for sudo password to automatically respond to sudo prompts.
 When this option is specified, bssh will:
 .RS
@@ -193,18 +264,18 @@ Password is never logged or printed in any output
 .RE
 
 .TP
-.BR \-f ", " \-\-filter " " \fIPATTERN\fR
+.BR \-\-filter " " \fIPATTERN\fR
 Filter hosts by pattern. Supports both wildcards and hostlist expressions.
-Use with -H or -C to execute on a subset of hosts.
+Use with -H or --cluster to execute on a subset of hosts.
 .RS
 .PP
 Examples:
 .IP \[bu] 2
--f "web*" \[->] matches web01, web02, etc. (glob pattern)
+--filter "web*" \[->] matches web01, web02, etc. (glob pattern)
 .IP \[bu] 2
--f "node[1-5]" \[->] matches node1 through node5 (hostlist expression)
+--filter "node[1-5]" \[->] matches node1 through node5 (hostlist expression)
 .IP \[bu] 2
--f "node[1,3,5]" \[->] matches node1, node3, node5 (specific values)
+--filter "node[1,3,5]" \[->] matches node1, node3, node5 (specific values)
 .RE
 
 .TP
@@ -286,16 +357,22 @@ disabled when output is piped or in CI environments. This disables the
 interactive TUI mode.
 
 .TP
-.BR \-N ", " \-\-no\-prefix
-Disable hostname prefix in output lines (pdsh -N compatibility). When
+.BR \-\-no\-prefix
+Disable hostname prefix in output lines. When
 specified, output lines are displayed without the [hostname] prefix,
 which is useful for programmatic parsing or cleaner display. Works
 with both stream mode (--stream) and file mode (--output-dir).
-Example: bssh -H host1,host2 --stream -N "uname -a"
+Example: bssh -H host1,host2 --stream --no-prefix "uname -a"
 
 .TP
-.BR \-k ", " \-\-fail\-fast
-Stop execution immediately on first failure (pdsh -k compatible).
+.BR \-\-batch
+Use single-stage interrupt handling: the first Ctrl+C terminates all jobs.
+The default multi-server behavior reports status on the first Ctrl+C and
+terminates on a second Ctrl+C.
+
+.TP
+.BR \-\-fail\-fast
+Stop execution immediately on first failure.
 When enabled, bssh cancels pending commands when any node fails due to
 connection error or non-zero exit code. This is useful for:
 .RS
@@ -328,11 +405,11 @@ Print help information
 .BR \-V ", " \-\-version
 Print version information
 
-.SS Exit Code Strategy Options (v1.2.0+)
+.SS Exit Code Strategy Options
 .TP
 .BR \-\-require\-all\-success
-Require all nodes to succeed (v1.0-v1.1 behavior).
-By default (v1.2+), bssh returns the main rank's exit code, matching
+Require all nodes to succeed.
+By default, bssh returns the main rank's exit code, matching
 standard MPI tools like mpirun and srun. When this flag is specified,
 bssh returns exit code 0 only if ALL nodes succeed, and exit code 1
 if ANY node fails. This is useful for health checks and monitoring
@@ -347,7 +424,7 @@ This hybrid strategy provides detailed error codes from the main rank
 while maintaining awareness of failures on other nodes.
 
 .SH COMMANDS
-In multi-server mode (-H or -C), commands can be executed directly without the 'exec' subcommand.
+In multi-server mode (-H or --cluster), commands can be executed directly without the 'exec' subcommand.
 For example: bssh -H "host1,host2" "uptime" (automatic command execution)
 
 .TP
@@ -519,6 +596,28 @@ flag or default SSH config files (~/.ssh/config, /etc/ssh/ssh_config).
 In addition to standard SSH configuration directives, bssh supports advanced options for
 certificate-based authentication and port forwarding control:
 
+.SS Connection Options
+.TP
+.B AddressFamily
+Restricts the IP address family used for connections. Accepted values are
+.IR any ", " inet " (IPv4 only), and " inet6 " (IPv6 only),"
+matched case-insensitively. The default is
+.IR any .
+An unrecognized value logs a warning and is treated as
+.IR any ,
+rather than failing, so a configuration file OpenSSH would tolerate keeps working.
+.br
+The
+.B \-4
+and
+.B \-6
+command line flags override this keyword. See
+.B ADDRESS FAMILY SELECTION
+for the scope of the constraint.
+.br
+Example:
+.I AddressFamily inet6
+
 .SS Certificate Authentication Options
 .TP
 .B CertificateFile
@@ -592,27 +691,30 @@ Example:
 
 .SS Proxy Options
 .TP
-.B ProxyUseFdpass
-Specifies that ProxyCommand will pass a connected file descriptor back to ssh(1)
-instead of continuing to execute and relay data.
-This reduces overhead by avoiding an unnecessary lingering process and extra I/O operations.
-When enabled, the proxy command establishes a connection, passes the file descriptor
-to ssh via the fdpass mechanism, and exits. The ssh process then communicates directly
-with the connection, eliminating the intermediate proxy process.
+.B ProxyCommand
+Executes a local command whose standard input and output carry the SSH transport.
+The command is run by the user's shell, preserving OpenSSH-style quoting,
+redirection, and pipelines.
 .br
-Default is no.
+Supported tokens are %%, %h, %k, %n, %p, and %r.
 .br
-Introduced in OpenSSH 6.5 (January 2014).
-.br
-This is particularly useful with proxy commands like netcat that support file descriptor
-passing via the -F option (nc.openbsd).
+.I ProxyCommand none
+explicitly selects a direct connection. When ProxyCommand and ProxyJump both
+appear in ssh_config, the first obtained value is used; command-line -J takes
+precedence over both.
 .br
 Example:
-.I ProxyUseFdpass yes
+.I ProxyCommand nc %h %p
+
+.TP
+.B ProxyUseFdpass
+Requests that ProxyCommand pass a connected file descriptor instead of relaying
+the SSH transport over standard input and output.
 .br
-Note: This option is currently parsed from SSH configuration files for compatibility
-but is not yet utilized in bssh's SSH client implementation, as proxy connections
-are not yet supported.
+Default is no. bssh does not support descriptor passing and rejects
+.I ProxyUseFdpass yes
+with an actionable error before starting the proxy command. Use a streaming
+ProxyCommand without netcat's -F option instead.
 
 .SS Command Execution and Automation Options
 .TP
@@ -1001,15 +1103,13 @@ Host *.secure.prod.example.com
     PermitRemoteOpen localhost:8080
     PermitRemoteOpen db.internal:5432
 
-# Optimized proxy connection with file descriptor passing
+# HTTP CONNECT proxy
 Host internal-server
-    ProxyCommand nc -X connect -x proxy.example.com:1080 -F %h %p
-    ProxyUseFdpass yes
+    ProxyCommand nc -X connect -x proxy.example.com:1080 %h %p
 
-# SOCKS proxy with netcat (reduces overhead)
+# SOCKS proxy with netcat
 Host *.internal.example.com
-    ProxyCommand nc -x socks.example.com:1080 -F %h %p
-    ProxyUseFdpass yes
+    ProxyCommand nc -x socks.example.com:1080 %h %p
 
 # Development server with automatic file sync
 Host dev-server
@@ -1091,6 +1191,101 @@ Host legacy.example.com
     FingerprintHash md5
     RequiredRSASize 1024
 .fi
+
+.SH ADDRESS FAMILY SELECTION
+.B \-4
+and
+.B \-6
+(and the equivalent
+.I AddressFamily
+configuration keyword) restrict which resolved addresses bssh will use.
+Precedence is the OpenSSH one: the command line flag wins over the configuration
+keyword, which wins over the
+.I any
+default. With no constraint, every resolved address is tried in resolver order,
+which is the historical behavior.
+
+.SS What the constraint covers
+.IP \[bu] 2
+Direct SSH connections for
+.BR exec ,
+interactive sessions,
+.BR ping ,
+and SFTP
+.RB ( upload / download ).
+Addresses of the other family are removed from the candidate list before any
+connection is attempted.
+.IP \[bu] 2
+The first hop of a
+.B \-J
+jump host chain, which uses the same connect path.
+.IP \[bu] 2
+The local listener created by
+.B \-L
+and
+.BR \-D .
+With
+.BR \-6 ,
+a specification that does not name a bind address listens on ::1 instead of
+127.0.0.1, and the
+.I *:port
+wildcard form listens on :: instead of 0.0.0.0. A specification that names a
+bind address explicitly always overrides the flag.
+
+.SS Forwarding target resolution
+.IP \[bu] 2
+Forwarding targets and tunneled jump-chain targets. Without
+.B \-4
+or
+.BR \-6 ,
+bssh sends the target hostname from a
+.B \-L
+forward, SOCKS5
+.B \-D
+domain request, later jump-chain hop, or final destination behind a jump chain
+as written in the
+.I direct-tcpip
+channel request. The remote SSH server resolves that name and performs the
+actual connection, matching OpenSSH and allowing names that exist only from the
+server's network position.
+.IP \[bu] 2
+When a family is forced with
+.B \-4
+or
+.BR \-6 ,
+bssh resolves the forwarding target locally, filters the candidate list to the
+requested family, and sends the matching numeric address in the
+.I direct-tcpip
+request. This gives the family request a concrete effect on the server-side
+connection, but it necessarily uses the client's resolver view for that forced
+path. SOCKS4 requests carry a literal IPv4 destination by protocol definition, so
+they still work under
+.B any
+and
+.BR \-4 ,
+but are rejected under
+.B \-6
+or
+.I AddressFamily inet6
+with the usual forced-family error instead of silently tunneling IPv4. SOCKS5
+literal IPv4 and IPv6 requests likewise already carry numeric destinations; when
+a forced family excludes that literal, the request fails with the same
+no-address-for-family error instead of silently falling back to the other family.
+
+.SS What the constraint does not cover
+The remote listener created by
+.BR \-R ,
+which the server binds. Its default stays IPv4 loopback.
+.IP \[bu] 2
+.BR bssh\-server ,
+which has its own command line and does not accept these flags.
+
+.SS Failure behavior
+When a family is forced and name resolution produces no address of that family,
+bssh fails with
+.I no IPv6 address found for <host>
+(or the IPv4 equivalent) and exits non-zero. There is no fallback to the other
+family, matching OpenSSH.
 
 .SH PDSH COMPATIBILITY MODE
 .B bssh
@@ -1222,6 +1417,10 @@ expands to web1.example.com, web2.example.com, web3.example.com
 .B With user and port
 .B admin@server[1-3]:2222
 expands to admin@server1:2222, admin@server2:2222, admin@server3:2222
+.TP
+.B IPv6 literal
+.B user@[2001:db8::1]:2222
+selects one IPv6 host. Brackets are required and are distinct from range brackets because their contents parse as a complete IPv6 address.
 
 .SS File Input
 .TP
@@ -1238,11 +1437,11 @@ Specify target hosts:
 .TP
 .B --filter
 Include only matching hosts:
-.B bssh -C cluster --filter "web[1-5]" "systemctl status nginx"
+.B bssh --cluster cluster --filter "web[1-5]" "systemctl status nginx"
 .TP
 .B --exclude
 Exclude matching hosts:
-.B bssh -C cluster --exclude "node[1,3,5]" "df -h"
+.B bssh --cluster cluster --exclude "node[1,3,5]" "df -h"
 
 .SS Examples
 .nf
@@ -1350,17 +1549,17 @@ Commands are executed directly without needing 'exec' subcommand
 
 .TP
 Use cluster from configuration:
-.B bssh -C production "df -h"
+.B bssh --cluster production "df -h"
 
 .TP
 Filter hosts with pattern matching:
-.B bssh -H "web1,web2,db1,db2" -f "web*" "systemctl status nginx"
+.B bssh -H "web1,web2,db1,db2" --filter "web*" "systemctl status nginx"
 .RS
 Executes command only on hosts matching the pattern 'web*'
 .RE
 
 .TP
-.B bssh -C production -f "db*" "pg_dump --version"
+.B bssh --cluster production --filter "db*" "pg_dump --version"
 .RS
 Executes command only on database nodes in the production cluster
 .RE
@@ -1373,31 +1572,31 @@ Executes command on node1 and node3, excluding node2
 .RE
 
 .TP
-.B bssh -C production --exclude "db*" "systemctl restart nginx"
+.B bssh --cluster production --exclude "db*" "systemctl restart nginx"
 .RS
 Executes command on all production hosts except database servers
 .RE
 
 .TP
-.B bssh -C production --exclude "web1,web2" "apt update"
+.B bssh --cluster production --exclude "web1,web2" "apt update"
 .RS
 Excludes specific hosts web1 and web2 from the cluster operation
 .RE
 
 .TP
 Test connectivity:
-.B bssh -C production ping
+.B bssh --cluster production ping
 .RS
 Note: 'ping' is a built-in subcommand, not an automatic execution
 .RE
 
 .TP
 Upload file to remote hosts (SFTP):
-.B bssh -C production upload local_file.txt /tmp/remote_file.txt
+.B bssh --cluster production upload local_file.txt /tmp/remote_file.txt
 
 .TP
 Download file from remote hosts (SFTP):
-.B bssh -C production download /etc/passwd ./downloads/
+.B bssh --cluster production download /etc/passwd ./downloads/
 .RS
 Downloads /etc/passwd from each host to ./downloads/ directory.
 Files are saved as hostname_passwd (e.g., web1_passwd, web2_passwd)
@@ -1413,11 +1612,11 @@ Increase verbosity for debugging:
 
 .TP
 Use custom SSH key:
-.B bssh -i ~/.ssh/custom_key -C staging "systemctl status"
+.B bssh -i ~/.ssh/custom_key --cluster staging "systemctl status"
 
 .TP
 Use SSH agent for authentication:
-.B bssh -A -C production "systemctl status"
+.B bssh --use-agent --cluster production "systemctl status"
 
 .TP
 Use password authentication:
@@ -1428,28 +1627,28 @@ Prompts for password interactively
 
 .TP
 Execute sudo commands with automatic password injection:
-.B bssh -S -C production "sudo apt update && sudo apt upgrade -y"
+.B bssh --sudo-password --cluster production "sudo apt update && sudo apt upgrade -y"
 .RS
 Prompts for sudo password once, then automatically responds to sudo prompts on all nodes
 .RE
 
 .TP
 Combine sudo with SSH agent authentication:
-.B bssh -A -S -C production "sudo systemctl restart nginx"
+.B bssh --use-agent --sudo-password --cluster production "sudo systemctl restart nginx"
 .RS
 Uses SSH agent for connection and sudo password for privilege escalation
 .RE
 
 .TP
 Use encrypted SSH key:
-.B bssh -i ~/.ssh/encrypted_key -C production "df -h"
+.B bssh -i ~/.ssh/encrypted_key --cluster production "df -h"
 .RS
 Automatically detects encrypted key and prompts for passphrase
 .RE
 
 .TP
 Save output to files:
-.B bssh --output-dir ./results -C production "ps aux"
+.B bssh --output-dir ./results --cluster production "ps aux"
 .RS
 Creates timestamped files per node:
 .br
@@ -1464,7 +1663,7 @@ Creates timestamped files per node:
 
 .TP
 Interactive TUI mode (default in terminals):
-.B bssh -C production "apt-get update"
+.B bssh --cluster production "apt-get update"
 .RS
 Automatically launches Terminal UI with real-time monitoring.
 .br
@@ -1497,7 +1696,7 @@ Log panel keys (when visible):
 
 .TP
 Stream mode with real-time prefixes:
-.B bssh -C production --stream "tail -f /var/log/syslog"
+.B bssh --cluster production --stream "tail -f /var/log/syslog"
 .RS
 Disables TUI and streams output with [node] prefixes in real-time.
 .br
@@ -1513,21 +1712,21 @@ Useful for monitoring long-running commands or when piping output.
 .SS Fail-Fast Mode Examples
 .TP
 Stop on first failure during critical deployment:
-.B bssh -k -C production "deploy.sh"
+.B bssh --fail-fast --cluster production "deploy.sh"
 .RS
 Execution stops immediately if any node fails the deployment script
 .RE
 
 .TP
 Combine fail-fast with require-all-success:
-.B bssh --fail-fast --require-all-success -C production "service-restart.sh"
+.B bssh --fail-fast --require-all-success --cluster production "service-restart.sh"
 .RS
 Stops early on failure AND ensures final exit code reflects any failures
 .RE
 
 .TP
 Sequential fail-fast with limited parallelism:
-.B bssh -k --parallel 1 -H "node1,node2,node3" "critical-operation"
+.B bssh --fail-fast --parallel 1 -H "node1,node2,node3" "critical-operation"
 .RS
 Runs commands one at a time, stopping on first failure
 .RE
@@ -1539,39 +1738,39 @@ Upload configuration file to all nodes:
 
 .TP
 Download logs from all web servers:
-.B bssh -C webservers download /var/log/nginx/access.log ./logs/
+.B bssh --cluster webservers download /var/log/nginx/access.log ./logs/
 .RS
 Each file is saved as hostname_access.log in the ./logs/ directory
 .RE
 
 .TP
 Upload with custom SSH key and increased parallelism:
-.B bssh -i ~/.ssh/deploy_key --parallel 20 -C production upload deploy.tar.gz /tmp/
+.B bssh -i ~/.ssh/deploy_key --parallel 20 --cluster production upload deploy.tar.gz /tmp/
 
 .TP
 Upload multiple files with glob pattern:
-.B bssh -C production upload "*.log" /var/backups/logs/
+.B bssh --cluster production upload "*.log" /var/backups/logs/
 .RS
 Uploads all .log files from current directory to /var/backups/logs/ on all nodes
 .RE
 
 .TP
 Download logs with wildcard pattern:
-.B bssh -C production download "/var/log/app*.log" ./collected_logs/
+.B bssh --cluster production download "/var/log/app*.log" ./collected_logs/
 .RS
 Downloads all files matching app*.log from /var/log/ on each node
 .RE
 
 .TP
 Start interactive mode with all nodes:
-.B bssh -C production interactive
+.B bssh --cluster production interactive
 .RS
 Opens an interactive shell session with all nodes in multiplex mode
 .RE
 
 .TP
 Start interactive mode with single node:
-.B bssh -C production interactive --single-node
+.B bssh --cluster production interactive --single-node
 .RS
 Prompts to select one node for interactive session
 .RE
@@ -1582,25 +1781,25 @@ Interactive mode with custom prompt:
 
 .TP
 Interactive mode with initial working directory:
-.B bssh -C staging interactive --work-dir /var/www
+.B bssh --cluster staging interactive --work-dir /var/www
 .RS
 Sets initial working directory to /var/www on all nodes
 .RE
 
 .TP
 Interactive mode with keepalive for long-running sessions:
-.B bssh -C production --server-alive-interval 30 --server-alive-count-max 5 interactive
+.B bssh --cluster production --server-alive-interval 30 --server-alive-count-max 5 interactive
 .RS
 Configure SSH keepalive settings to prevent idle disconnection in long-running sessions (e.g., tmux).
 The keepalive settings apply to both the destination host and any jump hosts in the connection chain.
 .RE
 
-.SS Exit Code Handling Examples (v1.2.0+)
+.SS Exit Code Handling Examples
 
 .TP
 MPI job with intelligent error handling:
 .nf
-.B bssh -C cluster "mpirun -n 16 ./simulation"
+.B bssh --cluster cluster "mpirun -n 16 ./simulation"
 .B EXIT_CODE=$?
 .B
 .B case $EXIT_CODE in
@@ -1613,9 +1812,9 @@ MPI job with intelligent error handling:
 .fi
 
 .TP
-Health check requiring all nodes (legacy behavior):
+Health check requiring all nodes:
 .nf
-.B bssh --require-all-success -C production "disk-check"
+.B bssh --require-all-success --cluster production "disk-check"
 .B if [ $? -ne 0 ]; then
 .B     alert_ops "One or more nodes unhealthy"
 .B fi
@@ -1624,7 +1823,7 @@ Health check requiring all nodes (legacy behavior):
 .TP
 Hybrid mode - preserve main exit code but detect failures:
 .nf
-.B bssh --check-all-nodes -C cluster "mpirun ./program"
+.B bssh --check-all-nodes --cluster cluster "mpirun ./program"
 .B EXIT_CODE=$?
 .B
 .B if [ $EXIT_CODE -eq 1 ]; then
@@ -1638,7 +1837,7 @@ Hybrid mode - preserve main exit code but detect failures:
 CI/CD pipeline integration (no changes needed):
 .nf
 .B # Works exactly like mpirun
-.B if bssh -C cluster "mpirun ./tests"; then
+.B if bssh --cluster cluster "mpirun ./tests"; then
 .B     echo "Tests passed"
 .B     deploy_to_production
 .B else
@@ -1670,7 +1869,7 @@ Note: The special command prefix can be customized in the configuration file.
 .B bssh
 uses different exit code strategies depending on command-line flags.
 
-.SS Default Behavior (v1.2.0+)
+.SS Default Behavior
 Returns the exit code from the main rank (rank 0 or first node).
 This matches standard MPI tool behavior (mpirun, srun, mpiexec).
 
@@ -1713,10 +1912,10 @@ Common exit codes:
 \- Terminated by SIGTERM
 .RE
 
-.SS Legacy Behavior (--require-all-success)
+.SS All-Nodes Mode (--require-all-success)
 When using the
 .B --require-all-success
-flag, bssh uses the v1.0-v1.1 behavior:
+flag, bssh requires every node to succeed:
 
 .TP
 .B 0
@@ -1742,6 +1941,34 @@ Main rank succeeded but other nodes failed
 .TP
 .B 2-255
 Main rank failed with this exit code
+
+.SS ping Subcommand
+The
+.B ping
+subcommand runs no remote command, so there is no remote exit status to
+forward and the main rank strategy does not apply. Its 0/1 boundary follows
+.B --require-all-success
+(a health check is green only when every host is green), and total failure is
+reported as 255 following OpenSSH's convention that 255 means ssh itself
+encountered an error:
+
+.TP
+.B 0
+Every targeted host connected and authenticated
+
+.TP
+.B 1
+At least one host was reachable and at least one failed
+
+.TP
+.B 255
+No host was reachable, or bssh failed before it could attempt any connection
+(configuration file could not be loaded, no host resolved, and similar)
+
+.PP
+Command-line usage errors are rejected by the argument parser before this
+contract applies and keep the parser's own exit code 2, as they do for every
+subcommand.
 
 .SH OUTPUT FILES
 When using the
@@ -1822,15 +2049,15 @@ Example: BSSH_PASSWORD=mysecret bssh --password -H "user@host" "uptime"
 .TP
 .B BSSH_SUDO_PASSWORD
 Sudo password for automated sudo authentication. When set along with the
-.B -S
-flag, bssh will use this password instead of prompting interactively.
+.B \-\-sudo\-password
+option, bssh will use this password instead of prompting interactively.
 .br
 .B WARNING:
 Using environment variables for passwords is not recommended for production
 use as they may be visible in process listings, shell history, or logs.
 Prefer the interactive prompt for security-sensitive operations.
 .br
-Example: BSSH_SUDO_PASSWORD=mypassword bssh -S -C cluster "sudo apt update"
+Example: BSSH_SUDO_PASSWORD=mypassword bssh --sudo-password --cluster cluster "sudo apt update"
 
 .TP
 .B BSSH_TUI_LOG_MAX_ENTRIES
@@ -1840,7 +2067,7 @@ Default: 1000
 .br
 Maximum: 10000 (prevents memory exhaustion)
 .br
-Example: BSSH_TUI_LOG_MAX_ENTRIES=5000 bssh -C cluster "command"
+Example: BSSH_TUI_LOG_MAX_ENTRIES=5000 bssh --cluster cluster "command"
 
 .TP
 .B USER
@@ -1865,45 +2092,11 @@ Backend.AI node role (main/sub)
 .TP
 .B SSH_AUTH_SOCK
 SSH agent socket path. When set, bssh can automatically detect and use
-the SSH agent for authentication without specifying the -A flag
+the SSH agent for authentication without specifying
+.BR \-\-use\-agent .
 
 .SH NOTES
-.SS Breaking Changes (v0.5.3+)
-.TP
-.B Cluster option changed:
-The cluster option has changed from lowercase -c to uppercase -C to avoid conflicts 
-with SSH's -c (cipher) option. Update your scripts accordingly.
-.TP
-.B Parallel option changed:
-The -p option now specifies port (SSH compatibility). For parallel connections,
-use --parallel instead.
-
-.SS Breaking Changes (v1.2.0)
-.TP
-.B Exit code behavior changed:
-The default exit code behavior has changed to match standard MPI tools.
-.RS
-.IP \(bu 2
-.B Old behavior (v1.0-v1.1):
-Returns 0 if all nodes succeeded, 1 if any node failed
-.IP \(bu 2
-.B New behavior (v1.2+):
-Returns main rank's actual exit code (matches mpirun/srun/mpiexec)
-.IP \(bu 2
-.B Migration:
-Use
-.I --require-all-success
-flag to preserve old behavior
-.IP \(bu 2
-.B Why this change?
-This change aligns bssh with industry-standard MPI tools, preserves actual exit codes
-for better error diagnosis (139=segfault, 137=OOM, etc.), enables exit-code-based
-automation in CI/CD pipelines, and improves integration with shell scripts and
-monitoring systems.
-.RE
-
-.TP
-.B Main Rank Detection:
+.SS Main Rank Detection
 The main rank is automatically identified using the following priority order:
 .RS
 .IP 1. 4

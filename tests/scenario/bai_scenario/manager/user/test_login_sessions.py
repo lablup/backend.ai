@@ -8,16 +8,6 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.components.user import AGrant
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.seeder import Laid
-from bai_scenario.seeds.user.fields import SeedKeypairOf, SeedLoginSessionOf
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_session.request import (
@@ -55,6 +45,16 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.user import AGrant
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.seeder import Laid
+from bai_scenario.seeds.user.fields import SeedKeypairOf, SeedLoginSessionOf
 
 type Searched = AdminSearchLoginSessionsPayload | MySearchLoginSessionsPayload
 

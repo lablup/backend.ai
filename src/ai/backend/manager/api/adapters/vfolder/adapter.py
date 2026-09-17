@@ -12,8 +12,10 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -30,6 +32,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
+    SetVFolderMountPolicyInput,
+    UnsetVFolderMountPolicyInput,
     VFolderFilter,
     VFolderOrder,
 )
@@ -52,6 +56,10 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     PurgeVFolderPayload,
     RestoreVFolderPayload,
     SearchVFoldersPayload,
+    SetVFolderMountPolicyPayload,
+    UnsetVFolderMountPolicyPayload,
+    VFolderMountPoliciesPayload,
+    VFolderMountPolicyNode,
     VFolderNode,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
@@ -59,6 +67,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
+    VFolderPermissionField,
     VFolderQuotaInfo,
     VFolderScope,
 )
@@ -72,6 +81,7 @@ from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -89,7 +99,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderMountPermission,
+    VFolderMountPolicyData,
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
@@ -125,6 +135,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
 )
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
+)
 from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
@@ -138,6 +151,11 @@ from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
+from ai.backend.manager.services.vfolder.actions.mount_policy import (
+    ListVFolderMountPoliciesAction,
+    SetVFolderMountPolicyAction,
+    UnsetVFolderMountPolicyAction,
+)
 from ai.backend.manager.services.vfolder.actions.scoped_search import (
     DomainVFolderScopeItem,
     ProjectVFolderScopeItem,
@@ -152,7 +170,11 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
 )
-from ai.backend.manager.services.vfolder.processors import VFolderFileProcessors, VFolderProcessors
+from ai.backend.manager.services.vfolder.processors import (
+    VFolderFileProcessors,
+    VFolderMountPolicyProcessors,
+    VFolderProcessors,
+)
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
@@ -207,6 +229,7 @@ class VFolderAdapter(BaseAdapter):
     _vfolder_file: VFolderFileProcessors
     _vfolder_admin: VFolderAdminProcessors
     _deployment: DeploymentProcessors
+    _mount_policy: VFolderMountPolicyProcessors
 
     def __init__(
         self,
@@ -214,11 +237,13 @@ class VFolderAdapter(BaseAdapter):
         vfolder_file: VFolderFileProcessors,
         vfolder_admin: VFolderAdminProcessors,
         deployment: DeploymentProcessors,
+        mount_policy: VFolderMountPolicyProcessors,
     ) -> None:
         self._vfolder = vfolder
         self._vfolder_file = vfolder_file
         self._vfolder_admin = vfolder_admin
         self._deployment = deployment
+        self._mount_policy = mount_policy
 
     @staticmethod
     def _vfolder_data_to_node(data: VFolderData) -> VFolderNode:
@@ -236,7 +261,7 @@ class VFolderAdapter(BaseAdapter):
                 cloneable=data.cloneable,
             ),
             access_control=VFolderAccessControlInfo(
-                permission=data.permission.to_field() if data.permission else None,
+                permission=VFolderPermissionField(data.default_mount_permission.value),
                 ownership_type=data.ownership_type.to_field(),
             ),
             ownership=VFolderOwnershipInfo(
@@ -275,6 +300,30 @@ class VFolderAdapter(BaseAdapter):
             self._vfolder_data_to_node(item) if item is not None else None
             for item in action_result.data
         ]
+
+    async def batch_load_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> list[list[PermissionBitDTO] | Exception]:
+        """The permission bits the caller holds on each vfolder, in the given order.
+
+        A folder the caller may not read answers with its denial.
+        """
+        if not vfolder_ids:
+            return []
+        result = await self._vfolder.bulk_load_permissions.run(
+            BulkLoadVFolderPermissionsAction(vfolder_ids=vfolder_ids)
+        )
+        held = result.values()
+        errors = result.errors()
+        answers: list[list[PermissionBitDTO] | Exception] = []
+        for vfolder_id in vfolder_ids:
+            error = self.batch_load_failure(errors.get(vfolder_id))
+            if error is not None:
+                answers.append(error)
+                continue
+            bits = held.get(vfolder_id, Permission.NONE)
+            answers.append([dto for dto in PermissionBitDTO if bits & Permission[dto.name]])
+        return answers
 
     # -------------------------------------------------------------------------
     # Search
@@ -454,7 +503,7 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             user=UserID(me.user_id),
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderMountPermission(input.permission.value),
+            default_mount_permission=VFolderMountPolicy(input.permission.value),
             cloneable=input.cloneable,
         )
 
@@ -473,7 +522,7 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             project=project_id,
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderMountPermission(input.permission.value),
+            default_mount_permission=VFolderMountPolicy(input.permission.value),
             cloneable=input.cloneable,
         )
 
@@ -499,6 +548,52 @@ class VFolderAdapter(BaseAdapter):
             GetVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
         )
         return self._vfolder_data_to_node(result.vfolder)
+
+    async def set_mount_policy(
+        self, vfolder_id: UUID, input: SetVFolderMountPolicyInput
+    ) -> SetVFolderMountPolicyPayload:
+        """Set the mount level one user gets on the folder."""
+        result = await self._mount_policy.set.run(
+            SetVFolderMountPolicyAction(
+                vfolder_uuid=VFolderUUID(vfolder_id),
+                user_id=UserID(input.user_id),
+                permission=VFolderMountPolicy(input.permission.value),
+            )
+        )
+        return SetVFolderMountPolicyPayload(policy=self._mount_policy_to_node(result.policy))
+
+    async def unset_mount_policy(
+        self, vfolder_id: UUID, input: UnsetVFolderMountPolicyInput
+    ) -> UnsetVFolderMountPolicyPayload:
+        """Take back the mount level one user was given on the folder."""
+        result = await self._mount_policy.unset.run(
+            UnsetVFolderMountPolicyAction(
+                vfolder_uuid=VFolderUUID(vfolder_id), user_id=UserID(input.user_id)
+            )
+        )
+        return UnsetVFolderMountPolicyPayload(
+            vfolder_id=vfolder_id, user_id=input.user_id, removed=result.removed
+        )
+
+    async def list_mount_policies(self, vfolder_id: UUID) -> VFolderMountPoliciesPayload:
+        """The mount levels set on the folder, one row per user."""
+        result = await self._mount_policy.list.run(
+            ListVFolderMountPoliciesAction(vfolder_uuid=VFolderUUID(vfolder_id))
+        )
+        return VFolderMountPoliciesPayload(
+            items=[self._mount_policy_to_node(policy) for policy in result.policies]
+        )
+
+    @staticmethod
+    def _mount_policy_to_node(data: VFolderMountPolicyData) -> VFolderMountPolicyNode:
+        return VFolderMountPolicyNode(
+            id=data.id,
+            vfolder_id=data.vfolder_id,
+            user_id=data.user_id,
+            permission=VFolderPermissionField(data.permission.value),
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
 
     async def get_folder_usage(self, vfolder_id: UUID) -> VFolderUsageInfoDTO | None:
         """Fetch usage statistics on demand through the storage proxy.

@@ -75,6 +75,24 @@ def register_v2_vfolder_routes(
         middlewares=[auth_required],
     )
     registry.add(
+        "PUT",
+        "/{vfolder_id}/mount-policies",
+        handler.set_mount_policy,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "DELETE",
+        "/{vfolder_id}/mount-policies/{user_id}",
+        handler.unset_mount_policy,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "GET",
+        "/{vfolder_id}/mount-policies",
+        handler.list_mount_policies,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "POST",
         "/{vfolder_id}/restore",
         handler.restore,

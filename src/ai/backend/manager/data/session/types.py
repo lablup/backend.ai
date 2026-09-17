@@ -589,13 +589,3 @@ class SessionSchedulingHistoryListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-
-@dataclass
-class SessionListResult:
-    """Search result with total count and pagination info for sessions."""
-
-    items: list[SessionData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool

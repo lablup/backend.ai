@@ -8,7 +8,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderItemField,
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission as VFolderPermission,
 )
@@ -53,7 +53,7 @@ class VFolderItemToCreate:
     name: str
     folder_host: str | None
     usage_mode: VFolderUsageMode
-    permission: VFolderPermission
+    permission: VFolderMountPolicy
     group_id: uuid.UUID | None
     cloneable: bool
     unmanaged_path: str | None
@@ -64,7 +64,7 @@ class VFolderItemToCreate:
             name=request.name,
             folder_host=request.folder_host,
             usage_mode=request.usage_mode,
-            permission=VFolderPermission(request.permission),
+            permission=VFolderMountPolicy(request.permission),
             group_id=request.group_id,
             cloneable=request.cloneable,
             unmanaged_path=request.unmanaged_path,

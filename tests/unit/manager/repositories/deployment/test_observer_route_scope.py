@@ -393,6 +393,7 @@ class TestObserverCycleRouteScope:
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),
             valkey_schedule=AsyncMock(),
+            permission_check=AsyncMock(),
         )
         coord = RouteCoordinator(
             valkey_schedule=AsyncMock(),

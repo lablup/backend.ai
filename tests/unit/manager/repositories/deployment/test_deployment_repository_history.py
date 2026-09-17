@@ -420,6 +420,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def test_updates_status_and_creates_history_atomically(
@@ -862,6 +863,7 @@ class TestUpdateRouteStatusBulkWithHistory:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def test_updates_status_and_creates_history_atomically(
@@ -1158,6 +1160,7 @@ class TestDeploymentHistoryMergeLogic:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def test_merge_same_phase_error_to_status(
@@ -1497,6 +1500,7 @@ class TestRouteHistoryMergeLogic:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def test_merge_same_phase_error_to_status(

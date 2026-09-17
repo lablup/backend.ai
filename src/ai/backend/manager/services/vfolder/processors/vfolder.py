@@ -1,4 +1,7 @@
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import ScopedBatchOpsResult
@@ -16,8 +19,6 @@ from ai.backend.manager.services.vfolder.actions.base import (
     GetTaskLogsActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
-    ListVFolderAction,
-    ListVFolderActionResult,
     LookupAccessibleVFolderAction,
     LookupAccessibleVFolderActionResult,
     MoveToTrashVFolderAction,
@@ -32,6 +33,12 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
     GlobalBatchLoadVFoldersActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
 )
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
@@ -108,7 +115,6 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 class VFolderProcessors:
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
-    list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
     scoped_search: ScopeActionProcessor[
         ScopedSearchVFoldersAction, ScopedBatchOpsResult[VFolderData]
     ]
@@ -167,6 +173,10 @@ class VFolderProcessors:
     batch_load_vfolders_by_ids: GlobalActionProcessor[
         GlobalBatchLoadVFoldersAction, GlobalBatchLoadVFoldersActionResult
     ]
+    bulk_load_permissions: PartialBulkActionProcessor[BulkLoadVFolderPermissionsAction, Permission]
+    bulk_load_mount_levels: PartialBulkActionProcessor[
+        BulkLoadVFolderMountLevelsAction, VFolderMountPolicy
+    ]
     lookup: LookupActionProcessor[LookupVFolderAction, LookupVFolderActionResult]
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     get_folder_usage: SingleEntityActionProcessor[
@@ -182,7 +192,6 @@ class VFolderProcessors:
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
-        self.list_vfolder = group.scope(ListVFolderAction, service.list)
         self.scoped_search = group.scope_search_ops(ScopedSearchVFoldersAction)
 
         # Single entity actions with RBAC validation
@@ -243,6 +252,12 @@ class VFolderProcessors:
         # Cross-entity loaders (no RBAC validation; caller has parent access)
         self.batch_load_vfolders_by_ids = group.global_scope(
             GlobalBatchLoadVFoldersAction, service.batch_load_by_ids
+        )
+        self.bulk_load_permissions = group.partial_bulk(
+            BulkLoadVFolderPermissionsAction, service.bulk_load_permissions
+        )
+        self.bulk_load_mount_levels = group.partial_bulk(
+            BulkLoadVFolderMountLevelsAction, service.bulk_load_mount_levels
         )
         self.lookup = group.lookup(LookupVFolderAction, service.lookup_vfolder)
 

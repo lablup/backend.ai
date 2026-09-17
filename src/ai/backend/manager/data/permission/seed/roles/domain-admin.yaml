@@ -11,7 +11,6 @@ permissions:
   app_config_fragment:              [read, update, create, soft_delete, hard_delete]
   artifact:                         []
   artifact_registry:                []
-  auth:                             []
   client_ip_masking_policy:         []
   container_registry:               [read]
   deployment:                       [read, update, create, soft_delete, hard_delete]
@@ -49,5 +48,4 @@ permissions:
   user:                             [read, update, create, soft_delete, hard_delete]
   user_resource_policy:             [read, update, create, soft_delete, hard_delete]
   vfolder:                          [read, update, create, soft_delete, hard_delete]
-  vfolder_invitation:               []
   vfs_storage:                      []

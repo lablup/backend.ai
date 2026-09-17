@@ -44,6 +44,10 @@ from .actions.get_entity_types import (
     PublicGetEntityTypesAction,
     PublicGetEntityTypesActionResult,
 )
+from .actions.get_held_permissions import (
+    ScopedGetHeldPermissionsAction,
+    ScopedGetHeldPermissionsActionResult,
+)
 from .actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
     PublicGetPermissionMatrixActionResult,
@@ -120,6 +124,9 @@ class PermissionControllerProcessors:
     public_get_permission_matrix: PublicActionProcessor[
         PublicGetPermissionMatrixAction, PublicGetPermissionMatrixActionResult
     ]
+    scoped_get_held_permissions: ScopeActionProcessor[
+        ScopedGetHeldPermissionsAction, ScopedGetHeldPermissionsActionResult
+    ]
     bulk_get_permissions: PartialBulkFieldActionProcessor[BulkGetPermissionsAction, PermissionData]
     search_role_permissions: BulkActionProcessor[
         SearchRolePermissionsAction, ScopedFieldsOpsResult[PermissionData]
@@ -184,6 +191,9 @@ class PermissionControllerProcessors:
         )
         self.public_get_permission_matrix = role_group.public(
             PublicGetPermissionMatrixAction, service.get_permission_matrix
+        )
+        self.scoped_get_held_permissions = role_group.scope(
+            ScopedGetHeldPermissionsAction, service.get_held_permissions
         )
         self.bulk_get_permissions = permissions.partial_bulk_get_ops(BulkGetPermissionsAction)
         self.search_role_permissions = permissions.atomic_bulk_scoped_search_ops(

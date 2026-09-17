@@ -5358,6 +5358,39 @@ type EntityActionInfo {
   actions: [OperationInfo!]!
 }
 
+"""
+Added in 26.3.0. Entity connection. Deprecated since 26.9.0. Use `Role.scope`.
+"""
+type EntityConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityRefEdge!]!
+  count: Int!
+}
+
+"""
+Added in 26.3.0. Filter for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+"""
+input EntityFilter {
+  entityType: StringFilter = null
+  entityId: StringFilter = null
+
+  """
+  Added in 26.8.0. Filter by the type of scope the entity is registered in.
+  """
+  scopeType: StringFilter = null
+
+  """
+  Added in 26.8.0. Filter by the id of scope the entity is registered in.
+  """
+  scopeId: StringFilter = null
+  AND: [EntityFilter!] = null
+  OR: [EntityFilter!] = null
+  NOT: [EntityFilter!] = null
+}
+
 """Added in 26.9.0. One `key=value` label and the entity carrying it."""
 type EntityLabel implements Node {
   """The Globally Unique ID of this object"""
@@ -5450,6 +5483,52 @@ type EntityOperationCombination {
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
+}
+
+"""
+Added in 26.3.0. Order by specification for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+"""
+input EntityOrderBy {
+  field: EntityOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Entity ordering field Deprecated since 26.9.0. Use `Role.scope`.
+"""
+enum EntityOrderField {
+  ENTITY_TYPE
+  REGISTERED_AT
+}
+
+"""
+Added in 26.3.0. A role and the scope it belongs to. Deprecated since 26.9.0. Use `Role.scope`.
+"""
+type EntityRef implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: String!
+  scopeId: String!
+  entityType: String!
+  entityId: String!
+  registeredAt: DateTime!
+
+  """The resolved entity object."""
+  entity: EntityNode
+
+  """
+  Added in 26.4.3. The resolved scope object in which the entity is registered.
+  """
+  scope: EntityNode
+}
+
+"""An edge in a connection."""
+type EntityRefEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityRef!
 }
 
 """
@@ -8589,10 +8668,10 @@ input ModifyQueryDefinitionInput {
 """Added in 26.3.0. Options for modifying an existing query definition."""
 input ModifyQueryDefinitionOptionsInput {
   """Allowed filter label keys."""
-  filterLabels: [String!] = null
+  filterLabels: [String!]
 
   """Allowed group-by label keys."""
-  groupLabels: [String!] = null
+  groupLabels: [String!]
 }
 
 """Added in 26.3.0. Payload returned after modifying a query definition."""
@@ -9470,6 +9549,16 @@ type Mutation {
   """
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload
 
+  """
+  Added in 26.9.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
+  """
+  setVFolderMountPolicy(vfolderId: UUID!, input: SetVFolderMountPolicyInput!): SetVFolderMountPolicyPayload
+
+  """
+  Added in 26.9.0. Take back the mount level one user was given on a virtual folder.
+  """
+  unsetVFolderMountPolicy(vfolderId: UUID!, input: UnsetVFolderMountPolicyInput!): UnsetVFolderMountPolicyPayload
+
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload
 
@@ -9530,11 +9619,45 @@ type Mutation {
 }
 
 """
+Added in 26.9.0. Input for the caller's permissions on several scopes and entity types.
+"""
+input MyAtomicBulkScopePermissionsInput {
+  """
+  The scopes and entity types to answer for, at most 100. A longer list is refused.
+  """
+  targets: [PermissionTarget!]!
+}
+
+"""
+Added in 26.9.0. Payload for the caller's permissions on several scopes and entity types.
+"""
+type MyAtomicBulkScopePermissionsPayload {
+  """One answer per target, in the order the targets were given."""
+  items: [ScopeEntityPermission!]!
+}
+
+"""
 Added in 26.4.2. Query result returning the current client's IP address.
 """
 type MyClientIp {
   """The client's IP address as seen by the server."""
   clientIp: String!
+}
+
+"""
+Added in 26.9.0. Input for the caller's permissions on one scope and entity type.
+"""
+input MyScopePermissionsInput {
+  """The scope and entity type to answer for."""
+  target: PermissionTarget!
+}
+
+"""
+Added in 26.9.0. Payload for the caller's permissions on one scope and entity type.
+"""
+type MyScopePermissionsPayload {
+  """The answer for the named target."""
+  item: ScopeEntityPermission!
 }
 
 """
@@ -9959,6 +10082,20 @@ enum PermissionOrderField {
   ID
   ENTITY_TYPE
   CREATED_AT
+}
+
+"""
+Added in 26.9.0. One scope and entity type to answer the caller's permissions for.
+"""
+input PermissionTarget {
+  """Type of the scope, e.g. `project`."""
+  scopeType: String!
+
+  """ID of the scope."""
+  scopeId: UUID!
+
+  """Entity type the permissions are asked about."""
+  entityType: String!
 }
 
 """
@@ -11685,6 +11822,16 @@ type Query {
   """
   rbacPermissionMatrix: [ScopeEntityOperationCombination!]
 
+  """
+  Added in 26.9.0. The permissions the caller holds on one entity type within one scope, read through every scope that governs it. A scope that does not exist and a scope the caller reaches nothing on answer alike, with no bits.
+  """
+  myScopePermissions(input: MyScopePermissionsInput!): MyScopePermissionsPayload
+
+  """
+  Added in 26.9.0. The same answer as `myScopePermissions` for several targets at once, resolved in one grouped pass. Atomic: there is no per-target failure, so the payload carries no failure channel and the whole query fails or none of it does.
+  """
+  myAtomicBulkScopePermissions(input: MyAtomicBulkScopePermissionsInput!): MyAtomicBulkScopePermissionsPayload
+
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
@@ -12055,6 +12202,11 @@ type Query {
   Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+
+  """
+  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+  """
+  vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
@@ -13442,6 +13594,11 @@ type Role implements Node {
 
   """Added in 26.9.0. Users holding this role."""
   usersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
+  Added in 26.4.2. Scopes this role is registered in. Deprecated since 26.9.0. Use `scope`.
+  """
+  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.9.0. Use `scope`. A role belongs to one scope, so this connection holds that one scope and ignores `filter` and `order_by`.")
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -13520,6 +13677,11 @@ input RoleAssignmentRoleNestedFilter {
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
+
+  """
+  Added in 26.9.0. Filter assignments by the scope their role is registered in. For listing assignments only — a role registered in a scope does not mean the caller holds anything there. Use `myScopePermissions` to decide.
+  """
+  mappedScope: RoleMappedScopeNestedFilter = null
   AND: [RoleAssignmentRoleNestedFilter!] = null
   OR: [RoleAssignmentRoleNestedFilter!] = null
   NOT: [RoleAssignmentRoleNestedFilter!] = null
@@ -13551,6 +13713,11 @@ input RoleFilter {
   status: RoleStatusFilter = null
   assignedUser: RoleUserNestedFilter = null
   mappedScope: RoleMappedScopeNestedFilter = null
+
+  """
+  Added in 26.9.0. Filter roles by the permissions they carry. For listing roles only — a role carrying a bit does not mean the caller holds it. Use `myScopePermissions` to decide what the caller may do.
+  """
+  permission: PermissionNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -14639,6 +14806,25 @@ type ScopeEntityOperationCombination {
 }
 
 """
+Added in 26.9.0. The bits the caller holds on one entity type within one scope.
+"""
+type ScopeEntityPermission {
+  """Type of the scope, echoed from the target."""
+  scopeType: String!
+
+  """ID of the scope, echoed from the target."""
+  scopeId: UUID!
+
+  """Entity type, echoed from the target."""
+  entityType: String!
+
+  """
+  The bits the caller holds. Empty when it holds none, which is also the answer for a scope that does not exist and for an entity type this build does not declare: the two are not told apart, so the answer cannot reveal whether a scope exists.
+  """
+  permissions: [PermissionBit!]!
+}
+
+"""
 Added in 26.4.2. Scope reference for associating an entity with a scope.
 """
 input ScopeInput {
@@ -15307,6 +15493,25 @@ enum SessionV2Type {
   SYSTEM
 }
 
+"""
+Added in 26.9.0. Input for setting the mount level one user gets on a virtual folder.
+"""
+input SetVFolderMountPolicyInput {
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """
+  Mount level: NONE, READ_ONLY or READ_WRITE. RW_DELETE is stored as READ_WRITE.
+  """
+  permission: VFolderMountPermission!
+}
+
+"""Added in 26.9.0. Payload returned after setting a mount policy."""
+type SetVFolderMountPolicyPayload {
+  """The mount level now set."""
+  policy: VFolderMountPolicy!
+}
+
 """Added in 26.4.2. Slider UI config."""
 type SliderOption {
   """Minimum value."""
@@ -15624,6 +15829,26 @@ Added in 26.8.0. What the caller could change so an unschedulable kernel would f
 type UnschedulableReasonHint {
   """Subtract these slots to fit the best-fitting node."""
   requiredReduction: [ResourceSlotEntry!]
+}
+
+"""
+Added in 26.9.0. Input for taking back the mount level one user was given on a virtual folder.
+"""
+input UnsetVFolderMountPolicyInput {
+  """User whose mount level is taken back."""
+  userId: UUID!
+}
+
+"""Added in 26.9.0. Payload returned after unsetting a mount policy."""
+type UnsetVFolderMountPolicyPayload {
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User whose mount level was taken back."""
+  userId: UUID!
+
+  """Whether a row was removed."""
+  removed: Boolean!
 }
 
 """Added in 26.8.0. Input for changing the resource group of an agent."""
@@ -17854,6 +18079,11 @@ type VFolder implements Node {
 
   """Added in 26.9.0. The labels on this vfolder."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
+
+  """
+  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  """
+  permissions: [PermissionBit!]!
 }
 
 """
@@ -17994,11 +18224,43 @@ type VFolderMetadataInfo {
   cloneable: Boolean!
 }
 
-"""Added in 26.4.2. Mount permission level for a virtual folder."""
+"""
+Added in 26.4.2. Mount permission level for a virtual folder. NONE (added in 26.9.0) mounts to nobody; RW_DELETE mounts as READ_WRITE.
+"""
 enum VFolderMountPermission {
+  NONE
   READ_ONLY
   READ_WRITE
   RW_DELETE
+}
+
+"""
+Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+"""
+type VFolderMountPoliciesPayload {
+  """One row per user."""
+  items: [VFolderMountPolicy!]!
+}
+
+"""Added in 26.9.0. The mount level one user gets on a virtual folder."""
+type VFolderMountPolicy {
+  """Mount policy row ID."""
+  id: UUID!
+
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """Mount level: NONE, RO or RW."""
+  permission: VFolderMountPermission!
+
+  """When the row was first set."""
+  createdAt: DateTime!
+
+  """When the level was last replaced."""
+  updatedAt: DateTime!
 }
 
 """Added in 26.4.2. Operation status of a virtual folder."""

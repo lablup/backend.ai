@@ -29,7 +29,6 @@ from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 
@@ -132,11 +131,10 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 )
             # The base image may have been deleted while the session is still
             # running, so include non-alive images when resolving it.
-            image_row = await self._session_repository.resolve_image(
-                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
-                alive_only=False,
+            image_data = await self._session_repository.resolve_image_by_canonical(
+                session.main_kernel.image, session.main_kernel.architecture, alive_only=False
             )
-            base_image_ref = image_row.image_ref
+            base_image_ref = image_data.image_ref
 
             # Build new image canonical name
             filtered_tag_set = [

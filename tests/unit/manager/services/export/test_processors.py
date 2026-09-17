@@ -38,8 +38,8 @@ from ai.backend.manager.repositories.base.export import StreamingExportQuery
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
 from ai.backend.manager.repositories.export.repository import ExportRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.manager.services.export.actions.export_my_keypairs_csv import (
     ExportMyKeypairsCSVAction,
@@ -76,7 +76,7 @@ def actor() -> UserData:
 
 @pytest.fixture
 def permission_repository() -> MagicMock:
-    repository = MagicMock(spec=PermissionControllerRepository)
+    repository = MagicMock(spec=RbacPermissionCheckRepository)
     repository.governed_permissions.return_value = {}
     return repository
 
