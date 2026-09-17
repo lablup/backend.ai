@@ -37,14 +37,14 @@ Then
 
 #### [a-status-equals-filter-keeps-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
 
-정상 상태의 서비스 둘을 그 상태와 같은 것으로 걸러 조회하면 둘 다 세어진다
+상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다
 
 Given
 
-- 서비스 2개와, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
+- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
+  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
+  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
+  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -54,27 +54,28 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 상태가 healthy인 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search — user-1이 상태가 unhealthy인 것으로 걸러 조회
 
 Then
 
-- 심은 서비스가 모두 세어진다
-  - items.id: 심은 서비스들와 같다
-  - items.instance_id = ['other-1', 'wanted-1']
-  - total_count = 2
+- 비정상 상태의 서비스만 반환된다
+  - items.id: 그 상태로 심은 서비스와 같다
+  - items.instance_id = ['unhealthy-1']
+  - items.status = [<ServiceCatalogStatus.UNHEALTHY: 'unhealthy'>]
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
-#### [a-status-in-filter-drops-the-services-of-no-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-status-in-filter-keeps-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
 
-정상 상태의 서비스 둘을 다른 상태들의 목록에 든 것으로 걸러 조회하면 아무것도 남지 않는다
+상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 비정상과 등록 해제 서비스만 반환된다
 
 Given
 
-- 서비스 2개와, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
+- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
+  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
+  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
+  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -88,22 +89,24 @@ When
 
 Then
 
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
+- 비정상·등록 해제 상태의 서비스만 반환된다
+  - items.id: 그 상태로 심은 서비스와 같다
+  - items.instance_id = ['deregistered-1', 'unhealthy-1']
+  - items.status = [<ServiceCatalogStatus.DEREGISTERED: 'deregistered'>, <ServiceCatalogStatus.UNHEALTHY: 'unhealthy'>]
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
 #### [a-status-not-equals-filter-drops-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
 
-정상 상태의 서비스 둘을 그 상태와 다른 것으로 걸러 조회하면 아무것도 남지 않는다
+상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 정상과 등록 해제 서비스만 반환된다
 
 Given
 
-- 서비스 2개와, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
+- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
+  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
+  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
+  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -113,26 +116,28 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 상태가 healthy이 아닌 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search — user-1이 상태가 unhealthy이 아닌 것으로 걸러 조회
 
 Then
 
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
+- 정상·등록 해제 상태의 서비스만 반환된다
+  - items.id: 그 상태로 심은 서비스와 같다
+  - items.instance_id = ['deregistered-1', 'healthy-1']
+  - items.status = [<ServiceCatalogStatus.DEREGISTERED: 'deregistered'>, <ServiceCatalogStatus.HEALTHY: 'healthy'>]
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
-#### [a-status-not-in-filter-keeps-the-services-of-no-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-status-not-in-filter-drops-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
 
-정상 상태의 서비스 둘을 다른 상태들의 목록에 들지 않은 것으로 걸러 조회하면 둘 다 세어진다
+상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다
 
 Given
 
-- 서비스 2개와, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
+- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
+  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
+  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
+  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -146,10 +151,11 @@ When
 
 Then
 
-- 심은 서비스가 모두 세어진다
-  - items.id: 심은 서비스들와 같다
-  - items.instance_id = ['other-1', 'wanted-1']
-  - total_count = 2
+- 정상 상태의 서비스만 반환된다
+  - items.id: 그 상태로 심은 서비스와 같다
+  - items.instance_id = ['healthy-1']
+  - items.status = [<ServiceCatalogStatus.HEALTHY: 'healthy'>]
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 

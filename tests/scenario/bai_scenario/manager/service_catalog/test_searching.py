@@ -23,13 +23,14 @@ from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatal
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.service_catalog import (
     EveryLaidServiceComesWhole,
-    EveryLaidServiceIsCounted,
     ManyServicesAndACaller,
     ManyServicesAndSomeone,
     OnlyTheNamedGroupIsLeft,
+    OnlyTheServicesOfStatuses,
+    ServicesOfEveryStatusAndSomeone,
     ServicesOfTwoGroupsAndSomeone,
     TheFirstPageOfServices,
 )
@@ -260,19 +261,19 @@ class AStatusEqualsFilterKeepsThatStatus(
 
     @override
     def describe(self) -> str:
-        return "정상 상태의 서비스 둘을 그 상태와 같은 것으로 걸러 조회하면 둘 다 세어진다"
+        return "상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
-        return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
+        return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
-        return SearchingByStatusEquals(ServiceCatalogStatus.HEALTHY)
+        return SearchingByStatusEquals(ServiceCatalogStatus.UNHEALTHY)
 
     @override
     def then(self) -> Then[ManyServicesAndACaller, Searched]:
-        return EveryLaidServiceIsCounted()
+        return OnlyTheServicesOfStatuses((ServiceCatalogStatus.UNHEALTHY,))
 
 
 @dataclass(frozen=True)
@@ -285,36 +286,45 @@ class AStatusNotEqualsFilterDropsThatStatus(
 
     @override
     def describe(self) -> str:
-        return "정상 상태의 서비스 둘을 그 상태와 다른 것으로 걸러 조회하면 아무것도 남지 않는다"
+        return (
+            "상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 "
+            "정상과 등록 해제 서비스만 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
-        return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
+        return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
-        return SearchingByStatusNotEquals(ServiceCatalogStatus.HEALTHY)
+        return SearchingByStatusNotEquals(ServiceCatalogStatus.UNHEALTHY)
 
     @override
     def then(self) -> Then[ManyServicesAndACaller, Searched]:
-        return NothingIsFound()
+        return OnlyTheServicesOfStatuses((
+            ServiceCatalogStatus.HEALTHY,
+            ServiceCatalogStatus.DEREGISTERED,
+        ))
 
 
 @dataclass(frozen=True)
-class AStatusInFilterDropsUnlistedStatuses(
+class AStatusInFilterKeepsListedStatuses(
     Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "a-status-in-filter-drops-the-services-of-no-listed-status"
+        return "a-status-in-filter-keeps-the-services-of-a-listed-status"
 
     @override
     def describe(self) -> str:
-        return "정상 상태의 서비스 둘을 다른 상태들의 목록에 든 것으로 걸러 조회하면 아무것도 남지 않는다"
+        return (
+            "상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 "
+            "비정상과 등록 해제 서비스만 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
-        return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
+        return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
@@ -325,24 +335,30 @@ class AStatusInFilterDropsUnlistedStatuses(
 
     @override
     def then(self) -> Then[ManyServicesAndACaller, Searched]:
-        return NothingIsFound()
+        return OnlyTheServicesOfStatuses((
+            ServiceCatalogStatus.UNHEALTHY,
+            ServiceCatalogStatus.DEREGISTERED,
+        ))
 
 
 @dataclass(frozen=True)
-class AStatusNotInFilterKeepsUnlistedStatuses(
+class AStatusNotInFilterDropsListedStatuses(
     Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "a-status-not-in-filter-keeps-the-services-of-no-listed-status"
+        return "a-status-not-in-filter-drops-the-services-of-a-listed-status"
 
     @override
     def describe(self) -> str:
-        return "정상 상태의 서비스 둘을 다른 상태들의 목록에 들지 않은 것으로 걸러 조회하면 둘 다 세어진다"
+        return (
+            "상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 "
+            "정상 서비스만 반환된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
-        return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
+        return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
@@ -353,7 +369,7 @@ class AStatusNotInFilterKeepsUnlistedStatuses(
 
     @override
     def then(self) -> Then[ManyServicesAndACaller, Searched]:
-        return EveryLaidServiceIsCounted()
+        return OnlyTheServicesOfStatuses((ServiceCatalogStatus.HEALTHY,))
 
 
 @dataclass(frozen=True)
@@ -441,8 +457,8 @@ SCENARIOS: list[SearchingStep] = [
     AGroupFilterNarrows(),
     AStatusEqualsFilterKeepsThatStatus(),
     AStatusNotEqualsFilterDropsThatStatus(),
-    AStatusInFilterDropsUnlistedStatuses(),
-    AStatusNotInFilterKeepsUnlistedStatuses(),
+    AStatusInFilterKeepsListedStatuses(),
+    AStatusNotInFilterDropsListedStatuses(),
     OmittingThePageSizeGivesTen(),
     TheMonitorSeesWhatTheSuperadminSees(started=datetime.now(UTC)),
     AUserWhoIsNotTheSuperadminMayNotSearch(),

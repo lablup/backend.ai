@@ -1,8 +1,8 @@
 """What a service catalog scenario table says besides the call.
 
 A service is registered in no scope, so a table lays no place for it: only the caller and
-the services the search reads. Every laid service is healthy, the one state the
-registration spec writes.
+the services the search reads. A service is laid healthy unless a table asks for the status
+filter, which needs one of every status side by side.
 """
 
 from __future__ import annotations
@@ -37,9 +37,11 @@ from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_caller, role_named
 from bai_scenario.seeds.service_catalog.service import (
     STARTED_UP,
+    STATUS_NAMES,
     VERSION,
     SeedEndpointOf,
     SeedService,
+    SeedServiceInStatus,
 )
 
 GROUP = "manager"
@@ -56,6 +58,7 @@ class ALaidService:
     id: ServiceCatalogID
     service_group: str
     instance_id: str
+    status: ServiceCatalogStatus
     endpoints: tuple[ServiceCatalogEndpointData, ...]
 
 
@@ -88,8 +91,17 @@ class ManyServicesAndSomeone(Given[Any, ManyServicesAndACaller]):
             for _ in range(self.besides)
         ]
         caller = await lay_a_caller(seeding, self.role)
-        first = ALaidService(seeding.made(wanted), GROUP, wanted.name, (seeding.made(endpoint),))
-        rest = [ALaidService(seeding.made(one), GROUP, one.name, ()) for one in others]
+        first = ALaidService(
+            seeding.made(wanted),
+            GROUP,
+            wanted.name,
+            ServiceCatalogStatus.HEALTHY,
+            (seeding.made(endpoint),),
+        )
+        rest = [
+            ALaidService(seeding.made(one), GROUP, one.name, ServiceCatalogStatus.HEALTHY, ())
+            for one in others
+        ]
         return ManyServicesAndACaller(laid=(first, *rest), named=first, caller=seeding.made(caller))
 
 
@@ -108,11 +120,49 @@ class ServicesOfTwoGroupsAndSomeone(Given[Any, ManyServicesAndACaller]):
         wanted = await seeding.creating(SeedService(service_group=GROUP, name_hint="wanted"))
         other = await seeding.creating(SeedService(service_group=OTHER_GROUP, name_hint="other"))
         caller = await lay_a_caller(seeding, self.role)
-        first = ALaidService(seeding.made(wanted), GROUP, wanted.name, ())
-        second = ALaidService(seeding.made(other), OTHER_GROUP, other.name, ())
+        first = ALaidService(
+            seeding.made(wanted), GROUP, wanted.name, ServiceCatalogStatus.HEALTHY, ()
+        )
+        second = ALaidService(
+            seeding.made(other), OTHER_GROUP, other.name, ServiceCatalogStatus.HEALTHY, ()
+        )
         return ManyServicesAndACaller(
             laid=(first, second), named=first, caller=seeding.made(caller)
         )
+
+
+@dataclass(frozen=True)
+class ServicesOfEveryStatusAndSomeone(Given[Any, ManyServicesAndACaller]):
+    """상태마다 서비스 하나씩과 사용자 한 명. ``named``는 정상 상태의 것이다."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        listed = "·".join(STATUS_NAMES[one] for one in ServiceCatalogStatus)
+        return f"{listed} 상태의 서비스 하나씩과, {role_named(self.role)} 한 명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyServicesAndACaller:
+        healthy = await seeding.creating(SeedService(service_group=GROUP, name_hint="healthy"))
+        others = [
+            (
+                status,
+                await seeding.creating(
+                    SeedServiceInStatus(service_group=GROUP, status=status, name_hint=status.value)
+                ),
+            )
+            for status in ServiceCatalogStatus
+            if status is not ServiceCatalogStatus.HEALTHY
+        ]
+        caller = await lay_a_caller(seeding, self.role)
+        first = ALaidService(
+            seeding.made(healthy), GROUP, healthy.name, ServiceCatalogStatus.HEALTHY, ()
+        )
+        rest = [
+            ALaidService(seeding.made(one), GROUP, one.name, status, ()) for status, one in others
+        ]
+        return ManyServicesAndACaller(laid=(first, *rest), named=first, caller=seeding.made(caller))
 
 
 def service_verdicts(
@@ -126,7 +176,7 @@ def service_verdicts(
         Same(f"{at}display_name", node.display_name, laid.instance_id),
         Same(f"{at}version", node.version, VERSION),
         Same(f"{at}labels", node.labels, {}),
-        Same(f"{at}status", node.status, ServiceCatalogStatus.HEALTHY),
+        Same(f"{at}status", node.status, laid.status),
         Same(f"{at}startup_time", node.startup_time, STARTED_UP),
         Held(f"{at}registered_at", node.registered_at, written),
         Held(f"{at}last_heartbeat", node.last_heartbeat, written),
@@ -182,12 +232,15 @@ class EveryLaidServiceComesWhole(Then[ManyServicesAndACaller, AdminSearchService
 
 
 @dataclass(frozen=True)
-class EveryLaidServiceIsCounted(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
-    """심은 서비스가 모두, 그리고 그것만 세어진다."""
+class OnlyTheServicesOfStatuses(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
+    """심은 서비스 중 이 상태들의 것만, 그리고 그것들 모두가 반환된다."""
+
+    statuses: tuple[ServiceCatalogStatus, ...]
 
     @override
     def says(self) -> str:
-        return "심은 서비스가 모두 세어진다"
+        listed = "·".join(STATUS_NAMES[one] for one in self.statuses)
+        return f"{listed} 상태의 서비스만 반환된다"
 
     @override
     def look(
@@ -196,18 +249,24 @@ class EveryLaidServiceIsCounted(Then[ManyServicesAndACaller, AdminSearchServiceC
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
+        expected = [one for one in laid.laid if one.status in self.statuses]
         return [
             Held(
                 "items.id",
                 sorted(str(one.id) for one in payload.items),
-                SameAs(sorted(str(one.id) for one in laid.laid), "심은 서비스들"),
+                SameAs(sorted(str(one.id) for one in expected), "그 상태로 심은 서비스"),
             ),
             Same(
                 "items.instance_id",
                 sorted(one.instance_id for one in payload.items),
-                sorted(one.instance_id for one in laid.laid),
+                sorted(one.instance_id for one in expected),
             ),
-            Same("total_count", payload.total_count, len(laid.laid)),
+            Same(
+                "items.status",
+                sorted(one.status for one in payload.items),
+                sorted(one.status for one in expected),
+            ),
+            Same("total_count", payload.total_count, len(expected)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
