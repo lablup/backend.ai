@@ -76,8 +76,8 @@ Then
 
 Given
 
-- 런타임 변형 하나와 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+- 런타임 변형 하나와, 슈퍼관리자 한 명
+  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -87,7 +87,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
@@ -114,8 +114,8 @@ Then
 
 Given
 
-- 런타임 변형 하나와 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+- 런타임 변형 하나와, 일반 사용자 한 명
+  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -125,7 +125,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
@@ -138,8 +138,8 @@ Then
 
 Given
 
-- 런타임 변형 하나와 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+- 런타임 변형 하나와, 슈퍼관리자 한 명
+  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -149,7 +149,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
@@ -176,8 +176,8 @@ Then
 
 Given
 
-- 런타임 변형 하나와 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+- 런타임 변형 하나와, 슈퍼관리자 한 명
+  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -187,7 +187,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
@@ -254,8 +254,8 @@ Then
 
 Given
 
-- 런타임 변형 하나와 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+- 런타임 변형 하나와, 일반 사용자 한 명
+  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -265,7 +265,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
