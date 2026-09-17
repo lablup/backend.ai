@@ -35,6 +35,14 @@ The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before 
   `(entity_type, entity_id)` pair.
 - A node id never goes on a `data/` type. A Row's `to_data()` names the entity as an `EntityIdentifier`.
 
+## Singleton scopes (`global_entities`)
+
+- Do NOT delete a `global_entities` row or its node (a `virtual_entities` row with
+  `entity_type = 'global'`). Deleting the node cascades to the scope's edges, roles and
+  role assignments.
+- The migration writes the rows and nodes. Do NOT add a code path that creates or deletes them.
+- The manager checks both rows and nodes at startup and refuses to start when one is missing.
+
 ## No logic in Row classes
 
 - Do NOT add query-builder methods to Row classes — that belongs to `repositories/db_source/`.
