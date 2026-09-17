@@ -138,6 +138,34 @@ class _ProjectCreateScopeAction(BaseScopeAction):
         return "create_project"
 
 
+class _ProjectSearchScopeAction(BaseScopeAction):
+    """PROJECT:SEARCH at domain scopes — the read the monitor role passes."""
+
+    _scopes: Sequence[EntityIdentifier]
+
+    def __init__(self, scopes: Sequence[EntityIdentifier]) -> None:
+        self._scopes = scopes
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return ProjectEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return self._scopes
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "search_projects"
+
+
 @dataclass
 class _VfolderUpdateAction(BaseSingleEntityAction):
     """VFOLDER:UPDATE on a single vfolder — exercises the single-entity path."""
@@ -201,8 +229,30 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
         return tuple(_VfolderID(i) for i in self.ids)
 
 
+@dataclass
+class _BulkVfolderSearchAction(BaseBulkAction):
+    """VFOLDER:SEARCH on multiple vfolders — the read the monitor role passes."""
+
+    ids: list[uuid.UUID]
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "search_vfolders"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(_VfolderID(i) for i in self.ids)
+
+
 def _bulk_meta(
-    action: _BulkVfolderUpdateAction, trigger_meta: ActionTriggerMeta
+    action: _BulkVfolderUpdateAction | _BulkVfolderSearchAction,
+    trigger_meta: ActionTriggerMeta,
 ) -> BulkActionTriggerMeta:
     return BulkActionTriggerMeta(
         action_id=trigger_meta.action_id,
@@ -224,13 +274,13 @@ def _domain_scope(scope_id: uuid.UUID) -> EntityIdentifier:
     return DomainID(scope_id)
 
 
-def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
+def _make_user_data(user_id: uuid.UUID, *, role: UserRole) -> UserData:
     return UserData(
         user_id=user_id,
         is_authorized=True,
-        is_admin=is_superadmin,
-        is_superadmin=is_superadmin,
-        role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
+        is_admin=role in (UserRole.SUPERADMIN, UserRole.ADMIN),
+        is_superadmin=role == UserRole.SUPERADMIN,
+        role=role,
         domain_name="default",
         domain_id=DomainID(uuid.uuid4()),
     )
@@ -433,7 +483,7 @@ async def _seed_granted_user(
         operation=operation,
         permission=permission,
     )
-    return _make_user_data(user_id, is_superadmin=False)
+    return _make_user_data(user_id, role=UserRole.USER)
 
 
 @pytest.fixture
@@ -444,6 +494,18 @@ def trigger_meta() -> ActionTriggerMeta:
 @pytest.fixture
 def scope_action() -> _ProjectCreateScopeAction:
     return _ProjectCreateScopeAction(scopes=[_domain_scope(_DOMAIN_ID)])
+
+
+@pytest.fixture
+def scope_search_action() -> _ProjectSearchScopeAction:
+    return _ProjectSearchScopeAction(scopes=[_domain_scope(_DOMAIN_ID)])
+
+
+@pytest.fixture
+async def provisioned_domain_scope(db_with_rbac_tables: ExtendedAsyncSAEngine) -> None:
+    """The domain scope has a node and nobody holds a grant within it."""
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        await VirtualEntitySeeder().provision(db_sess, DomainEntityType(), _DOMAIN_ID)
 
 
 @pytest.fixture
@@ -462,6 +524,19 @@ def single_entity_action() -> _VfolderUpdateAction:
 @pytest.fixture
 def bulk_vfolder_action() -> _BulkVfolderUpdateAction:
     return _BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED])
+
+
+@pytest.fixture
+def bulk_vfolder_search_action() -> _BulkVfolderSearchAction:
+    return _BulkVfolderSearchAction(ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED])
+
+
+@pytest.fixture
+async def provisioned_bulk_vfolders(db_with_rbac_tables: ExtendedAsyncSAEngine) -> None:
+    """Both bulk vfolders have a node and nobody holds a grant on either."""
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        for entity_id in (_BULK_VF_GRANTED, _BULK_VF_DENIED):
+            await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), entity_id)
 
 
 @pytest.fixture
@@ -530,7 +605,7 @@ def partial_bulk_validator(
 @pytest.fixture
 def superadmin_user() -> UserData:
     # Bypass path: validator returns before any DB lookup, so no rows are seeded.
-    return _make_user_data(uuid.uuid4(), is_superadmin=True)
+    return _make_user_data(uuid.uuid4(), role=UserRole.SUPERADMIN)
 
 
 @pytest.fixture
@@ -544,7 +619,21 @@ async def seeded_superadmin_user(
         await db_sess.execute(
             sa.update(UserRow).where(UserRow.uuid == user_id).values(role=UserRole.SUPERADMIN)
         )
-    return _make_user_data(user_id, is_superadmin=True)
+    return _make_user_data(user_id, role=UserRole.SUPERADMIN)
+
+
+@pytest.fixture
+async def seeded_monitor_user(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """A monitor stored as one, for the checks that read the role from the user row."""
+    user_id = uuid.uuid4()
+    await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=uuid.uuid4())
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.update(UserRow).where(UserRow.uuid == user_id).values(role=UserRole.MONITOR)
+        )
+    return _make_user_data(user_id, role=UserRole.MONITOR)
 
 
 @pytest.fixture
@@ -553,7 +642,7 @@ async def regular_user_without_permission(
 ) -> UserData:
     user_id = uuid.uuid4()
     await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=uuid.uuid4())
-    return _make_user_data(user_id, is_superadmin=False)
+    return _make_user_data(user_id, role=UserRole.USER)
 
 
 @pytest.fixture
@@ -728,6 +817,29 @@ class TestVirtualEntityScopeActionRBACValidator:
         # No permission rows seeded; bypass must succeed regardless.
         with with_user(superadmin_user):
             await scope_validator.validate(scope_action, trigger_meta)
+
+    @pytest.mark.usefixtures("provisioned_domain_scope")
+    async def test_monitor_reads_within_a_scope_without_a_grant(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        scope_search_action: _ProjectSearchScopeAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        with with_user(seeded_monitor_user):
+            await scope_validator.validate(scope_search_action, trigger_meta)
+
+    @pytest.mark.usefixtures("provisioned_domain_scope")
+    async def test_monitor_is_refused_a_write_within_a_scope_without_a_grant(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        scope_action: _ProjectCreateScopeAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        with with_user(seeded_monitor_user):
+            with pytest.raises(NotEnoughPermission):
+                await scope_validator.validate(scope_action, trigger_meta)
 
     async def test_enforcement_disabled_skips_check(
         self,
@@ -961,6 +1073,40 @@ class TestVirtualEntityAtomicBulkActionRBACValidator:
             with pytest.raises(NotEnoughPermission):
                 await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
 
+    @pytest.mark.usefixtures("provisioned_bulk_vfolders")
+    async def test_monitor_reads_without_a_grant(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_search_action: _BulkVfolderSearchAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        with with_user(seeded_monitor_user):
+            await bulk_validator.validate(_bulk_meta(bulk_vfolder_search_action, trigger_meta))
+
+    @pytest.mark.usefixtures("provisioned_bulk_vfolders")
+    async def test_monitor_is_refused_a_write_without_a_grant(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        with with_user(seeded_monitor_user):
+            with pytest.raises(NotEnoughPermission):
+                await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
+
+    async def test_monitor_is_refused_an_entity_without_a_node(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_search_action: _BulkVfolderSearchAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        with with_user(seeded_monitor_user):
+            with pytest.raises(NotEnoughPermission):
+                await bulk_validator.validate(_bulk_meta(bulk_vfolder_search_action, trigger_meta))
+
     async def test_all_targets_granted_passes(
         self,
         bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
@@ -1038,6 +1184,21 @@ class TestVirtualEntityPartialBulkActionRBACValidator:
 
         assert denied == {}
 
+    @pytest.mark.usefixtures("provisioned_bulk_vfolders")
+    async def test_monitor_is_denied_nothing_on_a_read_without_a_grant(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_search_action: _BulkVfolderSearchAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        with with_user(seeded_monitor_user):
+            denied = await partial_bulk_validator.validate(
+                _bulk_meta(bulk_vfolder_search_action, trigger_meta)
+            )
+
+        assert denied == {}
+
     async def test_missing_user_raises(
         self,
         partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
@@ -1081,6 +1242,23 @@ class TestHeldPermissions:
 
         # An entity without a node is no entity to hold anything on.
         assert held == {existing: Permission.full(), missing: Permission.NONE}
+
+    async def test_monitor_holds_read_on_an_existing_entity(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        repository: RbacPermissionCheckRepository,
+        seeded_monitor_user: UserData,
+    ) -> None:
+        existing = VFolderUUID(_BULK_VF_GRANTED)
+        missing = VFolderUUID(_BULK_VF_DENIED)
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), existing)
+
+        held = await repository.held_permissions(
+            UserID(seeded_monitor_user.user_id), [existing, missing]
+        )
+
+        assert held == {existing: Permission.READ, missing: Permission.NONE}
 
     async def test_enforcement_off_holds_everything(
         self,
