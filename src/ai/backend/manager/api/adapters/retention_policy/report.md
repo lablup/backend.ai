@@ -316,7 +316,7 @@ Then
 
 #### [the-monitor-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
 
-모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 전역 역할 검사에서 읽기만 통과한다
+모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다
 
 Given
 
@@ -949,7 +949,7 @@ Then
 
 #### [the-monitor-searches-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py) — pass
 
-모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 전역 역할 검사는 모니터의 읽기를 허용한다
+모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
 
 Given
 

@@ -240,7 +240,7 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 전역 역할 검사에서 읽기만 통과한다"
+        return "모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다"
 
     @override
     def given(self) -> Given[SeedingSession, ACaller]:
