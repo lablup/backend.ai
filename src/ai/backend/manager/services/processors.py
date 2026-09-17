@@ -489,7 +489,8 @@ class ProcessorsBundle:
     """What processor assembly hands back, without widening the Processors contract:
     the processors themselves, plus the one registry every v2-wired package
     registered through — its wired_specs() is the catalog of every registered
-    action."""
+    action — and the services for internal callers that run without a request user."""
 
     processors: Processors
+    services: Services
     registry: ProcessorRegistry[Any]

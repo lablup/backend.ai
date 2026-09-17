@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType
 
 __all__ = (
     "DeletePermissionPathParam",
@@ -48,6 +48,6 @@ class DeletePermissionPathParam(BaseRequestModel):
 class SearchScopesPathParam(BaseRequestModel):
     """Path parameter for searching scopes."""
 
-    scope_type: EntityType = Field(
+    scope_type: DeclaredEntityType = Field(
         description="Scope types", examples=["domain", "project", "user"]
     )

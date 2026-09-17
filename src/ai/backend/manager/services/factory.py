@@ -874,4 +874,4 @@ def create_processors(
             session_groups.group(GroupMeta(SessionEntityType())), services.stream
         ),
     )
-    return ProcessorsBundle(processors=processors, registry=registry)
+    return ProcessorsBundle(processors=processors, services=services, registry=registry)

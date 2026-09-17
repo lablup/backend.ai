@@ -32,6 +32,7 @@ from .permission import (
     RolePermissionPresetFilterGQL,
     RolePermissionPresetGQL,
     RolePermissionPresetOrderByGQL,
+    RolePermissionPresetOrderFieldGQL,
 )
 
 
@@ -82,9 +83,11 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         offset: int | None = None,
     ) -> RolePermissionPresetConnection | None:
         filter_dto: RolePermissionPresetFilter | None = filter.to_pydantic() if filter else None
-        orders_dto: list[RolePermissionPresetOrder] | None = (
-            [o.to_pydantic() for o in order_by] if order_by else None
-        )
+        orders_dto: list[RolePermissionPresetOrder] | None = [
+            o.to_pydantic()
+            for o in order_by or []
+            if o.field is not RolePermissionPresetOrderFieldGQL.OPERATION
+        ] or None
         search_input = SearchRolePermissionPresetsInput(
             filter=filter_dto,
             order=orders_dto,

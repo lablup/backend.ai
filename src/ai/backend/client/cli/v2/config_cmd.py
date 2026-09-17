@@ -1,4 +1,4 @@
-"""``backend.ai v2 config`` CLI commands for managing ``~/.backend.ai/`` settings."""
+"""``backend.ai v2 config`` CLI commands for managing the selected profile's settings."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 
 import click
 
-from .helpers import CONFIG_DIR, CONFIG_FILE, CREDENTIALS_FILE
+from .helpers import ProfileStore
 
 CONFIGURABLE_KEYS = {
     "endpoint": ("config", "endpoint"),
@@ -44,7 +44,7 @@ def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
 
 @click.group()
 def config() -> None:
-    """Manage v2 CLI configuration stored in ~/.backend.ai/."""
+    """Manage v2 CLI configuration of the selected profile."""
 
 
 @config.command()
@@ -52,7 +52,9 @@ def show() -> None:
     """Display the current v2 configuration."""
     from .helpers import load_v2_config
 
+    paths = ProfileStore().selected()
     cfg = load_v2_config()
+    click.echo(f"Profile:              {click.style(paths.name or '(default)', bold=True)}")
     click.echo(f"Endpoint:             {click.style(str(cfg.endpoint), bold=True)}")
     click.echo(f"Endpoint type:        {click.style(cfg.endpoint_type, bold=True)}")
     click.echo(f"API version:          {click.style(cfg.api_version, bold=True)}")
@@ -66,7 +68,7 @@ def show() -> None:
         click.echo(f"Secret key:           {click.style(masked, bold=True)}")
     else:
         click.echo("Secret key:           (not set)")
-    click.echo(f"Config dir:           {CONFIG_DIR}")
+    click.echo(f"Config dir:           {paths.base_dir}")
 
 
 @config.command("set")
@@ -80,10 +82,11 @@ def set_value(key: str, value: str) -> None:
     """
     file_type, toml_key = CONFIGURABLE_KEYS[key]
 
+    paths = ProfileStore().selected()
     if file_type == "config":
-        path = CONFIG_FILE
+        path = paths.config_file
     else:
-        path = CREDENTIALS_FILE
+        path = paths.credentials_file
 
     data = _load_toml(path)
     section = data.setdefault("backend-ai", {})

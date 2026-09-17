@@ -845,6 +845,16 @@ def _sweep_unknown_types(conn: sa.engine.Connection) -> None:
     )
 
 
+# Each user on a project's roster. The scope association table's project members were
+# moved to these edges; `association_groups_users` stopped being written before that.
+_ROSTER: Final[str] = """
+    SELECT p.entity_id AS project_id, u.entity_id AS user_id
+    FROM entity_memberships m
+    JOIN virtual_entities p ON p.id = m.virtual_entity_id AND p.entity_type = 'project'
+    JOIN virtual_entities u ON u.id = m.member_entity_id AND u.entity_type = 'user'
+"""
+
+
 def _create_preset_roles(conn: sa.engine.Connection) -> None:
     """Give every scope in the graph the role of each preset it lacks, named as the
     runtime names it, then put every preset role without a node in the graph."""
@@ -998,12 +1008,12 @@ def _carry_assignments(conn: sa.engine.Connection) -> None:
             carried,
         )
     conn.execute(
-        sa.text("""
+        sa.text(f"""
             INSERT INTO user_roles (user_id, role_id)
             SELECT g.creator_id, r.id
             FROM groups g
-            JOIN association_groups_users agu
-                ON agu.group_id = g.id AND agu.user_id = g.creator_id
+            JOIN ({_ROSTER}) roster
+                ON roster.project_id = g.id AND roster.user_id = g.creator_id
             JOIN roles r
                 ON r.scope_type = 'project' AND r.scope_id = g.id
                 AND r.role_preset_id = CAST(:preset_id AS uuid)
@@ -1042,20 +1052,17 @@ def _drop_unlinked_system_roles(conn: sa.engine.Connection) -> None:
 
 
 def _grant_auto_assign_roles(conn: sa.engine.Connection) -> None:
-    """Give every project member the roles their project assigns on its own, and put
-    them on its roster.
+    """Give every user on a project's roster the roles their project assigns on its own.
 
     Which users a project holds is the only part of a seed role's assignment a database
     still states for itself, so the roles a project hands out without being asked are
     the ones recoverable here. Who administers a project is not stated anywhere but the
-    assignments `_carry_assignments` passed on.
-
-    The roster edge carries the membership: a role held without it reaches nothing."""
+    assignments `_carry_assignments` passed on."""
     pairs = conn.execute(
-        sa.text("""
-            SELECT r.id AS role_id, agu.user_id AS user_id, r.scope_id AS project_id
+        sa.text(f"""
+            SELECT r.id AS role_id, roster.user_id AS user_id
             FROM roles r
-            JOIN association_groups_users agu ON agu.group_id = r.scope_id
+            JOIN ({_ROSTER}) roster ON roster.project_id = r.scope_id
             WHERE r.scope_type = 'project'
               AND r.auto_assign IS TRUE
               AND r.status = 'active'
@@ -1069,33 +1076,6 @@ def _grant_auto_assign_roles(conn: sa.engine.Connection) -> None:
                 ON CONFLICT (user_id, role_id) DO NOTHING
             """).bindparams(user_id=pair.user_id, role_id=pair.role_id)
         )
-        _share_membership(conn, str(pair.project_id), str(pair.user_id))
-
-
-def _share_membership(conn: sa.engine.Connection, project_id: str, user_id: str) -> None:
-    """Put the user on the project's roster: the share edge and the read cap on it.
-
-    Left alone where it already stands, so a project whose roster the graph already
-    holds keeps the caps it was given."""
-    membership_id = conn.execute(
-        sa.text("""
-            INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
-            SELECT scope.id, member.id, TRUE
-            FROM virtual_entities scope, virtual_entities member
-            WHERE scope.entity_type = 'project' AND scope.entity_id = CAST(:project_id AS uuid)
-              AND member.entity_type = 'user' AND member.entity_id = CAST(:user_id AS uuid)
-            ON CONFLICT (virtual_entity_id, member_entity_id) DO NOTHING
-            RETURNING id
-        """).bindparams(project_id=project_id, user_id=user_id)
-    ).scalar()
-    if membership_id is None:
-        return
-    conn.execute(
-        sa.text("""
-            INSERT INTO entity_membership_caps (membership_id, permission, all_fields)
-            VALUES (:membership_id, 1, TRUE)
-        """).bindparams(membership_id=membership_id)
-    )
 
 
 def upgrade() -> None:

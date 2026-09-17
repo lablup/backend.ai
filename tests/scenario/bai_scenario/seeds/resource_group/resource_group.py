@@ -29,6 +29,9 @@ class SeedResourceGroup(SeedRow[ResourceGroupData]):
 
     name_hint: str = "resource-group"
     scheduler: str = "fifo"
+    description: str | None = None
+    is_active: bool = True
+    is_default: bool = False
 
     @override
     def kind(self) -> str:
@@ -36,7 +39,12 @@ class SeedResourceGroup(SeedRow[ResourceGroupData]):
 
     @override
     def detail(self) -> str:
-        return f"{self.scheduler} 스케줄러를 쓴다"
+        parts = [f"{self.scheduler} 스케줄러를 쓴다"]
+        if not self.is_active:
+            parts.append("비활성")
+        if self.is_default:
+            parts.append("기본 그룹")
+        return ", ".join(parts)
 
     @override
     def name(self, naming: Naming) -> str:
@@ -44,7 +52,14 @@ class SeedResourceGroup(SeedRow[ResourceGroupData]):
 
     @override
     def seed(self, name: str) -> ResourceGroupCreator:
-        return ResourceGroupCreator(name=name, driver="static", scheduler=self.scheduler)
+        return ResourceGroupCreator(
+            name=name,
+            driver="static",
+            scheduler=self.scheduler,
+            description=self.description,
+            is_active=self.is_active,
+            is_default=self.is_default,
+        )
 
 
 @dataclass(frozen=True)

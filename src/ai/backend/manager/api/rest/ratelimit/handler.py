@@ -32,6 +32,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _RATELIMIT_WINDOW_SECONDS: Final = 60 * 15
 _ANONYMOUS_RATELIMIT: Final = 1000
+_HEALTH_PATH: Final = "/health"
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,9 @@ def make_rlim_middleware(
         handler: WebRequestHandler,
     ) -> web.StreamResponse:
         """Global middleware implementing a fixed-window rate limiter."""
+        # TODO: let the health routes declare the exemption as a handler attribute.
+        if request.path == _HEALTH_PATH or request.path.startswith(f"{_HEALTH_PATH}/"):
+            return await handler(request)
         rlim_window: RateLimitState
         if request["is_authorized"]:
             rlim_window = await valkey_client.consume_user_rlim_window(
