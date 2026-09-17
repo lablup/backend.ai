@@ -305,8 +305,15 @@ class TestOwnershipOfADeviceTheHostShares:
                 "the session's tunnel was not up to begin with"
             )
 
-            await node.run(["sudo", "-n", "ip", "link", "set", device, "down"], check=False)
-            assert not await _device_is_up(node, device), "the down did not take"
+            # Downed and read back in ONE command. As two, the watchdog's pass -- the very thing
+            # under test, on a three-second timer -- landed between them and had the device back
+            # up before the read, and the check that the down took reported the feature working
+            # as the scenario not starting.
+            downed = await node.run(
+                ["sh", "-c", f"ip link set {device} down && ip -o link show dev {device}"],
+                check=False,
+            )
+            assert not _flags_say_up(downed.stdout), f"the down did not take: {downed.stdout!r}"
 
             assert await _wait_for(lambda: _device_is_up(node, device)), (
                 f"{device} was still down long after another process downed it. A co-located"
@@ -336,7 +343,11 @@ class TestOwnershipOfADeviceTheHostShares:
 async def _device_is_up(node: Node, device: str) -> bool:
     """Whether the link carries IFF_UP, read from the flags `ip -o link` prints."""
     result = await node.run(["ip", "-o", "link", "show", "dev", device], check=False)
-    head, _, _ = result.stdout.partition(" mtu ")
+    return _flags_say_up(result.stdout)
+
+
+def _flags_say_up(ip_link_line: str) -> bool:
+    head, _, _ = ip_link_line.partition(" mtu ")
     return "UP" in head.split("<")[-1].split(">")[0].split(",") if "<" in head else False
 
 
