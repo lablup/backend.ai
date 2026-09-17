@@ -215,7 +215,7 @@ Then
 
 #### [the-monitor-role-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py) — pass
 
-모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. 전역 역할 검사는 읽기에만 그 역할을 허용한다
+모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. 슈퍼관리자 검사는 읽기에만 모니터를 허용한다
 
 Given
 
@@ -1136,7 +1136,7 @@ Then
 
 #### [the-monitor-role-previews-a-template](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
 
-모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 전역 역할 검사는 읽기에 한해 그 역할을 허용한다
+모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 슈퍼관리자 검사는 읽기에 한해 모니터를 허용한다
 
 Given
 
