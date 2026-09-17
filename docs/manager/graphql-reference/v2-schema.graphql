@@ -6,6 +6,13 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "
   subscription: Subscription
 }
 
+"""
+Added in 26.4.4. Input for accepting a role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input AcceptRoleInvitationInput {
+  invitationId: UUID!
+}
+
 """Added in 25.16.0. An access token for model deployment."""
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
@@ -1685,6 +1692,15 @@ input BlueGreenConfigInput {
 Added in 26.4.4. Failure detail for a single permission entry in bulk add
 """
 type BulkAddRolePermissionFailureInfo {
+  """Scope element type of the failed entry."""
+  scopeType: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Scope element ID of the failed entry."""
+  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Operation type of the failed entry."""
+  operation: String @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
   """Role ID of the failed entry."""
   roleId: UUID!
 
@@ -1702,6 +1718,9 @@ type BulkAddRolePermissionFailureInfo {
 Added in 26.4.4. Failure detail for a single permission entry in a bulk add operation.
 """
 type BulkAddRolePermissionPresetFailureInfo {
+  """Operation of the permission entry that failed."""
+  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
   """Entity type of the permission entry that failed."""
   entityType: String!
 
@@ -2227,6 +2246,13 @@ Added in 25.14.0. Response payload for canceling artifact import operations. Con
 type CancelImportArtifactPayload {
   """Artifact revision with cancelled import."""
   artifactRevision: ArtifactRevision!
+}
+
+"""
+Added in 26.4.4. Input for canceling a role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input CancelRoleInvitationInput {
+  invitationId: UUID!
 }
 
 """Added in 26.3.0. Filter input for querying query preset categories."""
@@ -3187,6 +3213,15 @@ input CreatePermissionInput {
   roleId: UUID!
   entityType: String!
   permission: PermissionBit!
+
+  """Scope type."""
+  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope ID."""
+  scopeId: String = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Operation type."""
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 }
 
 """Added in 26.4.2. Input for creating a new project."""
@@ -3424,6 +3459,22 @@ input CreateRoleInput {
 
   """Deprecated: use `scope`. Accepts exactly one entry."""
   scopes: [ScopeInput!] = null @deprecated(reason: "Deprecated since 26.9.0. Use `scope`.")
+}
+
+"""
+Added in 26.4.4. Input for creating role invitations. Deprecated since 26.9.0. Use role assignments.
+"""
+input CreateRoleInvitationInput {
+  roleId: UUID!
+  emails: [String!]!
+}
+
+"""
+Added in 26.4.4. Payload for role invitation creation. Deprecated since 26.9.0. Use role assignments.
+"""
+type CreateRoleInvitationPayload {
+  """List of created role invitations."""
+  items: [RoleInvitation!]!
 }
 
 """Added in 26.4.4. Input for creating a new role preset."""
@@ -9371,6 +9422,26 @@ type Mutation {
   """
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload
 
+  """
+  Added in 26.4.4. Create role invitations by email. Deprecated since 26.9.0.
+  """
+  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
+  """
+  Added in 26.4.4. Accept a pending role invitation. Deprecated since 26.9.0.
+  """
+  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
+  """
+  Added in 26.4.4. Reject a pending role invitation. Deprecated since 26.9.0.
+  """
+  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
+  """
+  Added in 26.4.4. Cancel a pending role invitation (admin only). Deprecated since 26.9.0.
+  """
+  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
   adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInput!): CreateKeypairResourcePolicyPayload
 
@@ -9969,6 +10040,39 @@ type OperationInfo {
   requiredPermission: PermissionBit!
 }
 
+"""
+Added in 26.3.0. RBAC operation type Deprecated since 26.9.0. Use `PermissionBit`.
+"""
+enum OperationType {
+  CREATE
+  READ
+  UPDATE
+  SOFT_DELETE
+  HARD_DELETE
+  GRANT_ALL
+  GRANT_READ
+  GRANT_UPDATE
+  GRANT_SOFT_DELETE
+  GRANT_HARD_DELETE
+}
+
+"""
+Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in. Deprecated since 26.9.0. Use `PermissionBitFilter`.
+"""
+input OperationTypeFilter {
+  """Matches rows with this exact operation."""
+  equals: OperationType = null
+
+  """Matches rows whose operation is in this list."""
+  in: [OperationType!] = null
+
+  """Excludes rows with this exact operation."""
+  notEquals: OperationType = null
+
+  """Excludes rows whose operation is in this list."""
+  notIn: [OperationType!] = null
+}
+
 """Added in 24.09.0. Sort direction for ordering"""
 enum OrderDirection {
   ASC
@@ -10003,6 +10107,18 @@ type Permission implements Node {
 
   """The role this permission belongs to."""
   role: Role
+
+  """Scope type."""
+  scopeType: RBACElementType @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Scope ID."""
+  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Operation type."""
+  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
+  """The scope this permission applies to."""
+  scope: EntityNode @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
 }
 
 """Added in 26.9.0. One bit of a permission mask."""
@@ -10055,6 +10171,12 @@ input PermissionFilter {
   roleId: UUIDFilter = null
   entityType: StringFilter = null
   createdAt: DateTimeFilter = null
+
+  """Scope type."""
+  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope ID."""
+  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
   NOT: [PermissionFilter!] = null
@@ -10066,6 +10188,15 @@ Added in 26.4.0. Nested filter for permissions within a role assignment. Filters
 input PermissionNestedFilter {
   entityType: StringFilter = null
   permission: PermissionBitFilter = null
+
+  """Scope ID."""
+  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope type."""
+  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Operation type."""
+  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -11766,6 +11897,31 @@ type Query {
   adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """
+  Added in 26.3.0. Search entity associations (admin only). Deprecated since 26.9.0.
+  """
+  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.9.0. The scope-entity association is removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List all role invitations across the system (superadmin only). Deprecated since 26.9.0.
+  """
+  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List the current user's role invitations. Deprecated since 26.9.0.
+  """
+  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List role invitations sent by the current user. Deprecated since 26.9.0.
+  """
+  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List invitations for a specific role. Deprecated since 26.9.0.
+  """
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
@@ -12397,6 +12553,74 @@ input QueryTimeRangeInput {
 }
 
 """
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships. Deprecated since 26.9.0. Use an entity type string.
+"""
+enum RBACElementType {
+  DOMAIN
+  PROJECT
+  USER
+  SESSION
+  VFOLDER
+  MODEL_DEPLOYMENT
+  KEYPAIR
+  NOTIFICATION_CHANNEL
+  NETWORK
+  IDLE_CHECKER_ASSIGNMENT
+  RESOURCE_GROUP
+  CONTAINER_REGISTRY
+  STORAGE_HOST
+  AGENT
+  KERNEL
+  ROUTING
+  IMAGE
+  ARTIFACT
+  ARTIFACT_REGISTRY
+  SESSION_TEMPLATE
+  APP_CONFIG
+  APP_CONFIG_DEFINITION
+  APP_CONFIG_ALLOW_LIST
+  APP_CONFIG_FRAGMENT
+  MODEL_CARD
+  RESOURCE_PRESET
+  USER_RESOURCE_POLICY
+  KEYPAIR_RESOURCE_POLICY
+  PROJECT_RESOURCE_POLICY
+  ROLE
+  AUDIT_LOG
+  KERNEL_HISTORY
+  EVENT_LOG
+  PROJECT_ADMIN_PAGE
+  DOMAIN_ADMIN_PAGE
+  NOTIFICATION_RULE
+  DEPLOYMENT_TOKEN
+  DEPLOYMENT_POLICY
+  DEPLOYMENT_REVISION
+  IMAGE_ALIAS
+  ROLE_ASSIGNMENT
+  VFOLDER_DATA
+  SESSION_APP_SERVICE
+  USER_EMAIL
+  ARTIFACT_REVISION
+}
+
+"""
+Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in. Deprecated since 26.9.0. Use `StringFilter`.
+"""
+input RBACElementTypeFilter {
+  """Matches rows with this exact element type."""
+  equals: RBACElementType = null
+
+  """Matches rows whose element type is in this list."""
+  in: [RBACElementType!] = null
+
+  """Excludes rows with this exact element type."""
+  notEquals: RBACElementType = null
+
+  """Excludes rows whose element type is in this list."""
+  notIn: [RBACElementType!] = null
+}
+
+"""
 Added in 26.2.0. Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.
 """
 input RGDomainFairShareFilter {
@@ -12515,6 +12739,13 @@ type RejectArtifactPayload {
 }
 
 """
+Added in 26.4.4. Input for rejecting a role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input RejectRoleInvitationInput {
+  invitationId: UUID!
+}
+
+"""
 Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput {
@@ -12562,6 +12793,15 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload {
 Added in 26.4.4. Failure detail for a single permission entry in replace
 """
 type ReplaceRolePermissionFailureInfo {
+  """Scope element type of the failed entry."""
+  scopeType: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Scope element ID of the failed entry."""
+  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Operation type of the failed entry."""
+  operation: String @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
   """Role ID of the failed entry."""
   roleId: UUID!
 
@@ -13724,6 +13964,137 @@ input RoleFilter {
 }
 
 """
+Added in 26.4.4. A role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+type RoleInvitation implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Inviter user ID."""
+  inviterUserId: UUID
+
+  """Invitee user ID."""
+  inviteeUserId: UUID!
+
+  """Role ID."""
+  roleId: UUID!
+
+  """Invitation state."""
+  state: RoleInvitationState!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+
+  """The user who sent this invitation. Null for system-issued invitations."""
+  inviter: UserV2
+
+  """
+  The user who received this invitation. Null if the user no longer exists.
+  """
+  invitee: UserV2
+
+  """
+  The role this invitation grants on acceptance. Null if the role no longer exists.
+  """
+  role: Role
+}
+
+"""
+Added in 26.4.4. Role invitation connection. Deprecated since 26.9.0. Use role assignments.
+"""
+type RoleInvitationConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleInvitationEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleInvitationEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleInvitation!
+}
+
+"""
+Added in 26.4.4. Filter for role invitations. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationFilter {
+  state: RoleInvitationStateFilter = null
+  roleId: UUIDFilter = null
+  role: RoleInvitationRoleNestedFilter = null
+  inviter: RoleInvitationUserNestedFilter = null
+  invitee: RoleInvitationUserNestedFilter = null
+  AND: [RoleInvitationFilter!] = null
+  OR: [RoleInvitationFilter!] = null
+  NOT: [RoleInvitationFilter!] = null
+}
+
+"""
+Added in 26.4.4. Order by specification for role invitations. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationOrderBy {
+  field: RoleInvitationOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.4.4. Role invitation ordering field. Deprecated since 26.9.0. Use role assignments.
+"""
+enum RoleInvitationOrderField {
+  CREATED_AT
+  UPDATED_AT
+  STATE
+}
+
+"""
+Added in 26.4.4. Nested filter for the role associated with an invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationRoleNestedFilter {
+  name: StringFilter = null
+}
+
+"""
+Added in 26.4.4. Role invitation state. Deprecated since 26.9.0. Use role assignments.
+"""
+enum RoleInvitationState {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+"""
+Added in 26.4.4. Filter for role invitation state. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationStateFilter {
+  equals: RoleInvitationState = null
+
+  """Match any of the provided states."""
+  in: [RoleInvitationState!] = null
+
+  """Exclude exact state match."""
+  notEquals: RoleInvitationState = null
+
+  """Exclude any of the provided states."""
+  notIn: [RoleInvitationState!] = null
+}
+
+"""
+Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationUserNestedFilter {
+  email: StringFilter = null
+}
+
+"""
 Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
 """
 input RoleMappedScopeNestedFilter {
@@ -13763,6 +14134,9 @@ type RolePermissionPreset implements Node {
 
   """Creation timestamp."""
   createdAt: DateTime!
+
+  """Operation granted by the permission."""
+  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
 }
 
 """
@@ -13797,6 +14171,9 @@ input RolePermissionPresetEntryInput {
 
   """The operation bit the entry grants."""
   permission: PermissionBit!
+
+  """Operation granted by the permission."""
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 }
 
 """
@@ -13811,6 +14188,9 @@ input RolePermissionPresetFilter {
 
   """Filter by the operation bit granted."""
   permission: PermissionBitFilter = null
+
+  """Filter by granted operation."""
+  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 
   """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
@@ -13845,6 +14225,7 @@ enum RolePermissionPresetOrderField {
   ENTITY_TYPE
   PERMISSION
   CREATED_AT
+  OPERATION @deprecated(reason: "Deprecated since 26.9.0. Use `PERMISSION`; ordering by it is ignored.")
 }
 
 """
@@ -16471,6 +16852,15 @@ input UpdatePermissionInput {
   id: UUID!
   entityType: String
   permission: PermissionBit
+
+  """Scope type."""
+  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope ID."""
+  scopeId: String = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Operation type."""
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 }
 
 """
