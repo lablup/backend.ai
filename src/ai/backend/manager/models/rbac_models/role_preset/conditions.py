@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -82,45 +80,5 @@ class RolePresetConditions:
     def by_deleted(deleted: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RolePresetRow.deleted == deleted
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Reads the cursor row's ``created_at`` and compares against that, because ``created_at`` is what
-        the page is ordered by — comparing ids would draw the page boundary on a column the
-        result is not sorted by.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RolePresetRow.created_at)
-                .where(RolePresetRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RolePresetRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Reads the cursor row's ``created_at`` and compares against that, because ``created_at`` is what
-        the page is ordered by — comparing ids would draw the page boundary on a column the
-        result is not sorted by.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RolePresetRow.created_at)
-                .where(RolePresetRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RolePresetRow.created_at > subquery
 
         return inner

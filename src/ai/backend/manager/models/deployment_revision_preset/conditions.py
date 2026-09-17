@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -123,46 +122,6 @@ class DeploymentRevisionPresetConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Reads the cursor row's ``created_at`` and compares against that, because that is what
-        the page is ordered by — comparing ids would draw the page boundary on a column the
-        result is not sorted by.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DeploymentRevisionPresetRow.created_at)
-                .where(DeploymentRevisionPresetRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DeploymentRevisionPresetRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Reads the cursor row's ``created_at`` and compares against that, because that is what
-        the page is ordered by — comparing ids would draw the page boundary on a column the
-        result is not sorted by.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DeploymentRevisionPresetRow.created_at)
-                .where(DeploymentRevisionPresetRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DeploymentRevisionPresetRow.created_at > subquery
 
         return inner
 

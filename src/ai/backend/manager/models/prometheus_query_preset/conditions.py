@@ -107,31 +107,3 @@ class PrometheusQueryPresetConditions:
             return PrometheusQueryPresetRow.metric_name == metric_name
 
         return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.ColumnElement[bool]:
-            subquery = (
-                sa.select(PrometheusQueryPresetRow.created_at)
-                .where(PrometheusQueryPresetRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return PrometheusQueryPresetRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.ColumnElement[bool]:
-            subquery = (
-                sa.select(PrometheusQueryPresetRow.created_at)
-                .where(PrometheusQueryPresetRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return PrometheusQueryPresetRow.created_at > subquery
-
-        return inner

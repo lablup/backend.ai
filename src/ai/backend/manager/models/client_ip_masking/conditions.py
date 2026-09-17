@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
@@ -25,35 +23,5 @@ class ClientIPMaskingPolicyConditions:
     def by_mode(mode: ClientIPMaskingMode) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ClientIPMaskingPolicyRow.mode == mode
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination, keyed on the ordered column."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ClientIPMaskingPolicyRow.target_type)
-                .where(ClientIPMaskingPolicyRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ClientIPMaskingPolicyRow.target_type > subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination, keyed on the ordered column."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ClientIPMaskingPolicyRow.target_type)
-                .where(ClientIPMaskingPolicyRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ClientIPMaskingPolicyRow.target_type < subquery
 
         return inner
