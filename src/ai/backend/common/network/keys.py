@@ -12,6 +12,9 @@ Layout:
   - ``ipam/{ip}``          : per-session IP reservation (manager-internal)
 - ``network/agent/{agent_id}/`` — per-agent advertisement (agent-written, manager reads)
   - ``caps`` / ``backend`` / ``vtep``
+- ``network/driver`` — the cluster-network driver the manager places multi-node sessions with
+  (manager-written at start, agent reads at start). ``overlay`` is Docker Swarm, which needs
+  nothing of this data plane: an agent reading it runs without its privileged helper at all.
 """
 
 from __future__ import annotations
@@ -30,7 +33,13 @@ __all__ = (
     "agent_boot_key",
     "agent_ready_key",
     "agent_vtep_key",
+    "cluster_driver_key",
 )
+
+
+# --- cluster-wide: network/driver ---
+def cluster_driver_key() -> str:
+    return "network/driver"
 
 
 # --- per-session: network/session/{session_id}/... ---

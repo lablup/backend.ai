@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.agent.docker.session_network import (
     NO_NETWORK_MODE,
+    effective_privnet_socket,
     is_session_networked,
     make_docker_locator,
 )
@@ -67,3 +68,22 @@ class TestTheLocator:
 def test_the_no_network_mode_is_dockers_own_word() -> None:
     # Not a BAI constant Docker would ignore: this is the value the daemon understands.
     assert NO_NETWORK_MODE == "none"
+
+
+class TestEffectivePrivnetSocket:
+    """A configured helper is used unless the cluster's driver is Docker Swarm."""
+
+    def test_the_swarm_driver_ignores_a_configured_helper(self) -> None:
+        assert effective_privnet_socket("/run/privnet.sock", "overlay") is None
+
+    def test_the_cni_driver_uses_it(self) -> None:
+        assert effective_privnet_socket("/run/privnet.sock", "cni") == "/run/privnet.sock"
+
+    def test_an_unpublished_driver_keeps_the_configured_helper(self) -> None:
+        """A manager from before the key, or not up yet: the safe direction is the configured
+        one, because a helper that is used for nothing is harmless and one that is needed and
+        ignored is a node that serves no overlay session."""
+        assert effective_privnet_socket("/run/privnet.sock", None) == "/run/privnet.sock"
+
+    def test_no_helper_configured_is_no_helper(self) -> None:
+        assert effective_privnet_socket(None, "cni") is None

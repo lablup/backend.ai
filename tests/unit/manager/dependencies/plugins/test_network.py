@@ -4,13 +4,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.network.keys import cluster_driver_key
 from ai.backend.manager.dependencies.plugins.base import PluginsInput
-from ai.backend.manager.dependencies.plugins.network import NetworkPluginDependency
+from ai.backend.manager.dependencies.plugins.network import (
+    NetworkPluginDependency,
+    cluster_driver_of,
+)
 
 
 def _make_plugins_input() -> PluginsInput:
+    etcd = MagicMock()
+    etcd.put = AsyncMock()
     return PluginsInput(
-        etcd=MagicMock(),
+        etcd=etcd,
         local_config={"key": "value"},
         allowed_plugins={"plugin_a"},
         disabled_plugins={"plugin_b"},
@@ -62,3 +68,39 @@ class TestNetworkPluginDependency:
                 raise RuntimeError("Test error")
 
         mock_ctx.cleanup.assert_called_once()
+
+
+class TestClusterDriverPublication:
+    """The driver is this process's config, and the agents decide from it whether to run their
+    privileged network helper at all -- so it is published where they can read it."""
+
+    def test_the_dumped_config_names_the_driver_by_its_alias(self) -> None:
+        assert (
+            cluster_driver_of({"network": {"inter-container": {"default-driver": "cni"}}}) == "cni"
+        )
+
+    def test_an_unset_driver_is_the_schema_default(self) -> None:
+        assert cluster_driver_of({"network": {"inter-container": {}}}) == "overlay"
+        assert cluster_driver_of({}) == "overlay"
+
+    @patch("ai.backend.manager.dependencies.plugins.network.NetworkPluginContext")
+    async def test_provide_publishes_it(self, mock_ctx_class: MagicMock) -> None:
+        plugins_input = _make_plugins_input()
+        plugins_input = PluginsInput(
+            etcd=plugins_input.etcd,
+            local_config={"network": {"inter-container": {"default-driver": "overlay"}}},
+            allowed_plugins=plugins_input.allowed_plugins,
+            disabled_plugins=plugins_input.disabled_plugins,
+            init_context=plugins_input.init_context,
+        )
+        mock_ctx = MagicMock()
+        mock_ctx.init = AsyncMock()
+        mock_ctx.cleanup = AsyncMock()
+        mock_ctx.plugins = {}
+        mock_ctx_class.return_value = mock_ctx
+
+        async with NetworkPluginDependency().provide(plugins_input):
+            pass
+
+        args, kwargs = plugins_input.etcd.put.await_args
+        assert args[:2] == (cluster_driver_key(), "overlay")
