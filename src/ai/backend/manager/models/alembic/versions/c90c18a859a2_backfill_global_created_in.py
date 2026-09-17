@@ -4,7 +4,7 @@ Create the existing domain, project, user and global-family entity nodes in the 
 scope: a membership and a scope binding from the `global` node to each.
 
 Revision ID: c90c18a859a2
-Revises: b76f2d5191d4
+Revises: c3e8a1f05b27
 Create Date: 2026-09-18
 
 """
@@ -16,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c90c18a859a2"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "b76f2d5191d4"
+down_revision = "c3e8a1f05b27"
 branch_labels = None
 depends_on = None
 

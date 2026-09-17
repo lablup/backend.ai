@@ -10,6 +10,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -23,10 +26,10 @@ class TestProvisionFixtureEntities:
     @pytest.fixture
     async def db(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -34,7 +37,7 @@ class TestProvisionFixtureEntities:
                 ContainerRegistryRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     def _registry(self, **overrides: Any) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -57,6 +60,17 @@ class TestProvisionFixtureEntities:
                     )
                 ).all()
             )
+
+    async def _global_node_id(self, db: ExtendedAsyncSAEngine) -> uuid.UUID:
+        async with db.begin_readonly_session() as sess:
+            return (
+                await sess.scalars(
+                    sa.select(VirtualEntityRow.id).where(
+                        VirtualEntityRow.entity_type == GlobalEntityType(),
+                        VirtualEntityRow.entity_id == global_entity_id(GlobalEntityName.GLOBAL),
+                    )
+                )
+            ).one()
 
     async def test_gives_a_fixture_row_a_node_owning_and_governing_itself(
         self, db: ExtendedAsyncSAEngine
@@ -82,7 +96,32 @@ class TestProvisionFixtureEntities:
                 )
             ).all()
         assert list(owns) == [nodes[0].id]
-        assert list(governed_by) == [nodes[0].id]
+        assert nodes[0].id in governed_by
+
+    async def test_creates_a_fixture_row_in_the_global_scope(
+        self, db: ExtendedAsyncSAEngine
+    ) -> None:
+        await populate_fixture(db, {"container_registries": [self._registry()]})
+
+        (node,) = await self._nodes(db)
+        global_node_id = await self._global_node_id(db)
+        async with db.begin_readonly_session() as sess:
+            owners = (
+                await sess.scalars(
+                    sa.select(EntityMembershipRow.virtual_entity_id).where(
+                        EntityMembershipRow.member_entity_id == node.id
+                    )
+                )
+            ).all()
+            governed_by = (
+                await sess.scalars(
+                    sa.select(ScopeBindingRow.scope_entity_id).where(
+                        ScopeBindingRow.virtual_entity_id == node.id
+                    )
+                )
+            ).all()
+        assert set(owners) == {node.id, global_node_id}
+        assert set(governed_by) == {node.id, global_node_id}
 
     async def test_covers_a_row_whose_id_the_server_defaults(
         self, db: ExtendedAsyncSAEngine
@@ -101,10 +140,18 @@ class TestProvisionFixtureEntities:
         nodes = await self._nodes(db)
         assert len(nodes) == 1
         async with db.begin_readonly_session() as sess:
-            assert (
-                await sess.scalar(sa.select(sa.func.count()).select_from(EntityMembershipRow))
-            ) == 1
-            assert (await sess.scalar(sa.select(sa.func.count()).select_from(ScopeBindingRow))) == 1
+            memberships = await sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(EntityMembershipRow)
+                .where(EntityMembershipRow.member_entity_id == nodes[0].id)
+            )
+            bindings = await sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(ScopeBindingRow)
+                .where(ScopeBindingRow.virtual_entity_id == nodes[0].id)
+            )
+        assert memberships == 2
+        assert bindings == 2
 
     async def test_keeps_a_node_the_fixture_wrote_itself(self, db: ExtendedAsyncSAEngine) -> None:
         registry_id = uuid.uuid4()
