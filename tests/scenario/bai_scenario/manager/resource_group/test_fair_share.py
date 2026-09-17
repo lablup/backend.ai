@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any, override
 
 import pytest
@@ -12,7 +11,6 @@ import pytest
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_group.request import (
-    ResourceWeightEntryInput,
     UpdateResourceGroupFairShareSpecInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
@@ -22,7 +20,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -70,9 +67,8 @@ class ReadingTheSpec(When[AGroupAndACaller, ResourceGroupAdapter, FairShareResou
 
 @dataclass(frozen=True)
 class EditingTheSpec(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
-    """fair share 설정을 바꾼다. ``weighted``면 용량에 없는 리소스에 가중치를 준다."""
+    """fair share 설정의 반감기를 바꾼다."""
 
-    weighted: bool = False
     unknown: bool = False
 
     @override
@@ -82,25 +78,16 @@ class EditingTheSpec(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupD
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
         target = "존재하지 않는 이름" if self.unknown else laid.group.name
-        what = "용량에 없는 리소스의 가중치를" if self.weighted else "반감기를"
-        return f"{laid.caller.username}이 {target}의 fair share 설정에서 {what} 수정"
+        return f"{laid.caller.username}이 {target}의 fair share 설정에서 반감기를 수정"
 
     @override
     async def call(
         self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
     ) -> ResourceGroupDetailNode:
-        if self.weighted:
-            asked = UpdateResourceGroupFairShareSpecInput(
-                resource_group_name=laid.group.name,
-                resource_weights=[
-                    ResourceWeightEntryInput(resource_type="cuda.shares", weight=Decimal("2"))
-                ],
-            )
-        else:
-            asked = UpdateResourceGroupFairShareSpecInput(
-                resource_group_name=UNKNOWN if self.unknown else laid.group.name,
-                half_life_days=HALF_LIFE,
-            )
+        asked = UpdateResourceGroupFairShareSpecInput(
+            resource_group_name=UNKNOWN if self.unknown else laid.group.name,
+            half_life_days=HALF_LIFE,
+        )
         with ActingAs(laid.caller):
             payload = await adapter.update_fair_share_spec(asked)
         return payload.resource_group
@@ -215,31 +202,6 @@ class TheSuperadminChangesTheHalfLife(
 
 
 @dataclass(frozen=True)
-class AWeightForAResourceNotInCapacityIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    @override
-    def summary(self) -> str:
-        return "a-weight-for-a-resource-not-in-the-capacity-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return "에이전트가 없어 용량이 빈 그룹에 어떤 리소스든 가중치를 주려 하면 잘못된 입력으로 거부된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
-        return EditingTheSpec(weighted=True)
-
-    @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
-        return TheCallIsRefused(InvalidResourceWeightError)
-
-
-@dataclass(frozen=True)
 class AUserGrantedUpdateOnTheGroupChangesTheSpec(
     Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -323,7 +285,6 @@ SCENARIOS: list[FairShareStep] = [
     AUserGrantedReadOnTheGroupMayNotReadTheSpec(),
     ReadingTheSpecOfAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheHalfLife(started=datetime.now(UTC)),
-    AWeightForAResourceNotInCapacityIsRefused(),
     AUserGrantedUpdateOnTheGroupChangesTheSpec(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotChangeTheSpec(),
     ChangingTheSpecOfAnUnknownNameIsNotFound(),

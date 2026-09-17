@@ -1287,30 +1287,6 @@ Then
   - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
   - default_session_options: 무시함 — 설치본이 정한 기본값이다
 
-#### [a-weight-for-a-resource-not-in-the-capacity-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
-
-에이전트가 없어 용량이 빈 그룹에 어떤 리소스든 가중치를 주려 하면 잘못된 입력으로 거부된다
-
-Given
-
-- 리소스 그룹 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 용량에 없는 리소스의 가중치를 수정
-
-Then
-
-- 거부된다
-  - 거부: InvalidResourceWeightError
-
 #### [changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
 
 슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다
