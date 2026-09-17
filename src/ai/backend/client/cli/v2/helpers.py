@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -23,10 +24,10 @@ if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 
 CONFIG_DIR = Path.home() / ".backend.ai"
-CONFIG_FILE = CONFIG_DIR / "config.toml"
-CREDENTIALS_FILE = CONFIG_DIR / "credentials.toml"
-SESSION_DIR = CONFIG_DIR / "session"
-COOKIE_FILE = SESSION_DIR / "cookie.dat"
+
+PROFILE_ENV = "BACKEND_PROFILE"
+PROFILE_META_KEY = "ai.backend.client.cli.v2.profile"
+_PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 DEFAULTS = {
     "endpoint": "https://api.cloud.backend.ai",
@@ -49,29 +50,122 @@ class V2ConnectionConfig:
     cookie_file: Path | None = field(default=None)
 
 
+@dataclass(frozen=True)
+class ProfilePaths:
+    """File locations of one profile. ``name`` is ``None`` for ``~/.backend.ai/`` itself."""
+
+    name: str | None
+    base_dir: Path
+
+    @property
+    def config_file(self) -> Path:
+        return self.base_dir / "config.toml"
+
+    @property
+    def credentials_file(self) -> Path:
+        return self.base_dir / "credentials.toml"
+
+    @property
+    def session_dir(self) -> Path:
+        return self.base_dir / "session"
+
+    @property
+    def cookie_file(self) -> Path:
+        return self.session_dir / "cookie.dat"
+
+    def read_config(self) -> dict[str, Any]:
+        """``config.toml`` values laid over the built-in defaults."""
+        import tomllib
+
+        cfg: dict[str, Any] = dict(DEFAULTS)
+        if self.config_file.exists():
+            with self.config_file.open("rb") as f:
+                file_cfg = tomllib.load(f).get("backend-ai", {})
+            cfg.update({k: v for k, v in file_cfg.items() if v is not None})
+        return cfg
+
+
+class ProfileStore:
+    """Profiles under ``~/.backend.ai/profiles/`` and the ``current-profile`` file."""
+
+    _root: Path
+
+    def __init__(self) -> None:
+        self._root = Path.home() / ".backend.ai"
+
+    @property
+    def _profiles_dir(self) -> Path:
+        return self._root / "profiles"
+
+    @property
+    def _current_file(self) -> Path:
+        return self._root / "current-profile"
+
+    def paths(self, name: str | None) -> ProfilePaths:
+        if name is None:
+            return ProfilePaths(name=None, base_dir=self._root)
+        if not _PROFILE_NAME_PATTERN.match(name):
+            raise click.ClickException(f"Invalid profile name: {name!r}")
+        return ProfilePaths(name=name, base_dir=self._profiles_dir / name)
+
+    def existing(self, name: str) -> ProfilePaths:
+        paths = self.paths(name)
+        if not paths.base_dir.is_dir():
+            raise click.ClickException(f"Profile {name!r} does not exist.")
+        return paths
+
+    def names(self) -> list[str]:
+        if not self._profiles_dir.is_dir():
+            return []
+        return sorted(p.name for p in self._profiles_dir.iterdir() if p.is_dir())
+
+    def current(self) -> str | None:
+        if not self._current_file.exists():
+            return None
+        return self._current_file.read_text().strip() or None
+
+    def set_current(self, name: str | None) -> None:
+        if name is None:
+            self._current_file.unlink(missing_ok=True)
+            return
+        self._root.mkdir(parents=True, exist_ok=True)
+        self._current_file.write_text(name + "\n")
+
+    def selected_name(self) -> str | None:
+        """``--profile`` > ``BACKEND_PROFILE`` > ``current-profile`` > none."""
+        ctx = click.get_current_context(silent=True)
+        if ctx is not None and (name := ctx.meta.get(PROFILE_META_KEY)):
+            return str(name)
+        if name := os.environ.get(PROFILE_ENV):
+            return name
+        return self.current()
+
+    def selected(self) -> ProfilePaths:
+        name = self.selected_name()
+        if name is None:
+            return self.paths(None)
+        return self.existing(name)
+
+
 def load_v2_config() -> V2ConnectionConfig:
-    """Load v2 connection config from ``~/.backend.ai/``.
+    """Load v2 connection config from the selected profile.
 
     Precedence (highest to lowest):
     1. Environment variables (``BACKEND_ENDPOINT``, ``BACKEND_ACCESS_KEY``, etc.)
-    2. ``~/.backend.ai/credentials.toml``
-    3. ``~/.backend.ai/config.toml``
+    2. ``credentials.toml`` of the profile
+    3. ``config.toml`` of the profile
     4. Built-in defaults
     """
     import tomllib
 
-    cfg: dict[str, Any] = dict(DEFAULTS)
-
-    if CONFIG_FILE.exists():
-        with CONFIG_FILE.open("rb") as f:
-            file_cfg = tomllib.load(f).get("backend-ai", {})
-        cfg.update({k: v for k, v in file_cfg.items() if v is not None})
+    paths = ProfileStore().selected()
+    cfg = paths.read_config()
 
     access_key: str | None = None
     secret_key: str | None = None
 
-    if CREDENTIALS_FILE.exists():
-        with CREDENTIALS_FILE.open("rb") as f:
+    if paths.credentials_file.exists():
+        with paths.credentials_file.open("rb") as f:
             creds = tomllib.load(f).get("backend-ai", {})
         access_key = creds.get("access_key")
         secret_key = creds.get("secret_key")
@@ -89,8 +183,8 @@ def load_v2_config() -> V2ConnectionConfig:
     # Defer cookie jar creation to async context (aiohttp >=3.13 requires event loop)
     cookie_file = None
     endpoint_type = str(cfg["endpoint_type"])
-    if endpoint_type == "session" and COOKIE_FILE.exists():
-        cookie_file = COOKIE_FILE
+    if endpoint_type == "session" and paths.cookie_file.exists():
+        cookie_file = paths.cookie_file
 
     return V2ConnectionConfig(
         endpoint=URL(str(cfg["endpoint"])),

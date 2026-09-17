@@ -34,9 +34,9 @@ that group hands out. The entity recorded is always the preset.
 
 ## A preset is global state that owns field rows
 
-- The preset sits outside the scope hierarchy: it declares what a scope type
-  gets, joins no scope, and is never shared — so `RolePresetCreator` is a
-  `GlobalEntityCreator`.
+- The preset declares what a scope type gets and is never shared. It is created
+  in the `global` scope, so `RolePresetCreator` is an `EntityCreator` with
+  `CreatedInGlobal`.
 - Its permission rows are a `FieldCreator`: FK to the preset with
   `ondelete=CASCADE`, unique on the `(preset, entity_type, operation)` triple,
   and referenced by nothing else.

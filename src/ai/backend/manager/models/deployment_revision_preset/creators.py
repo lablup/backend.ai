@@ -26,7 +26,8 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
-from ai.backend.manager.models.specs.creator import FieldCreator, GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 __all__ = (
@@ -48,7 +49,8 @@ def _parse_quantity(value: str) -> Decimal:
 
 @dataclass
 class DeploymentPresetCreator(
-    GlobalEntityCreator[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+    CreatedInGlobal[DeploymentRevisionPresetRow],
+    EntityCreator[DeploymentRevisionPresetRow, DeploymentRevisionPresetData],
 ):
     """Insert a preset, ranked last within its runtime variant.
 

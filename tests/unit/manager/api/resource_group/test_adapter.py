@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
-from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -35,10 +34,7 @@ def _get_pagination_spec() -> PaginationSpec:
     """
     return PaginationSpec(
         forward_order=ResourceGroupOrders.created_at(ascending=False),
-        backward_order=ResourceGroupOrders.created_at(ascending=True),
-        forward_condition_factory=ResourceGroupConditions.by_cursor_forward,
-        backward_condition_factory=ResourceGroupConditions.by_cursor_backward,
-        tiebreaker_order=ResourceGroupRow.name.asc(),
+        cursor_column=ResourceGroupRow.id,
     )
 
 

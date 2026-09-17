@@ -137,7 +137,7 @@ class ServiceMetadata(BackendAISchema):
         Convert the service metadata to a dictionary.
         :return: Dictionary representation of the service metadata.
         """
-        return self.model_dump()
+        return self.model_dump(mode="json")
 
 
 class ServiceDiscovery(ABC):

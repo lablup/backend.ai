@@ -23,6 +23,7 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
@@ -540,6 +541,23 @@ class TestNotificationService:
         # Validation succeeds by not raising exception
         assert result.message is not None
         mock_repository.get_rule_by_id.assert_called_once_with(sample_rule.id)
+
+    async def test_validate_rule_rejects_data_missing_a_required_field(
+        self,
+        notification_service: NotificationService,
+        mock_repository: MagicMock,
+        sample_rule: NotificationRuleData,
+        sample_webhook_channel: NotificationChannelData,
+    ) -> None:
+        mock_repository.get_rule_by_id = AsyncMock(return_value=sample_rule)
+        mock_repository.get_channel_by_id = AsyncMock(return_value=sample_webhook_channel)
+
+        action = ValidateRuleAction(
+            rule_id=sample_rule.id,
+            notification_data={"session_name": "test-session"},
+        )
+        with pytest.raises(BackendAISchemaValidationFailed):
+            await notification_service.validate_rule(action)
 
     async def test_validate_rule_template_error(
         self,

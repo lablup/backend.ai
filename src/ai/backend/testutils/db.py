@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql.ddl import SchemaGenerator
 from sqlalchemy.sql.schema import ForeignKeyConstraint
 
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
+from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 
 class HasTable(Protocol):
@@ -124,3 +129,22 @@ async def with_tables(
         async with engine.begin() as conn:
             table_names = ", ".join(f'"{t.name}"' for t in tables)
             await conn.execute(text(f"TRUNCATE {table_names} CASCADE"))
+
+
+@asynccontextmanager
+async def with_global_entities(engine: AsyncEngine) -> AsyncGenerator[None, None]:
+    """
+    Create the global entity rows and their virtual entities, as the migration does.
+    Tables are truncated on exit.
+    """
+    tables: list[TableOrORM] = [
+        GlobalEntityRow,
+        VirtualEntityRow,
+        EntityMembershipRow,
+        ScopeBindingRow,
+    ]
+    async with with_tables(engine, tables):
+        async with engine.begin() as conn:
+            for statement in SEED_GLOBAL_ENTITIES_SQL:
+                await conn.execute(text(statement))
+        yield

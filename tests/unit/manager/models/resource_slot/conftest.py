@@ -42,11 +42,11 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 @pytest.fixture
 async def database_with_resource_slot_tables(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     """Set up tables required for resource slot normalization tests."""
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             # FK dependency order: parents before children
             VirtualEntityRow,
@@ -73,7 +73,7 @@ async def database_with_resource_slot_tables(
             ResourceAllocationRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture

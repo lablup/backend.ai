@@ -10,7 +10,7 @@ from typing import Any
 
 import click
 
-from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_config
+from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
 
 @click.command()
@@ -20,7 +20,7 @@ from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_confi
 def login(force: bool) -> None:
     """Log in to a Backend.AI webserver endpoint.
 
-    Stores the session cookie in ``~/.backend.ai/session/cookie.dat``.
+    Stores the session cookie in ``session/cookie.dat`` of the selected profile.
     Requires ``endpoint-type`` to be ``session``.
     """
     user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
@@ -76,14 +76,15 @@ def login(force: bool) -> None:
                 click.echo(click.style(f"Login failed: {details}", fg="red"))
                 raise SystemExit(1)
 
-            SESSION_DIR.mkdir(parents=True, exist_ok=True)
+            paths = ProfileStore().selected()
+            paths.session_dir.mkdir(parents=True, exist_ok=True)
             cookie_jar = client.session.cookie_jar
             if hasattr(cookie_jar, "save"):
-                cookie_jar.save(COOKIE_FILE)
+                cookie_jar.save(paths.cookie_file)
 
             login_config = data.get("config", {})
             if login_config:
-                config_path = SESSION_DIR / "config.json"
+                config_path = paths.session_dir / "config.json"
                 config_path.write_text(json.dumps(login_config))
 
             click.echo(click.style("Login succeeded.", fg="green"))
@@ -121,7 +122,8 @@ def logout() -> None:
         finally:
             await registry.close()
 
-        for path in [COOKIE_FILE, SESSION_DIR / "config.json"]:
+        paths = ProfileStore().selected()
+        for path in [paths.cookie_file, paths.session_dir / "config.json"]:
             try:
                 path.unlink(missing_ok=True)
             except OSError:

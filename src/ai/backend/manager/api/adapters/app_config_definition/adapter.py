@@ -33,6 +33,7 @@ from ai.backend.manager.models.app_config_definition.creators import (
     AppConfigDefinitionCreator,
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_definition.searchers import (
     AppConfigDefinitionSearcher,
 )
@@ -60,10 +61,7 @@ from ai.backend.manager.services.app_config.processors import AppConfigProcessor
 def _get_app_config_definition_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
-        backward_order=AppConfigDefinitionOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigDefinitionConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigDefinitionConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigDefinitionOrders.id(ascending=True),
+        cursor_column=AppConfigDefinitionRow.id,
     )
 
 

@@ -39,10 +39,10 @@ class TestRetentionPolicyRow:
     @pytest.fixture
     async def db(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncIterator[ExtendedAsyncSAEngine]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -50,7 +50,7 @@ class TestRetentionPolicyRow:
                 RetentionPolicyRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     async def test_insert_and_read_back(self, db: ExtendedAsyncSAEngine) -> None:
         async with db.begin_session() as sess:

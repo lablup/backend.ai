@@ -115,7 +115,7 @@ Check options with `--help`.
 
 ### Utilities (not entities)
 
-`login`, `logout`, `config`, `gql` — single commands at the root.
+`login`, `logout`, `config`, `profile`, `gql` — single commands at the root.
 
 > When adding a new CLI command, update this Reference as well (see "Adding a new entity" in `client/cli/v2/AGENTS.md`).
 
@@ -153,6 +153,29 @@ Access the manager directly without the webserver (HMAC signature auth):
 ```
 
 The configuration is stored in `~/.backend.ai/config.toml` and `credentials.toml`.
+
+### Profiles
+
+A profile holds one endpoint, one account and its session. Passwords are not stored.
+
+```bash
+./bai profile create staging --endpoint https://staging.example --endpoint-type session
+./bai --profile staging login
+./bai profile use staging        # recorded in ~/.backend.ai/current-profile
+./bai profile list               # the selected profile is marked with *
+./bai profile show [name]
+./bai profile rename staging stg
+./bai profile delete stg [--yes]
+```
+
+| Item | Value |
+|---|---|
+| Profile folder | `~/.backend.ai/profiles/<name>/{config.toml, credentials.toml, session/}` |
+| Selection precedence | `--profile` > `BACKEND_PROFILE` > `current-profile` > files directly under `~/.backend.ai/` |
+| `config`, `login`, `logout` | Read and write the files of the selected profile |
+| `BACKEND_ENDPOINT` etc. | Override the values of the selected profile |
+
+To use different profiles in several shells at once, select with `BACKEND_PROFILE` or `--profile`.
 
 ## Command pattern
 

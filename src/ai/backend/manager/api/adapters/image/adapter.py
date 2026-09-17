@@ -96,10 +96,7 @@ def _get_image_pagination_spec() -> PaginationSpec:
     """Get pagination spec for Image queries."""
     return PaginationSpec(
         forward_order=ImageOrders.created_at(ascending=False),
-        backward_order=ImageOrders.created_at(ascending=True),
-        forward_condition_factory=ImageConditions.by_cursor_forward,
-        backward_condition_factory=ImageConditions.by_cursor_backward,
-        tiebreaker_order=ImageRow.id.asc(),
+        cursor_column=ImageRow.id,
     )
 
 
@@ -108,10 +105,7 @@ def _get_alias_pagination_spec() -> PaginationSpec:
     """Get pagination spec for ImageAlias queries."""
     return PaginationSpec(
         forward_order=ImageAliasOrders.alias(ascending=True),
-        backward_order=ImageAliasOrders.alias(ascending=False),
-        forward_condition_factory=ImageAliasConditions.by_cursor_forward,
-        backward_condition_factory=ImageAliasConditions.by_cursor_backward,
-        tiebreaker_order=ImageAliasRow.id.asc(),
+        cursor_column=ImageAliasRow.id,
     )
 
 

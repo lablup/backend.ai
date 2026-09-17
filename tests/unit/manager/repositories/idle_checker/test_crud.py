@@ -52,10 +52,10 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -72,7 +72,7 @@ async def database(
             EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ async def created_checker(
     repository: OpsRepository[IdleCheckerData],
     creator: IdleCheckerCreator,
 ) -> IdleCheckerData:
-    return await repository.create_global_entity(creator)
+    return await repository.create_entity(creator)
 
 
 @pytest.fixture
@@ -111,7 +111,7 @@ async def network_checker(
     repository: OpsRepository[IdleCheckerData],
     creator: IdleCheckerCreator,
 ) -> IdleCheckerData:
-    return await repository.create_global_entity(
+    return await repository.create_entity(
         replace(
             creator,
             name="network timeout",
@@ -129,7 +129,7 @@ class TestCreate:
         repository: OpsRepository[IdleCheckerData],
         creator: IdleCheckerCreator,
     ) -> None:
-        checker = await repository.create_global_entity(creator)
+        checker = await repository.create_entity(creator)
 
         assert checker.name == creator.name
         assert checker.checker_type == creator.spec.type
@@ -157,7 +157,7 @@ class TestSearch:
         creator: IdleCheckerCreator,
         created_checker: IdleCheckerData,
     ) -> None:
-        second_checker = await repository.create_global_entity(
+        second_checker = await repository.create_entity(
             replace(creator, name="second session lifetime")
         )
 

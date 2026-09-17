@@ -21,12 +21,15 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator, NestedFieldCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator, NestedFieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ResourceSlotTypeCreator(GlobalEntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]):
+class ResourceSlotTypeCreator(
+    CreatedInGlobal[ResourceSlotTypeRow], EntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]
+):
     """Creator for a resource slot type — a global catalog row.
 
     Registering a name that already exists fails rather than overwriting: the

@@ -77,11 +77,11 @@ class TestKeypairResourcePolicyOps:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -119,7 +119,7 @@ class TestKeypairResourcePolicyOps:
                 EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def sample_resource_slots(self) -> ResourceSlot:
@@ -318,7 +318,7 @@ class TestKeypairResourcePolicyOps:
         policy_creator: KeyPairResourcePolicyCreator,
     ) -> None:
         """Test creating a new keypair resource policy with various configurations"""
-        result = await ops.create_global_entity(policy_creator)
+        result = await ops.create_entity(policy_creator)
 
         assert result.name == policy_creator.name
         assert result.default_for_unspecified == policy_creator.default_for_unspecified

@@ -44,6 +44,7 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
     is_active: bool = True
     status: UserStatus | None = None
     """Written as is when given; otherwise the row derives it from ``is_active``."""
+    secret_key: SecretValue | None = None
 
     @override
     def kind(self) -> str:
@@ -61,6 +62,8 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
     def detail(self) -> str:
         if self.status is not None and self.status != UserStatus.ACTIVE:
             return f"상태 {self.status.value}, 자기 키와 개인 프로젝트를 갖는다"
+        if self.secret_key is not None and not isinstance(self.secret_key.content, str):
+            return "자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다"
         return "자기 키와 개인 프로젝트를 갖는다"
 
     @override
@@ -95,7 +98,7 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
             ),
             keypair_secrets=KeyPairSecrets(
                 access_key=AccessKey(f"AK{token}"),
-                secret_key=SecretValue(f"sk-{token}"),
+                secret_key=self.secret_key or SecretValue(f"sk-{token}"),
                 ssh_public_key="",
                 ssh_private_key="",
             ),

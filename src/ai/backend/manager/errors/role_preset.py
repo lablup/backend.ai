@@ -26,6 +26,17 @@ class InvalidRoleNameTemplate(EntityError, web.HTTPBadRequest):
         )
 
 
+class RolePresetScopeNotFound(EntityError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/role-preset-scope-not-found"
+    error_title = "The scope a role preset names does not exist."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RolePresetEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
+        )
+
+
 class SystemRoleNotEditable(EntityError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/system-role-not-editable"
     error_title = "A SYSTEM role cannot be purged; edit the role preset instead."

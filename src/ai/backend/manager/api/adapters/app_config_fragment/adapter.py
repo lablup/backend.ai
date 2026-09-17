@@ -52,6 +52,7 @@ from ai.backend.manager.models.app_config_fragment.purgers import AppConfigFragm
 from ai.backend.manager.models.app_config_fragment.queriers import (
     AppConfigFragmentQuerier,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.app_config_fragment.searchers import (
     AppConfigFragmentSearcher,
 )
@@ -92,10 +93,7 @@ from ai.backend.manager.services.app_config.processors import AppConfigProcessor
 def _get_app_config_fragment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigFragmentOrders.created_at(ascending=False),
-        backward_order=AppConfigFragmentOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigFragmentConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigFragmentConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigFragmentOrders.id(ascending=True),
+        cursor_column=AppConfigFragmentRow.id,
     )
 
 

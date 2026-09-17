@@ -13,8 +13,9 @@ from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.upserter import EntityUpserter, GlobalEntityUpserter
+from ai.backend.manager.models.specs.upserter import EntityUpserter
 
 
 def _write_gate_check(config_name: str, scope_type: AppConfigScopeType) -> IntegrityErrorCheck:
@@ -38,8 +39,8 @@ def _replaced_config(config: dict[str, Any]) -> dict[str, Any]:
 class AppConfigFragmentUpserter(EntityUpserter[AppConfigFragmentRow, AppConfigFragmentData]):
     """Upserter for a fragment owned by a domain or a user.
 
-    The owner is required, so the row always joins its owner's scope. A fragment that
-    belongs to no one is ``public``, written through
+    The owner is required, so the row always joins its owner's scope. A fragment with
+    no owner is ``public``, written through
     :class:`PublicAppConfigFragmentUpserter` instead.
     """
 
@@ -87,9 +88,10 @@ class AppConfigFragmentUpserter(EntityUpserter[AppConfigFragmentRow, AppConfigFr
 
 @dataclass
 class PublicAppConfigFragmentUpserter(
-    GlobalEntityUpserter[AppConfigFragmentRow, AppConfigFragmentData]
+    CreatedInPublic[AppConfigFragmentRow],
+    EntityUpserter[AppConfigFragmentRow, AppConfigFragmentData],
 ):
-    """Upserter for a ``public`` fragment, which belongs to no one.
+    """Upserter for a ``public`` fragment, created in the `global` and `public` scopes.
 
     It takes no owner, so it can only ever write a public row; the conflict target keys
     on a NULL ``scope_id`` like any other, since the constraint is NULLS NOT DISTINCT.

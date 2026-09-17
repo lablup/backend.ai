@@ -38,10 +38,7 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _LOGIN_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginHistoryOrders.created_at(ascending=False),
-    backward_order=LoginHistoryOrders.created_at(ascending=True),
-    forward_condition_factory=LoginHistoryConditions.by_cursor_forward,
-    backward_condition_factory=LoginHistoryConditions.by_cursor_backward,
-    tiebreaker_order=LoginHistoryRow.id.asc(),
+    cursor_column=LoginHistoryRow.id,
 )
 
 

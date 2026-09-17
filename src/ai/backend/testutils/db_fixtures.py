@@ -18,14 +18,17 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.testutils.bootstrap import (
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
 )
+from ai.backend.testutils.db import with_global_entities
 
 # The server already answered pg_isready; a longer wait would not change the outcome.
 CONNECT_TIMEOUT = 30.0
@@ -108,3 +111,19 @@ async def database_connection(test_database_url: str) -> AsyncIterator[ExtendedA
     )
     yield engine
     await engine.dispose()
+
+
+@pytest.fixture
+async def global_entity_ids(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
+    """
+    The global entities written as the migration writes them, with the id cache loaded
+    from them. Cleared on exit.
+    """
+    async with with_global_entities(database_connection):
+        await GlobalEntityIDLoader(database_connection).load()
+        try:
+            yield database_connection
+        finally:
+            GlobalEntityIDCache.clear()

@@ -27,7 +27,6 @@ from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.entity_label.conditions import (
-    EntityLabelConditions,
     EntityLabelOrders,
 )
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -40,10 +39,7 @@ from ai.backend.manager.services.entity_label.processors import EntityLabelProce
 
 _LABEL_PAGINATION_SPEC = PaginationSpec(
     forward_order=EntityLabelOrders.created_at(ascending=False),
-    backward_order=EntityLabelOrders.created_at(ascending=True),
-    forward_condition_factory=EntityLabelConditions.by_cursor_forward,
-    backward_condition_factory=EntityLabelConditions.by_cursor_backward,
-    tiebreaker_order=EntityLabelRow.id.asc(),
+    cursor_column=EntityLabelRow.id,
 )
 
 

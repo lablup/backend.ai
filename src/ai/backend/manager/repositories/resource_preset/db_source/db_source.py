@@ -101,7 +101,7 @@ class ResourcePresetDBSource:
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
         async with self._v2_ops.write_ops() as w:
-            return await w.create_global_entity(creator)
+            return await w.create_entity(creator)
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """

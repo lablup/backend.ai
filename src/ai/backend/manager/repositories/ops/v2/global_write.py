@@ -1,10 +1,12 @@
 """Global writes of the v2 ops: system-wide state outside the scope
-hierarchy. Plain row writes — nothing becomes a scope and nothing is joined."""
+hierarchy. Each row is created in the `global` scope."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
@@ -17,11 +19,13 @@ class V2GlobalWriteOps(V2GraphWriteOpsBase):
     async def create_global_entity[TRow: Base, TData](
         self, creator: GlobalEntityCreator[TRow, TData]
     ) -> TData:
-        """Insert one global entity row and provision it in the RBAC graph; it joins
-        nothing."""
+        """Insert one global entity row and provision it in the RBAC graph, created in
+        the `global` scope."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
-        await self._provision([creator.entity_id(row)])
+        entity = creator.entity_id(row)
+        await self._provision([entity])
+        await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
         return creator.to_data(row)
 
     async def atomic_create_global_entities[TRow: Base, TData](
@@ -34,9 +38,10 @@ class V2GlobalWriteOps(V2GraphWriteOpsBase):
         rows = [creator.build_row() for creator in creators]
         # First creator's checks: all specs share the same creator subclass.
         await self._insert_rows(rows, creators[0].integrity_error_checks())
-        await self._provision([
-            creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)
-        ])
+        entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
+        await self._provision(entities)
+        for entity in entities:
+            await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def atomic_upsert_global_entities[TRow: Base, TData](
@@ -61,9 +66,10 @@ class V2GlobalWriteOps(V2GraphWriteOpsBase):
             )
             for upserter in upserters
         ]
-        await self._provision([
-            upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)
-        ])
+        entities = [upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)]
+        await self._provision(entities)
+        for entity in entities:
+            await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
     async def upsert_global_entity[TRow: Base, TData](
@@ -78,5 +84,7 @@ class V2GlobalWriteOps(V2GraphWriteOpsBase):
             upserter.build_update_values(),
             upserter.integrity_error_checks(),
         )
-        await self._provision([upserter.entity_id(row)])
+        entity = upserter.entity_id(row)
+        await self._provision([entity])
+        await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
         return upserter.to_data(row)
