@@ -1,4 +1,4 @@
-"""커널 할당 검색 — 전역 역할을 검사하고, 각 필터가 무엇을 좁히고, 크기를 어떻게 지정하면 몇 건이 반환되는가."""
+"""커널 할당 검색 — 슈퍼관리자인지 검사하고, 각 필터가 무엇을 좁히고, 크기를 어떻게 지정하면 몇 건이 반환되는가."""
 
 from __future__ import annotations
 
@@ -267,7 +267,7 @@ class AMonitorCountsEveryAllocation(
 
     @override
     def describe(self) -> str:
-        return "모니터가 필터 없이 조회하면 할당이 다 집계된다. 전역 역할을 검사하는 조회는 모니터도 통과한다"
+        return "모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다"
 
     @override
     def given(self) -> Given[SeedingSession, KernelsAndACaller]:
@@ -317,7 +317,7 @@ class EnforcementOffStillNeedsTheRole(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 전역 역할 검사는 그 설정을 읽지 않는다"
+        return "권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다"
 
     @override
     def config(self) -> Mapping[str, Any]:

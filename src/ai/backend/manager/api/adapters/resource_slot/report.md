@@ -1829,7 +1829,7 @@ Then
 
 #### [a-monitor-may-search-agent-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
 
-모니터가 필터 없이 조회하면 응답이 반환된다. 전역 역할을 검사하는 조회는 모니터도 통과한다
+모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다
 
 Given
 
@@ -1910,7 +1910,7 @@ Then
 
 #### [turning-enforcement-off-still-refuses-a-user-searching-agent-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 전역 역할 검사는 그 설정을 읽지 않는다
+권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다
 
 Given
 
@@ -1977,7 +1977,7 @@ Then
 
 #### [a-monitor-counts-every-allocation-laid](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
-모니터가 필터 없이 조회하면 할당이 다 집계된다. 전역 역할을 검사하는 조회는 모니터도 통과한다
+모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다
 
 Given
 
@@ -2179,7 +2179,7 @@ Then
 
 #### [turning-enforcement-off-still-refuses-a-user-searching-allocations](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
-권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 전역 역할 검사는 그 설정을 읽지 않는다
+권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다
 
 Given
 
