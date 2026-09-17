@@ -1,13 +1,13 @@
 """프리셋 실행 — 조회할 수 있어도 실행은 권한 그래프로 보호된다.
 
 실행은 저장된 프리셋을 읽어 Prometheus에 질의한다. 모의 서버가 응답하는 샘플의 값이 모의
-서버가 받은 질의라, 시간 창과 라벨이 어떻게 들어갔는지를 응답에서 확인한다. 라벨 검사는
-프리셋이 허용 목록을 둔 때만 실행되고, 모의 서버를 호출하기 전에 실행된다.
+서버가 받은 질의라, 시간 창이 어떻게 들어갔는지를 응답에서 확인한다. 시간 창의 우선순위와
+라벨 허용 목록은 서비스의 단위 테스트가 검사하므로 여기에는 없다.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, override
@@ -18,7 +18,6 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ExecuteQueryDefinitionOptionsInput,
-    MetricLabelEntry,
     QueryTimeRangeInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -26,7 +25,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 )
 from ai.backend.common.exception import (
     FailedToGetMetric,
-    PrometheusQueryPresetInvalidLabel,
     PrometheusQueryPresetNotFound,
 )
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
@@ -54,8 +52,6 @@ from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import EMPTY_WITHOUT_LABELS
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
-SERVER_WINDOW_PATH = "metric.timewindow"
-SERVER_WINDOW = "2m"
 PRESET_WINDOW = "1h"
 ASKED_WINDOW = "30s"
 
@@ -67,10 +63,8 @@ type ExecutingStep = Scenario[
 
 @dataclass(frozen=True)
 class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
-    """미리 만들어 둔 프리셋을 실행한다. 시간 창, 조회 구간, 라벨은 지정한 것만 담는다."""
+    """미리 만들어 둔 프리셋을 실행한다. 시간 창과 조회 구간은 지정한 것만 담는다."""
 
-    filter_labels: tuple[tuple[str, str], ...] = ()
-    group_labels: Sequence[str] = ()
     time_window: str | None = None
     over_a_range: bool = False
     other: UUID | None = None
@@ -82,8 +76,7 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 id" if self.other is not None else laid.preset.name
-        how = [f"필터 라벨 {key}={value}" for key, value in self.filter_labels]
-        how.extend(f"그룹 라벨 {one}" for one in self.group_labels)
+        how: list[str] = []
         if self.time_window is not None:
             how.append(f"시간 창 {self.time_window}")
         if self.over_a_range:
@@ -95,12 +88,7 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
     @override
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: APresetAndACaller) -> Result:
         wanted = self.other if self.other is not None else laid.preset.id
-        options = ExecuteQueryDefinitionOptionsInput(
-            filter_labels=[
-                MetricLabelEntry(key=key, value=value) for key, value in self.filter_labels
-            ],
-            group_labels=list(self.group_labels),
-        )
+        options = ExecuteQueryDefinitionOptionsInput(filter_labels=[], group_labels=[])
         time_range = (
             QueryTimeRangeInputDTO(
                 start=datetime(2026, 1, 1, tzinfo=UTC),
@@ -168,239 +156,6 @@ class RunningOverARangeIsARangeQuery(
     def then(self) -> Then[APresetAndACaller, Result]:
         return TheQueryAnswered(
             query="avg by () (rate(container_cpu_seconds_total{}[1h]))", result_type=RANGE
-        )
-
-
-@dataclass(frozen=True)
-class ThePresetWindowFillsInForTheRequest(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-request-naming-no-window-runs-with-the-window-of-the-preset"
-
-    @override
-    def describe(self) -> str:
-        return "시간 창이 설정된 프리셋을 슈퍼관리자가 시간 창 없이 실행하면, 모의 서버가 받은 질의의 시간 창이 프리셋의 시간 창이다"
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW)
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing()
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[1h]))")
-
-
-@dataclass(frozen=True)
-class TheServerWindowFillsInForBoth(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result], Configured
-):
-    @override
-    def summary(self) -> str:
-        return "a-preset-and-a-request-naming-no-window-run-with-the-server-default"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "시간 창이 없는 프리셋을 슈퍼관리자가 시간 창 없이 실행하면, "
-            "모의 서버가 받은 질의의 시간 창이 서버 설정의 기본 시간 창이다"
-        )
-
-    @override
-    def config(self) -> Mapping[str, Any]:
-        return {SERVER_WINDOW_PATH: SERVER_WINDOW}
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing()
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[2m]))")
-
-
-@dataclass(frozen=True)
-class TheRequestWindowWinsOverThePreset(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "the-window-a-request-names-wins-over-the-window-of-the-preset"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "시간 창이 설정된 프리셋을 슈퍼관리자가 다른 시간 창을 지정해 실행하면, "
-            "모의 서버가 받은 질의의 시간 창이 요청의 시간 창이다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW)
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing(time_window=ASKED_WINDOW)
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[30s]))")
-
-
-@dataclass(frozen=True)
-class AnAllowedFilterLabelReachesTheQuery(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-filter-label-the-preset-allows-reaches-the-query-as-an-exact-match"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "필터 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록 안의 라벨로 실행하면, "
-            "모의 서버가 받은 질의에 그 라벨이 정확히 일치하는 조건으로 들어 있다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(
-            role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW, filter_labels=("kernel_id",)
-        )
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing(filter_labels=(("kernel_id", "k1"),))
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheQueryAnswered(
-            query='avg by () (rate(container_cpu_seconds_total{kernel_id="k1"}[1h]))'
-        )
-
-
-@dataclass(frozen=True)
-class AnAllowedGroupLabelReachesTheQuery(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-group-label-the-preset-allows-reaches-the-query"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "그룹 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록 안의 라벨로 실행하면, "
-            "모의 서버가 받은 질의의 그룹에 그 라벨이 들어 있다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(
-            role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW, group_labels=("agent_id",)
-        )
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing(group_labels=("agent_id",))
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheQueryAnswered(query="avg by (agent_id) (rate(container_cpu_seconds_total{}[1h]))")
-
-
-@dataclass(frozen=True)
-class AFilterLabelOutsideTheListIsRefused(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-filter-label-the-preset-does-not-allow-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "필터 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, "
-            "외부에 질의하기 전에 라벨 오류로 거부된다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN, filter_labels=("kernel_id",))
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing(filter_labels=(("session_id", "s1"),))
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheCallIsRefused(PrometheusQueryPresetInvalidLabel)
-
-
-@dataclass(frozen=True)
-class AGroupLabelOutsideTheListIsRefused(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-group-label-the-preset-does-not-allow-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "그룹 라벨을 제한해 둔 프리셋을 슈퍼관리자가 그 목록에 없는 라벨로 실행하면, "
-            "같은 단계에서 라벨 오류로 거부된다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN, group_labels=("agent_id",))
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing(group_labels=("session_id",))
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheCallIsRefused(PrometheusQueryPresetInvalidLabel)
-
-
-@dataclass(frozen=True)
-class AnUnrestrictedPresetTakesAnyLabel(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-preset-restricting-no-label-runs-with-any-label"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "허용 라벨 목록이 빈 프리셋을 슈퍼관리자가 아무 라벨이나 지정해 실행하면, "
-            "모의 서버가 받은 질의에 그 라벨이 들어 있다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW)
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Executing(filter_labels=(("session_id", "s1"),), group_labels=("agent_id",))
-
-    @override
-    def then(self) -> Then[APresetAndACaller, Result]:
-        return TheQueryAnswered(
-            query='avg by (agent_id) (rate(container_cpu_seconds_total{session_id="s1"}[1h]))'
         )
 
 
@@ -549,14 +304,6 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 SCENARIOS: list[ExecutingStep] = [
     TheSuperadminRunsItWithoutARange(),
     RunningOverARangeIsARangeQuery(),
-    ThePresetWindowFillsInForTheRequest(),
-    TheServerWindowFillsInForBoth(),
-    TheRequestWindowWinsOverThePreset(),
-    AnAllowedFilterLabelReachesTheQuery(),
-    AnAllowedGroupLabelReachesTheQuery(),
-    AFilterLabelOutsideTheListIsRefused(),
-    AGroupLabelOutsideTheListIsRefused(),
-    AnUnrestrictedPresetTakesAnyLabel(),
     PrometheusRefusingTheQueryIsPassedOn(),
     AUserGrantedNothingMayNotRun(),
     EnforcementOffLetsAnyoneRun(),
