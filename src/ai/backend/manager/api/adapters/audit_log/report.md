@@ -921,7 +921,7 @@ Then
 
 #### [the-monitor-role-searching-sees-the-same-records-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
 
-검색은 읽기 연산이므로 모니터 역할 사용자도 전역 역할 검사를 통과해 슈퍼관리자와 같은 응답을 받는다
+검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다
 
 Given
 

@@ -1,4 +1,4 @@
-"""감사 기록 전체 검색 — 전역 역할이 필요하지만, 읽기 연산이라 모니터 역할도 통과한다.
+"""감사 기록 전체 검색 — 슈퍼관리자인지 검사하지만, 읽기 연산이라 모니터 역할도 통과한다.
 
 모니터 역할은 통과하지만 슈퍼관리자가 아닌 사용자는 거부된다. 이 검색은 권한 그래프가 아니라
 역할로 보호된다.
@@ -208,7 +208,7 @@ class TheMonitorRoleSeesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return "검색은 읽기 연산이므로 모니터 역할 사용자도 전역 역할 검사를 통과해 슈퍼관리자와 같은 응답을 받는다"
+        return "검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다"
 
     @override
     def given(self) -> Given[SeedingSession, RecordsAndACaller]:
