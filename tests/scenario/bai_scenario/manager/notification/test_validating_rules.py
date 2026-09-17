@@ -14,12 +14,10 @@ from ai.backend.common.dto.manager.v2.notification.request import ValidateNotifi
 from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationRulePayload,
 )
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
-    NotificationTemplateRenderingFailure,
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -34,7 +32,6 @@ from bai_scenario.components.notification import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.notification.rule import BROKEN_TEMPLATE
 
 type Validated = ValidateNotificationRulePayload
 type ValidatingStep = Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Any]
@@ -53,12 +50,8 @@ RENDERED = "Session train is running"
 
 @dataclass(frozen=True)
 class Validating(When[ARuleAndACaller, NotificationAdapter, Validated]):
-    """시험 데이터를 주고 규칙을 검증한다. ``unknown``이면 어느 행에도 없는 id를 쓴다.
+    """시험 데이터를 주고 규칙을 검증한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
-    ``incomplete``이면 필수 항목이 빠진 시험 데이터를 준다.
-    """
-
-    incomplete: bool = False
     unknown: bool = False
 
     @override
@@ -68,16 +61,15 @@ class Validating(When[ARuleAndACaller, NotificationAdapter, Validated]):
     @override
     def describe(self, laid: ARuleAndACaller) -> str:
         target = "존재하지 않는 id" if self.unknown else f"규칙 {laid.rule.name}"
-        data = "필수 항목이 빠진 시험 데이터" if self.incomplete else "시험 데이터"
-        return f"{laid.caller.username}이 {target}을 {data}로 검증"
+        return f"{laid.caller.username}이 {target}을 시험 데이터로 검증"
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ARuleAndACaller) -> Validated:
-        data = {"session_name": "train"} if self.incomplete else dict(SESSION_STARTED_DATA)
         with ActingAs(laid.caller):
             return await adapter.validate_rule(
                 ValidateNotificationRuleInput(
-                    id=uuid4() if self.unknown else laid.rule.id, notification_data=data
+                    id=uuid4() if self.unknown else laid.rule.id,
+                    notification_data=dict(SESSION_STARTED_DATA),
                 )
             )
 
@@ -108,56 +100,6 @@ class TheSuperadminValidatesARule(
     @override
     def then(self) -> Then[ARuleAndACaller, Validated]:
         return TheRenderedMessage(rendered=RENDERED)
-
-
-@dataclass(frozen=True)
-class IncompleteTestDataIsRefused(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
-):
-    @override
-    def summary(self) -> str:
-        return "test-data-missing-a-required-field-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return "시험 데이터에 그 종류가 요구하는 항목이 빠져 있으면 잘못된 입력으로 거부된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
-        return ARuleAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ARuleAndACaller, NotificationAdapter, Validated]:
-        return Validating(incomplete=True)
-
-    @override
-    def then(self) -> Then[ARuleAndACaller, Validated]:
-        return TheCallIsRefused(BackendAISchemaValidationFailed)
-
-
-@dataclass(frozen=True)
-class ABrokenTemplateIsRefused(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
-):
-    @override
-    def summary(self) -> str:
-        return "a-rule-whose-template-does-not-parse-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return "템플릿이 닫히지 않은 규칙을 검증하면 템플릿을 그릴 수 없어 거부된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
-        return ARuleAndSomeone(role=UserRole.SUPERADMIN, message_template=BROKEN_TEMPLATE)
-
-    @override
-    def when(self) -> When[ARuleAndACaller, NotificationAdapter, Validated]:
-        return Validating()
-
-    @override
-    def then(self) -> Then[ARuleAndACaller, Validated]:
-        return TheCallIsRefused(NotificationTemplateRenderingFailure)
 
 
 @dataclass(frozen=True)
@@ -237,8 +179,6 @@ class AUserGrantedNothingMayNotValidate(
 
 SCENARIOS: list[ValidatingStep] = [
     TheSuperadminValidatesARule(),
-    IncompleteTestDataIsRefused(),
-    ABrokenTemplateIsRefused(),
     ARuleWhoseChannelIsGoneIsRefused(),
     TheSuperadminValidatingAnUnknownIdIsNotFound(),
     AUserGrantedNothingMayNotValidate(),

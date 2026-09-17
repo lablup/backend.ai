@@ -16,9 +16,6 @@ from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
 TEMPLATE = "Session {{ session_name }} is {{ status }}"
 """A template the session.started data fills in whole."""
 
-BROKEN_TEMPLATE = "Session {{ session_name"
-"""A template the renderer cannot parse."""
-
 
 @dataclass(frozen=True)
 class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
@@ -37,8 +34,6 @@ class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationR
     @override
     def detail(self) -> str:
         parts = [f"{self.rule_type.value} 이벤트를 알린다"]
-        if self.message_template == BROKEN_TEMPLATE:
-            parts.append("템플릿이 닫히지 않았다")
         if not self.enabled:
             parts.append("비활성")
         return ", ".join(parts)

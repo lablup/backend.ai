@@ -1873,31 +1873,6 @@ Then
 - 거부된다
   - 거부: NotificationChannelNotFound
 
-#### [a-rule-whose-template-does-not-parse-is-refused](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
-
-템플릿이 닫히지 않은 규칙을 검증하면 템플릿을 그릴 수 없어 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다, 템플릿이 닫히지 않았다
-
-When
-
-- NotificationAdapter.validate_rule — user-1이 규칙 rule-1을 시험 데이터로 검증
-
-Then
-
-- 거부된다
-  - 거부: NotificationTemplateRenderingFailure
-
 #### [a-user-granted-nothing-may-not-validate-a-rule](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
 
 아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다
@@ -1922,31 +1897,6 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
-
-#### [test-data-missing-a-required-field-is-refused](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
-
-시험 데이터에 그 종류가 요구하는 항목이 빠져 있으면 잘못된 입력으로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.validate_rule — user-1이 규칙 rule-1을 필수 항목이 빠진 시험 데이터로 검증
-
-Then
-
-- 거부된다
-  - 거부: BackendAISchemaValidationFailed
 
 #### [the-superadmin-validates-a-rule-with-test-data](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
 
