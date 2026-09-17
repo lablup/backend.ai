@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.service_discovery import (
     MODEL_SERVICE_GROUP,
     ModelServiceMetadata,
@@ -129,3 +130,13 @@ def test_model_service_metadata_port_validation() -> None:
             host="10.0.1.50",
             port=65536,  # Invalid: too high
         )
+
+
+def test_service_metadata_to_dict_holds_a_replica_id_as_a_string(
+    replica_route: ModelServiceMetadata,
+) -> None:
+    """The dict a backend stores carries the id as a string, whatever UUID subclass it was."""
+    stored = replica_route.to_service_metadata().to_dict()
+
+    assert stored["id"] == str(replica_route.route_id)
+    dump_json_str(stored)

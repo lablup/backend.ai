@@ -274,6 +274,17 @@ async def test_redis_sync_model_service_routes_multiple(
     assert service_names == {"vllm-0", "vllm-1", "tgi-0"}
 
 
+async def test_redis_sync_model_service_routes_replica_id(
+    redis_discovery: RedisServiceDiscovery,
+    replica_route: ModelServiceMetadata,
+) -> None:
+    """A route whose id subclasses UUID is stored and read back as the same id."""
+    await redis_discovery.sync_model_service_routes([replica_route])
+
+    services = await redis_discovery.get_service_group(MODEL_SERVICE_GROUP)
+    assert [service.id for service in services] == [replica_route.route_id]
+
+
 async def test_redis_sync_model_service_routes_stale_cleanup(
     redis_discovery: RedisServiceDiscovery,
 ) -> None:
