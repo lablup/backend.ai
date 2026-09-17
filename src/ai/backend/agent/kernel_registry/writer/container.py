@@ -50,13 +50,27 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             try:
                 original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
             except KernelRecoveryDataParseError as e:
-                log.exception(
-                    "Failed to parse recovery data from kernel {}: {}", kernel.kernel_id, str(e)
+                # A kernel that is registered but not yet fully built -- its REPL ports arrive a
+                # step later -- has nothing to record yet, and its own start writes it. Ordinary
+                # under concurrent creates; a traceback here reported a race as a fault.
+                log.warning(
+                    "Skipped saving kernel {}: its recovery data is not complete yet ({})",
+                    kernel.kernel_id,
+                    e.__cause__ or e,
                 )
                 continue
             recovery_data = KernelRecoveryScratchData.from_kernel_recovery_data(
                 original_recovery_data
             )
-            await config_mgr.save_json_recovery_data(recovery_data)
+            # The config directory is the kernel's own, made when it was created and removed with
+            # it. Never re-made here: a save that outran a destroy would otherwise leave an empty
+            # scratch directory behind for a kernel that is gone.
+            try:
+                await config_mgr.save_json_recovery_data(recovery_data, create_config_dir=False)
+            except FileNotFoundError:
+                log.debug(
+                    "Skipped saving kernel {}: its scratch config directory was removed",
+                    kernel_id,
+                )
             # resource spec and environ are not saved here, as they are saved when the kernel is created.
         log.debug("Saved kernel registry to scratch root {}", str(self._scratch_root))
