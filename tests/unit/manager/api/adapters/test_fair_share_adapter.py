@@ -21,15 +21,15 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     UserFairShareOrderField,
 )
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
-from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.repositories.base import QueryOrder
 
 _DIRECTIONS = [(OrderDirection.ASC, True), (OrderDirection.DESC, False)]
 
@@ -49,8 +49,8 @@ _DOMAIN_RG_CASES: list[tuple[DomainFairShareOrderField, InstrumentedAttribute[An
 _PROJECT_CASES: list[tuple[ProjectFairShareOrderField, InstrumentedAttribute[Any]]] = [
     (ProjectFairShareOrderField.FAIR_SHARE_FACTOR, ProjectFairShareRow.fair_share_factor),
     (ProjectFairShareOrderField.CREATED_AT, ProjectFairShareRow.created_at),
-    (ProjectFairShareOrderField.PROJECT_NAME, ProjectRow.name),
-    (ProjectFairShareOrderField.PROJECT_IS_ACTIVE, ProjectRow.is_active),
+    (ProjectFairShareOrderField.PROJECT_NAME, GroupRow.name),
+    (ProjectFairShareOrderField.PROJECT_IS_ACTIVE, GroupRow.is_active),
 ]
 _USER_CASES: list[tuple[UserFairShareOrderField, InstrumentedAttribute[Any]]] = [
     (UserFairShareOrderField.FAIR_SHARE_FACTOR, UserFairShareRow.fair_share_factor),
@@ -196,7 +196,7 @@ class TestOrderListConversion:
         ])
 
         assert len(orders) == 2
-        _assert_sorts_on(orders[0], ProjectRow.name, ascending=True)
+        _assert_sorts_on(orders[0], GroupRow.name, ascending=True)
         _assert_sorts_on(orders[1], ProjectFairShareRow.created_at, ascending=False)
 
     def test_empty_input_yields_no_orders(self, adapter: FairShareAdapter) -> None:

@@ -15,6 +15,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.types import AutoPullBehavior
 from ai.backend.manager.sokovan.data import (
     ImageConfigData,
     SessionDataForPull,
@@ -259,6 +260,37 @@ class TestSessionLauncherKernelCreation:
         # Assert - create_kernels called for each session
         mock_client = mock_agent_client_pool._mock_client
         assert mock_client.create_kernels.await_count == 2
+
+    @pytest.mark.parametrize("auto_pull", list(AutoPullBehavior))
+    async def test_kernel_creation_follows_auto_pull_config(
+        self,
+        auto_pull: AutoPullBehavior,
+        launcher: SessionLauncher,
+        mock_config_provider: MagicMock,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """Kernel creation carries the configured auto_pull behavior.
+
+        Given: auto_pull configured in docker.image
+        When: Start session
+        Then: create_kernels receives that behavior in the kernel and image configs
+        """
+        mock_config_provider.config.docker.image.auto_pull.value = auto_pull.value
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.create_kernels.assert_awaited_once()
+        kernel_configs = mock_client.create_kernels.call_args[0][2]
+        assert [c["auto_pull"] for c in kernel_configs] == [auto_pull]
+        assert [c["image"]["auto_pull"] for c in kernel_configs] == [auto_pull]
 
 
 # =============================================================================
