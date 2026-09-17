@@ -16,14 +16,25 @@ from ai.backend.common.cli import LazyGroup
 from .admin import admin
 from .config_cmd import config
 from .gql_cmd import gql
+from .helpers import PROFILE_META_KEY
 from .login_cmd import login, logout
 from .my import my
+from .profile_cmd import profile
 from .public import public
 
 
 @click.group()
-def v2() -> None:
+@click.option(
+    "--profile",
+    "profile_name",
+    default=None,
+    metavar="NAME",
+    help="Profile to use. Overrides BACKEND_PROFILE and the current profile.",
+)
+@click.pass_context
+def v2(ctx: click.Context, profile_name: str | None) -> None:
     """V2 REST API commands."""
+    ctx.meta[PROFILE_META_KEY] = profile_name
     # The real entry point for `./bai v2 ...` is the `LazyGroup` wrapper in
     # `client/cli/__init__.py`, because `LazyGroup` does not delegate
     # `MultiCommand.invoke` to the underlying group. This callback only runs
@@ -37,6 +48,7 @@ def v2() -> None:
 
 # Infrastructure commands
 v2.add_command(config)
+v2.add_command(profile)
 v2.add_command(login)
 v2.add_command(logout)
 v2.add_command(gql)

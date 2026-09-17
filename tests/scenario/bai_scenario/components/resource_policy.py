@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, override
 
 from ai.backend.common.data.entity.resource_policy import (
+    ProjectResourcePolicyEntityType,
     UserResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
@@ -25,13 +26,20 @@ from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
+    AdminSearchProjectResourcePoliciesInput,
     AdminSearchUserResourcePoliciesInput,
+    CreateProjectResourcePolicyInput,
     CreateUserResourcePolicyInput,
+    DeleteProjectResourcePolicyInput,
     DeleteUserResourcePolicyInput,
+    ProjectResourcePolicyFilter,
+    UpdateProjectResourcePolicyInput,
     UpdateUserResourcePolicyInput,
     UserResourcePolicyFilter,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
+    ProjectResourcePolicyNode,
+    SearchProjectResourcePoliciesPayload,
     SearchUserResourcePoliciesPayload,
     UserResourcePolicyNode,
 )
@@ -60,12 +68,12 @@ from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.project import SeedNamedProjectPolicy, SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
 from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
 from bai_scenario.seeds.user.user import SeedUserOf
 
-type Searched = SearchUserResourcePoliciesPayload
+type Searched = SearchProjectResourcePoliciesPayload | SearchUserResourcePoliciesPayload
 
 
 @dataclass(frozen=True)
@@ -229,6 +237,143 @@ class OwnFamily[PolicyData, PolicyNode](Family[PolicyData, PolicyNode]):
     @abstractmethod
     async def read_mine(self, adapter: ResourcePolicyAdapter) -> PolicyNode:
         raise NotImplementedError
+
+
+class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNode]):
+    @property
+    @override
+    def label(self) -> str:
+        return "project-policy"
+
+    @property
+    @override
+    def kind(self) -> str:
+        return "프로젝트 정책"
+
+    @property
+    @override
+    def entity_type(self) -> EntityType:
+        return ProjectResourcePolicyEntityType()
+
+    @property
+    @override
+    def calls(self) -> Calls:
+        return Calls(
+            create="admin_create_project_resource_policy",
+            read="admin_get_project_resource_policy",
+            search="admin_search_project_resource_policies",
+            update="admin_update_project_resource_policy",
+            delete="admin_delete_project_resource_policy",
+        )
+
+    @property
+    @override
+    def fields(self) -> tuple[str, ...]:
+        return ("max_vfolder_count", "max_quota_scope_size", "max_network_count")
+
+    @override
+    def seed(
+        self, name_hint: str = "project-policy", *, holding_optional: bool = False
+    ) -> SeedRow[ProjectResourcePolicyData]:
+        return SeedNamedProjectPolicy(name_hint=name_hint)
+
+    @override
+    def own_of(self, holder: LaidHolder) -> Laid[ProjectResourcePolicyData]:
+        return holder.project_policy
+
+    @override
+    def view(self, node: ProjectResourcePolicyNode) -> dict[str, Any]:
+        return {
+            "name": node.name,
+            "max_vfolder_count": node.max_vfolder_count,
+            "max_quota_scope_size": (
+                node.max_quota_scope_size.expr,
+                node.max_quota_scope_size.display,
+            ),
+            "max_network_count": node.max_network_count,
+        }
+
+    @override
+    def seeded_view(self, seeded: ProjectResourcePolicyData) -> dict[str, Any]:
+        return {
+            "name": seeded.name,
+            "max_vfolder_count": seeded.max_vfolder_count,
+            "max_quota_scope_size": (
+                str(seeded.max_quota_scope_size),
+                f"{BinarySize(seeded.max_quota_scope_size):s}",
+            ),
+            "max_network_count": seeded.max_network_count,
+        }
+
+    @override
+    def everything(self, name: str) -> Ask:
+        return Ask(
+            CreateProjectResourcePolicyInput(
+                name=name,
+                max_vfolder_count=20,
+                max_quota_scope_size=BinarySizeInput(expr="1g"),
+                max_network_count=5,
+            ),
+            "모든 값을 지정해",
+            {
+                "name": name,
+                "max_vfolder_count": 20,
+                "max_quota_scope_size": ("1073741824", "1g"),
+                "max_network_count": 5,
+            },
+        )
+
+    @override
+    def one_limit(self) -> Edit:
+        return Edit(
+            UpdateProjectResourcePolicyInput(max_vfolder_count=20),
+            "폴더 수 20으로 변경",
+            {"max_vfolder_count": 20},
+        )
+
+    @override
+    def nothing(self) -> Edit:
+        return Edit(UpdateProjectResourcePolicyInput(), "빈 요청")
+
+    @override
+    def clearing_a_non_nullable(self) -> Edit:
+        return Edit(UpdateProjectResourcePolicyInput(max_vfolder_count=None), "폴더 수 비우기")
+
+    @override
+    async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> ProjectResourcePolicyNode:
+        payload = await adapter.admin_create_project_resource_policy(asked)
+        return payload.project_resource_policy
+
+    @override
+    async def read(self, adapter: ResourcePolicyAdapter, name: str) -> ProjectResourcePolicyNode:
+        return await adapter.admin_get_project_resource_policy(name)
+
+    @override
+    async def search(
+        self, adapter: ResourcePolicyAdapter, named: str | None = None
+    ) -> SearchProjectResourcePoliciesPayload:
+        chosen = (
+            ProjectResourcePolicyFilter(name=StringFilter(equals=named))
+            if named is not None
+            else None
+        )
+        return await adapter.admin_search_project_resource_policies(
+            AdminSearchProjectResourcePoliciesInput(filter=chosen)
+        )
+
+    @override
+    async def update(
+        self, adapter: ResourcePolicyAdapter, name: str, asked: Any
+    ) -> ProjectResourcePolicyNode:
+        payload = await adapter.admin_update_project_resource_policy(name, asked)
+        return payload.project_resource_policy
+
+    @override
+    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        payload = await adapter.admin_delete_project_resource_policy(
+            DeleteProjectResourcePolicyInput(name=name)
+        )
+        return payload.name
 
 
 class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
@@ -405,9 +550,10 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
         return await adapter.get_my_user_resource_policy()
 
 
+PROJECT = ProjectPolicies()
 USER = UserPolicies()
 
-FAMILIES: tuple[Family[Any, Any], ...] = (USER,)
+FAMILIES: tuple[Family[Any, Any], ...] = (PROJECT, USER)
 OWN_FAMILIES: tuple[OwnFamily[Any, Any], ...] = (USER,)
 
 

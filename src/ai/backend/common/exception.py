@@ -455,6 +455,19 @@ class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class DuplicateEntityTypeName(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/internal-server-error"
+    error_title = "Entity type names collide once lowercased."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Malformed request body."

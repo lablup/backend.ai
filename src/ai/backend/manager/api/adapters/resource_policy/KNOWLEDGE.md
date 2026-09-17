@@ -1,7 +1,7 @@
 ---
 name: resource-policy-adapter-scenarios
 type: reference
-description: what the resource policy adapter guarantees, as scenarios, one chapter per policy — the user policy so far; the tests in tests/scenario/bai_scenario/manager/resource_policy match these one for one
+description: what the resource policy adapter guarantees, as scenarios, one chapter per policy — the project and user policies so far; the tests in tests/scenario/bai_scenario/manager/resource_policy match these one for one
 scope: src/ai/backend/manager/api/adapters/resource_policy
 keywords: [resource policy, keypair resource policy, user resource policy, project resource policy, scenario, adapter, superadmin, lookup, scope]
 generated:
@@ -31,6 +31,74 @@ status: draft
 위반을 별도 오류로 구분하지 않아 저장소가 제약 위반을 그대로 전파하므로, 그 요청은 정책 고유의
 오류가 아니라 저장소의 제약 위반 오류로 거부된다. 이름이 공백뿐인 요청은 어느 절에도 시나리오로
 두지 않는다. 요청 타입이 이미 막으므로 어댑터가 보장하는 것이 아니기 때문이다.
+
+## 프로젝트 정책
+
+프로젝트 정책·키페어 정책·사용자 정책 중 가장 단순하다. 생성할 때 생략하거나 수정할 때 비울 수
+있는 항목이 없고, 자기 정책을 조회하는 호출도 없다. 한 사용자가 여러 프로젝트에 속하므로 어느
+프로젝트의 정책이 자기 것인지 정해져 있지 않다.
+
+### 생성
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 모든 값을 지정해 생성한다 | 정책 없음 | 생성 | 지정한 값이 그대로 담긴 노드 전체 |
+| 이미 사용 중인 이름으로 생성한다 | 그 이름의 정책이 있음 | 생성 | 이름 중복으로 거부 |
+| 슈퍼관리자가 아닌 사용자가 생성한다 | 권한 없음 | 생성 | 역할 부족으로 거부 |
+| 모니터 역할 사용자가 생성한다 | 모니터 역할 | 생성 | 역할 부족으로 거부 |
+| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화 | 생성 | 역할 부족으로 거부 |
+
+`max_quota_scope_size` 값은 사람이 읽기 쉬운 표기("1g")로 받고, 정확한 바이트 수와 읽기 쉬운
+표기 둘 다로 응답한다.
+
+### 이름으로 조회
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 이름으로 조회한다 | 그 이름의 정책이 있음 | 이름으로 조회 | 그 정책 전체 |
+| 아무 권한도 없는 사용자가 조회한다 | 같은 정책이 있음 | 이름으로 조회 | 정책을 찾을 수 없다는 이유로 거부 |
+| 슈퍼관리자가 없는 이름으로 조회한다 | 다른 정책만 있음 | 이름으로 조회 | 대상을 찾을 수 없어 거부 |
+| 권한 검사를 끄면 권한 없이도 조회할 수 있다 | 권한 검사 비활성화, 권한 없음 | 이름으로 조회 | 그 정책 전체 |
+
+### 검색
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 필터 없이 검색한다 | 정책 여럿이 있음 | 전체 검색 | 미리 만들어 둔 정책만 빠짐없이 반환된다 |
+| 이름 필터로 검색한다 | 이름이 다른 정책 여럿 | 이름 필터 검색 | 그 이름의 정책만 반환된다 |
+| 모니터 역할 사용자가 검색한다 | 모니터 역할, 정책 하나 | 전체 검색 | 슈퍼관리자와 같은 응답 |
+| 슈퍼관리자가 아닌 사용자가 검색한다 | 권한 없음 | 전체 검색 | 역할 부족으로 거부 |
+
+모니터 역할은 검색은 통과하고 생성은 통과하지 못한다. 슈퍼관리자 검사가 모니터 역할에는 읽기만
+허용하기 때문이다.
+
+### 수정
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 한도 하나만 수정한다 | 그 정책이 있음 | `max_vfolder_count` 수정 | 그 한도는 새 값, 나머지는 그대로 |
+| 값을 하나도 지정하지 않는다 | 그 정책이 있음 | 빈 수정 | 아무것도 바뀌지 않은 노드 |
+| 비울 수 없는 항목을 비우려 한다 | 그 정책이 있음 | `max_vfolder_count` 값을 비우는 수정 | 아무것도 바뀌지 않은 노드 |
+| 아무 권한도 없는 사용자가 수정한다 | 같은 정책이 있음 | 한도 수정 | 정책을 찾을 수 없다는 이유로 거부 |
+| 슈퍼관리자가 없는 이름을 수정한다 | 다른 정책만 있음 | 한도 수정 | 대상을 찾을 수 없어 거부 |
+
+비울 수 없는 항목을 비우는 요청은 지정하지 않은 것으로 취급되어 값이 그대로 남는다. 오류로
+거부되리라 기대하기 쉬우므로 시나리오로 둔다.
+
+### 삭제
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 아무도 사용하지 않는 정책을 삭제한다 | 어느 프로젝트도 사용하지 않는 정책이 있음 | 삭제 | 삭제한 이름을 담은 응답. 이어서 검색하면 없다 |
+| 아직 사용 중인 정책을 삭제한다 | 그 정책을 사용하는 프로젝트가 있음 | 삭제 | 아직 참조 중이라는 이유로 거부 |
+| 아무 권한도 없는 사용자가 삭제한다 | 같은 정책이 있음 | 삭제 | 정책을 찾을 수 없다는 이유로 거부 |
+| 슈퍼관리자가 없는 이름을 삭제한다 | 다른 정책만 있음 | 삭제 | 대상을 찾을 수 없어 거부 |
+
+이 어댑터에는 soft delete가 없다. 삭제하면 행이 바로 사라지고, 되살리는 호출도 없다.
+
+정책을 사용하는 프로젝트로는 사용자를 만들 때 함께 만들어지는 개인 프로젝트를 쓴다. 개인
+프로젝트는 이름이 `default`인 프로젝트 정책을 참조하므로, 사용자를 미리 만들어 두는 시나리오는
+그 정책을 먼저 만들어야 한다.
 
 ## 사용자 정책
 
@@ -102,10 +170,13 @@ status: draft
 
 ## 아직 적지 않은 것
 
-사용자 정책의 `admin_create_user_resource_policy`, `admin_get_user_resource_policy`,
-`admin_search_user_resource_policies`, `admin_update_user_resource_policy`,
-`admin_delete_user_resource_policy`, `get_my_user_resource_policy`는 모두 위에 적혀 있다. 프로젝트
-정책과 키페어 정책의 호출은 아직 절이 없다. 실행 결과가 그 목록을 함께 출력한다.
+프로젝트 정책의 `admin_create_project_resource_policy`, `admin_get_project_resource_policy`,
+`admin_search_project_resource_policies`, `admin_update_project_resource_policy`,
+`admin_delete_project_resource_policy`와 사용자 정책의 `admin_create_user_resource_policy`,
+`admin_get_user_resource_policy`, `admin_search_user_resource_policies`,
+`admin_update_user_resource_policy`, `admin_delete_user_resource_policy`,
+`get_my_user_resource_policy`는 모두 위에 적혀 있다. 키페어 정책의 호출은 아직 절이 없다.
+실행 결과가 그 목록을 함께 출력한다.
 
 실행 결과에 포함되는 `batch_load_fields`는 모든 어댑터가 물려받는 공통 호출이고, 이 어댑터는
 사용하지 않는다.

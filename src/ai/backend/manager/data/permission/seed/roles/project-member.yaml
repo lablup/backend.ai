@@ -27,7 +27,7 @@ permissions:
   notification_channel:             []
   notification_rule:                []
   object_storage:                   []
-  project:                          []
+  project:                          [read]
   project_resource_policy:          []
   prometheus_query_preset:          []
   prometheus_query_preset_category: []

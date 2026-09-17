@@ -364,6 +364,17 @@ from .rbac import (
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
 )
+from .rbac.resolver.entity import admin_entities
+from .rbac.resolver.role_invitation import (
+    accept_role_invitation,
+    admin_cancel_role_invitation,
+    admin_role_invitations,
+    create_role_invitation,
+    my_role_invitations,
+    my_sent_role_invitations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -680,6 +691,11 @@ class Query:
     admin_roles = admin_roles
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
+    admin_entities = admin_entities
+    admin_role_invitations = admin_role_invitations
+    my_role_invitations = my_role_invitations
+    my_sent_role_invitations = my_sent_role_invitations
+    role_scoped_role_invitations = role_scoped_role_invitations
     # Keypair self-service queries
     my_keypairs = my_keypairs
     # Keypair admin queries
@@ -1011,6 +1027,10 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
+    create_role_invitation = create_role_invitation
+    accept_role_invitation = accept_role_invitation
+    reject_role_invitation = reject_role_invitation
+    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2

@@ -19,6 +19,7 @@ class SeedRuntimeVariant(SeedRow[RuntimeVariantData]):
     """
 
     name_hint: str = "runtime"
+    description: str | None = None
 
     @override
     def kind(self) -> str:
@@ -34,4 +35,4 @@ class SeedRuntimeVariant(SeedRow[RuntimeVariantData]):
 
     @override
     def seed(self, name: str) -> RuntimeVariantCreator:
-        return RuntimeVariantCreator(name=name, description=None)
+        return RuntimeVariantCreator(name=name, description=self.description)
