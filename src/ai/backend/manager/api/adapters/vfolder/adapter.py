@@ -203,12 +203,8 @@ class VFolderAdapter(BaseAdapter):
     ) -> VFolderNode:
         """Convert VFolderData to VFolderNode DTO.
 
-        ``access_info`` carries the mount permission the requesting user holds on
-        this folder, which is what ``access_control.permission`` reports -- a
-        folder shared read-only must not be reported as writable just because its
-        owner made it so. It is omitted on responses that are not resolved
-        against a single requesting user, such as the admin and project-wide
-        searches, where the folder's own permission is the right answer.
+        ``access_control.permission`` reports the requesting user's own permission
+        when ``access_info`` is given, and the folder's own otherwise.
         """
         permission = data.permission
         if access_info is not None and access_info.effective_permission is not None:

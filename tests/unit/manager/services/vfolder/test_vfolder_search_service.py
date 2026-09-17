@@ -204,7 +204,11 @@ class TestVFolderServiceSearchUserVFolders:
                 has_previous_page=False,
             )
         )
-        mock_vfolder_repository.get_granted_mount_permissions = AsyncMock(return_value={})
+        mock_vfolder_repository.get_access_infos = AsyncMock(
+            return_value=[
+                VfolderRepository._resolve_access_info(vfolder_1, user_id, None),
+            ]
+        )
         search_scope = UserVFolderSearchScope(user_id=user_id)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUserVFoldersAction(scope=search_scope, querier=querier)

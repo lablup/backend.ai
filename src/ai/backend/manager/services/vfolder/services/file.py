@@ -16,7 +16,6 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.services.vfolder.access import ensure_writable, load_access_info
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateArchiveDownloadSessionActionResult,
@@ -74,8 +73,8 @@ class VFolderFileService:
         self, vfolder_data: VFolderData, user_id: uuid.UUID, user_role: UserRole | None
     ) -> None:
         """Refuse the operation when the caller only holds read access on the folder."""
-        access_info = await load_access_info(self._vfolder_repository, vfolder_data, user_id)
-        ensure_writable(access_info, user_role)
+        access_infos = await self._vfolder_repository.get_access_infos([vfolder_data], user_id)
+        self._vfolder_repository.ensure_writable(access_infos[0], user_role)
 
     async def upload_file(
         self, action: CreateUploadSessionAction

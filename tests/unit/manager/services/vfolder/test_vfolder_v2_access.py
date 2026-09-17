@@ -1,6 +1,5 @@
 """
-Unit tests for the caller-relative vfolder access rules and their enforcement on
-the v2 write paths.
+Unit tests for the v2 vfolder write paths refusing a folder shared read-only.
 """
 
 from __future__ import annotations
@@ -25,7 +24,6 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.storage import VFolderPermissionError
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.services.vfolder.access import ensure_writable, resolve_access_info
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     DeleteFilesV2Action,
     MkdirV2Action,
@@ -36,8 +34,6 @@ from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
 )
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
-
-VFolderDataFactory = Callable[..., VFolderData]
 
 
 @pytest.fixture
@@ -56,159 +52,33 @@ def vfolder_uuid() -> VFolderUUID:
 
 
 @pytest.fixture
-def make_vfolder_data(vfolder_uuid: VFolderUUID, owner_uuid: uuid.UUID) -> VFolderDataFactory:
-    def _make(
-        *,
-        ownership_type: VFolderOwnershipType = VFolderOwnershipType.USER,
-        permission: VFolderMountPermission | None = VFolderMountPermission.OWNER_PERM,
-        user: uuid.UUID | None = None,
-        group: uuid.UUID | None = None,
-    ) -> VFolderData:
-        now = datetime.now(UTC)
-        return VFolderData(
-            id=vfolder_uuid,
-            name="shared-folder",
-            host="local:volume1",
-            domain_name="default",
-            quota_scope_id=QuotaScopeID(QuotaScopeType.USER, owner_uuid),
-            usage_mode=VFolderUsageMode.GENERAL,
-            permission=permission,
-            max_files=1000,
-            max_size=None,
-            num_files=0,
-            cur_size=0,
-            created_at=now,
-            last_used=None,
-            updated_at=now,
-            creator="owner@example.com",
-            creator_id=owner_uuid,
-            unmanaged_path=None,
-            ownership_type=ownership_type,
-            user=owner_uuid
-            if user is None and ownership_type is VFolderOwnershipType.USER
-            else user,
-            group=group,
-            cloneable=False,
-            status=VFolderOperationStatus.READY,
-        )
-
-    return _make
-
-
-class TestResolveAccessInfo:
-    def test_owner_of_user_folder_reads_the_folder_permission(
-        self, make_vfolder_data: VFolderDataFactory, owner_uuid: uuid.UUID
-    ) -> None:
-        vfolder_data = make_vfolder_data(permission=VFolderMountPermission.READ_WRITE)
-
-        access_info = resolve_access_info(vfolder_data, owner_uuid, None)
-
-        assert access_info.is_owner is True
-        assert access_info.effective_permission is VFolderMountPermission.READ_WRITE
-
-    def test_invitee_holds_the_granted_permission_not_the_folder_default(
-        self, make_vfolder_data: VFolderDataFactory, invitee_uuid: uuid.UUID
-    ) -> None:
-        # The folder's own column says rw-delete; the invitee was granted ro.
-        access_info = resolve_access_info(
-            make_vfolder_data(), invitee_uuid, VFolderMountPermission.READ_ONLY
-        )
-
-        assert access_info.is_owner is False
-        assert access_info.effective_permission is VFolderMountPermission.READ_ONLY
-
-    def test_stranger_of_user_folder_holds_no_permission(
-        self, make_vfolder_data: VFolderDataFactory, invitee_uuid: uuid.UUID
-    ) -> None:
-        access_info = resolve_access_info(make_vfolder_data(), invitee_uuid, None)
-
-        assert access_info.is_owner is False
-        assert access_info.effective_permission is None
-
-    def test_project_member_inherits_the_folder_permission(
-        self, make_vfolder_data: VFolderDataFactory, invitee_uuid: uuid.UUID
-    ) -> None:
-        vfolder_data = make_vfolder_data(
-            ownership_type=VFolderOwnershipType.GROUP,
-            permission=VFolderMountPermission.READ_WRITE,
-            group=uuid.uuid4(),
-        )
-
-        access_info = resolve_access_info(vfolder_data, invitee_uuid, None)
-
-        assert access_info.is_owner is False
-        assert access_info.effective_permission is VFolderMountPermission.READ_WRITE
-
-    def test_explicit_grant_overrides_the_project_folder_permission(
-        self, make_vfolder_data: VFolderDataFactory, invitee_uuid: uuid.UUID
-    ) -> None:
-        vfolder_data = make_vfolder_data(
-            ownership_type=VFolderOwnershipType.GROUP,
-            permission=VFolderMountPermission.READ_WRITE,
-            group=uuid.uuid4(),
-        )
-
-        access_info = resolve_access_info(
-            vfolder_data, invitee_uuid, VFolderMountPermission.READ_ONLY
-        )
-
-        assert access_info.effective_permission is VFolderMountPermission.READ_ONLY
-
-
-class TestEnsureWritable:
-    def test_read_only_permission_is_refused(
-        self, make_vfolder_data: VFolderDataFactory, invitee_uuid: uuid.UUID
-    ) -> None:
-        access_info = resolve_access_info(
-            make_vfolder_data(), invitee_uuid, VFolderMountPermission.READ_ONLY
-        )
-
-        with pytest.raises(VFolderPermissionError):
-            ensure_writable(access_info, UserRole.USER)
-
-    def test_absent_permission_is_refused(
-        self, make_vfolder_data: VFolderDataFactory, invitee_uuid: uuid.UUID
-    ) -> None:
-        access_info = resolve_access_info(make_vfolder_data(), invitee_uuid, None)
-
-        with pytest.raises(VFolderPermissionError):
-            ensure_writable(access_info, UserRole.USER)
-
-    @pytest.mark.parametrize(
-        "permission",
-        [VFolderMountPermission.READ_WRITE, VFolderMountPermission.RW_DELETE],
+def vfolder_data(vfolder_uuid: VFolderUUID, owner_uuid: uuid.UUID) -> VFolderData:
+    """A folder owned by someone else, whose own permission allows writing."""
+    now = datetime.now(UTC)
+    return VFolderData(
+        id=vfolder_uuid,
+        name="shared-folder",
+        host="local:volume1",
+        domain_name="default",
+        quota_scope_id=QuotaScopeID(QuotaScopeType.USER, owner_uuid),
+        usage_mode=VFolderUsageMode.GENERAL,
+        permission=VFolderMountPermission.RW_DELETE,
+        max_files=1000,
+        max_size=None,
+        num_files=0,
+        cur_size=0,
+        created_at=now,
+        last_used=None,
+        updated_at=now,
+        creator="owner@example.com",
+        creator_id=owner_uuid,
+        unmanaged_path=None,
+        ownership_type=VFolderOwnershipType.USER,
+        user=owner_uuid,
+        group=None,
+        cloneable=False,
+        status=VFolderOperationStatus.READY,
     )
-    def test_writable_permissions_pass(
-        self,
-        make_vfolder_data: VFolderDataFactory,
-        invitee_uuid: uuid.UUID,
-        permission: VFolderMountPermission,
-    ) -> None:
-        access_info = resolve_access_info(make_vfolder_data(), invitee_uuid, permission)
-
-        ensure_writable(access_info, UserRole.USER)
-
-    def test_owner_passes_even_when_the_folder_permission_is_read_only(
-        self, make_vfolder_data: VFolderDataFactory, owner_uuid: uuid.UUID
-    ) -> None:
-        vfolder_data = make_vfolder_data(permission=VFolderMountPermission.READ_ONLY)
-
-        access_info = resolve_access_info(vfolder_data, owner_uuid, None)
-
-        ensure_writable(access_info, UserRole.USER)
-
-    @pytest.mark.parametrize("role", [UserRole.ADMIN, UserRole.SUPERADMIN])
-    def test_admins_keep_privileged_access(
-        self,
-        make_vfolder_data: VFolderDataFactory,
-        invitee_uuid: uuid.UUID,
-        role: UserRole,
-    ) -> None:
-        access_info = resolve_access_info(
-            make_vfolder_data(), invitee_uuid, VFolderMountPermission.READ_ONLY
-        )
-
-        ensure_writable(access_info, role)
 
 
 @pytest.fixture
@@ -230,29 +100,35 @@ def mock_storage_manager() -> MagicMock:
 
 
 @pytest.fixture
-def make_user_repository(invitee_uuid: uuid.UUID) -> Callable[[UserRole], MagicMock]:
-    def _make(role: UserRole) -> MagicMock:
-        repo = MagicMock()
-        user = MagicMock()
-        user.id = invitee_uuid
-        user.domain_name = "default"
-        user.role = role
-        repo.get_user_by_uuid = AsyncMock(return_value=user)
-        return repo
-
-    return _make
+def mock_user_repository(invitee_uuid: uuid.UUID) -> MagicMock:
+    repo = MagicMock()
+    user = MagicMock()
+    user.id = invitee_uuid
+    user.domain_name = "default"
+    user.role = UserRole.USER
+    repo.get_user_by_uuid = AsyncMock(return_value=user)
+    return repo
 
 
 @pytest.fixture
 def make_vfolder_repository(
-    make_vfolder_data: VFolderDataFactory, vfolder_uuid: VFolderUUID
-) -> Callable[[VFolderMountPermission | None], MagicMock]:
-    def _make(granted: VFolderMountPermission | None) -> MagicMock:
+    vfolder_data: VFolderData, invitee_uuid: uuid.UUID
+) -> Callable[[VFolderMountPermission], MagicMock]:
+    """Build a repository whose caller holds ``granted`` on the folder.
+
+    ``ensure_writable`` stays the real rule so the refusal under test is the
+    production one, not a mock's.
+    """
+
+    def _make(granted: VFolderMountPermission) -> MagicMock:
         repo = MagicMock(spec=VfolderRepository)
-        repo.get_by_id_validated = AsyncMock(return_value=make_vfolder_data())
-        repo.get_granted_mount_permissions = AsyncMock(
-            return_value={vfolder_uuid: granted} if granted is not None else {}
+        repo.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        repo.get_access_infos = AsyncMock(
+            return_value=[
+                VfolderRepository._resolve_access_info(vfolder_data, invitee_uuid, granted)
+            ]
         )
+        repo.ensure_writable = VfolderRepository.ensure_writable
         repo.ensure_host_permission_allowed_by_user = AsyncMock()
         return repo
 
@@ -263,8 +139,8 @@ class TestUploadSessionV2RefusesReadOnlyFolder:
     async def test_read_only_invitee_cannot_create_an_upload_session(
         self,
         mock_storage_manager: MagicMock,
-        make_user_repository: Callable[[UserRole], MagicMock],
-        make_vfolder_repository: Callable[[VFolderMountPermission | None], MagicMock],
+        mock_user_repository: MagicMock,
+        make_vfolder_repository: Callable[[VFolderMountPermission], MagicMock],
         invitee_uuid: uuid.UUID,
         vfolder_uuid: VFolderUUID,
     ) -> None:
@@ -275,7 +151,7 @@ class TestUploadSessionV2RefusesReadOnlyFolder:
             storage_manager=mock_storage_manager,
             background_task_manager=MagicMock(),
             vfolder_repository=vfolder_repository,
-            user_repository=make_user_repository(UserRole.USER),
+            user_repository=mock_user_repository,
             valkey_stat_client=MagicMock(),
         )
         action = CreateUploadSessionV2Action(
@@ -293,8 +169,8 @@ class TestUploadSessionV2RefusesReadOnlyFolder:
     async def test_read_write_invitee_gets_a_token(
         self,
         mock_storage_manager: MagicMock,
-        make_user_repository: Callable[[UserRole], MagicMock],
-        make_vfolder_repository: Callable[[VFolderMountPermission | None], MagicMock],
+        mock_user_repository: MagicMock,
+        make_vfolder_repository: Callable[[VFolderMountPermission], MagicMock],
         invitee_uuid: uuid.UUID,
         vfolder_uuid: VFolderUUID,
     ) -> None:
@@ -304,7 +180,7 @@ class TestUploadSessionV2RefusesReadOnlyFolder:
             storage_manager=mock_storage_manager,
             background_task_manager=MagicMock(),
             vfolder_repository=make_vfolder_repository(VFolderMountPermission.READ_WRITE),
-            user_repository=make_user_repository(UserRole.USER),
+            user_repository=mock_user_repository,
             valkey_stat_client=MagicMock(),
         )
         action = CreateUploadSessionV2Action(
@@ -324,14 +200,14 @@ class TestFileV2OperationsRefuseReadOnlyFolder:
     def file_service(
         self,
         mock_storage_manager: MagicMock,
-        make_user_repository: Callable[[UserRole], MagicMock],
-        make_vfolder_repository: Callable[[VFolderMountPermission | None], MagicMock],
+        mock_user_repository: MagicMock,
+        make_vfolder_repository: Callable[[VFolderMountPermission], MagicMock],
     ) -> VFolderFileService:
         return VFolderFileService(
             config_provider=MagicMock(),
             storage_manager=mock_storage_manager,
             vfolder_repository=make_vfolder_repository(VFolderMountPermission.READ_ONLY),
-            user_repository=make_user_repository(UserRole.USER),
+            user_repository=mock_user_repository,
         )
 
     async def test_mkdir_is_refused(

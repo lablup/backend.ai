@@ -68,6 +68,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
     VFolderOperationFailed,
+    VFolderPermissionError,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
@@ -285,28 +286,80 @@ class VfolderRepository:
             rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
             return [rows_by_id.get(VFolderUUID(vfolder_id)) for vfolder_id in ids]
 
-    @vfolder_repository_resilience.apply()
-    async def get_granted_mount_permissions(
-        self, vfolder_ids: Sequence[uuid.UUID], user_id: uuid.UUID
-    ) -> dict[uuid.UUID, VFolderMountPermission]:
-        """
-        Fetch the mount permissions ``user_id`` was granted on the given vfolders.
+    @staticmethod
+    def _resolve_access_info(
+        vfolder_data: VFolderData,
+        user_id: uuid.UUID,
+        granted_permission: VFolderMountPermission | None,
+    ) -> VFolderAccessInfo:
+        """Resolve ownership and a grant into an effective permission.
 
-        Only folders the user holds an explicit ``vfolder_permissions`` row on
-        appear in the result. Ownership and project membership are not consulted
-        here; the service layer resolves those into an effective permission.
+        Follows the precedence ``query_accessible_vfolders`` uses. A caller with
+        no grant on someone else's folder gets ``effective_permission=None``.
         """
-        if not vfolder_ids:
-            return {}
+        if vfolder_data.ownership_type == VFolderOwnershipType.USER:
+            if vfolder_data.user == user_id:
+                return VFolderAccessInfo(
+                    vfolder_data=vfolder_data,
+                    is_owner=True,
+                    effective_permission=vfolder_data.permission,
+                )
+            return VFolderAccessInfo(
+                vfolder_data=vfolder_data,
+                is_owner=False,
+                effective_permission=granted_permission,
+            )
+        # Project folder: a member inherits the folder's permission unless granted one.
+        return VFolderAccessInfo(
+            vfolder_data=vfolder_data,
+            is_owner=False,
+            effective_permission=granted_permission or vfolder_data.permission,
+        )
+
+    @vfolder_repository_resilience.apply()
+    async def get_access_infos(
+        self, vfolder_data: Sequence[VFolderData], user_id: uuid.UUID
+    ) -> list[VFolderAccessInfo]:
+        """
+        Resolve how ``user_id`` may reach each of the given vfolders, reading
+        their grants in a single query.
+        """
+        if not vfolder_data:
+            return []
         async with self._db.begin_readonly_session() as session:
             query = sa.select(VFolderPermissionRow.vfolder, VFolderPermissionRow.permission).where(
                 sa.and_(
-                    VFolderPermissionRow.vfolder.in_(list(vfolder_ids)),
+                    VFolderPermissionRow.vfolder.in_([data.id for data in vfolder_data]),
                     VFolderPermissionRow.user == user_id,
                 )
             )
             result = await session.execute(query)
-            return {row.vfolder: row.permission for row in result}
+            granted: dict[uuid.UUID, VFolderMountPermission] = {}
+            for row in result:
+                if row.permission is None:
+                    continue
+                # Without a unique constraint on (vfolder, user) a folder may carry
+                # more than one grant; keep the most restrictive one.
+                current = granted.get(row.vfolder)
+                if current is None or (current.is_writable() and not row.permission.is_writable()):
+                    granted[row.vfolder] = row.permission
+        return [
+            self._resolve_access_info(data, user_id, granted.get(data.id)) for data in vfolder_data
+        ]
+
+    @staticmethod
+    def ensure_writable(access_info: VFolderAccessInfo, user_role: UserRole | None) -> None:
+        """Refuse a write to a folder the caller may only read.
+
+        Owners and admins pass regardless, as in ``query_accessible_vfolders``.
+        """
+        if access_info.is_owner or user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+            return
+        permission = access_info.effective_permission
+        if permission is None or not permission.is_writable():
+            raise VFolderPermissionError(
+                f"VFolder {access_info.vfolder_data.id} is not writable by this user"
+            )
 
     @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(

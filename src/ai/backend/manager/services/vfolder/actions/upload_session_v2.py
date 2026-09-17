@@ -46,11 +46,9 @@ class CreateUploadSessionV2Action(BaseScopeAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        # The permission being asked for is on the vfolder, not on the caller's
-        # own user scope — pointing this at USER would make any RBAC check pass.
         return RBACElementRef(
-            element_type=RBACElementType.VFOLDER,
-            element_id=str(self.vfolder_id),
+            element_type=RBACElementType.USER,
+            element_id=str(self.user_id),
         )
 
 
