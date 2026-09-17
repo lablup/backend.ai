@@ -102,9 +102,15 @@ class ScratchConfig:
         raw_data = filepath.read_text()
         return KernelResourceSpec.read_from_string(raw_data)
 
-    async def save_json_recovery_data(self, data: KernelRecoveryScratchData) -> None:
+    async def save_json_recovery_data(
+        self,
+        data: KernelRecoveryScratchData,
+        *,
+        create_config_dir: bool = True,
+    ) -> None:
         filepath = self._json_recovery_file_path()
-        filepath.parent.mkdir(parents=True, exist_ok=True)
+        if create_config_dir:
+            filepath.parent.mkdir(parents=True, exist_ok=True)
         serialized = data.model_dump_json()
         async with aiofiles.open(filepath, "w") as file:
             await file.write(serialized)
