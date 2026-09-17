@@ -96,10 +96,9 @@ class GetImagePayload(BaseResponseModel):
 
 
 class RescanImagesPayload(BaseResponseModel):
-    """Payload for image rescan result."""
+    """Rescanned image matching the requested architecture."""
 
-    item: ImageNode = Field(description="Rescanned image")
-    errors: list[str] = Field(default_factory=list, description="Errors encountered during rescan")
+    item: ImageNode = Field(description="Rescanned image matching the requested architecture")
 
 
 class AliasImagePayload(BaseResponseModel):

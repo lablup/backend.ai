@@ -11,6 +11,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.arch import arch_name_aliases
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.user import UserID
@@ -29,6 +30,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
@@ -522,6 +524,40 @@ class ImageDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def rescan_image(self, canonical: str, architecture: str) -> ImageData:
+        registries = await self._load_configured_registries(None)
+        # Select registered registries whose registry/project prefix matches the image canonical.
+        matching = self._filter_by_img_canonical(registries, canonical)
+        if not matching:
+            raise RegistryNotFoundForImage(
+                f"Registry not found for image: Image canonical - {canonical}"
+            )
+        if len(matching) > 1:
+            raise InternalServerError(
+                f"Multiple container registries match image: Image canonical - {canonical}"
+            )
+        registry_key, registry_row = next(iter(matching.items()))
+        # The loader keys rows by registry/project, which hides duplicate rows.
+        async with self._db.begin_readonly_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ContainerRegistryRow)
+                .where(
+                    ContainerRegistryRow.registry_name == registry_row.registry_name,
+                    ContainerRegistryRow.project == registry_row.project,
+                )
+            )
+        if count != 1:
+            raise InternalServerError(
+                f"Expected one container registry for registry_name and project: Actual count - {count}"
+            )
+        result = await self.scan_single_image(registry_key, registry_row, canonical)
+        architecture = arch_name_aliases.get(architecture, architecture)
+        image = next((image for image in result.images if image.architecture == architecture), None)
+        if image is None:
+            raise ImageNotFound
+        return image
 
     async def rescan_images(
         self,

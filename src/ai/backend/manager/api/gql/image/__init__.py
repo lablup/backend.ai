@@ -8,6 +8,7 @@ See BEP-1038 for detailed specifications.
 from .resolver import (
     admin_image_aliases,
     admin_images_v2,
+    admin_rescan_image,
     container_registry_images_v2,
     image_alias,
     image_scoped_aliases,
@@ -74,6 +75,7 @@ __all__ = [
     "ImageV2ScopeGQL",
     # Resolver fields
     "admin_images_v2",
+    "admin_rescan_image",
     "scoped_images_v2",
     "image_v2",
     "container_registry_images_v2",

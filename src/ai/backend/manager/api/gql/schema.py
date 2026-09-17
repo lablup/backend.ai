@@ -208,6 +208,7 @@ from .idle_checker_assignment import (
 from .image import (
     admin_image_aliases,
     admin_images_v2,
+    admin_rescan_image,
     container_registry_images_v2,
     image_alias,
     image_scoped_aliases,
@@ -838,6 +839,7 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_rescan_image = admin_rescan_image
     admin_update_agent_resource_group = admin_update_agent_resource_group
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker
