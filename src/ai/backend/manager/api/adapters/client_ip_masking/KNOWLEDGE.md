@@ -39,8 +39,6 @@ status: draft
 |---|---|---|---|
 | 슈퍼관리자가 정책을 새로 만든다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `target_type=default`, `mode=truncate`, `ipv4_prefix=24`, `ipv6_prefix=48` | 응답 노드의 `target_type`, `mode`, `ipv4_prefix`, `ipv6_prefix`가 보낸 값과 같다 |
 | prefix를 보내지 않는다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `target_type`과 `mode`만 보낸다 | 응답 노드의 `ipv4_prefix`·`ipv6_prefix`가 null이다 |
-| `target_type`에 어떤 값을 보내도 그대로 저장된다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `target_type`을 `default`, `login_history`, `audit_logs` 중 하나로 보낸다 (값마다 따로 실행) | 응답 노드의 `target_type`이 보낸 값과 같다 |
-| `mode`에 어떤 값을 보내도 그대로 저장된다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `mode`를 `none`, `truncate`, `drop` 중 하나로 보낸다 (값마다 따로 실행) | 응답 노드의 `mode`가 보낸 값과 같다 |
 | 이미 정책이 있는 `target_type`에 다시 upsert한다 | `target_type`이 `default`인 `truncate` 정책이 있다. 호출자는 슈퍼관리자 | 같은 `target_type=default`에 `mode=drop` | 새 행이 생기지 않는다. 기존 행의 `id`는 그대로이고 `mode`만 `drop`으로 바뀐다 |
 | prefix가 저장된 정책에 prefix 없이 다시 upsert한다 | `target_type`이 `default`이고 `ipv4_prefix=24`, `ipv6_prefix=48`이 저장된 정책이 있다. 호출자는 슈퍼관리자 | `target_type`과 `mode`만 보낸다 | 저장돼 있던 `ipv4_prefix`·`ipv6_prefix`가 null이 된다 |
 | 일반 사용자가 upsert한다 | 호출자는 슈퍼관리자가 아니다 | upsert | `InsufficientPrivilege`로 거부 |
@@ -56,20 +54,21 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 그대로 담긴다.
 
 `ipv4_prefix`가 0~32, `ipv6_prefix`가 0~128을 벗어나는 요청은 시나리오로 두지 않는다. 요청 DTO의
-검증이 어댑터를 호출하기 전에 거부한다.
+검증이 어댑터를 호출하기 전에 거부한다. `target_type`과 `mode`의 값마다 저장되는지도 시나리오로
+두지 않는다. 어댑터가 보장하는 것이 아니라 컬럼 타입이 받는 값의 목록이고, 단위 테스트의 자리다.
 
 ## 검색 (`admin_search`)
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | 슈퍼관리자가 전체를 조회한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 슈퍼관리자 | 필터 없이 조회 | 둘 다 반환되고 `total_count`가 2다 |
-| `target_type` 필터로 조회한다 | `target_type`이 `default`, `login_history`, `audit_logs`인 정책이 모두 있다. 호출자는 슈퍼관리자 | `target_type=default` 필터로 조회 | `target_type`이 `default`인 정책 하나만 반환된다 |
-| `mode` 필터로 조회한다 | `truncate` 정책 둘(`default`, `audit_logs`)과 `drop` 정책 하나(`login_history`)가 있다. 호출자는 슈퍼관리자 | `mode=truncate` 필터로 조회 | `truncate` 정책 둘만 반환된다 |
 | 모니터 역할이 전체를 조회한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 `MONITOR` 역할 | 필터 없이 조회 | 슈퍼관리자와 같은 응답. 둘 다 반환된다 |
 | 일반 사용자가 조회한다 | 호출자는 슈퍼관리자가 아니다 | 필터 없이 조회 | `InsufficientPrivilege`로 거부 |
 
-`target_type`이 `default`, `login_history`, `audit_logs` 셋뿐이라 정책 행도 셋을 넘지 못한다. 그래서 페이지 크기보다 많은 건수를 만들어
-다음 페이지를 확인하는 시나리오는 둘 수 없다.
+`target_type`과 `mode` 필터가 무엇을 좁히는지는 시나리오로 두지 않는다. 필터를 조건으로 옮기는 것과
+그 조건으로 행을 고르는 것은 단위 테스트의 자리다. `target_type`이 `default`, `login_history`,
+`audit_logs` 셋뿐이라 정책 행도 셋을 넘지 못하므로, 페이지 크기보다 많은 건수를 만들어 다음 페이지를
+확인하는 시나리오도 둘 수 없다.
 
 모니터 역할은 슈퍼관리자 검사에서 읽기 호출만 통과한다. "모니터 역할이 전체를 조회한다"(통과)와
 "모니터 역할이 upsert한다"(거부)가 그 차이를 보여 준다.

@@ -49,10 +49,8 @@ type UpsertingStep = Scenario[
 
 @dataclass(frozen=True)
 class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]):
-    """한 대상에 정책을 등록한다. 응답에 담긴 노드를 꺼내서 준다."""
+    """기본값 대상에 truncate 모드 정책을 등록한다. 응답에 담긴 노드를 꺼내서 준다."""
 
-    target: ClientIPMaskingTarget = ClientIPMaskingTarget.DEFAULT
-    mode: ClientIPMaskingMode = ClientIPMaskingMode.TRUNCATE
     ipv4: int | None = IPV4
     ipv6: int | None = IPV6
 
@@ -63,10 +61,7 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
     @override
     def describe(self, laid: ACaller) -> str:
         prefixes = "" if self.ipv4 is None and self.ipv6 is None else " 접두 길이와 함께"
-        return (
-            f"{laid.caller.username}이 {self.target.value} 대상에 {self.mode.value} 모드 정책을"
-            f"{prefixes} 등록"
-        )
+        return f"{laid.caller.username}이 default 대상에 truncate 모드 정책을{prefixes} 등록"
 
     @override
     async def call(
@@ -75,8 +70,8 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
         with ActingAs(laid.caller):
             payload = await adapter.admin_upsert(
                 AdminUpsertClientIPMaskingPolicyInput(
-                    target_type=TargetInput(self.target.value),
-                    mode=ModeInput(self.mode.value),
+                    target_type=TargetInput.DEFAULT,
+                    mode=ModeInput.TRUNCATE,
                     ipv4_prefix=self.ipv4,
                     ipv6_prefix=self.ipv6,
                 )
@@ -185,74 +180,6 @@ class OmittedPrefixesStayEmpty(
             mode=ClientIPMaskingMode.TRUNCATE,
             ipv4=None,
             ipv6=None,
-        )
-
-
-@dataclass(frozen=True)
-class EachTargetTakesAPolicy(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
-):
-    started: datetime
-    target: ClientIPMaskingTarget
-
-    @override
-    def summary(self) -> str:
-        return f"a-masking-policy-is-put-on-the-{self.target.value.replace('_', '-')}-target"
-
-    @override
-    def describe(self) -> str:
-        return f"슈퍼관리자가 {self.target.value} 대상에 등록하면 그 대상이 담긴 노드가 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ACaller]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
-        return Upserting(target=self.target)
-
-    @override
-    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
-        return TheNewMaskingPolicyNode(
-            started=self.started,
-            target=self.target,
-            mode=ClientIPMaskingMode.TRUNCATE,
-            ipv4=IPV4,
-            ipv6=IPV6,
-        )
-
-
-@dataclass(frozen=True)
-class EachModeIsKept(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
-):
-    started: datetime
-    mode: ClientIPMaskingMode
-
-    @override
-    def summary(self) -> str:
-        return f"a-masking-policy-of-the-{self.mode.value}-mode-is-put"
-
-    @override
-    def describe(self) -> str:
-        return f"슈퍼관리자가 {self.mode.value} 모드로 등록하면 그 모드가 담긴 노드가 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ACaller]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
-        return Upserting(mode=self.mode)
-
-    @override
-    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
-        return TheNewMaskingPolicyNode(
-            started=self.started,
-            target=ClientIPMaskingTarget.DEFAULT,
-            mode=self.mode,
-            ipv4=IPV4,
-            ipv6=IPV6,
         )
 
 
@@ -404,11 +331,6 @@ class EnforcementOffStillNeedsTheSuperadmin(
 SCENARIOS: list[UpsertingStep] = [
     TheSuperadminPutsAPolicyOnATarget(started=datetime.now(UTC)),
     OmittedPrefixesStayEmpty(started=datetime.now(UTC)),
-    *(
-        EachTargetTakesAPolicy(started=datetime.now(UTC), target=target)
-        for target in ClientIPMaskingTarget
-    ),
-    *(EachModeIsKept(started=datetime.now(UTC), mode=mode) for mode in ClientIPMaskingMode),
     PuttingOnATakenTargetRewritesTheRow(started=datetime.now(UTC)),
     PuttingAgainWithoutPrefixesClearsThem(started=datetime.now(UTC)),
     AUserWhoIsNotTheSuperadminMayNotPut(),

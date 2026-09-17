@@ -50,10 +50,9 @@ class AMaskingPolicyAndACaller:
 
 @dataclass(frozen=True)
 class ManyMaskingPoliciesAndACaller:
-    """검색 대상 정책 여럿과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것만이고 ``named``는 그중 하나다."""
+    """검색 대상 정책 여럿과, 검색을 호출할 사용자. ``laid``는 응답에 나와야 하는 것만이다."""
 
     laid: tuple[ClientIPMaskingPolicyData, ...]
-    named: ClientIPMaskingPolicyData
     caller: UserData
 
 
@@ -82,7 +81,7 @@ class AMaskingPolicyAndSomeone(Given[Any, AMaskingPolicyAndACaller]):
 
 @dataclass(frozen=True)
 class TwoMaskingPoliciesAndSomeone(Given[Any, ManyMaskingPoliciesAndACaller]):
-    """대상이 다른 정책 둘과 사용자 한 명. ``named``는 앞의 것이다."""
+    """대상이 다른 정책 둘과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
 
@@ -101,68 +100,6 @@ class TwoMaskingPoliciesAndSomeone(Given[Any, ManyMaskingPoliciesAndACaller]):
         caller = await lay_a_caller(seeding, self.role)
         return ManyMaskingPoliciesAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
-            named=seeding.made(wanted),
-            caller=seeding.made(caller),
-        )
-
-
-@dataclass(frozen=True)
-class MaskingPoliciesOfEveryTarget(Given[Any, ManyMaskingPoliciesAndACaller]):
-    """세 대상의 정책과 사용자 한 명. ``named``는 기본값 대상의 것이다."""
-
-    role: UserRole = UserRole.USER
-
-    @override
-    def describe(self) -> str:
-        return f"세 대상의 클라이언트 IP 마스킹 정책과, {role_named(self.role)} 한 명"
-
-    @override
-    async def lay(self, seeding: Any) -> ManyMaskingPoliciesAndACaller:
-        laid = [
-            await seeding.creating(SeedClientIPMaskingPolicy(target_type=target))
-            for target in ClientIPMaskingTarget
-        ]
-        caller = await lay_a_caller(seeding, self.role)
-        return ManyMaskingPoliciesAndACaller(
-            laid=tuple(seeding.made(one) for one in laid),
-            named=seeding.made(laid[0]),
-            caller=seeding.made(caller),
-        )
-
-
-@dataclass(frozen=True)
-class MaskingPoliciesOfMixedModes(Given[Any, ManyMaskingPoliciesAndACaller]):
-    """truncate 모드 정책 둘과 drop 모드 정책 하나, 사용자 한 명. ``laid``는 truncate 둘이다."""
-
-    role: UserRole = UserRole.USER
-
-    @override
-    def describe(self) -> str:
-        return f"모드가 다른 클라이언트 IP 마스킹 정책 셋과, {role_named(self.role)} 한 명"
-
-    @override
-    async def lay(self, seeding: Any) -> ManyMaskingPoliciesAndACaller:
-        truncating = [
-            await seeding.creating(
-                SeedClientIPMaskingPolicy(
-                    target_type=ClientIPMaskingTarget.DEFAULT, mode=ClientIPMaskingMode.TRUNCATE
-                )
-            ),
-            await seeding.creating(
-                SeedClientIPMaskingPolicy(
-                    target_type=ClientIPMaskingTarget.AUDIT_LOGS, mode=ClientIPMaskingMode.TRUNCATE
-                )
-            ),
-        ]
-        await seeding.creating(
-            SeedClientIPMaskingPolicy(
-                target_type=ClientIPMaskingTarget.LOGIN_HISTORY, mode=ClientIPMaskingMode.DROP
-            )
-        )
-        caller = await lay_a_caller(seeding, self.role)
-        return ManyMaskingPoliciesAndACaller(
-            laid=tuple(seeding.made(one) for one in truncating),
-            named=seeding.made(truncating[0]),
             caller=seeding.made(caller),
         )
 
@@ -278,37 +215,6 @@ class TheLaidMaskingPoliciesAreLeft(
                 sorted(one.target_type.value for one in laid.laid),
             ),
             Same("total_count", page.total_count, len(laid.laid)),
-            Same("has_next_page", page.has_next_page, False),
-            Same("has_previous_page", page.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class OnlyTheNamedMaskingPolicyIsLeft(
-    Then[ManyMaskingPoliciesAndACaller, AdminSearchClientIPMaskingPoliciesPayload]
-):
-    """필터에 맞는 그 하나만 반환된다."""
-
-    @override
-    def says(self) -> str:
-        return "필터에 맞는 정책 하나만 반환된다"
-
-    @override
-    def look(
-        self,
-        laid: ManyMaskingPoliciesAndACaller,
-        answered: Answered[AdminSearchClientIPMaskingPoliciesPayload],
-    ) -> list[Verdict]:
-        page = answered.response
-        if page is None:
-            return [Refused(EntityNotFoundError, answered.raised)]
-        return [
-            Same(
-                "items",
-                [one.target_type.value for one in page.items],
-                [laid.named.target_type.value],
-            ),
-            Same("total_count", page.total_count, 1),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]

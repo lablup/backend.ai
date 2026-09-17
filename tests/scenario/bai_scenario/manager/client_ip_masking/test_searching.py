@@ -1,7 +1,7 @@
-"""마스킹 정책 검색 — 필터가 무엇을 좁히고, 누가 검색할 수 있는가.
+"""마스킹 정책 검색 — 누가 검색할 수 있는가.
 
-대상이 `default`, `login_history`, `audit_logs` 셋뿐이라 정책도 셋을 넘지 못한다. 10건을 넘겨 다음
-페이지를 확인하는 시나리오는 없다.
+필터가 무엇을 좁히는지는 시나리오로 두지 않는다. 대상이 `default`, `login_history`, `audit_logs`
+셋뿐이라 정책도 셋을 넘지 못하고, 10건을 넘겨 다음 페이지를 확인하는 시나리오도 없다.
 """
 
 from __future__ import annotations
@@ -14,16 +14,9 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     AdminSearchClientIPMaskingPoliciesInput,
-    ClientIPMaskingPolicyFilter,
 )
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     AdminSearchClientIPMaskingPoliciesPayload,
-)
-from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
-    ClientIPMaskingMode as ModeInput,
-)
-from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
-    ClientIPMaskingTarget as TargetInput,
 )
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -32,9 +25,6 @@ from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     ManyMaskingPoliciesAndACaller,
-    MaskingPoliciesOfEveryTarget,
-    MaskingPoliciesOfMixedModes,
-    OnlyTheNamedMaskingPolicyIsLeft,
     TheLaidMaskingPoliciesAreLeft,
     TwoMaskingPoliciesAndSomeone,
 )
@@ -69,56 +59,6 @@ class SearchingEveryPolicy(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAd
 
 
 @dataclass(frozen=True)
-class SearchingByTarget(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]):
-    """골라낸 하나의 대상을 필터로 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "admin_search"
-
-    @override
-    def describe(self, laid: ManyMaskingPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.target_type.value} 대상 필터로 조회"
-
-    @override
-    async def call(
-        self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller
-    ) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.admin_search(
-                AdminSearchClientIPMaskingPoliciesInput(
-                    filter=ClientIPMaskingPolicyFilter(
-                        target_type=TargetInput(laid.named.target_type.value)
-                    )
-                )
-            )
-
-
-@dataclass(frozen=True)
-class SearchingByMode(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]):
-    """골라낸 하나의 모드를 필터로 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "admin_search"
-
-    @override
-    def describe(self, laid: ManyMaskingPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.mode.value} 모드 필터로 조회"
-
-    @override
-    async def call(
-        self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller
-    ) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.admin_search(
-                AdminSearchClientIPMaskingPoliciesInput(
-                    filter=ClientIPMaskingPolicyFilter(mode=ModeInput(laid.named.mode.value))
-                )
-            )
-
-
-@dataclass(frozen=True)
 class TheSuperadminCountsEveryPolicy(
     Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
@@ -137,56 +77,6 @@ class TheSuperadminCountsEveryPolicy(
     @override
     def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
         return SearchingEveryPolicy()
-
-    @override
-    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Searched]:
-        return TheLaidMaskingPoliciesAreLeft()
-
-
-@dataclass(frozen=True)
-class ATargetFilterNarrows(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-target-filter-narrows-the-answer-to-that-targets-policy"
-
-    @override
-    def describe(self) -> str:
-        return "세 대상의 정책이 있을 때 한 대상을 필터로 조회하면 그 대상의 정책 하나만 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
-        return MaskingPoliciesOfEveryTarget(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
-        return SearchingByTarget()
-
-    @override
-    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Searched]:
-        return OnlyTheNamedMaskingPolicyIsLeft()
-
-
-@dataclass(frozen=True)
-class AModeFilterNarrows(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-mode-filter-keeps-only-the-policies-of-that-mode"
-
-    @override
-    def describe(self) -> str:
-        return "모드가 다른 정책 여럿이 있을 때 한 모드를 필터로 조회하면 그 모드의 정책만 반환된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
-        return MaskingPoliciesOfMixedModes(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
-        return SearchingByMode()
 
     @override
     def then(self) -> Then[ManyMaskingPoliciesAndACaller, Searched]:
@@ -245,8 +135,6 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
 SCENARIOS: list[SearchingStep] = [
     TheSuperadminCountsEveryPolicy(),
-    ATargetFilterNarrows(),
-    AModeFilterNarrows(),
     TheMonitorSearchesLikeTheSuperadmin(),
     AUserWhoIsNotTheSuperadminMayNotSearch(),
 ]
