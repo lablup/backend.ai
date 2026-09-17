@@ -8,7 +8,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType, EntityType
 from ai.backend.common.data.permission.types import (
     Permission,
     RoleSource,
@@ -130,14 +130,14 @@ class PermissionBitFilter(BaseRequestModel):
 class ScopeInputDTO(BaseRequestModel):
     """Scope reference for associating an entity with a scope."""
 
-    scope_type: EntityType
+    scope_type: DeclaredEntityType
     scope_id: str
 
 
 class EntityTypeScope(BaseRequestModel):
     """A typed (entity type, id) pair naming one entity."""
 
-    entity_type: EntityType
+    entity_type: DeclaredEntityType
     entity_id: str
 
 

@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -155,7 +155,7 @@ class CreatePermissionInput(BaseRequestModel):
     """Input for creating a scoped permission."""
 
     role_id: UUID = Field(description="Role ID to assign this permission to")
-    entity_type: EntityType = Field(description="Entity type (e.g. 'session', 'vfolder')")
+    entity_type: DeclaredEntityType = Field(description="Entity type (e.g. 'session', 'vfolder')")
     permission: PermissionBitDTO = Field(description="The operation bit the row holds")
 
     def permission_bit(self) -> Permission:
@@ -167,7 +167,7 @@ class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    entity_type: EntityType | None | Unset = Field(
+    entity_type: DeclaredEntityType | None | Unset = Field(
         default=UNSET, description="Updated entity type. Omit to leave unchanged."
     )
     permission: PermissionBitDTO | None | Unset = Field(

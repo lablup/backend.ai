@@ -8,10 +8,11 @@ permission mutations.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Any, Self
 from uuid import UUID
 
+import strawberry
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
@@ -35,6 +36,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     RolePermissionPresetNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -59,6 +61,14 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionBitFilterGQL,
     PermissionBitGQL,
 )
+from ai.backend.manager.api.gql.rbac.types.permission import (
+    OperationTypeFilterGQL,
+    OperationTypeGQL,
+)
+
+_REMOVED_OPERATION_REASON = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; this field is always null."
+)
 
 # --- Node / Connection types ---
 
@@ -76,6 +86,13 @@ class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     entity_type: str = gql_field(description="Entity type the permission applies to.")
     permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")
     created_at: datetime = gql_field(description="Creation timestamp.")
+
+    @gql_field(
+        description="Operation granted by the permission.",
+        deprecation_reason=_REMOVED_OPERATION_REASON,
+    )  # type: ignore[misc]
+    def operation(self) -> OperationTypeGQL | None:
+        return None
 
 
 RolePermissionPresetEdge = Edge[RolePermissionPresetGQL]
@@ -121,6 +138,13 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     permission: PermissionBitFilterGQL | None = gql_field(
         description="Filter by the operation bit granted.", default=None
     )
+    operation: OperationTypeFilterGQL | None = gql_field(
+        description="Filter by granted operation.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
+        ),
+    )
     created_at: DateTimeFilter | None = gql_field(
         description="Filter by creation timestamp.", default=None
     )
@@ -145,10 +169,16 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     ),
     name="RolePermissionPresetOrderField",
 )
-class RolePermissionPresetOrderFieldGQL(StrEnum):
+class RolePermissionPresetOrderFieldGQL(Enum):
     ENTITY_TYPE = "entity_type"
     PERMISSION = "permission"
     CREATED_AT = "created_at"
+    OPERATION = strawberry.enum_value(
+        "operation",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `PERMISSION`; ordering by it is ignored."
+        ),
+    )
 
 
 @gql_pydantic_input(
@@ -199,6 +229,13 @@ class BulkAddRolePermissionPresetFailureInfoGQL(
         description="The operation bit of the permission entry that failed."
     )
     message: str = gql_field(description="Error message describing the failure.")
+
+    @gql_field(
+        description="Operation of the permission entry that failed.",
+        deprecation_reason=_REMOVED_OPERATION_REASON,
+    )  # type: ignore[misc]
+    def operation(self) -> OperationTypeGQL | None:
+        return None
 
 
 @gql_pydantic_type(

@@ -396,6 +396,7 @@ def provision(cli_ctx: CLIContext) -> None:
     """
     from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.repositories.db.engine import connect_database
+    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
     from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
     from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 
@@ -406,6 +407,7 @@ def provision(cli_ctx: CLIContext) -> None:
         # A standalone CLI process has not imported the full model tree.
         ensure_all_tables_registered()
         async with connect_database(bootstrap_config.db) as db:
+            await GlobalEntityIDLoader(db).load()
             repository = RolePresetRepository(RolePresetOpsProvider(db))
             await repository.provision_roles(creator_preset_ids)
 

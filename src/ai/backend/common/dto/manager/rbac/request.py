@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
@@ -48,7 +48,7 @@ class CreateRoleRequest(BaseRequestModel):
     """Request to create a role."""
 
     name: str = Field(description="Role name")
-    scope_type: EntityType = Field(description="Type of the scope the role belongs to")
+    scope_type: DeclaredEntityType = Field(description="Type of the scope the role belongs to")
     scope_id: UUID = Field(description="ID of the scope the role belongs to")
     status: RoleStatus | None = Field(default=None, description="Role status; active if omitted")
     description: str | None = Field(default=None, description="Role description")
@@ -150,7 +150,7 @@ class CreatePermissionRequest(BaseRequestModel):
     """Request to create a permission."""
 
     role_id: UUID = Field(description="Role ID for the permission")
-    entity_type: EntityType = Field(description="Entity type for the permission")
+    entity_type: DeclaredEntityType = Field(description="Entity type for the permission")
     permission: PermissionBitDTO = Field(description="The operation bit the row holds")
 
 

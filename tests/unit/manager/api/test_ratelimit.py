@@ -71,6 +71,15 @@ class TestRlimMiddleware:
             yield request
 
     @pytest.fixture
+    def exceeded_ip_window(self, mock_valkey_client: MagicMock) -> None:
+        """An address whose window is already past its limit."""
+        mock_valkey_client.consume_ip_rlim_window.return_value = RateLimitState(
+            count=_ANONYMOUS_RATELIMIT + 1,
+            limit=_ANONYMOUS_RATELIMIT,
+            reset_after_seconds=_RESET_AFTER_SECONDS,
+        )
+
+    @pytest.fixture
     def mock_request_authorized(self) -> web.Request:
         """A request carrying the user and rate limit the auth middleware resolved."""
         request = make_mocked_request("GET", "/")
@@ -181,4 +190,52 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Remaining"] == "0"
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
+        mock_handler.assert_not_called()
+
+    @pytest.mark.parametrize("path", ["/health", "/health/livez", "/health/readyz"])
+    async def test_a_health_check_spends_no_window(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        exceeded_ip_window: None,
+        mock_handler: AsyncMock,
+        path: str,
+    ) -> None:
+        """A health check passes an exhausted window, untouched and without quota headers."""
+        # Arrange
+        request = make_mocked_request("GET", path)
+        request["is_authorized"] = False
+        request["user"] = None
+
+        # Act
+        with with_client_ip(_CLIENT_IP):
+            response = await middleware(request, mock_handler)
+        await apply_reserved_response_headers(request, response)
+
+        # Assert
+        assert response.status == 200
+        assert "X-RateLimit-Limit" not in response.headers
+        mock_valkey_client.consume_ip_rlim_window.assert_not_called()
+        mock_valkey_client.consume_user_rlim_window.assert_not_called()
+        mock_handler.assert_called_once_with(request)
+
+    @pytest.mark.parametrize("path", ["/", "/healthy", "/v2/health"])
+    async def test_an_anonymous_query_past_its_window_is_refused(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        exceeded_ip_window: None,
+        mock_handler: AsyncMock,
+        path: str,
+    ) -> None:
+        """Paths outside the health prefix still spend the address window."""
+        # Arrange
+        request = make_mocked_request("GET", path)
+        request["is_authorized"] = False
+        request["user"] = None
+
+        # Act & Assert
+        with with_client_ip(_CLIENT_IP), pytest.raises(RateLimitExceeded):
+            await middleware(request, mock_handler)
+        mock_valkey_client.consume_ip_rlim_window.assert_called_once()
         mock_handler.assert_not_called()

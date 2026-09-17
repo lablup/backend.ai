@@ -119,6 +119,35 @@ def _project(
     )
 
 
+async def _add_roster_edge(session: Any, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """A project member's edge as the scope association table's move left it: own, no cap."""
+    nodes = dict(
+        (
+            await session.execute(
+                sa.select(VirtualEntityRow.entity_id, VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_id.in_([project_id, user_id])
+                )
+            )
+        ).all()
+    )
+    session.add(
+        EntityMembershipRow(
+            virtual_entity_id=nodes[project_id], member_entity_id=nodes[user_id], capped=False
+        )
+    )
+
+
+async def _remove_roster_edge(session: Any, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    project = sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_id == project_id)
+    user = sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_id == user_id)
+    await session.execute(
+        sa.delete(EntityMembershipRow).where(
+            EntityMembershipRow.virtual_entity_id == project.scalar_subquery(),
+            EntityMembershipRow.member_entity_id == user.scalar_subquery(),
+        )
+    )
+
+
 @pytest.fixture
 async def seeded(db: ExtendedAsyncSAEngine) -> dict[str, uuid.UUID]:
     """A database shaped like one seeded before the declaration: presets soft-deleted,
@@ -248,6 +277,9 @@ async def seeded(db: ExtendedAsyncSAEngine) -> dict[str, uuid.UUID]:
             (UserEntityType(), member_id),
         ):
             session.add(VirtualEntityRow(entity_type=entity_type, entity_id=entity_id))
+        await session.flush()
+        for user_id in (admin_id, member_id):
+            await _add_roster_edge(session, project_id, user_id)
         return {
             "domain": domain_id,
             "project": project_id,
@@ -427,6 +459,9 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                     entity_id=uuid.UUID(entity["entity_id"]),
                 )
             )
+        await session.flush()
+        for group_id, user_id in roster:
+            await _add_roster_edge(session, uuid.UUID(group_id), uuid.UUID(user_id))
         for preset in _PRESETS:
             session.add(
                 RolePresetRow(
@@ -673,45 +708,33 @@ class TestSyncSeedRoles:
         role = await _role_of(db, "project_member", migrated["project"])
         assert await _holders(db, role.id) == {migrated["admin"], migrated["member"]}
 
-    async def test_the_roster_edge_carries_a_read_cap(
-        self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
+    async def test_a_member_left_only_in_association_groups_users_holds_nothing(
+        self, db: ExtendedAsyncSAEngine, seeded: dict[str, uuid.UUID]
     ) -> None:
+        async with db.begin_session() as session:
+            await _remove_roster_edge(session, seeded["project"], seeded["member"])
+
+        await _migrate(db)
+
+        role = await _role_of(db, "project_member", seeded["project"])
+        assert await _holders(db, role.id) == {seeded["admin"]}
         async with db.begin_readonly_session() as session:
-            scope = (
+            edges = (
                 await session.execute(
-                    sa.select(VirtualEntityRow.id).where(
-                        VirtualEntityRow.entity_id == migrated["project"]
+                    sa.select(sa.func.count())
+                    .select_from(EntityMembershipRow)
+                    .join(
+                        VirtualEntityRow,
+                        VirtualEntityRow.id == EntityMembershipRow.member_entity_id,
+                    )
+                    .where(VirtualEntityRow.entity_id == seeded["member"])
+                    .where(
+                        EntityMembershipRow.virtual_entity_id
+                        != EntityMembershipRow.member_entity_id
                     )
                 )
             ).scalar_one()
-            member = (
-                await session.execute(
-                    sa.select(VirtualEntityRow.id).where(
-                        VirtualEntityRow.entity_id == migrated["member"]
-                    )
-                )
-            ).scalar_one()
-            membership = (
-                await session.execute(
-                    sa.select(EntityMembershipRow).where(
-                        EntityMembershipRow.virtual_entity_id == scope,
-                        EntityMembershipRow.member_entity_id == member,
-                    )
-                )
-            ).scalar_one()
-            caps = (
-                (
-                    await session.execute(
-                        sa.select(EntityMembershipCapRow).where(
-                            EntityMembershipCapRow.membership_id == membership.id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-        assert membership.capped is True
-        assert [(int(cap.permission), cap.all_fields) for cap in caps] == [(1, True)]
+        assert edges == 0
 
     async def test_running_it_twice_changes_nothing(
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
@@ -821,11 +844,8 @@ class TestProjectCreator:
         self, db: ExtendedAsyncSAEngine, created_by_member: dict[str, uuid.UUID]
     ) -> dict[str, uuid.UUID]:
         async with db.begin_session() as session:
-            await session.execute(
-                sa.delete(association_groups_users).where(
-                    association_groups_users.c.user_id == created_by_member["member"],
-                    association_groups_users.c.group_id == created_by_member["project"],
-                )
+            await _remove_roster_edge(
+                session, created_by_member["project"], created_by_member["member"]
             )
         return created_by_member
 
@@ -871,6 +891,8 @@ class TestScopeWithoutRoles:
                 )
             )
             session.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=project_id))
+            await session.flush()
+            await _add_roster_edge(session, project_id, seeded["member"])
         seeded["bare_project"] = project_id
         await _migrate(db)
         return seeded

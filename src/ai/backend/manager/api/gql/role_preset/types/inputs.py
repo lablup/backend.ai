@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     UpdateRolePresetInput as UpdateRolePresetInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -35,6 +36,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 from ai.backend.manager.api.gql.rbac.types import PermissionBitGQL
+from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
 
 
 @gql_pydantic_input(
@@ -47,6 +49,13 @@ from ai.backend.manager.api.gql.rbac.types import PermissionBitGQL
 class RolePermissionPresetEntryInputGQL(PydanticInputMixin[RolePermissionPresetEntryDTO]):
     entity_type: str = gql_field(description="Entity type the permission applies to.")
     permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")
+    operation: OperationTypeGQL | None = gql_field(
+        description="Operation granted by the permission.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
+        ),
+    )
 
 
 @gql_pydantic_input(

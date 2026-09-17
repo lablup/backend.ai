@@ -6,9 +6,15 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryProjectCreator,
+)
+from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
 
 
 @dataclass(frozen=True)
@@ -16,6 +22,8 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
     """A registry. An image joins the one it came from, so it is laid first."""
 
     name_hint: str = "registry"
+    registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
+    is_global: bool = True
 
     @override
     def kind(self) -> str:
@@ -33,6 +41,26 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
     def seed(self, name: str) -> ContainerRegistryCreator:
         return ContainerRegistryCreator(
             url=f"https://{name}.scenario.local",
-            type=ContainerRegistryType.DOCKER,
+            type=self.registry_type,
             registry_name=name,
+            is_global=self.is_global,
         )
+
+
+@dataclass(frozen=True)
+class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
+    @override
+    def kind(self) -> str:
+        return "을 허용한"
+
+    @override
+    def scope_id(self, scope: ProjectData) -> ProjectID:
+        return ProjectID(scope.id)
+
+    @override
+    def target_id(self, target: ContainerRegistryData) -> ContainerRegistryID:
+        return ContainerRegistryID(target.id)
+
+    @override
+    def seed(self) -> ContainerRegistryProjectCreator:
+        return ContainerRegistryProjectCreator()
