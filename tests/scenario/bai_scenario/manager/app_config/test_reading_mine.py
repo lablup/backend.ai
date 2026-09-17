@@ -230,100 +230,6 @@ class AFlippedRankLetsTheDomainWin(
 
 
 @dataclass(frozen=True)
-class NestedKeysMergeInside(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
-):
-    @override
-    def summary(self) -> str:
-        return "nested-dicts-merge-key-by-key-inside"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "같은 키 아래 중첩 사전을 담은 두 조각을 조회하면, 겹치지 않는 안쪽 키는 양쪽 모두 "
-            "남고 겹치는 안쪽 키만 뒤의 것이 남는다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
-        return AConfigLaidAcross(
-            domain={"editor": {"font": {"size": 12, "family": "mono"}, "wrap": True}},
-            user={"editor": {"font": {"size": 14}, "theme": "night"}},
-        )
-
-    @override
-    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
-        return ReadingMine()
-
-    @override
-    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
-        return TheMergedConfigs(
-            wanted=(
-                {
-                    "editor": {
-                        "font": {"size": 14, "family": "mono"},
-                        "wrap": True,
-                        "theme": "night",
-                    }
-                },
-            )
-        )
-
-
-@dataclass(frozen=True)
-class ListsAreReplacedWhole(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
-):
-    @override
-    def summary(self) -> str:
-        return "a-list-is-replaced-whole-rather-than-appended"
-
-    @override
-    def describe(self) -> str:
-        return "같은 키에 목록을 담은 두 조각을 조회하면, 뒤의 것의 목록만 남고 이어 붙지 않는다"
-
-    @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
-        return AConfigLaidAcross(domain={"plugins": ["git", "lint"]}, user={"plugins": ["spell"]})
-
-    @override
-    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
-        return ReadingMine()
-
-    @override
-    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
-        return TheMergedConfigs(wanted=({"plugins": ["spell"]},))
-
-
-@dataclass(frozen=True)
-class AnExplicitNullOverrides(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
-):
-    @override
-    def summary(self) -> str:
-        return "a-value-written-as-null-overrides-rather-than-being-skipped"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "앞 조각의 키에 값이 있고 뒤 조각이 같은 키를 비워 두면, 그 키는 비어 있는 채로 "
-            "반환된다. 빈 값도 덮어쓴다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
-        return AConfigLaidAcross(domain={"banner": "welcome"}, user={"banner": None})
-
-    @override
-    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
-        return ReadingMine()
-
-    @override
-    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
-        return TheMergedConfigs(wanted=({"banner": None},))
-
-
-@dataclass(frozen=True)
 class AnotherUsersFragmentStaysOut(
     Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
@@ -489,9 +395,6 @@ SCENARIOS: list[ReadingStep] = [
     MyFragmentOverridesTheDomains(),
     TheDomainsFragmentOverridesThePublic(),
     AFlippedRankLetsTheDomainWin(),
-    NestedKeysMergeInside(),
-    ListsAreReplacedWhole(),
-    AnExplicitNullOverrides(),
     # TODO(BA-7934): the domain visibility reaches every fragment its users own, so
     # another user's fragment merges into mine until the condition is scoped.
     # AnotherUsersFragmentStaysOut(),

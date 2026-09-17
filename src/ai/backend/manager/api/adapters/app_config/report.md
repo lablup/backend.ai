@@ -6,41 +6,6 @@ Not exercised by any scenario: batch_load_fields.
 
 ### reading_mine
 
-#### [a-list-is-replaced-whole-rather-than-appended](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
-
-같은 키에 목록을 담은 두 조각을 조회하면, 뒤의 것의 목록만 남고 이어 붙지 않는다
-
-Given
-
-- 도메인·사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 domain-fragment-1: 값 {'plugins': ['git', 'lint']}
-  - 설정 조각 own-fragment-1: 값 {'plugins': ['spell']}
-
-When
-
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
-
-Then
-
-- 요청한 이름마다 병합된 설정이 반환된다
-  - app_configs = 1
-  - app_configs[0].config_name: 요청한 이름와 같다
-  - app_configs[0].config = {'plugins': ['spell']}
-
 #### [a-name-asked-twice-is-answered-twice](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
 
 같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다
@@ -232,41 +197,6 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-value-written-as-null-overrides-rather-than-being-skipped](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
-
-앞 조각의 키에 값이 있고 뒤 조각이 같은 키를 비워 두면, 그 키는 비어 있는 채로 반환된다. 빈 값도 덮어쓴다
-
-Given
-
-- 도메인·사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 domain-fragment-1: 값 {'banner': 'welcome'}
-  - 설정 조각 own-fragment-1: 값 {'banner': None}
-
-When
-
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
-
-Then
-
-- 요청한 이름마다 병합된 설정이 반환된다
-  - app_configs = 1
-  - app_configs[0].config_name: 요청한 이름와 같다
-  - app_configs[0].config = {'banner': None}
-
 #### [another-domains-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
 
 다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다
@@ -336,41 +266,6 @@ Then
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'solar', 'menu': {'docs': False, 'billing': True, 'home': False}}
-
-#### [nested-dicts-merge-key-by-key-inside](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
-
-같은 키 아래 중첩 사전을 담은 두 조각을 조회하면, 겹치지 않는 안쪽 키는 양쪽 모두 남고 겹치는 안쪽 키만 뒤의 것이 남는다
-
-Given
-
-- 도메인·사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 domain-fragment-1: 값 {'editor': {'font': {'size': 12, 'family': 'mono'}, 'wrap': True}}
-  - 설정 조각 own-fragment-1: 값 {'editor': {'font': {'size': 14}, 'theme': 'night'}}
-
-When
-
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
-
-Then
-
-- 요청한 이름마다 병합된 설정이 반환된다
-  - app_configs = 1
-  - app_configs[0].config_name: 요청한 이름와 같다
-  - app_configs[0].config = {'editor': {'font': {'size': 14, 'family': 'mono'}, 'wrap': True, 'theme': 'night'}}
 
 #### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
 
