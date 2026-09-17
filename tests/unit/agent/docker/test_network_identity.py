@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -119,6 +119,7 @@ class _AgentStub:
         self.local_config = SimpleNamespace(
             agent=SimpleNamespace(network_privnet_socket=None, backend="docker")
         )
+        self._privnet_socket = None
         # Readiness also reports what recovery could not close, and retries it on this same timer.
         self._session_network = _StubSessionNetwork(vtep_ip)
 
@@ -364,19 +365,28 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
     async def test_the_docker_agent_answers_with_its_privnet(self, tmp_path: pathlib.Path) -> None:
         """On a privnet-backed node every session's devices are made by that process, the
         single-node bridge included, so a node that cannot reach it can serve nothing."""
-        stub = SimpleNamespace(
-            local_config=SimpleNamespace(
-                agent=SimpleNamespace(network_privnet_socket=str(tmp_path / "absent.sock"))
-            )
-        )
+        stub = SimpleNamespace(_privnet_socket=str(tmp_path / "absent.sock"))
         reason = await DockerAgent.not_serving_reason(cast(Any, stub))
         assert reason is not None and "does not exist" in reason
 
     async def test_a_node_without_a_privnet_has_nothing_to_answer_for(self) -> None:
-        stub = SimpleNamespace(
-            local_config=SimpleNamespace(agent=SimpleNamespace(network_privnet_socket=None))
-        )
+        stub = SimpleNamespace(_privnet_socket=None)
         assert await DockerAgent.not_serving_reason(cast(Any, stub)) is None
+
+    async def test_a_swarm_cluster_does_not_publish_the_advert(self) -> None:
+        """Under the Swarm driver nothing reads the BEP-1078 advert, so `start_serving` announces
+        the node and stops there -- no publish, no refresh task."""
+        agent = object.__new__(DockerAgent)
+        agent._cluster_network_owned = False
+        agent._network_identity_task = None
+        publish = AsyncMock()
+        with (
+            patch.object(AbstractAgent, "start_serving", AsyncMock()),
+            patch.object(agent, "_publish_network_identity", publish),
+        ):
+            await agent.start_serving()
+        publish.assert_not_awaited()
+        assert agent._network_identity_task is None
 
     async def test_announcing_before_the_transport_serves_is_refused(self) -> None:
         """Refuse announcements before the transport enters serving state."""

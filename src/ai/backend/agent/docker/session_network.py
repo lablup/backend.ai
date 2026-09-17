@@ -99,3 +99,20 @@ def build_docker_session_network(
         vtep_ip=vtep_ip,
         configured_dns=configured_dns,
     )
+
+
+def effective_privnet_socket(configured: str | None, cluster_driver: str | None) -> str | None:
+    """The privileged network helper this agent actually uses, or None.
+
+    A cluster whose multi-node sessions ride Docker Swarm (``overlay``) has no use for the BEP-1078
+    data plane on any node: no session ever arrives with a ``backend``, so a helper configured
+    there would be probed, heartbeat-gated and sent port unpublishes for nothing -- and a helper
+    outage would take a node out of service over sessions that never needed it. So a configured
+    socket is ignored under that driver, and the agent runs as it did before the helper existed.
+    An unpublished driver (a manager from before the key, or not started yet) keeps the socket.
+    """
+    if configured is None:
+        return None
+    if cluster_driver == "overlay":
+        return None
+    return configured

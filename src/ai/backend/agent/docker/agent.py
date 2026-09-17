@@ -63,7 +63,6 @@ from ai.backend.agent.errors import (
     UnsupportedBaseDistroError,
     UnsupportedResource,
 )
-from ai.backend.agent.errors.network import ContainerLifecycleUnavailable
 from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
@@ -150,6 +149,7 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
@@ -159,6 +159,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.network.keys import cluster_driver_key
 from ai.backend.common.network.types import SessionNetMeta
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
@@ -195,6 +196,7 @@ from .kernel import DockerKernel
 from .session_network import (
     NO_NETWORK_MODE,
     build_docker_session_network,
+    effective_privnet_socket,
     is_session_networked,
 )
 from .utils import PersistentServiceContainer
@@ -464,9 +466,7 @@ _REPL_OUT_PORT: Final = 2001
 _REPL_PORTS: Final = frozenset({_REPL_IN_PORT, _REPL_OUT_PORT})
 
 
-def _port_publisher(
-    local_config: AgentUnifiedConfig, session_network: SessionNetwork
-) -> PortPublisher:
+def _port_publisher(session_network: SessionNetwork) -> PortPublisher:
     """Who installs the host-port DNAT for a session-networked kernel.
 
     It is an iptables (CAP_NET_ADMIN) op, so it belongs to whoever owns the host's networking: this
@@ -475,19 +475,15 @@ def _port_publisher(
     refuses with "you must be root", which is a kernel that never reaches RUNNING. Same choice the
     containerd agent makes; see ContainerdAgent.__ainit__.
     """
-    privnet_socket = local_config.agent.network_privnet_socket
-    if privnet_socket is None:
-        return PortForwarder()
     # The session network's own client, not a fresh one on the same socket. That object is where
     # each session's incarnation is bound, and it is what stamps every request with it; a client
     # built here carries none, so a PUBLISH or UNPUBLISH delayed across a teardown and a rebuild
-    # would reach the rules of the session that replaced the one it was issued for.
+    # would reach the rules of the session that replaced the one it was issued for. And it is the
+    # one place that knows whether this agent uses a helper at all -- the configured socket is
+    # not consulted here, because under the Swarm driver it is configured and not used.
     client = session_network.privnet_client
     if client is None:
-        raise ContainerLifecycleUnavailable(
-            "this agent is configured with a privileged network helper, but its session network"
-            " holds no client for it; host port rules would be installed unfenced"
-        )
+        return PortForwarder()
     return PrivNetPortForwarder(client, session_network.session_of)
 
 
@@ -965,7 +961,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if cp not in _REPL_PORTS
         ]
         if forwards:
-            await _port_publisher(self.local_config, self._session_network).install(
+            await _port_publisher(self._session_network).install(
                 forwards_for(
                     cid,
                     self._container_ip,
@@ -1951,6 +1947,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     _host_ip: str
     #: Refreshes the published capabilities, so readiness does not go stale.
     _network_identity_task: asyncio.Task[None] | None
+    #: The privileged network helper this agent uses, or None: the configured socket, unless the
+    #: cluster's driver is Docker Swarm -- see `effective_privnet_socket`.
+    _privnet_socket: str | None
+    #: Whether this node takes part in the BEP-1078 data plane at all. False under the Swarm
+    #: driver: no session ever arrives with a backend, so the identity that admits a node to one
+    #: is not published either.
+    _cluster_network_owned: bool
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -2068,6 +2071,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
         self._host_ip = host_ip
         self._network_identity_task = None
+        configured_socket = self.local_config.agent.network_privnet_socket
+        cluster_driver = await self.etcd.get(cluster_driver_key(), scope=ConfigScopes.GLOBAL)
+        self._privnet_socket = effective_privnet_socket(configured_socket, cluster_driver)
+        self._cluster_network_owned = cluster_driver != "overlay"
+        if configured_socket is not None and self._privnet_socket is None:
+            log.info(
+                "the cluster-network driver is {!r} (Docker Swarm): the privileged network helper"
+                " at {} is not used on this node",
+                cluster_driver,
+                configured_socket,
+            )
         self._vtep_ip = usable_vtep(host_ip)
         # The interface the data plane is BUILT on, kept because it is half of what this node
         # serves with. The vxlan device is created on this uplink for the life of the process, so
@@ -2079,7 +2093,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_id=str(self.id),
             host_ip=host_ip,
             uplink=self._serving_uplink,
-            privnet_socket=self.local_config.agent.network_privnet_socket,
+            privnet_socket=self._privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
             agent_state_dir=self.local_config.agent.var_base_path,
             vtep_ip=self._vtep_ip,
@@ -2195,6 +2209,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         in the manager's own table can keep that node looking ALIVE for its own timeout.
         """
         await super().start_serving()
+        if not self._cluster_network_owned:
+            # Nothing reads the advert under the Swarm driver, and probing what this node could
+            # serve would only report, every minute, an overlay it will never be asked for.
+            return
         await self._publish_network_identity()
         self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
 
@@ -2279,7 +2297,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # The interface sessions are served on, not the one the address is on now: a probe
                 # of the wrong NIC describes a path this node will not use.
                 self._serving_uplink,
-                privnet_socket=self.local_config.agent.network_privnet_socket,
+                privnet_socket=self._privnet_socket,
                 # Retried here rather than on a loop of its own: this already runs on a timer,
                 # and the answer it publishes is exactly what the retry changes.
                 recovery_problems=await self._session_network.retry_recovery_fail_close(),
@@ -2315,7 +2333,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # can serve no session at all. Only reachability: an overlay-specific problem (an
         # unrecovered tunnel, a helper too old to fence) is published in the capability record
         # and keeps overlay sessions away while single-node ones still run.
-        socket = self.local_config.agent.network_privnet_socket
+        socket = self._privnet_socket
         if socket is None:
             return None
         from ai.backend.agent.network.privnet.client import PrivNetClient
@@ -2405,7 +2423,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @override
     def port_publisher(self) -> PortPublisher:
         """This backend does publish host ports, so its rules are the reclaim's to collect."""
-        return _port_publisher(self.local_config, self._session_network)
+        return _port_publisher(self._session_network)
 
     @override
     async def enumerate_containers(
@@ -2992,9 +3010,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # reclaims them, and a host port still pointing at a dead container's address is
                 # handed straight to whichever kernel draws that port next.
                 try:
-                    await _port_publisher(
-                        self.local_config, self._session_network
-                    ).remove_container(str(container_id))
+                    await _port_publisher(self._session_network).remove_container(str(container_id))
                 except Exception:
                     log.warning(
                         "could not remove the published ports of container {}", container_id
