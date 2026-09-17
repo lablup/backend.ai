@@ -228,7 +228,7 @@ class AMonitorFindsEveryOne(
     def describe(self) -> str:
         return (
             f"모니터 역할 사용자가 {self.family.kind} 전체를 검색하면 슈퍼관리자와 같은 응답이 "
-            "반환된다. 역할 검사가 읽기는 모니터에게도 허용하기 때문이다"
+            "반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다"
         )
 
     @override

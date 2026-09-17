@@ -267,7 +267,7 @@ class AMonitorMayNotCreate(
     def describe(self) -> str:
         return (
             f"모니터 역할 사용자가 {self.family.kind}을 생성하려 하면 역할 부족으로 거부된다. "
-            "역할 검사는 모니터에게 읽기만 허용한다"
+            "슈퍼관리자 검사는 모니터에게 읽기만 허용한다"
         )
 
     @override
