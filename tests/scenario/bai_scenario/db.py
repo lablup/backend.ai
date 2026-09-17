@@ -17,6 +17,7 @@ from ai.backend.manager.models.base import (
     metadata,
     pgsql_connect_opts,
 )
+from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
 from ai.backend.manager.repositories.db.engine import create_async_engine
@@ -62,6 +63,8 @@ async def create_schema(engine: ExtendedAsyncSAEngine) -> None:
         await conn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
         await conn.exec_driver_sql(UUID_GENERATE_V7_DDL)
         await conn.run_sync(lambda sync_conn: metadata.create_all(sync_conn, checkfirst=False))
+        for statement in SEED_GLOBAL_ENTITIES_SQL:
+            await conn.exec_driver_sql(statement)
 
 
 @dataclass(frozen=True)
