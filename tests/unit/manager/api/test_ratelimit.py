@@ -40,6 +40,13 @@ class RateLimitSuccessCase:
     description: str
 
 
+@dataclass(frozen=True)
+class HealthProbeCase:
+    """A route of the public health sub-app."""
+
+    path: str
+
+
 class TestRlimMiddleware:
     @pytest.fixture
     def mock_valkey_client(self) -> MagicMock:
@@ -65,6 +72,15 @@ class TestRlimMiddleware:
     def mock_request_anonymous(self) -> Iterator[web.Request]:
         """An unauthenticated request, whose address the context carries."""
         request = make_mocked_request("GET", "/")
+        request["is_authorized"] = False
+        request["user"] = None
+        with with_client_ip(_CLIENT_IP):
+            yield request
+
+    @pytest.fixture
+    def health_probe_request(self, case: HealthProbeCase) -> Iterator[web.Request]:
+        """An unauthenticated request to the health route the case names."""
+        request = make_mocked_request("GET", case.path)
         request["is_authorized"] = False
         request["user"] = None
         with with_client_ip(_CLIENT_IP):
@@ -182,3 +198,29 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
         mock_handler.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            HealthProbeCase(path="/health"),
+            HealthProbeCase(path="/health/livez"),
+            HealthProbeCase(path="/health/readyz"),
+        ],
+        ids=lambda case: case.path,
+    )
+    async def test_a_health_probe_opens_no_window(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        health_probe_request: web.Request,
+        mock_handler: AsyncMock,
+        case: HealthProbeCase,
+    ) -> None:
+        """A probe reaches its handler without consuming the address's window."""
+        # Act
+        await middleware(health_probe_request, mock_handler)
+
+        # Assert
+        mock_handler.assert_called_once_with(health_probe_request)
+        mock_valkey_client.consume_ip_rlim_window.assert_not_called()
+        mock_valkey_client.consume_user_rlim_window.assert_not_called()
