@@ -482,10 +482,10 @@ class FieldPartialBulkGetOpsAction[TRow: Base, TData: FieldData](OpsBackendActio
 
 
 class GlobalEntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A create-or-update of a global entity; nothing is registered either way."""
+    """A create-or-update of an entity created in the global scope."""
 
     @abstractmethod
-    def to_upserter(self) -> GlobalEntityUpserter[TRow, TData]:
+    def to_upserter(self) -> EntityUpserter[TRow, TData]:
         """Return the upsert spec this action executes."""
         raise NotImplementedError
 

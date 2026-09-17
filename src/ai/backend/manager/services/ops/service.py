@@ -759,7 +759,7 @@ class FieldPartialBulkPurgeService[TData: FieldData]:
 
 
 class GlobalUpsertService[TData]:
-    """Inserts or updates a global row on conflict; nothing is registered."""
+    """Inserts or updates a row of an entity created in the global scope on conflict."""
 
     _repository: OpsRepository[TData]
 
@@ -769,9 +769,7 @@ class GlobalUpsertService[TData]:
     async def execute(
         self, action: GlobalEntityUpsertOpsAction[Any, TData]
     ) -> EntityOpsResult[TData]:
-        return EntityOpsResult(
-            data=await self._repository.upsert_global_entity(action.to_upserter())
-        )
+        return EntityOpsResult(data=await self._repository.upsert_entity(action.to_upserter()))
 
 
 class EntityUpsertService[TData]:

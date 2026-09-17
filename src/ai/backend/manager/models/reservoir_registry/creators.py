@@ -9,12 +9,16 @@ from typing import override
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ReservoirRegistryCreator(GlobalEntityCreator[ReservoirRegistryRow, ReservoirRegistryData]):
+class ReservoirRegistryCreator(
+    CreatedInGlobal[ReservoirRegistryRow],
+    EntityCreator[ReservoirRegistryRow, ReservoirRegistryData],
+):
     """Register a Reservoir registry.
 
     The node is provisioned on this row's id, and the name is read through the relation
