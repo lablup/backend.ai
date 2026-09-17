@@ -80,7 +80,7 @@ async def repository(
 async def existing_definition(
     repository: OpsRepository[AppConfigDefinitionData],
 ) -> AppConfigDefinitionData:
-    return await repository.create_global_entity(AppConfigDefinitionCreator(config_name="menu"))
+    return await repository.create_entity(AppConfigDefinitionCreator(config_name="menu"))
 
 
 @pytest.fixture
@@ -89,7 +89,7 @@ async def seeded_definitions(
 ) -> list[AppConfigDefinitionData]:
     definitions: list[AppConfigDefinitionData] = []
     for config_name in ("theme", "menu", "preferences"):
-        definition = await repository.create_global_entity(
+        definition = await repository.create_entity(
             AppConfigDefinitionCreator(config_name=config_name)
         )
         definitions.append(definition)
@@ -104,9 +104,7 @@ class TestCreateAndGet:
     async def test_create_then_get_by_id(
         self, repository: OpsRepository[AppConfigDefinitionData]
     ) -> None:
-        created = await repository.create_global_entity(
-            AppConfigDefinitionCreator(config_name="theme")
-        )
+        created = await repository.create_entity(AppConfigDefinitionCreator(config_name="theme"))
         fetched = await repository.get(AppConfigDefinitionQuerier(definition_id=created.id))
         assert fetched.id == created.id
         assert fetched.config_name == "theme"

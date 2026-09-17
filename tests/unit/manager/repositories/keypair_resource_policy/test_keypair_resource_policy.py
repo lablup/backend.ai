@@ -318,7 +318,7 @@ class TestKeypairResourcePolicyOps:
         policy_creator: KeyPairResourcePolicyCreator,
     ) -> None:
         """Test creating a new keypair resource policy with various configurations"""
-        result = await ops.create_global_entity(policy_creator)
+        result = await ops.create_entity(policy_creator)
 
         assert result.name == policy_creator.name
         assert result.default_for_unspecified == policy_creator.default_for_unspecified

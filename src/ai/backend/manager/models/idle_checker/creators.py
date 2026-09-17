@@ -34,14 +34,17 @@ from ai.backend.manager.models.idle_checker.row import (
 )
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.user.row import UserRow
 
 
 @dataclass
-class IdleCheckerCreator(GlobalEntityCreator[IdleCheckerRow, IdleCheckerData]):
+class IdleCheckerCreator(
+    CreatedInGlobal[IdleCheckerRow], EntityCreator[IdleCheckerRow, IdleCheckerData]
+):
     """Creator for an idle checker definition in the global catalog."""
 
     name: str

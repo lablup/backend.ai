@@ -10,12 +10,15 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ResourcePresetCreator(GlobalEntityCreator[ResourcePresetRow, ResourcePresetData]):
+class ResourcePresetCreator(
+    CreatedInGlobal[ResourcePresetRow], EntityCreator[ResourcePresetRow, ResourcePresetData]
+):
     """Creator for one resource preset. A preset with no resource group is global."""
 
     name: str

@@ -184,7 +184,7 @@ class TestResourceSlotTypeCreator:
             rank=7,
         )
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-            data = await w.create_global_entity(creator)
+            data = await w.create_entity(creator)
 
         assert data.slot_name == "tpu.device"
         assert data.slot_type == "unique"
@@ -201,7 +201,7 @@ class TestResourceSlotTypeCreator:
         for name in ("cpu", "mem"):
             creator = _creator(name, SlotTypes.COUNT)
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-                data = await w.create_global_entity(creator)
+                data = await w.create_entity(creator)
                 uuids.add(data.uuid)
         assert len(uuids) == 2
 
@@ -217,7 +217,7 @@ class TestResourceSlotTypeCreator:
         )
         with pytest.raises(ResourceSlotTypeAlreadyExists):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-                await w.create_global_entity(creator)
+                await w.create_entity(creator)
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(

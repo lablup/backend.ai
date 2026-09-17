@@ -19,7 +19,6 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
-    RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.purger import (
@@ -275,10 +274,10 @@ class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the global insert spec; no scope membership involved."""
+    """Carries the insert spec of an entity created in the global scope."""
 
     @abstractmethod
-    def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
+    def to_creator(self) -> EntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
@@ -296,7 +295,7 @@ class GlobalEntityWithFieldsCreateOpsAction[
     """
 
     @abstractmethod
-    def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
+    def to_creator(self) -> EntityCreator[TRow, TData]:
         """Return the insert spec for the owning row."""
         raise NotImplementedError
 
@@ -347,11 +346,11 @@ class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalRoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the role-managed entity insert spec of an entity created in no
-    scope: the row and its preset roles."""
+    """Carries the role-managed entity insert spec of an entity created in the
+    global scope: the row and its preset roles."""
 
     @abstractmethod
-    def to_creator(self) -> RoleManagedGlobalEntityCreator[TRow, TData]:
+    def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
@@ -500,11 +499,11 @@ class EntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalEntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A create-or-update of several global rows at once, atomically; each node stays
-    provisioned, and none belongs under another scope."""
+    """A create-or-update of several global rows at once, atomically; each row stays
+    provisioned in the scopes it is created in."""
 
     @abstractmethod
-    def to_upserters(self) -> Sequence[GlobalEntityUpserter[TRow, TData]]:
+    def to_upserters(self) -> Sequence[EntityUpserter[TRow, TData]]:
         """Return one upsert spec per row this action writes."""
         raise NotImplementedError
 

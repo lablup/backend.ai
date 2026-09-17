@@ -188,7 +188,7 @@ class TestPrometheusQueryPresetRepository:
             group_labels=group_labels,
         )
 
-        result = await preset_ops.create_global_entity(creator)
+        result = await preset_ops.create_entity(creator)
 
         assert isinstance(result, PrometheusQueryPresetData)
         assert result.name == name
