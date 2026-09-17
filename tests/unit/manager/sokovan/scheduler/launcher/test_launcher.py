@@ -15,16 +15,9 @@ from uuid import UUID
 
 import pytest
 
-<<<<<<< HEAD
+from ai.backend.common.types import AutoPullBehavior
 from ai.backend.manager.sokovan.data import (
     ImageConfigData,
-=======
-from ai.backend.common.types import AutoPullBehavior
-from ai.backend.manager.sokovan.recorder import RecorderContext
-from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
-from ai.backend.manager.views.sokovan.image import ImageConfigData
-from ai.backend.manager.views.sokovan.lifecycle import (
->>>>>>> 8a38933b (fix(BA-7884): pass the configured auto_pull behavior to kernel creation (#14616))
     SessionDataForPull,
     SessionDataForStart,
 )
