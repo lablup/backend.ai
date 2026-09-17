@@ -395,7 +395,10 @@ async def client_registry(dataplane_config: DataplaneConfig) -> AsyncIterator[V2
     # V2ClientRegistry, not BackendAIClientRegistry: the latter's `.session` is the v1 client,
     # which has no enqueue/terminate at all. The difference is invisible until the first live run.
     registry = await V2ClientRegistry.create(
-        ClientConfig(endpoint=yarl.URL(dataplane_config.manager_endpoint)),
+        # A bounded read: the default is none, and one manager request that never answers held a
+        # nine-hour run in an idle wait with nothing to report. A bound turns that into a failure
+        # that names the call.
+        ClientConfig(endpoint=yarl.URL(dataplane_config.manager_endpoint), read_timeout=120.0),
         HMACAuth(
             access_key=dataplane_config.access_key,
             secret_key=dataplane_config.secret_key,
