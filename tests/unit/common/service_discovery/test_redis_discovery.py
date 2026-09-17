@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     _DEFAULT_TTL,
     RedisServiceDiscovery,
@@ -272,6 +273,17 @@ async def test_redis_sync_model_service_routes_multiple(
     assert len(services) == 3
     service_names = {s.display_name for s in services}
     assert service_names == {"vllm-0", "vllm-1", "tgi-0"}
+
+
+@pytest.fixture
+def replica_route() -> ModelServiceMetadata:
+    """A model-service route whose id is the UUID subclass the repository returns."""
+    return ModelServiceMetadata(
+        route_id=ReplicaID(uuid.uuid4()),
+        model_service_name="vllm-0",
+        host="10.0.1.50",
+        port=8080,
+    )
 
 
 async def test_redis_sync_model_service_routes_replica_id(

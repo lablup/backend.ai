@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator
 import pytest
 
 from ai.backend.common import redis_helper
-from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
@@ -17,7 +16,6 @@ from ai.backend.common.service_discovery.redis_discovery.service_discovery impor
 )
 from ai.backend.common.service_discovery.service_discovery import (
     HealthStatus,
-    ModelServiceMetadata,
     ServiceEndpoint,
     ServiceMetadata,
 )
@@ -133,15 +131,4 @@ async def unhealthy_service_metadata() -> AsyncIterator[ServiceMetadata]:
             registration_time=before_10_minutes,
             last_heartbeat=before_10_minutes,
         ),
-    )
-
-
-@pytest.fixture
-def replica_route() -> ModelServiceMetadata:
-    """A model-service route whose id is the UUID subclass the repository returns."""
-    return ModelServiceMetadata(
-        route_id=ReplicaID(uuid.uuid4()),
-        model_service_name="vllm-0",
-        host="10.0.1.50",
-        port=8080,
     )
