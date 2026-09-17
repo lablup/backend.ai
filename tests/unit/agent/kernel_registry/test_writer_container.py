@@ -112,6 +112,35 @@ class TestSaveKernelRegistry:
             # Should not raise, just skip the kernel
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
+    async def test_a_kernel_created_while_saving_does_not_break_the_save(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
+        mock_config_mgr: MagicMock,
+    ) -> None:
+        """The save awaits once per kernel over the LIVE registry, and a create on this node
+        registers its kernel in between. Measured with 27 sessions started at once: one create
+        failed on `dictionary changed size during iteration`, in its own save."""
+        registered_meanwhile = KernelId(uuid.uuid4())
+
+        async def _register_while_saving(_data: object) -> None:
+            kernel_registry_data[registered_meanwhile] = mock_kernel
+
+        mock_config_mgr.save_json_recovery_data = AsyncMock(side_effect=_register_while_saving)
+        with (
+            patch.object(writer, "_parse_recovery_data_from_kernel", return_value=MagicMock()),
+            patch("ai.backend.agent.kernel_registry.writer.container.KernelRecoveryScratchData"),
+            patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
+            patch(
+                "ai.backend.agent.kernel_registry.writer.container.ScratchConfig",
+                return_value=mock_config_mgr,
+            ),
+        ):
+            await writer.save_kernel_registry(kernel_registry_data, metadata)
+        assert registered_meanwhile in kernel_registry_data
+
     async def test_a_kernel_it_cannot_write_down_is_raised_not_skipped(
         self,
         writer: ContainerBasedKernelRegistryWriter,
