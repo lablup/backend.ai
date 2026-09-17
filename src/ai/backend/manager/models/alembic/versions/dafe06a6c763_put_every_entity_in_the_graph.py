@@ -131,7 +131,7 @@ RELATION_SOURCES: Final[tuple[tuple[str, str], ...]] = (
 _READ: Final = 1
 _PERMISSION_BITS: Final = (1, 2, 4, 8, 16)
 _MAX_ROLE_NAME_LENGTH: Final = 64
-_PROJECT_ADMIN_PRESET_ID: Final = "22c4db03-24aa-5ff8-b5a9-64b2a2182413"
+PROJECT_ADMIN_PRESET_ID: Final = "22c4db03-24aa-5ff8-b5a9-64b2a2182413"
 
 _ADD_SELF_MEMBERSHIPS: Final = sa.text("""
     INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
@@ -410,7 +410,7 @@ def _add_preset_roles(conn: sa.Connection) -> None:
 def _grant_roles(conn: sa.Connection) -> None:
     conn.execute(_GRANT_USER_AND_DOMAIN_ROLES)
     conn.execute(_GRANT_PROJECT_ROLES)
-    conn.execute(_GRANT_CREATOR_ROLES, {"preset_id": _PROJECT_ADMIN_PRESET_ID})
+    conn.execute(_GRANT_CREATOR_ROLES, {"preset_id": PROJECT_ADMIN_PRESET_ID})
 
 
 def put_every_entity_in_the_graph(conn: sa.Connection) -> None:
