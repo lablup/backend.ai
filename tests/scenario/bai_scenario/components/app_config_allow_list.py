@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.app_config import UNREGISTERED
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
@@ -38,6 +39,18 @@ from bai_scenario.seeds.domain.domain import SeedDomain
 
 def _who(role: UserRole) -> str:
     return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "권한이 없는 일반 사용자 한 명"
+
+
+def in_page_order(
+    entries: tuple[AppConfigAllowListData, ...],
+) -> tuple[AppConfigAllowListData, ...]:
+    """검색이 페이지를 끊는 순서. 생성 시각 내림차순이고, 같으면 ID 오름차순이다.
+
+    한 전제에 심긴 행은 생성 시각이 모두 같으므로 ID가 순서를 정한다.
+    """
+    ordered = sorted(entries, key=lambda one: one.id)
+    ordered.sort(key=lambda one: one.created_at, reverse=True)
+    return tuple(ordered)
 
 
 @dataclass(frozen=True)
@@ -257,4 +270,32 @@ class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowList
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
+    """커서가 가리킨 allow_list 바로 다음 하나만 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "커서 다음 allow_list 하나가 오고 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def look(
+        self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        ordered = in_page_order(laid.laid)
+        return [
+            Held[tuple[UUID, ...]](
+                "items",
+                tuple(one.id for one in payload.items),
+                SameAs[tuple[UUID, ...]]((ordered[1].id,), "커서 다음 allow_list 하나"),
+            ),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, True),
+            Same("has_previous_page", payload.has_previous_page, True),
         ]

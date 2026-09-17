@@ -1,4 +1,4 @@
-"""allow_list 검색 — 슈퍼관리자 검사를 확인한다."""
+"""allow_list 검색 — 슈퍼관리자 검사와 커서 다음 페이지를 확인한다."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     SearchAppConfigAllowListPayload,
 )
+from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
@@ -26,6 +27,8 @@ from bai_scenario.components.app_config_allow_list import (
     EntriesLaidAcross,
     EveryLaidEntryIsFound,
     ManyEntriesAndACaller,
+    TheEntryAfterTheCursorIsFound,
+    in_page_order,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -58,6 +61,29 @@ class SearchingEverything(When[ManyEntriesAndACaller, AppConfigAllowListAdapter,
 
 
 @dataclass(frozen=True)
+class SearchingAfterTheFirst(When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]):
+    """기본 순서의 첫 항목을 가리키는 커서 뒤로 한 건을 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: ManyEntriesAndACaller) -> str:
+        return f"{laid.caller.username}이 기본 순서 첫 항목의 커서 뒤로 한 건 검색"
+
+    @override
+    async def call(
+        self, adapter: AppConfigAllowListAdapter, laid: ManyEntriesAndACaller
+    ) -> Searched:
+        ordered = in_page_order(laid.laid)
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                SearchAppConfigAllowListInput(first=1, after=encode_cursor(ordered[0].id))
+            )
+
+
+@dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
     Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
@@ -87,6 +113,31 @@ class TheSuperadminCountsEveryOne(
 
 
 @dataclass(frozen=True)
+class AForwardCursorAnswersTheNextOne(
+    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-forward-cursor-answers-the-one-right-after-it"
+
+    @override
+    def describe(self) -> str:
+        return "생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+        return EntriesLaidAcross(names=4, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]:
+        return SearchingAfterTheFirst()
+
+    @override
+    def then(self) -> Then[ManyEntriesAndACaller, Searched]:
+        return TheEntryAfterTheCursorIsFound()
+
+
+@dataclass(frozen=True)
 class APlainUserMayNotSearch(
     Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
@@ -113,6 +164,7 @@ class APlainUserMayNotSearch(
 
 SCENARIOS: list[SearchingStep] = [
     TheSuperadminCountsEveryOne(),
+    AForwardCursorAnswersTheNextOne(),
     APlainUserMayNotSearch(),
 ]
 
