@@ -55,3 +55,35 @@ class SeedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
             max_quota_scope_size=self.max_quota_scope_size,
             max_network_count=self.max_network_count,
         )
+
+
+@dataclass(frozen=True)
+class SeedNamedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
+    """A project policy under a name of its own. No personal project looks for it, so a
+    scenario that reads, edits or purges a project policy targets this one."""
+
+    name_hint: str = "project-policy"
+    max_vfolder_count: int = 10
+    max_quota_scope_size: int = -1
+    max_network_count: int = 3
+
+    @override
+    def kind(self) -> str:
+        return "프로젝트 정책"
+
+    @override
+    def detail(self) -> str:
+        return f"프로젝트 하나당 폴더 {self.max_vfolder_count}개까지"
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(self, name: str) -> ProjectResourcePolicyCreator:
+        return ProjectResourcePolicyCreator(
+            name=name,
+            max_vfolder_count=self.max_vfolder_count,
+            max_quota_scope_size=self.max_quota_scope_size,
+            max_network_count=self.max_network_count,
+        )
