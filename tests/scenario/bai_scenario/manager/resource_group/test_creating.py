@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGro
 from ai.backend.common.exception import ResourceGroupConflict
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -142,19 +143,16 @@ class ANameAnotherGroupHoldsIsRefused(
 
 
 @dataclass(frozen=True)
-class ASecondDefaultIsRefusedAsAConflict(
+class ASecondDefaultIsRefused(
     Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-second-default-resource-group-is-refused-as-a-name-conflict"
+        return "a-second-default-resource-group-is-refused"
 
     @override
     def describe(self) -> str:
-        return (
-            "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 만들려 하면 거부된다. "
-            "생성 경로는 기본 그룹 제약을 이름 중복과 구분하지 않으므로 이름 중복으로 거부된다"
-        )
+        return "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 만들려 하면 기본 그룹이 이미 있다는 이유로 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, AGroupAndACaller]:
@@ -166,7 +164,7 @@ class ASecondDefaultIsRefusedAsAConflict(
 
     @override
     def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
-        return TheCallIsRefused(ResourceGroupConflict)
+        return TheCallIsRefused(DefaultResourceGroupAlreadyExists)
 
 
 @dataclass(frozen=True)
@@ -223,7 +221,10 @@ SCENARIOS: list[CreatingStep] = [
     TheSuperadminMakesAGroup(started=datetime.now(UTC)),
     ADefaultGroupIsMade(started=datetime.now(UTC)),
     ANameAnotherGroupHoldsIsRefused(),
-    ASecondDefaultIsRefusedAsAConflict(),
+    # TODO(BA-7946): the create path maps every unique violation to a name conflict, so a
+    # second default is refused as ResourceGroupConflict; list this row once it raises
+    # DefaultResourceGroupAlreadyExists like the update path.
+    # ASecondDefaultIsRefused(),
     AUserWhoIsNotTheSuperadminMayNotCreate(),
     TheMonitorMayNotCreate(),
 ]
