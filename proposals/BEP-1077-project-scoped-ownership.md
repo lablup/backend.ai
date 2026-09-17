@@ -428,7 +428,7 @@ Service logic assumes the singletons always exist.
 
 | Layer | Role |
 |---|---|
-| DB | Inserted by migration. Deletion-guard triggers on `global_entities` rows and the singleton virtual entity nodes |
+| DB | Inserted by migration. No deletion-guard trigger; `models/AGENTS.md` states that `global_entities` rows and the singleton virtual entity nodes are never deleted |
 | ops | Singleton nodes are found or the call fails. No creation path creates a singleton implicitly |
 | Manager startup | Loading the id cache also checks that both rows and nodes exist. If not, startup fails and points to the recovery command |
 | Recovery | `mgr permissions provision` reconciles rows, nodes, memberships, relations, and preset roles from the enum. If a new id is generated, restart the manager |
