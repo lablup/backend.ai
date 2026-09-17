@@ -26,8 +26,8 @@ status: draft
 
 | 호출 | 검사 | 통과하는 호출자 | 거부 예외 |
 |---|---|---|---|
-| `admin_upsert` | 전역 역할 | 슈퍼관리자 | `InsufficientPrivilege` |
-| `admin_search` | 전역 역할 | 슈퍼관리자, 모니터 | `InsufficientPrivilege` |
+| `admin_upsert` | 슈퍼관리자 여부 | 슈퍼관리자 | `InsufficientPrivilege` |
+| `admin_search` | 슈퍼관리자 여부 | 슈퍼관리자, 모니터 | `InsufficientPrivilege` |
 | `admin_purge` | 그 정책에 대한 엔티티 권한 | 슈퍼관리자 | `NotEnoughPermission` |
 
 정책은 어느 스코프에도 속하지 않으므로 `admin_purge`의 엔티티 권한을 부여받을 방법이 없다. 그래서
@@ -43,9 +43,9 @@ status: draft
 | `mode`에 어떤 값을 보내도 그대로 저장된다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `mode`를 `none`, `truncate`, `drop` 중 하나로 보낸다 (값마다 따로 실행) | 응답 노드의 `mode`가 보낸 값과 같다 |
 | 이미 정책이 있는 `target_type`에 다시 upsert한다 | `target_type`이 `default`인 `truncate` 정책이 있다. 호출자는 슈퍼관리자 | 같은 `target_type=default`에 `mode=drop` | 새 행이 생기지 않는다. 기존 행의 `id`는 그대로이고 `mode`만 `drop`으로 바뀐다 |
 | prefix가 저장된 정책에 prefix 없이 다시 upsert한다 | `target_type`이 `default`이고 `ipv4_prefix=24`, `ipv6_prefix=48`이 저장된 정책이 있다. 호출자는 슈퍼관리자 | `target_type`과 `mode`만 보낸다 | 저장돼 있던 `ipv4_prefix`·`ipv6_prefix`가 null이 된다 |
-| 일반 사용자가 upsert한다 | 호출자에게 전역 역할이 없다 | upsert | `InsufficientPrivilege`로 거부 |
+| 일반 사용자가 upsert한다 | 호출자는 슈퍼관리자가 아니다 | upsert | `InsufficientPrivilege`로 거부 |
 | 모니터 역할이 upsert한다 | 호출자가 `MONITOR` 역할 | upsert | `InsufficientPrivilege`로 거부 |
-| 권한 검사를 꺼도 일반 사용자는 upsert할 수 없다 | 권한 검사 비활성화. 호출자에게 전역 역할이 없다 | upsert | `InsufficientPrivilege`로 거부 |
+| 권한 검사를 꺼도 일반 사용자는 upsert할 수 없다 | 권한 검사 비활성화. 호출자는 슈퍼관리자가 아니다 | upsert | `InsufficientPrivilege`로 거부 |
 
 upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 바꾼다. 그래서 요청에서 생략한
 `ipv4_prefix`·`ipv6_prefix`는 저장돼 있던 값이 있어도 null이 된다. 부분 수정처럼 보여 오해하기 쉬운
@@ -66,12 +66,12 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 | `target_type` 필터로 조회한다 | `target_type`이 `default`, `login_history`, `audit_logs`인 정책이 모두 있다. 호출자는 슈퍼관리자 | `target_type=default` 필터로 조회 | `target_type`이 `default`인 정책 하나만 반환된다 |
 | `mode` 필터로 조회한다 | `truncate` 정책 둘(`default`, `audit_logs`)과 `drop` 정책 하나(`login_history`)가 있다. 호출자는 슈퍼관리자 | `mode=truncate` 필터로 조회 | `truncate` 정책 둘만 반환된다 |
 | 모니터 역할이 전체를 조회한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 `MONITOR` 역할 | 필터 없이 조회 | 슈퍼관리자와 같은 응답. 둘 다 반환된다 |
-| 일반 사용자가 조회한다 | 호출자에게 전역 역할이 없다 | 필터 없이 조회 | `InsufficientPrivilege`로 거부 |
+| 일반 사용자가 조회한다 | 호출자는 슈퍼관리자가 아니다 | 필터 없이 조회 | `InsufficientPrivilege`로 거부 |
 
 `target_type`이 `default`, `login_history`, `audit_logs` 셋뿐이라 정책 행도 셋을 넘지 못한다. 그래서 페이지 크기보다 많은 건수를 만들어
 다음 페이지를 확인하는 시나리오는 둘 수 없다.
 
-모니터 역할은 전역 역할 검사에서 읽기 호출만 통과한다. "모니터 역할이 전체를 조회한다"(통과)와
+모니터 역할은 슈퍼관리자 검사에서 읽기 호출만 통과한다. "모니터 역할이 전체를 조회한다"(통과)와
 "모니터 역할이 upsert한다"(거부)가 그 차이를 보여 준다.
 
 ## 완전 삭제 (`admin_purge`)
