@@ -6,13 +6,21 @@ import copy
 import importlib
 import pickle
 import pkgutil
+from typing import override
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
 import ai.backend.common.data.entity as entity_package
 from ai.backend.common.data.entity.agent import AgentEntityType
-from ai.backend.common.data.entity.types import DanglingFieldType, EntityType, FieldType
+from ai.backend.common.data.entity.types import (
+    DanglingFieldType,
+    DeclaredEntityType,
+    EntityType,
+    FieldType,
+)
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.exception import DuplicateEntityTypeName
 
 
 def _subclasses[T: type](base: T) -> list[T]:
@@ -72,3 +80,30 @@ def test_value_rebuilt_from_a_string_is_a_bare_base() -> None:
     assert type(pickle.loads(pickle.dumps(rebuilt))) is EntityType
     with pytest.raises(NotImplementedError):
         rebuilt.name()
+
+
+@pytest.mark.parametrize("value", ["vfolder", "VFOLDER", "Vfolder"])
+def test_declared_entity_type_accepts_a_declared_name_ignoring_case(value: str) -> None:
+    resolved = TypeAdapter(DeclaredEntityType).validate_python(value)
+    assert type(resolved) is VFolderEntityType
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["model_deployment", "vfolder:data", "deployment:token", "storage_host", "routing"],
+)
+def test_declared_entity_type_refuses_an_undeclared_name(value: str) -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(DeclaredEntityType).validate_python(value)
+
+
+def test_kind_differing_from_a_registered_name_only_in_case_is_refused() -> None:
+    with pytest.raises(DuplicateEntityTypeName):
+
+        class UpperVFolderEntityType(EntityType):
+            __module__ = f"{entity_package.__name__}.fake"
+
+            @override
+            @classmethod
+            def name(cls) -> str:
+                return "VFOLDER"

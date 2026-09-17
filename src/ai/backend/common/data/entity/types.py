@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import importlib
+import pkgutil
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, Self, override
+from typing import Annotated, Any, ClassVar, Self, override
 from uuid import UUID
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
+
+import ai.backend.common.data.entity as entity_package
+from ai.backend.common.exception import DuplicateEntityTypeName
 
 
 class EntityType(str):
@@ -22,6 +27,21 @@ class EntityType(str):
     or `description()`. Reserved for a boundary that reads one -- a row column, a
     legacy action, an RBAC element -- and written nowhere else.
     """
+
+    _declared: ClassVar[dict[str, type[EntityType]]] = {}
+
+    @override
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Registers a kind of the entity package by its lowercased name. A kind whose
+        name differs from a registered one only in case is refused."""
+        super().__init_subclass__(**kwargs)
+        if not cls.__module__.startswith(f"{entity_package.__name__}."):
+            return
+        key = cls.name().lower()
+        registered = EntityType._declared.get(key)
+        if registered is not None:
+            raise DuplicateEntityTypeName(extra_msg=f"{registered.name()}, {cls.name()}")
+        EntityType._declared[key] = cls
 
     def __new__(cls, value: str | None = None) -> Self:
         """A kind is built with no argument. Passing a value rebuilds the bare base from
@@ -56,6 +76,12 @@ class EntityType(str):
         return EntityType(name)
 
     @classmethod
+    def declared_kind(cls, name: str) -> type[EntityType] | None:
+        """The registered kind answering to ``name`` ignoring case. Only kinds whose
+        modules are imported are registered."""
+        return EntityType._declared.get(name.lower())
+
+    @classmethod
     def kinds(cls) -> Iterator[type[EntityType]]:
         """Every kind declared under this one, in whatever this build has imported."""
         for kind in cls.__subclasses__():
@@ -74,6 +100,28 @@ class EntityType(str):
         return core_schema.no_info_after_validator_function(
             lambda _: cls(), core_schema.literal_schema([cls.name()])
         )
+
+
+class DeclaredEntityTypeSchema:
+    """Validates a request's entity type: a kind of the entity package, matched by name
+    ignoring case. Every module of the package is imported when the schema is built."""
+
+    def __get_pydantic_core_schema__(
+        self, source: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        for module in pkgutil.iter_modules(entity_package.__path__):
+            importlib.import_module(f"{entity_package.__name__}.{module.name}")
+        return core_schema.no_info_after_validator_function(self._resolve, core_schema.str_schema())
+
+    def _resolve(self, value: str) -> EntityType:
+        kind = EntityType.declared_kind(value)
+        if kind is None:
+            raise ValueError(f"Unknown entity type: {value!r}")
+        return kind()
+
+
+DeclaredEntityType = Annotated[EntityType, DeclaredEntityTypeSchema()]
+"""An entity type a request names. Only a declared kind is accepted, ignoring case."""
 
 
 class GlobalEntityType(EntityType):
