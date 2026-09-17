@@ -8,7 +8,7 @@ Not exercised by any scenario: admin_create_keypair_resource_policy, admin_creat
 
 #### [a-monitor-may-not-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
 
-모니터 역할 사용자가 프로젝트 정책을 생성하려 하면 역할 부족으로 거부된다. 역할 검사는 모니터에게 읽기만 허용한다
+모니터 역할 사용자가 프로젝트 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다
 
 Given
 
@@ -478,7 +478,7 @@ Then
 
 #### [a-monitor-finds-every-project-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
 
-모니터 역할 사용자가 프로젝트 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 역할 검사가 읽기는 모니터에게도 허용하기 때문이다
+모니터 역할 사용자가 프로젝트 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다
 
 Given
 
