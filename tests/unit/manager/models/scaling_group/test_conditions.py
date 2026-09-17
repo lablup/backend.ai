@@ -21,6 +21,11 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+<<<<<<< HEAD:tests/unit/manager/models/scaling_group/test_conditions.py
+=======
+from ai.backend.manager.models.resource_group import ResourceGroupRow
+from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734)):tests/unit/manager/models/resource_group/test_conditions.py
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -76,6 +81,7 @@ async def db_with_tables(
         yield database_connection
 
 
+<<<<<<< HEAD:tests/unit/manager/models/scaling_group/test_conditions.py
 class TestScalingGroupConditionsCursor:
     """Tests for cursor-related conditions in ScalingGroupConditions."""
 
@@ -138,6 +144,8 @@ class TestScalingGroupConditionsCursor:
         )
 
 
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734)):tests/unit/manager/models/resource_group/test_conditions.py
 class TestScalingGroupOrdersCursor:
     """Tests for cursor-related orders in ScalingGroupOrders."""
 

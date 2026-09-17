@@ -9,7 +9,11 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+<<<<<<< HEAD
 import sqlalchemy as sa
+=======
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -212,9 +216,7 @@ from ai.backend.manager.models.endpoint.orders import (
 )
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-    ALLOCATED_SLOT_REVISION_TIEBREAKER,
     resolve_allocated_slot_revision_order,
 )
 from ai.backend.manager.models.routing import RoutingRow
@@ -343,20 +345,14 @@ def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
 def _get_deployment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DeploymentOrders.created_at(ascending=False),
-        backward_order=DeploymentOrders.created_at(ascending=True),
-        forward_condition_factory=DeploymentConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentConditions.by_cursor_backward,
-        tiebreaker_order=EndpointRow.id.asc(),
+        cursor_column=EndpointRow.id,
     )
 
 
 def _get_deployment_policy_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DeploymentPolicyRow.created_at.desc(),
-        backward_order=DeploymentPolicyRow.created_at.asc(),
-        forward_condition_factory=DeploymentConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentPolicyRow.id.asc(),
+        cursor_column=DeploymentPolicyRow.id,
     )
 
 
@@ -364,10 +360,7 @@ def _get_deployment_policy_pagination_spec() -> PaginationSpec:
 def _get_revision_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RevisionOrders.created_at(ascending=False),
-        backward_order=RevisionOrders.created_at(ascending=True),
-        forward_condition_factory=RevisionConditions.by_cursor_forward,
-        backward_condition_factory=RevisionConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentRevisionRow.id.asc(),
+        cursor_column=DeploymentRevisionRow.id,
     )
 
 
@@ -375,10 +368,7 @@ def _get_revision_pagination_spec() -> PaginationSpec:
 def _get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RouteOrders.created_at(ascending=False),
-        backward_order=RouteOrders.created_at(ascending=True),
-        forward_condition_factory=RouteConditions.by_cursor_forward,
-        backward_condition_factory=RouteConditions.by_cursor_backward,
-        tiebreaker_order=RoutingRow.id.asc(),
+        cursor_column=RoutingRow.id,
     )
 
 
@@ -386,10 +376,7 @@ def _get_route_pagination_spec() -> PaginationSpec:
 def _get_access_token_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AccessTokenOrders.created_at(ascending=False),
-        backward_order=AccessTokenOrders.created_at(ascending=True),
-        forward_condition_factory=AccessTokenConditions.by_cursor_forward,
-        backward_condition_factory=AccessTokenConditions.by_cursor_backward,
-        tiebreaker_order=EndpointTokenRow.id.asc(),
+        cursor_column=EndpointTokenRow.id,
     )
 
 
@@ -397,10 +384,7 @@ def _get_access_token_pagination_spec() -> PaginationSpec:
 def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AutoScalingRuleOrders.created_at(ascending=False),
-        backward_order=AutoScalingRuleOrders.created_at(ascending=True),
-        forward_condition_factory=AutoScalingRuleConditions.by_cursor_forward,
-        backward_condition_factory=AutoScalingRuleConditions.by_cursor_backward,
-        tiebreaker_order=EndpointAutoScalingRuleRow.id.asc(),
+        cursor_column=EndpointAutoScalingRuleRow.id,
     )
 
 
@@ -408,10 +392,7 @@ def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
 def _get_replica_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RouteOrders.created_at(ascending=False),
-        backward_order=RouteOrders.created_at(ascending=True),
-        forward_condition_factory=RouteConditions.by_cursor_forward,
-        backward_condition_factory=RouteConditions.by_cursor_backward,
-        tiebreaker_order=RoutingRow.id.asc(),
+        cursor_column=RoutingRow.id,
     )
 
 
@@ -419,10 +400,7 @@ def _get_replica_pagination_spec() -> PaginationSpec:
 def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
-        forward_condition_factory=RevisionResourceSlotConditions.by_cursor_forward,
-        backward_condition_factory=RevisionResourceSlotConditions.by_cursor_backward,
-        tiebreaker_order=ALLOCATED_SLOT_REVISION_TIEBREAKER,
+        cursor_column=DeploymentRevisionResourceSlotRow.id,
     )
 
 

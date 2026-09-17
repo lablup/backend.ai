@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -10,10 +11,16 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
+=======
+from typing import TYPE_CHECKING, Any, TypeVar
+
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck as IntegrityErrorCheck
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
+<<<<<<< HEAD
     from ai.backend.manager.errors.repository import RepositoryIntegrityError
 
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
@@ -69,6 +76,8 @@ type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.Col
 # Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
 type CursorConditionFactory = Callable[[str], QueryCondition]
 
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 TRow = TypeVar("TRow", bound="Row[Any]")
 
 

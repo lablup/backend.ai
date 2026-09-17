@@ -5,6 +5,7 @@ Response DTOs for resource policy DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -14,6 +15,7 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
     VFolderHostPermissionEntryInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import DefaultForUnspecified
 
@@ -37,6 +39,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
     """Node model representing a keypair resource policy entity."""
 
     id: str = Field(description="Policy name (primary key).")
+    entity_id: UUID = Field(description=f"UUID of the policy. Added in {NEXT_RELEASE_VERSION}.")
     name: str = Field(description="Unique name of the keypair resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -102,6 +105,7 @@ class UserResourcePolicyNode(BaseResponseModel):
     """Node model representing a user resource policy entity."""
 
     id: str = Field(description="Policy name (primary key).")
+    entity_id: UUID = Field(description=f"UUID of the policy. Added in {NEXT_RELEASE_VERSION}.")
     name: str = Field(description="Unique name of the user resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -155,6 +159,7 @@ class ProjectResourcePolicyNode(BaseResponseModel):
     """Node model representing a project resource policy entity."""
 
     id: str = Field(description="Policy name (primary key).")
+    entity_id: UUID = Field(description=f"UUID of the policy. Added in {NEXT_RELEASE_VERSION}.")
     name: str = Field(description="Unique name of the project resource policy.")
     created_at: datetime | None = Field(
         default=None,

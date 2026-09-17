@@ -289,6 +289,7 @@ class AuditLogConditions:
 
     by_triggered_by_in = staticmethod(make_string_in_factory(AuditLogRow.triggered_by))
 
+<<<<<<< HEAD
     # --- cursor pagination conditions ---
 
     @staticmethod
@@ -300,10 +301,22 @@ class AuditLogConditions:
                 .scalar_subquery()
             )
             return AuditLogRow.created_at < subquery
+=======
+    # --- acted_as UUID filters ---
+
+    @staticmethod
+    def by_acted_as_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AuditLogRow.acted_as == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
         return inner
 
     @staticmethod
+<<<<<<< HEAD
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
@@ -312,6 +325,14 @@ class AuditLogConditions:
                 .scalar_subquery()
             )
             return AuditLogRow.created_at > subquery
+=======
+    def by_acted_as_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AuditLogRow.acted_as.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
         return inner
 

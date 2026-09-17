@@ -34,25 +34,40 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SubStepResult,
 )
+<<<<<<< HEAD
+=======
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.replica_group_history.conditions import (
+    ReplicaGroupHistoryConditions,
+)
+from ai.backend.manager.models.replica_group_history.orders import (
+    REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
+    resolve_replica_group_order,
+)
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
 from ai.backend.manager.models.scheduling_history.orders import (
-    DEPLOYMENT_DEFAULT_BACKWARD_ORDER,
     DEPLOYMENT_DEFAULT_FORWARD_ORDER,
+<<<<<<< HEAD
     DEPLOYMENT_TIEBREAKER_ORDER,
     ROUTE_DEFAULT_BACKWARD_ORDER,
+=======
+    KERNEL_DEFAULT_FORWARD_ORDER,
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
     ROUTE_DEFAULT_FORWARD_ORDER,
-    ROUTE_TIEBREAKER_ORDER,
-    SESSION_DEFAULT_BACKWARD_ORDER,
     SESSION_DEFAULT_FORWARD_ORDER,
-    SESSION_TIEBREAKER_ORDER,
     resolve_deployment_order,
     resolve_route_order,
     resolve_session_order,
 )
+<<<<<<< HEAD
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -60,6 +75,18 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
+=======
+from ai.backend.manager.models.scheduling_history.row import (
+    DeploymentHistoryRow,
+    KernelSchedulingHistoryRow,
+    RouteHistoryRow,
+    SessionSchedulingHistoryRow,
+)
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentHistoryOperationScope,
+    RouteHistoryOperationScope,
+    SessionSchedulingHistoryOperationScope,
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 )
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
@@ -87,26 +114,33 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_scope
 
 _SESSION_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=SESSION_DEFAULT_FORWARD_ORDER,
-    backward_order=SESSION_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_forward,
-    backward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_backward,
-    tiebreaker_order=SESSION_TIEBREAKER_ORDER,
+    cursor_column=SessionSchedulingHistoryRow.id,
 )
 
+<<<<<<< HEAD
+=======
+_KERNEL_HISTORY_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
+    cursor_column=KernelSchedulingHistoryRow.id,
+)
+
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 _DEPLOYMENT_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEPLOYMENT_DEFAULT_FORWARD_ORDER,
-    backward_order=DEPLOYMENT_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=DeploymentHistoryConditions.by_cursor_forward,
-    backward_condition_factory=DeploymentHistoryConditions.by_cursor_backward,
-    tiebreaker_order=DEPLOYMENT_TIEBREAKER_ORDER,
+    cursor_column=DeploymentHistoryRow.id,
 )
 
+<<<<<<< HEAD
+=======
+_REPLICA_GROUP_HISTORY_PAGINATION_SPEC = PaginationSpec(
+    forward_order=REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
+    cursor_column=ReplicaGroupHistoryRow.id,
+)
+
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=ROUTE_DEFAULT_FORWARD_ORDER,
-    backward_order=ROUTE_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=RouteHistoryConditions.by_cursor_forward,
-    backward_condition_factory=RouteHistoryConditions.by_cursor_backward,
-    tiebreaker_order=ROUTE_TIEBREAKER_ORDER,
+    cursor_column=RouteHistoryRow.id,
 )
 
 

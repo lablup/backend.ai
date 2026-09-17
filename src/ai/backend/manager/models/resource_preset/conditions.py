@@ -125,6 +125,7 @@ class ResourcePresetConditions:
     by_resource_group_name_in = staticmethod(
         make_string_in_factory(ResourcePresetRow.scaling_group_name)
     )
+<<<<<<< HEAD
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -143,3 +144,5 @@ class ResourcePresetConditions:
             return ResourcePresetRow.id > sa.text(f"'{cursor_id}'::uuid")
 
         return inner
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))

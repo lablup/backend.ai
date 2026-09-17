@@ -78,6 +78,7 @@ class RuntimeVariantConditions:
             return RuntimeVariantRow.id.in_(ids)
 
         return inner
+<<<<<<< HEAD
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -92,3 +93,5 @@ class RuntimeVariantConditions:
             return RuntimeVariantRow.id > sa.text(f"'{cursor_id}'::uuid")
 
         return inner
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
-from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -260,6 +259,7 @@ class GroupConditions:
 
         return inner
 
+<<<<<<< HEAD:src/ai/backend/manager/models/group/conditions.py
     # ==================== Cursor Pagination ====================
 
     @staticmethod
@@ -292,6 +292,8 @@ class GroupConditions:
 
         return inner
 
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734)):src/ai/backend/manager/models/project/conditions.py
     # ==================== Domain Nested Filters ====================
 
     @staticmethod

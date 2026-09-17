@@ -121,6 +121,7 @@ class DeploymentRevisionPresetConditions:
         return inner
 
     @staticmethod
+<<<<<<< HEAD
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DeploymentRevisionPresetRow.id < sa.text(f"'{cursor_id}'::uuid")
@@ -131,5 +132,39 @@ class DeploymentRevisionPresetConditions:
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DeploymentRevisionPresetRow.id > sa.text(f"'{cursor_id}'::uuid")
+=======
+    def satisfying_model_card(model_card_id: ModelCardID) -> QueryCondition:
+        """Presets meeting every minimum slot quantity the card requires.
+
+        Relational division: a preset qualifies iff no required slot lacks a
+        preset_resource_slots row whose quantity meets the minimum. Both EXISTS
+        clauses correlate against the outer preset (and the outer requirement),
+        without which SQLAlchemy aliases the inner FROM and the predicates
+        degenerate into Cartesian matches that accept every preset.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            drp = DeploymentRevisionPresetRow.__table__
+            mcr = ModelCardResourceRequirementRow.__table__
+            prs = PresetResourceSlotRow.__table__
+            return ~sa.exists(
+                sa.select(sa.literal(1))
+                .select_from(mcr)
+                .correlate(drp)
+                .where(
+                    mcr.c.model_card_id == model_card_id,
+                    ~sa.exists(
+                        sa.select(sa.literal(1))
+                        .select_from(prs)
+                        .correlate(drp, mcr)
+                        .where(
+                            prs.c.preset_id == drp.c.id,
+                            prs.c.slot_name == mcr.c.slot_name,
+                            prs.c.quantity >= mcr.c.min_quantity,
+                        )
+                    ),
+                )
+            )
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
         return inner

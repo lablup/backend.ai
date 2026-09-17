@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+<<<<<<< HEAD
+=======
+import re
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 from collections.abc import Collection
 from uuid import UUID
 
@@ -109,6 +113,7 @@ class RuntimeVariantPresetConditions:
     by_name_in = staticmethod(make_string_in_factory(RuntimeVariantPresetRow.name))
 
     @staticmethod
+<<<<<<< HEAD
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RuntimeVariantPresetRow.id < sa.text(f"'{cursor_id}'::uuid")
@@ -119,5 +124,35 @@ class RuntimeVariantPresetConditions:
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RuntimeVariantPresetRow.id > sa.text(f"'{cursor_id}'::uuid")
+=======
+    def by_valid_at_version(version: str) -> QueryCondition:
+        """Half-open range: ``added_version <= version < deprecated_version``."""
+        target = _version_segments(version)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if target is None:
+                return sa.false()
+            major, minor, patch = target
+            added = sa.tuple_(
+                RuntimeVariantPresetRow.added_version_major,
+                RuntimeVariantPresetRow.added_version_minor,
+                RuntimeVariantPresetRow.added_version_patch,
+            )
+            deprecated = sa.tuple_(
+                RuntimeVariantPresetRow.deprecated_version_major,
+                RuntimeVariantPresetRow.deprecated_version_minor,
+                RuntimeVariantPresetRow.deprecated_version_patch,
+            )
+            return sa.and_(
+                sa.or_(
+                    RuntimeVariantPresetRow.added_version.is_(None),
+                    added <= sa.tuple_(sa.literal(major), sa.literal(minor), sa.literal(patch)),
+                ),
+                sa.or_(
+                    RuntimeVariantPresetRow.deprecated_version.is_(None),
+                    deprecated > sa.tuple_(sa.literal(major), sa.literal(minor), sa.literal(patch)),
+                ),
+            )
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
         return inner

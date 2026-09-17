@@ -1,0 +1,226 @@
+"""Query conditions for app config fragment rows."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import datetime
+
+import sqlalchemy as sa
+
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_fragment import (
+    AppConfigFragmentEntityType,
+    AppConfigFragmentID,
+)
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
+
+__all__ = ("AppConfigFragmentConditions",)
+
+
+class AppConfigFragmentConditions:
+    @staticmethod
+    def by_config_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AppConfigFragmentRow.config_name.ilike(f"%{spec.value}%")
+            else:
+                condition = AppConfigFragmentRow.config_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_config_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(AppConfigFragmentRow.config_name) == spec.value.lower()
+            else:
+                condition = AppConfigFragmentRow.config_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_config_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AppConfigFragmentRow.config_name.ilike(f"{spec.value}%")
+            else:
+                condition = AppConfigFragmentRow.config_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_config_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AppConfigFragmentRow.config_name.ilike(f"%{spec.value}")
+            else:
+                condition = AppConfigFragmentRow.config_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_config_name_in = staticmethod(make_string_in_factory(AppConfigFragmentRow.config_name))
+
+    @staticmethod
+    def by_ids(fragment_ids: Sequence[AppConfigFragmentID]) -> QueryCondition:
+        """Fragments whose id is one of ``fragment_ids``, for batch loading by id."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.id.in_(list(fragment_ids))
+
+        return inner
+
+    @staticmethod
+    def by_config_names(config_names: Sequence[str]) -> QueryCondition:
+        """Fragments whose ``config_name`` is one of ``config_names``.
+
+        The plain-name membership filter the merged read AND-combines with a visibility
+        filter — kept separate from the ``by_*_visibility`` scope builders.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.config_name.in_(list(config_names))
+
+        return inner
+
+    # --- scope_type enum filters ---
+
+    @staticmethod
+    def by_scope_type_equals(scope_type: AppConfigScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.scope_type == scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_equals(scope_type: AppConfigScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.scope_type != scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_in(scope_types: Sequence[AppConfigScopeType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.scope_type.in_(list(scope_types))
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_in(scope_types: Sequence[AppConfigScopeType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.scope_type.notin_(list(scope_types))
+
+        return inner
+
+    # --- scope_id filter ---
+
+    @staticmethod
+    def by_scope_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigFragmentRow.scope_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # --- per-scope visibility filters (one scope_type each), independent of config_name ---
+
+    @staticmethod
+    def by_public_visibility() -> QueryCondition:
+        """The ``public`` scope (public has no per-entity scope_id)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC
+
+        return inner
+
+    @staticmethod
+    def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
+        """The ``domain`` scope for ``domain_id``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return scope_membership_exists(
+                DomainEntityType(),
+                domain_id,
+                AppConfigFragmentEntityType(),
+                AppConfigFragmentRow.id,
+            )
+
+        return inner
+
+    @staticmethod
+    def by_user_visibility(user_id: UserID) -> QueryCondition:
+        """The ``user`` scope for ``user_id``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return scope_membership_exists(
+                UserEntityType(),
+                user_id,
+                AppConfigFragmentEntityType(),
+                AppConfigFragmentRow.id,
+            )
+
+        return inner
+
+    # --- created_at / updated_at datetime filters ---
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.created_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.updated_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.updated_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.updated_at == dt
+
+        return inner

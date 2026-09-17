@@ -29,9 +29,7 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
 from ai.backend.manager.models.container_registry.orders import (
-    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
     resolve_order,
 )
 from ai.backend.manager.repositories.base import (
@@ -40,6 +38,7 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
 )
+<<<<<<< HEAD
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -48,6 +47,13 @@ from ai.backend.manager.repositories.container_registry.creators import (
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+=======
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 )
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
@@ -68,10 +74,7 @@ def _pagination_spec() -> PaginationSpec:
     """How a page of registries is cut, in either mode. The order runs by id."""
     return PaginationSpec(
         forward_order=DEFAULT_FORWARD_ORDER,
-        backward_order=DEFAULT_BACKWARD_ORDER,
-        forward_condition_factory=ContainerRegistryConditions.by_cursor_forward,
-        backward_condition_factory=ContainerRegistryConditions.by_cursor_backward,
-        tiebreaker_order=TIEBREAKER_ORDER,
+        cursor_column=ContainerRegistryRow.id,
     )
 
 

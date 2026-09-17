@@ -190,11 +190,16 @@ def _slot_quantities_to_resource_slot_info(
 
 def _resource_group_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
+<<<<<<< HEAD
         forward_order=ScalingGroupOrders.created_at(ascending=False),
         backward_order=ScalingGroupOrders.created_at(ascending=True),
         forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
         backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
         tiebreaker_order=ScalingGroupRow.name.asc(),
+=======
+        forward_order=ResourceGroupOrders.created_at(ascending=False),
+        cursor_column=ResourceGroupRow.id,
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
     )
 
 

@@ -323,36 +323,6 @@ class SessionSchedulingHistoryConditions:
     by_error_code_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.message))
 
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(SessionSchedulingHistoryRow.created_at)
-                .where(SessionSchedulingHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return SessionSchedulingHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(SessionSchedulingHistoryRow.created_at)
-                .where(SessionSchedulingHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return SessionSchedulingHistoryRow.created_at > subquery
-
-        return inner
-
     # DateTime filter conditions
     @staticmethod
     def by_created_at_before(dt: datetime) -> QueryCondition:
@@ -449,6 +419,7 @@ class KernelSchedulingHistoryConditions:
         return inner
 
     @staticmethod
+<<<<<<< HEAD
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
@@ -460,10 +431,16 @@ class KernelSchedulingHistoryConditions:
                 .scalar_subquery()
             )
             return KernelSchedulingHistoryRow.created_at < subquery
+=======
+    def by_from_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.from_status.in_(statuses)
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
         return inner
 
     @staticmethod
+<<<<<<< HEAD
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
         """Cursor condition for backward pagination (before cursor)."""
         cursor_uuid = uuid.UUID(cursor_id)
@@ -475,6 +452,257 @@ class KernelSchedulingHistoryConditions:
                 .scalar_subquery()
             )
             return KernelSchedulingHistoryRow.created_at > subquery
+=======
+    def by_to_statuses(statuses: list[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.to_status.in_(statuses)
+
+        return inner
+
+    # UUID filter conditions for kernel_id
+    @staticmethod
+    def by_kernel_id_filter(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelSchedulingHistoryRow.kernel_id != spec.value
+            return KernelSchedulingHistoryRow.kernel_id == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_kernel_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelSchedulingHistoryRow.kernel_id.notin_(spec.values)
+            return KernelSchedulingHistoryRow.kernel_id.in_(spec.values)
+
+        return inner
+
+    # UUID filter conditions for session_id
+    @staticmethod
+    def by_session_id_filter(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelSchedulingHistoryRow.session_id != spec.value
+            return KernelSchedulingHistoryRow.session_id == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_session_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelSchedulingHistoryRow.session_id.notin_(spec.values)
+            return KernelSchedulingHistoryRow.session_id.in_(spec.values)
+
+        return inner
+
+    # String filter conditions for error_code
+    @staticmethod
+    def by_error_code_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.error_code.ilike(f"%{spec.value}%")
+            else:
+                condition = KernelSchedulingHistoryRow.error_code.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_error_code_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(KernelSchedulingHistoryRow.error_code) == spec.value.lower()
+                )
+            else:
+                condition = KernelSchedulingHistoryRow.error_code == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_error_code_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.error_code.ilike(f"{spec.value}%")
+            else:
+                condition = KernelSchedulingHistoryRow.error_code.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_error_code_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.error_code.ilike(f"%{spec.value}")
+            else:
+                condition = KernelSchedulingHistoryRow.error_code.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # String filter conditions for phase
+    @staticmethod
+    def by_phase_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.phase.ilike(f"%{spec.value}%")
+            else:
+                condition = KernelSchedulingHistoryRow.phase.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_phase_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(KernelSchedulingHistoryRow.phase) == spec.value.lower()
+            else:
+                condition = KernelSchedulingHistoryRow.phase == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_phase_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.phase.ilike(f"{spec.value}%")
+            else:
+                condition = KernelSchedulingHistoryRow.phase.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_phase_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.phase.ilike(f"%{spec.value}")
+            else:
+                condition = KernelSchedulingHistoryRow.phase.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # String filter conditions for message
+    @staticmethod
+    def by_message_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.message.ilike(f"%{spec.value}%")
+            else:
+                condition = KernelSchedulingHistoryRow.message.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_message_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(KernelSchedulingHistoryRow.message) == spec.value.lower()
+            else:
+                condition = KernelSchedulingHistoryRow.message == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_message_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.message.ilike(f"{spec.value}%")
+            else:
+                condition = KernelSchedulingHistoryRow.message.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_message_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = KernelSchedulingHistoryRow.message.ilike(f"%{spec.value}")
+            else:
+                condition = KernelSchedulingHistoryRow.message.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_phase_in = staticmethod(make_string_in_factory(KernelSchedulingHistoryRow.phase))
+    by_error_code_in = staticmethod(make_string_in_factory(KernelSchedulingHistoryRow.error_code))
+    by_message_in = staticmethod(make_string_in_factory(KernelSchedulingHistoryRow.message))
+
+    # DateTime filter conditions
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.created_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.updated_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.updated_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelSchedulingHistoryRow.updated_at == dt
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
         return inner
 
@@ -761,36 +989,6 @@ class DeploymentHistoryConditions:
     by_phase_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.phase))
     by_error_code_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.message))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DeploymentHistoryRow.created_at)
-                .where(DeploymentHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DeploymentHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DeploymentHistoryRow.created_at)
-                .where(DeploymentHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DeploymentHistoryRow.created_at > subquery
-
-        return inner
 
     # DateTime filter conditions
     @staticmethod
@@ -1162,36 +1360,6 @@ class RouteHistoryConditions:
     by_phase_in = staticmethod(make_string_in_factory(RouteHistoryRow.phase))
     by_error_code_in = staticmethod(make_string_in_factory(RouteHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(RouteHistoryRow.message))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RouteHistoryRow.created_at)
-                .where(RouteHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RouteHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RouteHistoryRow.created_at)
-                .where(RouteHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RouteHistoryRow.created_at > subquery
-
-        return inner
 
     # DateTime filter conditions
     @staticmethod

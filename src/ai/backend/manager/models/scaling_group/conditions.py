@@ -172,6 +172,7 @@ class ScalingGroupConditions:
             )
 
         return inner
+<<<<<<< HEAD:src/ai/backend/manager/models/scaling_group/conditions.py
 
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
@@ -208,3 +209,5 @@ class ScalingGroupConditions:
             return ScalingGroupRow.created_at > subquery
 
         return inner
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734)):src/ai/backend/manager/models/resource_group/conditions.py

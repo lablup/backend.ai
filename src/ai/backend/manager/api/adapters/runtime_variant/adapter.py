@@ -53,11 +53,16 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _runtime_variant_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
+<<<<<<< HEAD
         forward_order=RuntimeVariantOrders.id(ascending=False),
         backward_order=RuntimeVariantOrders.id(ascending=True),
         forward_condition_factory=RuntimeVariantConditions.by_cursor_forward,
         backward_condition_factory=RuntimeVariantConditions.by_cursor_backward,
         tiebreaker_order=RuntimeVariantRow.name.asc(),
+=======
+        forward_order=RuntimeVariantOrders.created_at(ascending=False),
+        cursor_column=RuntimeVariantRow.id,
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
     )
 
 

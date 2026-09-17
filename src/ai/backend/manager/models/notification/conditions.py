@@ -115,42 +115,6 @@ class NotificationChannelConditions:
 
         return inner
 
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(NotificationChannelRow.created_at)
-                .where(NotificationChannelRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return NotificationChannelRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(NotificationChannelRow.created_at)
-                .where(NotificationChannelRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return NotificationChannelRow.created_at > subquery
-
-        return inner
-
 
 class NotificationRuleConditions:
     """Query conditions for notification rules."""
@@ -250,41 +214,5 @@ class NotificationRuleConditions:
     def by_enabled(enabled: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return NotificationRuleRow.enabled == enabled
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(NotificationRuleRow.created_at)
-                .where(NotificationRuleRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return NotificationRuleRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(NotificationRuleRow.created_at)
-                .where(NotificationRuleRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return NotificationRuleRow.created_at > subquery
 
         return inner

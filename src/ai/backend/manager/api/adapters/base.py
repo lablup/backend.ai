@@ -78,7 +78,10 @@ class BaseAdapter(BaseFilterAdapter):
         all_orders: list[QueryOrder] = list(orders)
         if not all_orders and not is_cursor_pagination:
             all_orders.append(pagination_spec.forward_order)
-        all_orders.append(pagination_spec.tiebreaker_order)
+        if last is not None:
+            all_orders.append(pagination_spec.backward_tiebreaker_order)
+        else:
+            all_orders.append(pagination_spec.tiebreaker_order)
 
         pagination = build_pagination(
             PaginationOptions(

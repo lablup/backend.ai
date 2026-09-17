@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -30,6 +31,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.types import DefaultForUns
 def _make_keypair_policy_node(name: str = "default") -> KeypairResourcePolicyNode:
     return KeypairResourcePolicyNode(
         id=name,
+        entity_id=uuid.uuid4(),
         name=name,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -53,6 +55,7 @@ def _make_keypair_policy_node(name: str = "default") -> KeypairResourcePolicyNod
 def _make_user_policy_node(name: str = "user-policy") -> UserResourcePolicyNode:
     return UserResourcePolicyNode(
         id=name,
+        entity_id=uuid.uuid4(),
         name=name,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         max_vfolder_count=10,
@@ -65,6 +68,7 @@ def _make_user_policy_node(name: str = "user-policy") -> UserResourcePolicyNode:
 def _make_project_policy_node(name: str = "project-policy") -> ProjectResourcePolicyNode:
     return ProjectResourcePolicyNode(
         id=name,
+        entity_id=uuid.uuid4(),
         name=name,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         max_vfolder_count=20,
@@ -86,6 +90,7 @@ class TestKeypairResourcePolicyNode:
     def test_valid_creation_without_created_at(self) -> None:
         node = KeypairResourcePolicyNode(
             id="default",
+            entity_id=uuid.uuid4(),
             name="default",
             default_for_unspecified=DefaultForUnspecified.UNLIMITED,
             total_resource_slots=[],

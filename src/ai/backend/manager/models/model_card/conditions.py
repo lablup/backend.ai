@@ -251,6 +251,7 @@ class ModelCardConditions:
             lambda c: ModelCardConditions._exists_vfolder(c),
         )
     )
+<<<<<<< HEAD
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -265,3 +266,5 @@ class ModelCardConditions:
             return ModelCardRow.id > sa.text(f"'{cursor_id}'::uuid")
 
         return inner
+=======
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))

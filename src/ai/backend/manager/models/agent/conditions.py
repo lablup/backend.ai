@@ -157,6 +157,7 @@ class AgentConditions:
 
         return inner
 
+<<<<<<< HEAD
     by_scaling_group_in = staticmethod(make_string_in_factory(AgentRow.scaling_group))
 
     # --- cursor pagination conditions ---
@@ -190,3 +191,6 @@ class AgentConditions:
             return AgentRow.first_contact > subquery
 
         return inner
+=======
+    by_resource_group_in = staticmethod(make_string_in_factory(AgentRow.scaling_group))
+>>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
