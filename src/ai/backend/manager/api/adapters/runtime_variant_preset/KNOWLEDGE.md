@@ -15,8 +15,8 @@ status: draft
 검토한다.
 
 `runtime_variant_preset` 엔티티는 `runtime_variant` 하나에 속하지만 그 스코프 안에서 생성되지는
-않는다. `runtime_variant` 컬럼으로 참조할 뿐 어느 스코프에도 속하지 않는다. 생성에는 전역 역할이
-필요하다. 수정과 삭제에는 프리셋별 권한이 필요하지만 현재는 그 권한을 부여할 방법이 없다. 조회와
+않는다. `runtime_variant` 컬럼으로 참조할 뿐 어느 스코프에도 속하지 않는다. 생성은 호출한 사용자가
+슈퍼관리자인지 검사한다. 수정과 삭제에는 프리셋별 권한이 필요하지만 현재는 그 권한을 부여할 방법이 없다. 조회와
 검색은 인증만 확인한다.
 
 `runtime_variant` 어댑터의 시나리오는 `../runtime_variant/KNOWLEDGE.md`에 있다.
@@ -25,15 +25,15 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 필수 항목만 지정해 생성한다 | `runtime_variant` 하나, 해당 `runtime_variant`에 프리셋이 없음, 전역 역할 있음 | 이름과 `runtime_variant_id`·`preset_target`·`value_type`·`key` 필드만 지정하여 생성 | `rank` 값은 100이고 `required` 값은 false이며, 나머지 선택 항목은 비어 있음 |
-| 같은 `runtime_variant`에 하나 더 생성한다 | 해당 `runtime_variant`에 프리셋 하나, 전역 역할 있음 | 생성 | 새 프리셋의 `rank` 값이 기존 프리셋보다 100 큼 |
-| `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정해 생성한다 | `runtime_variant` 하나, 전역 역할 있음 | `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정하여 생성 | 지정한 `preset_target`·`value_type`·`default_value`·`key` 값이 `target_spec` 하나로 묶여 반환됨 |
-| `value_type` 값마다 올바른 `default_value` 값을 지정해 생성한다 | `runtime_variant` 하나, 전역 역할 있음 | `value_type` 값 `str`, `int`, `float`, `bool`, `flag` 각각에 맞는 `default_value` 값으로 생성 | 생성됨 |
-| `ui_option` 필드를 지정해 생성한다 | `runtime_variant` 하나, 전역 역할 있음 | `ui_option`에 `slider` 옵션을 추가하여 생성 | `ui_option` 필드에서 읽은 `ui_type` 값이 응답 노드에 함께 포함됨 |
-| 같은 `runtime_variant` 안에서 이름이 중복된다 | 해당 `runtime_variant`에 같은 이름의 프리셋이 있음, 전역 역할 있음 | 생성 | 이름 중복으로 거부 |
-| 다른 `runtime_variant`에 속하면 같은 이름을 쓸 수 있다 | `runtime_variant` 둘, 한쪽에만 프리셋 하나, 전역 역할 있음 | 다른 `runtime_variant`에 같은 이름으로 생성 | 생성됨 |
-| 슈퍼관리자가 아닌 사용자가 생성한다 | `runtime_variant` 하나, 전역 역할 없음 | 생성 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 전역 역할 없음 | 생성 | 역할 부족으로 거부 |
+| 슈퍼관리자가 필수 항목만 지정해 생성한다 | `runtime_variant` 하나, 해당 `runtime_variant`에 프리셋이 없음, 슈퍼관리자 | 이름과 `runtime_variant_id`·`preset_target`·`value_type`·`key` 필드만 지정하여 생성 | `rank` 값은 100이고 `required` 값은 false이며, 나머지 선택 항목은 비어 있음 |
+| 같은 `runtime_variant`에 하나 더 생성한다 | 해당 `runtime_variant`에 프리셋 하나, 슈퍼관리자 | 생성 | 새 프리셋의 `rank` 값이 기존 프리셋보다 100 큼 |
+| `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정하여 생성 | 지정한 `preset_target`·`value_type`·`default_value`·`key` 값이 `target_spec` 하나로 묶여 반환됨 |
+| `value_type` 값마다 올바른 `default_value` 값을 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `value_type` 값 `str`, `int`, `float`, `bool`, `flag` 각각에 맞는 `default_value` 값으로 생성 | 생성됨 |
+| `ui_option` 필드를 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `ui_option`에 `slider` 옵션을 추가하여 생성 | `ui_option` 필드에서 읽은 `ui_type` 값이 응답 노드에 함께 포함됨 |
+| 같은 `runtime_variant` 안에서 이름이 중복된다 | 해당 `runtime_variant`에 같은 이름의 프리셋이 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
+| 다른 `runtime_variant`에 속하면 같은 이름을 쓸 수 있다 | `runtime_variant` 둘, 한쪽에만 프리셋 하나, 슈퍼관리자 | 다른 `runtime_variant`에 같은 이름으로 생성 | 생성됨 |
+| 슈퍼관리자가 아닌 사용자가 생성한다 | `runtime_variant` 하나, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
+| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
 
 `rank` 값은 요청에서 정할 수 없다. 생성 시 같은 `runtime_variant`에서 가장 큰 `rank` 값에 100을
 더하며, 첫 프리셋의 `rank` 값은 100이 된다. 같은 `runtime_variant`에 프리셋을 하나 더 생성하는
@@ -63,7 +63,7 @@ status: draft
 | 빈 목록으로 조회한다 | 프리셋 하나 | 빈 ID 목록으로 조회 | 빈 응답을 반환하고 하위 계층을 호출하지 않음 |
 
 조회에는 권한 검사가 없다. 아무 권한도 없는 사용자의 조회가 성공하는 시나리오로 이를 검증한다.
-반면 생성 요청은 전역 역할이 없으면 거부된다.
+반면 생성 요청은 슈퍼관리자가 아니면 거부된다.
 
 여러 ID를 한 번에 조회할 때는 ID 조건을 지정한 검색으로 실행한다. ID마다 개별 조회하는 방식이
 아니므로 존재하지 않는 ID가 있어도 요청 전체를 거부하지 않고 해당 위치에 빈 항목을 반환한다.
@@ -89,13 +89,13 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 이름만 바꾼다 | 프리셋 하나, 전역 역할 있음 | 이름 수정 | 이름만 변경되고 나머지는 유지됨 |
-| 설명을 지운다 | 설명이 있는 프리셋, 전역 역할 있음 | 설명을 비우도록 수정 | 설명이 없어짐 |
-| `rank` 값을 바꾼다 | 프리셋 하나, 전역 역할 있음 | `rank` 값 수정 | `rank` 값이 변경된 노드 |
-| 변경할 값을 지정하지 않는다 | 프리셋 하나, 전역 역할 있음 | 빈 수정 요청 | 아무것도 바뀌지 않은 노드 |
-| `value_type` 값만 `flag`로 바꾼다 | `preset_target` 값이 `env`인 프리셋, 전역 역할 있음 | `value_type` 값을 `flag`로 수정 | 잘못된 입력으로 거부 |
-| `default_value` 값만 바꿔 `value_type` 값과 어긋나게 한다 | `value_type` 값이 `int`인 프리셋, 전역 역할 있음 | `default_value` 값을 숫자가 아닌 문자열로 수정 | 잘못된 입력으로 거부 |
-| 존재하지 않는 ID를 수정한다 | 다른 프리셋만 있음, 전역 역할 있음 | 이름 수정 | 대상을 찾을 수 없어 거부 |
+| 슈퍼관리자가 이름만 바꾼다 | 프리셋 하나, 슈퍼관리자 | 이름 수정 | 이름만 변경되고 나머지는 유지됨 |
+| 설명을 지운다 | 설명이 있는 프리셋, 슈퍼관리자 | 설명을 비우도록 수정 | 설명이 없어짐 |
+| `rank` 값을 바꾼다 | 프리셋 하나, 슈퍼관리자 | `rank` 값 수정 | `rank` 값이 변경된 노드 |
+| 변경할 값을 지정하지 않는다 | 프리셋 하나, 슈퍼관리자 | 빈 수정 요청 | 아무것도 바뀌지 않은 노드 |
+| `value_type` 값만 `flag`로 바꾼다 | `preset_target` 값이 `env`인 프리셋, 슈퍼관리자 | `value_type` 값을 `flag`로 수정 | 잘못된 입력으로 거부 |
+| `default_value` 값만 바꿔 `value_type` 값과 어긋나게 한다 | `value_type` 값이 `int`인 프리셋, 슈퍼관리자 | `default_value` 값을 숫자가 아닌 문자열로 수정 | 잘못된 입력으로 거부 |
+| 존재하지 않는 ID를 수정한다 | 다른 프리셋만 있음, 슈퍼관리자 | 이름 수정 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 수정한다 | 해당 프리셋에 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 변경된 노드 |
 
@@ -114,8 +114,8 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 삭제한다 | 프리셋 하나, 전역 역할 있음 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
-| 존재하지 않는 ID를 삭제한다 | 다른 프리셋만 있음, 전역 역할 있음 | 삭제 | 대상을 찾을 수 없어 거부 |
+| 슈퍼관리자가 삭제한다 | 프리셋 하나, 슈퍼관리자 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
+| 존재하지 않는 ID를 삭제한다 | 다른 프리셋만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 삭제한다 | 해당 프리셋에 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
 
