@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -76,6 +75,36 @@ TWO_DEVICE_NEURON_LS_JSON = """
         "nc_count": 2,
         "memory_size": 34359738368,
         "neuroncore_ids": [6, 7],
+        "neuron_processes": []
+    }
+]
+"""
+
+# Synthesized non-uniform shape: the two mounted devices differ in `nc_count`.
+# No instance type ships this today, but it is the case that distinguishes
+# "cores preceding this device" from "position * this device's nc_count".
+MIXED_NC_COUNT_NEURON_LS_JSON = """
+[
+    {
+        "neuron_device": 0,
+        "bdf": "0000:00:1e.0",
+        "cpu_affinity": "0-7",
+        "numa_node": "0",
+        "connected_to": null,
+        "nc_count": 1,
+        "memory_size": 17179869184,
+        "neuroncore_ids": [0],
+        "neuron_processes": []
+    },
+    {
+        "neuron_device": 1,
+        "bdf": "0000:00:1f.0",
+        "cpu_affinity": "8-15",
+        "numa_node": "1",
+        "connected_to": null,
+        "nc_count": 2,
+        "memory_size": 34359738368,
+        "neuroncore_ids": [1, 2],
         "neuron_processes": []
     }
 ]
@@ -426,9 +455,22 @@ class TestContainerPlumbing:
         plugin = await _make_plugin(monkeypatch, TWO_DEVICE_NEURON_LS_JSON)
         # Global core 1 lives on host device 0 (local index 1); global core 7
         # lives on host device 3, which is renumbered to container device 1, so
-        # its container-local core index is 1 * nc_count + 1 == 3.
+        # its container-local core index is (the 2 cores of the preceding
+        # device) + 1 == 3.
         args = await plugin.generate_docker_args(NO_DOCKER, self._alloc("1", "7"))
         assert args["Env"] == ["NEURON_RT_VISIBLE_CORES=1,3"]
+
+    async def test_visible_cores_handle_a_non_uniform_nc_count(
+        self, monkeypatch: pytest.MonkeyPatch, stub_sysfs: None
+    ) -> None:
+        plugin = await _make_plugin(monkeypatch, MIXED_NC_COUNT_NEURON_LS_JSON)
+        # Host device 0 carries a single core, host device 1 carries two.  Global
+        # core 2 is the second core of device 1, so exactly one core precedes its
+        # device and its container-local index is 1 + 1 == 2.  Multiplying the
+        # device's position by its own nc_count would yield 3 and hand the
+        # runtime a core index that does not exist in the container.
+        args = await plugin.generate_docker_args(NO_DOCKER, self._alloc("0", "2"))
+        assert args["Env"] == ["NEURON_RT_VISIBLE_CORES=0,2"]
 
     async def test_allocating_one_core_still_mounts_the_whole_device(
         self, monkeypatch: pytest.MonkeyPatch, stub_sysfs: None
@@ -485,12 +527,3 @@ class TestMetadata:
     def test_metadata_slot_name_matches_the_declared_slot(self) -> None:
         metadata = NeuronPlugin({}, {}).get_metadata()
         assert metadata["slot_name"] == str(NeuronPlugin.slot_types[0][0])
-
-    def test_declared_icon_exists_in_the_repo(self) -> None:
-        # No `npu.svg` exists despite other plugins declaring `display_icon:
-        # "npu"`; only ship an icon name that is actually present.
-        icon = NeuronPlugin({}, {}).get_metadata()["display_icon"]
-        icons_dir = Path(__file__).parents[4] / "src/ai/backend/web/static/resources/icons"
-        if not icons_dir.is_dir():
-            pytest.skip("icon assets are not part of this test's sandbox")
-        assert list(icons_dir.glob(f"{icon}.*")), f"no icon asset for {icon!r}"

@@ -291,20 +291,22 @@ class NeuronPlugin(AbstractComputePlugin):
                 )
                 capacity_by_node[node_path] = capacity_by_node.get(node_path, 0) + dev.memory_size
 
-            for cid in container_ids:
-                mem_stats[cid] = 0
-                mem_capacities[cid] = 0
-                try:
-                    async with Docker() as docker:
+            async with Docker() as docker:
+                for cid in container_ids:
+                    mem_stats[cid] = 0
+                    mem_capacities[cid] = 0
+                    try:
                         container_info = await docker.containers.get(cid)
-                except DockerError:
-                    log.debug("skipping unreachable container {} in Neuron stat collection", cid)
-                    continue
-                for attached in container_info["HostConfig"].get("Devices") or []:
-                    host_path = attached.get("PathOnHost")
-                    if host_path in usage_by_node:
-                        mem_stats[cid] += usage_by_node[host_path]
-                        mem_capacities[cid] += capacity_by_node[host_path]
+                    except DockerError:
+                        log.debug(
+                            "skipping unreachable container {} in Neuron stat collection", cid
+                        )
+                        continue
+                    for attached in container_info["HostConfig"].get("Devices") or []:
+                        host_path = attached.get("PathOnHost")
+                        if host_path in usage_by_node:
+                            mem_stats[cid] += usage_by_node[host_path]
+                            mem_capacities[cid] += capacity_by_node[host_path]
 
         return [
             ContainerMeasurement(
@@ -400,14 +402,19 @@ class NeuronPlugin(AbstractComputePlugin):
 
         # Container-local NeuronCore indices.  The runtime numbers cores by the
         # order of the *visible* devices, so a core's container-local index is
-        # (position of its device among the mounted ones) * nc_count + its index
-        # within the device.
+        # (number of cores on the devices preceding its own) + its index within
+        # the device.  Accumulating the preceding devices' nc_count is correct
+        # even if the mounted devices differ in nc_count, which multiplying by a
+        # single device's nc_count would not be.
         nc_count_of = {info.neuron_device: info.nc_count for info in self._device_infos}
+        core_base_of: dict[int, int] = {}
+        core_base = 0
+        for host_index in host_device_indices:
+            core_base_of[host_index] = core_base
+            core_base += nc_count_of.get(host_index, 1)
 
         def _container_local_core_index(dev: NeuronCoreDevice) -> int:
-            host_index = dev.neuron_device_index
-            nc_count = nc_count_of.get(host_index, 1)
-            return container_index_of[host_index] * nc_count + dev.core_index
+            return core_base_of[dev.neuron_device_index] + dev.core_index
 
         visible_cores = sorted(_container_local_core_index(dev) for dev in allocated)
 
@@ -472,22 +479,17 @@ class NeuronPlugin(AbstractComputePlugin):
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
         if resource_spec is None:
             return
-        if hasattr(alloc_map, "apply_allocation"):
-            for slot_name, _ in self.slot_types:
-                alloc_map.apply_allocation({
-                    slot_name: resource_spec.allocations.get(self.key, {}).get(
-                        slot_name,
-                        {
-                            dev_id: Decimal(0)
-                            for dev_id, dev_slot_info in alloc_map.device_slots.items()
-                            if dev_slot_info.slot_name == slot_name
-                        },
-                    ),
-                })
-        else:  # older agents without lablup/backend.ai-agent#180
-            alloc_map.allocations[SLOT_NAME].update(
-                resource_spec.allocations.get(self.key, {}).get(SLOT_NAME, {}),
-            )
+        for slot_name, _ in self.slot_types:
+            alloc_map.apply_allocation({
+                slot_name: resource_spec.allocations.get(self.key, {}).get(
+                    slot_name,
+                    {
+                        dev_id: Decimal(0)
+                        for dev_id, dev_slot_info in alloc_map.device_slots.items()
+                        if dev_slot_info.slot_name == slot_name
+                    },
+                ),
+            })
 
     async def get_attached_devices(
         self,
