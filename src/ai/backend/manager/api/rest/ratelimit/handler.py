@@ -32,7 +32,9 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _RATELIMIT_WINDOW_SECONDS: Final = 60 * 15
 _ANONYMOUS_RATELIMIT: Final = 1000
-_HEALTH_PATH: Final = "/health"
+# Every manager shares one window per client address, so a pool probing
+# all of them would exhaust that window by itself.
+_RATELIMIT_EXEMPT_PATH_PREFIXES: Final[tuple[str, ...]] = ("/health",)
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,13 @@ class RateLimitQuota:
         headers["X-RateLimit-Window"] = str(self.window_seconds)
 
 
+def _is_exempt(path: str) -> bool:
+    return any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in _RATELIMIT_EXEMPT_PATH_PREFIXES
+    )
+
+
 def make_rlim_middleware(
     valkey_client: ValkeyRateLimitClient,
 ) -> Middleware:
@@ -60,9 +69,7 @@ def make_rlim_middleware(
         handler: WebRequestHandler,
     ) -> web.StreamResponse:
         """Global middleware implementing a fixed-window rate limiter."""
-        # Every manager shares one window per client address, so a pool
-        # probing all of them would exhaust that window by itself.
-        if request.path == _HEALTH_PATH or request.path.startswith(f"{_HEALTH_PATH}/"):
+        if _is_exempt(request.path):
             return await handler(request)
         rlim_window: RateLimitState
         if request["is_authorized"]:
