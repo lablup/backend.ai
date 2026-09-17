@@ -7,7 +7,7 @@ in, the project rosters, the relations, and the accepted shares. Then give the s
 that had no node when the preset roles were written their roles and grants.
 
 Revision ID: dafe06a6c763
-Revises: a7d0f5b3c841
+Revises: f345b344d526
 Create Date: 2026-09-16
 
 """
@@ -21,7 +21,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "dafe06a6c763"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "a7d0f5b3c841"
+down_revision = "f345b344d526"
 branch_labels = None
 depends_on = None
 
@@ -171,16 +171,15 @@ _CAP_ROSTER_EDGES: Final = sa.text(f"""
     WHERE capped IS FALSE AND id IN ({_PROJECT_USER_EDGES})
 """)
 
-_ADD_ROSTER_EDGES: Final = sa.text("""
+# A personal project's creator is its one member. Every other member's edge is already in
+# the graph; `association_groups_users` stopped being written before that and is not read.
+_ADD_PERSONAL_ROSTER_EDGES: Final = sa.text("""
     INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
-    SELECT DISTINCT p.id, u.id, TRUE
-    FROM (
-        SELECT group_id, user_id FROM association_groups_users
-        UNION
-        SELECT id, creator_id FROM groups WHERE type = 'personal' AND creator_id IS NOT NULL
-    ) r (project_id, user_id)
-    JOIN virtual_entities p ON p.entity_type = 'project' AND p.entity_id = r.project_id
-    JOIN virtual_entities u ON u.entity_type = 'user' AND u.entity_id = r.user_id
+    SELECT p.id, u.id, TRUE
+    FROM groups g
+    JOIN virtual_entities p ON p.entity_type = 'project' AND p.entity_id = g.id
+    JOIN virtual_entities u ON u.entity_type = 'user' AND u.entity_id = g.creator_id
+    WHERE g.type = 'personal'
     ON CONFLICT (virtual_entity_id, member_entity_id) DO NOTHING
 """)
 
@@ -387,7 +386,7 @@ def _add_relation_edges(conn: sa.Connection) -> None:
 
 def _add_rosters(conn: sa.Connection) -> None:
     conn.execute(_CAP_ROSTER_EDGES)
-    conn.execute(_ADD_ROSTER_EDGES)
+    conn.execute(_ADD_PERSONAL_ROSTER_EDGES)
     conn.execute(_ADD_ROSTER_CAPS)
     conn.execute(_DROP_PROJECT_BINDINGS_OF_USERS)
 

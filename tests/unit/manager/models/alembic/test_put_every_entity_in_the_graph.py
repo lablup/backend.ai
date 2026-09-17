@@ -326,16 +326,29 @@ class _Scopes:
     idle_checker: sa.RowMapping
 
 
+async def _add_member(rows: _Rows, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """A project member's edge as the scope association table's move left it: own, no cap,
+    between nodes that have no self rows yet."""
+    project = await rows.insert("virtual_entities", entity_type="project", entity_id=project_id)
+    user = await rows.insert("virtual_entities", entity_type="user", entity_id=user_id)
+    await rows.insert(
+        "entity_memberships",
+        virtual_entity_id=project["id"],
+        member_entity_id=user["id"],
+        capped=False,
+    )
+
+
 async def _scopes(rows: _Rows) -> _Scopes:
     """A user in a domain with their personal project, a team project the user is on, and
-    a resource group, a registry and an idle checker, none of them in the graph."""
+    a resource group, a registry and an idle checker. Only the membership is in the graph."""
     domain = await rows.insert("domains")
     user = await rows.insert("users", domain_name=domain["name"], domain_id=domain["id"])
     project = await rows.insert("groups", domain_name=domain["name"], type="general")
     personal_project = await rows.insert(
         "groups", domain_name=domain["name"], type="personal", creator_id=user["uuid"]
     )
-    await rows.insert("association_groups_users", group_id=project["id"], user_id=user["uuid"])
+    await _add_member(rows, project["id"], user["uuid"])
     return _Scopes(
         domain=domain,
         user=user,
@@ -803,6 +816,27 @@ class TestRosters:
             assert (await _owners(conn, user))[project] is True
             assert await _caps(conn, project, user) == {1}
             assert project not in await _governors(conn, user)
+
+
+class TestLegacyRoster:
+    async def test_a_user_only_in_association_groups_users_is_not_on_the_roster(
+        self, db: ExtendedAsyncSAEngine
+    ) -> None:
+        async with db.begin() as conn:
+            rows = _Rows(conn)
+            scopes = await _scopes(rows)
+            removed = await rows.insert(
+                "users", domain_name=scopes.domain["name"], domain_id=scopes.domain["id"]
+            )
+            await rows.insert(
+                "association_groups_users", group_id=scopes.project["id"], user_id=removed["uuid"]
+            )
+
+            await _run(conn)
+
+            user = await _node(conn, "user", removed["uuid"])
+            project = await _node(conn, "project", scopes.project["id"])
+            assert project not in await _owners(conn, user)
 
 
 class TestRelations:
