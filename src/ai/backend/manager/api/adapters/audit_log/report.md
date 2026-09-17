@@ -622,7 +622,7 @@ Then
 
 #### [the-monitor-role-without-a-grant-may-not-scope-search](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 역할 검사뿐이고 이 검색은 권한 그래프로 보호된다
+모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다
 
 Given
 
