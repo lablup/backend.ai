@@ -160,6 +160,23 @@ class TestPrometheusQueryPresetService:
         assert result.preset == preset_data
         mock_ops_repository.update.assert_called_once_with(updater)
 
+    async def test_modify_preset_without_a_template_skips_validation(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_ops_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        mock_ops_repository.update = AsyncMock(return_value=preset_data)
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=preset_data.id,
+            name=OptionalState[str].update("renamed"),
+        )
+
+        result = await service.update_preset(UpdatePresetAction(updater=updater))
+
+        assert result.preset == preset_data
+        mock_ops_repository.update.assert_awaited_once_with(updater)
+
     async def test_modify_preset_rejects_invalid_template(
         self,
         service: PrometheusQueryPresetService,

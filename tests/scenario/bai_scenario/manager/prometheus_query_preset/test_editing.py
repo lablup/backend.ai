@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
 )
-from ai.backend.common.exception import InvalidMetricPresetTemplate
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
@@ -46,7 +45,6 @@ from bai_scenario.components.prometheus_query_preset import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.prometheus_query_preset.preset import UNRENDERABLE
 
 RENAMED = "cpu-by-session"
 RETUNED = "sum by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}[${{window}}]))"
@@ -265,61 +263,6 @@ class GivingNothingChangesNothing(
 
 
 @dataclass(frozen=True)
-class AnUnrenderableTemplateIsRefused(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
-):
-    @override
-    def summary(self) -> str:
-        return "a-template-the-renderer-refuses-cannot-replace-the-stored-one"
-
-    @override
-    def describe(self) -> str:
-        return "슈퍼관리자가 렌더러가 받지 않는 템플릿으로 수정하면, 템플릿 오류로 거부된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
-        return Editing(query_template=UNRENDERABLE)
-
-    @override
-    def then(self) -> Then[APresetAndACaller, PresetNodeAnswer]:
-        return TheCallIsRefused(InvalidMetricPresetTemplate)
-
-
-@dataclass(frozen=True)
-class AStoredBadTemplateDoesNotBlockOtherChanges(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "a-stored-template-the-renderer-refuses-does-not-block-renaming"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "렌더러가 받지 않는 템플릿을 가진 프리셋을 슈퍼관리자가 이름만 수정하면, 이름은 새 값이다. "
-            "템플릿 검증은 요청이 템플릿을 지정한 때만 실행된다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone(role=UserRole.SUPERADMIN, query_template=UNRENDERABLE)
-
-    @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
-        return Editing(named=RENAMED)
-
-    @override
-    def then(self) -> Then[APresetAndACaller, PresetNodeAnswer]:
-        return ThePresetNode(started=self.started, named=RENAMED)
-
-
-@dataclass(frozen=True)
 class AnUnknownCategoryIsRefused(
     Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
@@ -440,8 +383,6 @@ SCENARIOS: list[EditingStep] = [
     MovingToAnotherCategory(started=datetime.now(UTC)),
     ChangingOnlyTheFilterLabels(started=datetime.now(UTC)),
     GivingNothingChangesNothing(started=datetime.now(UTC)),
-    AnUnrenderableTemplateIsRefused(),
-    AStoredBadTemplateDoesNotBlockOtherChanges(started=datetime.now(UTC)),
     AnUnknownCategoryIsRefused(),
     AUserGrantedNothingMayNotEdit(),
     EnforcementOffLetsAnyoneEdit(started=datetime.now(UTC)),

@@ -20,10 +20,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionResultInfo,
 )
-from ai.backend.common.exception import (
-    InvalidMetricPresetTemplate,
-    PrometheusQueryEvaluationFailed,
-)
+from ai.backend.common.exception import PrometheusQueryEvaluationFailed
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -45,11 +42,7 @@ from bai_scenario.components.prometheus_query_preset import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.prometheus_query_preset.preset import (
-    EMPTY_WITHOUT_LABELS,
-    TEMPLATE,
-    UNRENDERABLE,
-)
+from bai_scenario.seeds.prometheus_query_preset.preset import EMPTY_WITHOUT_LABELS, TEMPLATE
 
 SERVER_WINDOW_PATH = "metric.timewindow"
 SERVER_WINDOW = "2m"
@@ -72,10 +65,9 @@ class Previewing(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result])
 
     @override
     def describe(self, laid: ACatalogAndACaller) -> str:
-        what = {
-            UNRENDERABLE: "렌더러가 받지 않는 템플릿",
-            EMPTY_WITHOUT_LABELS: "빈 질의로 렌더되는 템플릿",
-        }.get(self.query_template, "템플릿")
+        what = (
+            "빈 질의로 렌더되는 템플릿" if self.query_template == EMPTY_WITHOUT_LABELS else "템플릿"
+        )
         return f"{laid.caller.username}이 {what} 미리 보기"
 
     @override
@@ -117,31 +109,6 @@ class TheSuperadminPreviewsATemplate(
     @override
     def then(self) -> Then[ACatalogAndACaller, Result]:
         return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[2m]))")
-
-
-@dataclass(frozen=True)
-class AnUnrenderableTemplateIsRefused(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
-):
-    @override
-    def summary(self) -> str:
-        return "a-template-the-renderer-refuses-cannot-be-previewed"
-
-    @override
-    def describe(self) -> str:
-        return "슈퍼관리자가 렌더러가 받지 않는 템플릿을 미리 보면, 외부에 질의하기 전에 템플릿 오류로 거부된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
-        return JustSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
-        return Previewing(query_template=UNRENDERABLE)
-
-    @override
-    def then(self) -> Then[ACatalogAndACaller, Result]:
-        return TheCallIsRefused(InvalidMetricPresetTemplate)
 
 
 @dataclass(frozen=True)
@@ -229,7 +196,6 @@ class APlainUserMayNotPreview(
 
 SCENARIOS: list[PreviewingStep] = [
     TheSuperadminPreviewsATemplate(),
-    AnUnrenderableTemplateIsRefused(),
     PrometheusRefusingTheQueryIsAnEvaluationFailure(),
     AMonitorPreviewsToo(),
     APlainUserMayNotPreview(),

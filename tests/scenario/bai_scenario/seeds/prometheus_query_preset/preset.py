@@ -26,9 +26,6 @@ METRIC = "container_cpu_seconds_total"
 TEMPLATE = "avg by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}[${{window}}]))"
 """A template the renderer accepts: literal PromQL and the three placeholders."""
 
-UNRENDERABLE = "up${{ nope }}"
-"""A template the renderer refuses: it names a variable no placeholder provides."""
-
 EMPTY_WITHOUT_LABELS = "${{labels}}"
 """A template the renderer accepts that renders to nothing when no label is given.
 Prometheus refuses the empty query it becomes."""
@@ -52,8 +49,6 @@ class SeedPreset(SeedRow[PrometheusQueryPresetData]):
     @override
     def detail(self) -> str:
         says: list[str] = []
-        if self.query_template == UNRENDERABLE:
-            says.append("렌더러가 받지 않는 템플릿을 갖는다")
         if self.query_template == EMPTY_WITHOUT_LABELS:
             says.append("라벨 없이는 빈 질의로 렌더되는 템플릿을 갖는다")
         if self.time_window is not None:

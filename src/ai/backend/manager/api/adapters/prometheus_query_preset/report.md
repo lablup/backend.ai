@@ -64,29 +64,6 @@ Then
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
-#### [a-template-the-renderer-refuses-cannot-be-stored](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py) — pass
-
-슈퍼관리자가 렌더러가 받지 않는 템플릿으로 생성하면, 템플릿 오류로 거부된다
-
-Given
-
-- 프리셋이 하나도 없고, superadmin 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.create — user-1이 이름 cpu-by-kernel(으)로 생성
-
-Then
-
-- 거부된다
-  - 거부: InvalidMetricPresetTemplate
-
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py) — pass
 
 슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다
@@ -260,65 +237,6 @@ Then
   - 거부: InsufficientPrivilege
 
 ### editing
-
-#### [a-stored-template-the-renderer-refuses-does-not-block-renaming](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py) — pass
-
-렌더러가 받지 않는 템플릿을 가진 프리셋을 슈퍼관리자가 이름만 수정하면, 이름은 새 값이다. 템플릿 검증은 요청이 템플릿을 지정한 때만 실행된다
-
-Given
-
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 질의 프리셋 preset-1: 렌더러가 받지 않는 템플릿을 갖는다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1 수정 (이름 변경)
-
-Then
-
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
-  - name = 'cpu-by-session'
-  - description = '미리 만들어 둔 질의 프리셋'
-  - rank = 0
-  - category_id = None
-  - metric_name = 'container_cpu_seconds_total'
-  - query_template = 'up${{ nope }}'
-  - time_window = None
-  - options.filter_labels = []
-  - options.group_labels = []
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-#### [a-template-the-renderer-refuses-cannot-replace-the-stored-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py) — pass
-
-슈퍼관리자가 렌더러가 받지 않는 템플릿으로 수정하면, 템플릿 오류로 거부된다
-
-Given
-
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 질의 프리셋 preset-1
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.update — user-1이 preset-1 수정 (템플릿 변경)
-
-Then
-
-- 거부된다
-  - 거부: InvalidMetricPresetTemplate
 
 #### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py) — pass
 
@@ -858,29 +776,6 @@ Then
 
 - 거부된다
   - 거부: PrometheusQueryEvaluationFailed
-
-#### [a-template-the-renderer-refuses-cannot-be-previewed](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
-
-슈퍼관리자가 렌더러가 받지 않는 템플릿을 미리 보면, 외부에 질의하기 전에 템플릿 오류로 거부된다
-
-Given
-
-- 프리셋이 하나도 없고, superadmin 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- PrometheusQueryPresetAdapter.admin_preview — user-1이 렌더러가 받지 않는 템플릿 미리 보기
-
-Then
-
-- 거부된다
-  - 거부: InvalidMetricPresetTemplate
 
 #### [a-user-who-is-not-the-superadmin-may-not-preview-a-template](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py) — pass
 

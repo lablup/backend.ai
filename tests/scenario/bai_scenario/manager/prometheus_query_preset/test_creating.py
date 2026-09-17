@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     CreateQueryDefinitionOptionsInput,
 )
-from ai.backend.common.exception import InvalidMetricPresetTemplate
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -46,7 +45,7 @@ from bai_scenario.components.prometheus_query_preset import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.prometheus_query_preset.preset import METRIC, TEMPLATE, UNRENDERABLE
+from bai_scenario.seeds.prometheus_query_preset.preset import METRIC, TEMPLATE
 
 MADE = "cpu-by-kernel"
 WINDOW = "5m"
@@ -81,7 +80,6 @@ class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNode
     """프리셋 하나를 생성한다. 카테고리는 미리 만들어 둔 것을 가리키거나, 존재하지 않는 id를 지정하거나, 없다."""
 
     named: str = MADE
-    query_template: str = TEMPLATE
     time_window: str | None = None
     under_the_category: bool = False
     under_an_unknown_category: bool = False
@@ -110,7 +108,7 @@ class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNode
             category_id = uuid4()
         with ActingAs(laid.caller):
             payload = await adapter.create(
-                _create_input(self.named, self.query_template, self.time_window, category_id)
+                _create_input(self.named, TEMPLATE, self.time_window, category_id)
             )
         return payload.item
 
@@ -220,31 +218,6 @@ class WithAWindow(
     @override
     def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheNewPresetNode(started=self.started, named=MADE, time_window=WINDOW)
-
-
-@dataclass(frozen=True)
-class AnUnrenderableTemplateIsRefused(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
-):
-    @override
-    def summary(self) -> str:
-        return "a-template-the-renderer-refuses-cannot-be-stored"
-
-    @override
-    def describe(self) -> str:
-        return "슈퍼관리자가 렌더러가 받지 않는 템플릿으로 생성하면, 템플릿 오류로 거부된다"
-
-    @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
-        return JustSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
-        return Creating(query_template=UNRENDERABLE)
-
-    @override
-    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
-        return TheCallIsRefused(InvalidMetricPresetTemplate)
 
 
 @dataclass(frozen=True)
@@ -392,7 +365,6 @@ SCENARIOS: list[CreatingStep] = [
     TheRequiredValuesMakeAWholeNode(started=datetime.now(UTC)),
     FiledUnderACategory(started=datetime.now(UTC)),
     WithAWindow(started=datetime.now(UTC)),
-    AnUnrenderableTemplateIsRefused(),
     AnUnknownCategoryIsRefused(),
     APlainUserMayNotCreate(),
     AMonitorMayNotCreate(),
