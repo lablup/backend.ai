@@ -99,10 +99,10 @@ class TestIdleCheckerAssignmentRepository:
     @pytest.fixture
     async def database(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -123,7 +123,7 @@ class TestIdleCheckerAssignmentRepository:
                 EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:

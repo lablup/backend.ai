@@ -103,10 +103,10 @@ def _slots(*entries: tuple[str, str]) -> list[PresetResourceSlotCreator]:
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -126,7 +126,7 @@ async def database(
             EntityShareRow,
         ],
     ):
-        async with database_connection.begin_session() as session:
+        async with global_entity_ids.begin_session() as session:
             session.add(
                 RuntimeVariantRow(
                     id=_VARIANT_ID,
@@ -138,7 +138,7 @@ async def database(
                 ResourceSlotTypeRow(slot_name="cpu", slot_type="count"),
                 ResourceSlotTypeRow(slot_name="mem", slot_type="bytes"),
             ])
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -282,7 +282,8 @@ class TestReadingBackWhatSqlComputed:
         verbs: list[str] = []
 
         def record(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
-            verbs.append(statement.split()[0].upper())
+            if "deployment_revision_presets" in statement:
+                verbs.append(statement.split()[0].upper())
 
         sa.event.listen(database.sync_engine, "before_cursor_execute", record)
         try:
@@ -298,7 +299,8 @@ class TestReadingBackWhatSqlComputed:
         verbs: list[str] = []
 
         def record(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
-            verbs.append(statement.split()[0].upper())
+            if "deployment_revision_presets" in statement:
+                verbs.append(statement.split()[0].upper())
 
         sa.event.listen(database.sync_engine, "before_cursor_execute", record)
         try:

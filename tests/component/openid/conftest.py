@@ -44,6 +44,7 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
@@ -70,6 +71,7 @@ from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -400,7 +402,11 @@ async def database_engine(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Live ExtendedAsyncSAEngine connected to the test database."""
     async with connect_database(db_config) as db:
-        yield db
+        await GlobalEntityIDLoader(db).load()
+        try:
+            yield db
+        finally:
+            GlobalEntityIDCache.clear()
 
 
 # ---------------------------------------------------------------------------

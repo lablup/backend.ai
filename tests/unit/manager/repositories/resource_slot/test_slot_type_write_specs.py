@@ -77,7 +77,7 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def db_with_referencing_tables(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     """Every table the purger's conflict checks read, plus their FK parents.
 
@@ -85,7 +85,7 @@ async def db_with_referencing_tables(
     tables, so each of them has to exist even when only one carries a row.
     """
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -126,7 +126,7 @@ async def db_with_referencing_tables(
             EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture

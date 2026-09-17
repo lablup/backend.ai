@@ -7,11 +7,13 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.repository import (
@@ -75,7 +77,7 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
 
     @override
     def created_in(self, row: ProjectRow) -> Collection[EntityIdentifier]:
-        return (self.domain_id,)
+        return (self.domain_id, global_entity_id(GlobalEntityName.GLOBAL))
 
     @override
     def template_value(self, row: ProjectRow) -> ScopeTemplateValue:

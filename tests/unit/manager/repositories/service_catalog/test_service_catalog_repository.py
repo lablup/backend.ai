@@ -6,7 +6,10 @@ from datetime import UTC, datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
 from ai.backend.manager.models.service_catalog.row import (
     ServiceCatalogEndpointRow,
@@ -27,10 +30,10 @@ class TestServiceCatalogRepositoryRegister:
     @pytest.fixture
     async def db_with_tables(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 ServiceCatalogRow,
                 ServiceCatalogEndpointRow,
@@ -40,7 +43,7 @@ class TestServiceCatalogRepositoryRegister:
                 ScopeBindingRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def repository(self, db_with_tables: ExtendedAsyncSAEngine) -> ServiceCatalogRepository:
@@ -67,7 +70,7 @@ class TestServiceCatalogRepositoryRegister:
             metadata={},
         )
 
-    async def test_new_service_is_put_in_the_graph_in_no_scope(
+    async def test_new_service_is_put_in_the_graph_in_the_global_scope(
         self,
         repository: ServiceCatalogRepository,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -88,8 +91,14 @@ class TestServiceCatalogRepositoryRegister:
                     )
                 )
             ).all()
+            global_node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == GlobalEntityType(),
+                    VirtualEntityRow.entity_id == global_entity_id(GlobalEntityName.GLOBAL),
+                )
+            )
         assert node_id is not None
-        assert holders == [node_id]
+        assert set(holders) == {node_id, global_node_id}
 
     async def test_reregistration_keeps_the_node_and_replaces_endpoints(
         self,

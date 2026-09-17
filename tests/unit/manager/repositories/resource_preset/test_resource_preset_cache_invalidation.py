@@ -68,11 +68,11 @@ class TestResourcePresetCacheInvalidation:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 # FK dependency order: parents before children
                 DomainRow,
@@ -111,7 +111,7 @@ class TestResourcePresetCacheInvalidation:
                 association_groups_users,  # association table
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     async def test_scaling_group_name(
