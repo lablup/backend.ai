@@ -19,9 +19,11 @@ from typing import ClassVar
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DomainNotFound
@@ -80,8 +82,9 @@ class V2UserWriteOps(V2RosterWriteOps):
 
     async def create_user(self, creation: FullUserCreator) -> FullUserCreatorResult:
         """Provision a user: the row, its virtual entity, the domain that owns and
-        governs it, the roles its scope's and its domain's presets call for, the keypair
-        it authorizes with, and the personal project it alone belongs to."""
+        governs it, the roles its scope's, its domain's and the public scope's presets
+        call for, the keypair it authorizes with, and the personal project it alone
+        belongs to."""
         domain_id = creation.user.domain_id
         # The user is created in its domain, so the domain has to be in the graph
         # first: one created before the graph, or by a data migration, has no node yet.
@@ -90,7 +93,9 @@ class V2UserWriteOps(V2RosterWriteOps):
         # the spec is created in, so it owns and governs the user.
         user = await self.create_role_managed_entity(creation.user)
         user_id = UserID(user.id)
-        await self._grant_auto_assign_roles([user_id, domain_id], user_id)
+        await self._grant_auto_assign_roles(
+            [user_id, domain_id, global_entity_id(GlobalEntityName.PUBLIC)], user_id
+        )
         keypair = await self._create_default_keypair(user, creation)
         personal_project = await self._create_personal_project(user_id, user.username, domain_id)
         return FullUserCreatorResult(user=user, keypair=keypair, personal_project=personal_project)

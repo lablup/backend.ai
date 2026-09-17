@@ -480,6 +480,45 @@ class TestUserGraphProvisioning:
             ).all()
         assert list(held) == [declared_user_owner_preset]
 
+    async def test_the_user_holds_the_public_role(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+        public_role: RoleID,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+
+        async with db.begin_readonly_session() as session:
+            held = (
+                await session.scalars(
+                    sa.select(UserRoleRow.role_id).where(
+                        UserRoleRow.user_id == user_id,
+                        UserRoleRow.role_id == public_role,
+                    )
+                )
+            ).all()
+        assert list(held) == [public_role]
+
+
+@pytest.fixture
+async def public_role(db: ExtendedAsyncSAEngine) -> RoleID:
+    """An auto_assign role in the public global entity."""
+    role_id = RoleID(uuid.uuid4())
+    async with db.begin_session() as session:
+        session.add(
+            RoleRow(
+                id=role_id,
+                name="public_member",
+                status=RoleStatus.ACTIVE,
+                auto_assign=True,
+                scope_type=GlobalEntityType(),
+                scope_id=global_entity_id(GlobalEntityName.PUBLIC),
+            )
+        )
+        await session.commit()
+    return role_id
+
 
 @pytest.fixture
 async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:

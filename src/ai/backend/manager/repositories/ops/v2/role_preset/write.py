@@ -15,6 +15,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleID
@@ -27,6 +28,7 @@ from ai.backend.common.data.entity.types import (
 )
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.errors.role_preset import RolePresetScopeNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -103,8 +105,9 @@ class RolePresetWriteOps(PermissionWriteOps):
             for spec in await self._preset_role_specs(values)
             if (str(spec.role_preset_id), str(spec.entity)) not in held
         ])
+        public_id = global_entity_id(GlobalEntityName.PUBLIC)
         for user_id, domain_id in await self._users_by_domain():
-            await self._grant_auto_assign_roles([user_id, domain_id], user_id)
+            await self._grant_auto_assign_roles([user_id, domain_id, public_id], user_id)
         roster = await self._project_roster()
         for user_id, project_id in roster:
             await self._grant_auto_assign_roles([project_id], user_id)

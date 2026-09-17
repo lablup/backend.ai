@@ -333,6 +333,14 @@ class TestProvisionPresetRoles:
             role = await _role(db, provisioned.presets["user_owner"], user_id)
             assert await _holders(db, role.id) == {user_id}
 
+    async def test_every_user_holds_the_public_role(
+        self, db: ExtendedAsyncSAEngine, provisioned: Scene
+    ) -> None:
+        role = await _role(
+            db, provisioned.presets["public_member"], global_entity_id(GlobalEntityName.PUBLIC)
+        )
+        assert await _holders(db, role.id) == set(provisioned.users.values())
+
     async def test_a_roster_member_holds_the_project_s_auto_assign_role(
         self, db: ExtendedAsyncSAEngine, provisioned: Scene
     ) -> None:
