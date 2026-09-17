@@ -34,6 +34,7 @@ from ai.backend.common.types import ClusterMode, IntrinsicSlotNames, VFolderMoun
 from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionData
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
@@ -112,6 +113,8 @@ class LaidMaterials:
     image: Laid[ImageData]
     folder: Laid[VFolderData]
     runtime: Laid[RuntimeVariantData]
+    cpu: Laid[ResourceSlotTypeData]
+    memory: Laid[ResourceSlotTypeData]
 
 
 @dataclass(frozen=True)
@@ -142,9 +145,9 @@ class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
             own = seed.personal_project_of(self.folder_owner)
             seed.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), self.folder_owner))
         runtime = seed.creating(SeedRuntimeVariant())
-        seed.creating(SeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
-        seed.creating(SeedSlotType(IntrinsicSlotNames.MEMORY))
-        return LaidMaterials(image=image, folder=folder, runtime=runtime)
+        cpu = seed.creating(SeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
+        memory = seed.creating(SeedSlotType(IntrinsicSlotNames.MEMORY))
+        return LaidMaterials(image=image, folder=folder, runtime=runtime, cpu=cpu, memory=memory)
 
     def _folder(self, seed: Seeder) -> Laid[VFolderData]:
         if self.lender is None:
