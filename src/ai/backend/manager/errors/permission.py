@@ -18,6 +18,8 @@ from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode, FieldNotFoundError
 
 __all__ = (
+    "GlobalEntityMissing",
+    "GlobalEntityNotLoaded",
     "InvalidFieldPermission",
     "InvalidRoleSeed",
     "InvalidPermissionOperation",
@@ -175,4 +177,34 @@ class InvalidRoleSeed(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class GlobalEntityNotLoaded(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a global entity id is read before the ids are loaded."""
+
+    error_type = "https://api.backend.ai/probs/global-entity-not-loaded"
+    error_title = "The global entity ids are not loaded."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_READY,
+        )
+
+
+class GlobalEntityMissing(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a global entity row or its virtual entity does not exist."""
+
+    error_type = "https://api.backend.ai/probs/global-entity-missing"
+    error_title = "A global entity or its virtual entity does not exist."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
