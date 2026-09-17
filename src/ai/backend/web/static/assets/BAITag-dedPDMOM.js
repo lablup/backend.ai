@@ -1,2 +1,0 @@
-import{j as v,fA as m,gm as p,g as x,p as j}from"./index-DPebpL40.js";const d=({color:g,icon:n,closable:b,onClose:t,children:a,className:i,style:f,onClick:r,variant:u,...s})=>{if(b){const o=typeof a=="string"||typeof a=="number"?String(a):"";return v.jsx(m,{...s,className:i,color:p(g),icon:n,label:o,isLabelHidden:o==="",endContent:o===""?a:void 0,onRemove:e=>t==null?void 0:t(e),onClick:r?e=>r(e):void 0})}return v.jsx(x,{...s,className:i,style:f,variant:j(g),icon:n,label:a,onClick:r})};export{d as B};
-//# sourceMappingURL=BAITag-dedPDMOM.js.map
