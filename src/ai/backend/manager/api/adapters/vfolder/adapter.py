@@ -112,17 +112,12 @@ from ai.backend.manager.models.vfolder.creators import (
     VFolderBaseCreator,
 )
 from ai.backend.manager.models.vfolder.orders import (
-    DEFAULT_BACKWARD_ORDER as VFOLDER_DEFAULT_BACKWARD_ORDER,
-)
-from ai.backend.manager.models.vfolder.orders import (
     DEFAULT_FORWARD_ORDER as VFOLDER_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.vfolder.orders import (
-    TIEBREAKER_ORDER as VFOLDER_TIEBREAKER_ORDER,
 )
 from ai.backend.manager.models.vfolder.orders import (
     resolve_order as resolve_vfolder_order,
 )
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -179,10 +174,7 @@ from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolder
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
     forward_order=VFOLDER_DEFAULT_FORWARD_ORDER,
-    backward_order=VFOLDER_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=VFolderConditions.by_cursor_forward,
-    backward_condition_factory=VFolderConditions.by_cursor_backward,
-    tiebreaker_order=VFOLDER_TIEBREAKER_ORDER,
+    cursor_column=VFolderRow.id,
 )
 
 

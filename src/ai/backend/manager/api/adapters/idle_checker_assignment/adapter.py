@@ -44,6 +44,7 @@ from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignm
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerAssignmentOrders
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -76,10 +77,7 @@ from ai.backend.manager.services.rbac.processors import RbacProcessors
 def _get_idle_checker_assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=IdleCheckerAssignmentOrders.created_at(ascending=False),
-        backward_order=IdleCheckerAssignmentOrders.created_at(ascending=True),
-        forward_condition_factory=IdleCheckerAssignmentConditions.by_cursor_forward,
-        backward_condition_factory=IdleCheckerAssignmentConditions.by_cursor_backward,
-        tiebreaker_order=IdleCheckerAssignmentOrders.id(ascending=True),
+        cursor_column=IdleCheckerBindingRow.id,
     )
 
 

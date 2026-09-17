@@ -9,6 +9,7 @@ import pytest
 
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.app_config_definition.conditions import (
@@ -81,6 +82,14 @@ async def existing_definition(
     repository: OpsRepository[AppConfigDefinitionData],
 ) -> AppConfigDefinitionData:
     return await repository.create_global_entity(AppConfigDefinitionCreator(config_name="menu"))
+
+
+@pytest.fixture
+def pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
+        cursor_column=AppConfigDefinitionRow.id,
+    )
 
 
 @pytest.fixture
@@ -237,6 +246,7 @@ class TestAdminSearch:
         self,
         repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
+        pagination_spec: PaginationSpec,
     ) -> None:
         by_created_desc = sorted(seeded_definitions, key=lambda d: d.created_at, reverse=True)
         cursor = by_created_desc[0].id
@@ -245,7 +255,7 @@ class TestAdminSearch:
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
-                    cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
+                    cursor_condition=pagination_spec.forward_condition(str(cursor)),
                 )
             )
         )

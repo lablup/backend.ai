@@ -323,36 +323,6 @@ class SessionSchedulingHistoryConditions:
     by_error_code_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.message))
 
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(SessionSchedulingHistoryRow.created_at)
-                .where(SessionSchedulingHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return SessionSchedulingHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(SessionSchedulingHistoryRow.created_at)
-                .where(SessionSchedulingHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return SessionSchedulingHistoryRow.created_at > subquery
-
-        return inner
-
     # DateTime filter conditions
     @staticmethod
     def by_created_at_before(dt: datetime) -> QueryCondition:
@@ -685,36 +655,6 @@ class KernelSchedulingHistoryConditions:
     by_error_code_in = staticmethod(make_string_in_factory(KernelSchedulingHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(KernelSchedulingHistoryRow.message))
 
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(KernelSchedulingHistoryRow.created_at)
-                .where(KernelSchedulingHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return KernelSchedulingHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(KernelSchedulingHistoryRow.created_at)
-                .where(KernelSchedulingHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return KernelSchedulingHistoryRow.created_at > subquery
-
-        return inner
-
     # DateTime filter conditions
     @staticmethod
     def by_created_at_before(dt: datetime) -> QueryCondition:
@@ -1041,36 +981,6 @@ class DeploymentHistoryConditions:
     by_phase_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.phase))
     by_error_code_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.message))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DeploymentHistoryRow.created_at)
-                .where(DeploymentHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DeploymentHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DeploymentHistoryRow.created_at)
-                .where(DeploymentHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DeploymentHistoryRow.created_at > subquery
-
-        return inner
 
     # DateTime filter conditions
     @staticmethod
@@ -1442,36 +1352,6 @@ class RouteHistoryConditions:
     by_phase_in = staticmethod(make_string_in_factory(RouteHistoryRow.phase))
     by_error_code_in = staticmethod(make_string_in_factory(RouteHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(RouteHistoryRow.message))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RouteHistoryRow.created_at)
-                .where(RouteHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RouteHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RouteHistoryRow.created_at)
-                .where(RouteHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return RouteHistoryRow.created_at > subquery
-
-        return inner
 
     # DateTime filter conditions
     @staticmethod

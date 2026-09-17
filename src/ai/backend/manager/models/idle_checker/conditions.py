@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
-from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -139,34 +138,6 @@ class IdleCheckerConditions:
 
         return inner
 
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = IdleCheckerID(UUID(cursor_id))
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
-                sa.select(IdleCheckerRow.created_at)
-                .where(IdleCheckerRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return IdleCheckerRow.created_at < cursor_created_at
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = IdleCheckerID(UUID(cursor_id))
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
-                sa.select(IdleCheckerRow.created_at)
-                .where(IdleCheckerRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return IdleCheckerRow.created_at > cursor_created_at
-
-        return inner
-
 
 class IdleCheckerAssignmentConditions:
     @staticmethod
@@ -283,34 +254,6 @@ class IdleCheckerAssignmentConditions:
     def by_updated_at_equals(value: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return IdleCheckerBindingRow.updated_at == value
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
-                sa.select(IdleCheckerBindingRow.created_at)
-                .where(IdleCheckerBindingRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return IdleCheckerBindingRow.created_at < cursor_created_at
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            cursor_created_at = (
-                sa.select(IdleCheckerBindingRow.created_at)
-                .where(IdleCheckerBindingRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return IdleCheckerBindingRow.created_at > cursor_created_at
 
         return inner
 
