@@ -16,11 +16,14 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.repository import CheckConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     FAMILIES,
+    KEYPAIR,
+    OWN_FAMILIES,
     APolicyAndACaller,
     APolicyAndSomeone,
     Edit,
@@ -123,6 +126,38 @@ class GivingNothingChangesNothing(
 
 
 @dataclass(frozen=True)
+class ANullableValueIsCleared(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    family: Family[Any, Any]
+    edit: Edit
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return f"clearing-a-nullable-value-of-a-{self.family.label}-empties-it"
+
+    @override
+    def describe(self) -> str:
+        return (
+            f"비울 수 있는 항목에 값이 설정된 {self.family.kind}을 슈퍼관리자가 그 항목을 비우도록 "
+            "수정하면, 그 항목이 비어 있는 노드가 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN, holding_optional=True)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return Editing(self.family, self.edit)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return ThePolicyNode(self.family, self.started, changed=self.edit.changed)
+
+
+@dataclass(frozen=True)
 class ANonNullableValueStaysWhenCleared(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
@@ -151,6 +186,34 @@ class ANonNullableValueStaysWhenCleared(
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
         return ThePolicyNode(self.family, self.started)
+
+
+@dataclass(frozen=True)
+class APriorityCapMovedOutOfRangeIsRefused(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    @override
+    def summary(self) -> str:
+        return "moving-the-priority-cap-outside-the-session-range-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 "
+            "하면, 제약 위반으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return Editing(KEYPAIR, KEYPAIR.priority_moved_out_of_range())
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheCallIsRefused(CheckConstraintViolationError)
 
 
 @dataclass(frozen=True)
@@ -216,7 +279,12 @@ class ANameNothingAnswersToIsNotFound(
 SCENARIOS: list[EditingStep] = [
     *(OneLimitChangesAndNothingElse(family, started=datetime.now(UTC)) for family in FAMILIES),
     *(GivingNothingChangesNothing(family, started=datetime.now(UTC)) for family in FAMILIES),
+    *(
+        ANullableValueIsCleared(family, family.clearing_a_nullable(), started=datetime.now(UTC))
+        for family in OWN_FAMILIES
+    ),
     *(ANonNullableValueStaysWhenCleared(family, started=datetime.now(UTC)) for family in FAMILIES),
+    APriorityCapMovedOutOfRangeIsRefused(),
     *(AUserGrantedNothingMayNotEdit(family) for family in FAMILIES),
     *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
 ]
