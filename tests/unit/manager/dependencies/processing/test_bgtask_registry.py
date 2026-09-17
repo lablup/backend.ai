@@ -30,7 +30,8 @@ class TestBgtaskRegistryDependency:
         mock_registry = MagicMock()
         mock_registry_class.return_value = mock_registry
 
-        mock_processors = MagicMock()
+        mock_container_registry_service = MagicMock()
+        mock_image_service = MagicMock()
         mock_bgtask_manager = MagicMock()
         mock_repositories = MagicMock()
         mock_agent_client_pool = MagicMock()
@@ -40,7 +41,8 @@ class TestBgtaskRegistryDependency:
 
         dependency = BgtaskRegistryDependency()
         registry_input = BgtaskRegistryInput(
-            processors=mock_processors,
+            container_registry_service=mock_container_registry_service,
+            image_service=mock_image_service,
             background_task_manager=mock_bgtask_manager,
             repositories=mock_repositories,
             agent_client_pool=mock_agent_client_pool,
@@ -55,11 +57,11 @@ class TestBgtaskRegistryDependency:
             # Verify 4 handlers registered
             assert mock_registry.register.call_count == 4
 
-            # Verify RescanImagesHandler created with processors
-            mock_rescan_images.assert_called_once_with(mock_processors)
+            # Verify RescanImagesHandler created with the container registry service
+            mock_rescan_images.assert_called_once_with(mock_container_registry_service)
 
-            # Verify PurgeImagesHandler created with processors
-            mock_purge_images.assert_called_once_with(mock_processors)
+            # Verify PurgeImagesHandler created with the image service
+            mock_purge_images.assert_called_once_with(mock_image_service)
 
             # Verify RescanGPUAllocMapsHandler created with correct args
             mock_rescan_gpu.assert_called_once_with(

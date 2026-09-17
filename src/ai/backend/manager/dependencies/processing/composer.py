@@ -375,6 +375,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ),
         )
         processors = processor_bundle.processors
+        services = processor_bundle.services
 
         # Step 3: Register Dispatchers and start EventDispatcher
         dispatchers = Dispatchers(
@@ -396,7 +397,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 idle_checker_host=setup_input.idle_checker_host,
                 event_dispatcher_plugin_ctx=setup_input.event_dispatcher_plugin_ctx,
                 repositories=setup_input.repositories,
-                processors_factory=lambda: processors,
+                notification_service=services.notification,
+                artifact_service=services.artifact,
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 event_producer=setup_input.event_producer,
@@ -409,7 +411,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         await stack.enter_dependency(
             BgtaskRegistryDependency(),
             BgtaskRegistryInput(
-                processors=processors,
+                container_registry_service=services.container_registry,
+                image_service=services.image,
                 background_task_manager=setup_input.background_task_manager,
                 repositories=setup_input.repositories,
                 agent_client_pool=setup_input.agent_client_pool,
