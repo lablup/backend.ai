@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import MutableMapping
 from pathlib import Path
@@ -12,15 +13,17 @@ from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseError
 from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.scratch.types import KernelRecoveryScratchData
+from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
 
 
 @pytest.fixture
-def writer() -> ContainerBasedKernelRegistryWriter:
+def writer(tmp_path: Path) -> ContainerBasedKernelRegistryWriter:
     """Writer instance with scratch root."""
-    return ContainerBasedKernelRegistryWriter(Path("/tmp/scratch"))
+    return ContainerBasedKernelRegistryWriter(tmp_path)
 
 
 @pytest.fixture
@@ -87,6 +90,37 @@ def mock_config_mgr() -> MagicMock:
     return mgr
 
 
+@pytest.fixture
+def serialized_recovery_data() -> KernelRecoveryScratchData:
+    data = MagicMock()
+    data.model_dump_json.return_value = "{}"
+    return cast(KernelRecoveryScratchData, data)
+
+
+@pytest.fixture
+def registry_with_destroyable_kernel(
+    kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+    mock_kernel: MagicMock,
+    tmp_path: Path,
+) -> tuple[KernelId, Path]:
+    destroyed_kernel_id = KernelId(uuid.uuid4())
+    kernel_registry_data[destroyed_kernel_id] = mock_kernel
+    for kernel_id in kernel_registry_data:
+        config_path = ScratchUtils.get_scratch_kernel_config_dir(tmp_path, kernel_id)
+        config_path.mkdir(parents=True)
+    return (
+        destroyed_kernel_id,
+        ScratchUtils.get_scratch_kernel_config_dir(tmp_path, destroyed_kernel_id),
+    )
+
+
+@pytest.fixture
+def existing_config_path(mock_kernel: MagicMock, tmp_path: Path) -> Path:
+    config_path = ScratchUtils.get_scratch_kernel_config_dir(tmp_path, mock_kernel.kernel_id)
+    config_path.mkdir(parents=True)
+    return config_path
+
+
 class TestSaveKernelRegistry:
     """Tests for save_kernel_registry method."""
 
@@ -109,6 +143,31 @@ class TestSaveKernelRegistry:
             # Should not raise, just skip the kernel
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
+    async def test_a_kernel_not_yet_fully_built_is_skipped_without_a_traceback(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Registered before its REPL ports exist: ordinary under concurrent creates, and its
+        own start writes it a moment later. One warning line, not an exception traceback."""
+        with (
+            patch.object(
+                writer,
+                "_parse_recovery_data_from_kernel",
+                side_effect=KernelRecoveryDataParseError(),
+            ),
+            patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
+            patch("ai.backend.agent.kernel_registry.writer.container.ScratchConfig"),
+            caplog.at_level(logging.WARNING, logger="ai.backend.agent.kernel_registry"),
+        ):
+            await writer.save_kernel_registry(kernel_registry_data, metadata)
+        records = [r for r in caplog.records if "not complete yet" in r.getMessage()]
+        assert len(records) == 1
+        assert records[0].levelno == logging.WARNING
+        assert records[0].exc_info is None
+
     async def test_a_kernel_created_while_saving_does_not_break_the_save(
         self,
         writer: ContainerBasedKernelRegistryWriter,
@@ -122,7 +181,7 @@ class TestSaveKernelRegistry:
         failed on `dictionary changed size during iteration`, in its own save."""
         registered_meanwhile = KernelId(uuid.uuid4())
 
-        async def _register_while_saving(_data: object) -> None:
+        async def _register_while_saving(_data: object, **_kwargs: object) -> None:
             kernel_registry_data[registered_meanwhile] = mock_kernel
 
         mock_config_mgr.save_json_recovery_data = AsyncMock(side_effect=_register_while_saving)

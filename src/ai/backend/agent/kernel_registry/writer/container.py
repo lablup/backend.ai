@@ -56,8 +56,13 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             try:
                 original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
             except KernelRecoveryDataParseError as e:
-                log.exception(
-                    "Failed to parse recovery data from kernel {}: {}", kernel.kernel_id, str(e)
+                # A kernel that is registered but not yet fully built -- its REPL ports arrive a
+                # step later -- has nothing to record yet, and its own start writes it. Ordinary
+                # under concurrent creates; a traceback here reported a race as a fault.
+                log.warning(
+                    "Skipped saving kernel {}: its recovery data is not complete yet ({})",
+                    kernel.kernel_id,
+                    e.__cause__ or e,
                 )
                 continue
             if original_recovery_data is None:
