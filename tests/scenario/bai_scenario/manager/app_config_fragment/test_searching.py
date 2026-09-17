@@ -1,7 +1,7 @@
 """설정 조각 검색 — 한 스코프 검색과 전체 검색이 서로 다른 검사로 막는다.
 
 한 스코프 검색은 지정한 소유자의 스코프에 부여된 읽기 권한을 검사하고, 공개 스코프에는 보호할
-스코프가 없어 인증만으로 응답한다. 전체 검색은 전역 역할이 있어야 한다.
+스코프가 없어 인증만으로 응답한다. 전체 검색은 슈퍼관리자인지 검사한다.
 """
 
 from __future__ import annotations
@@ -326,7 +326,7 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 전역 역할로 보호된다"
+        return "공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:

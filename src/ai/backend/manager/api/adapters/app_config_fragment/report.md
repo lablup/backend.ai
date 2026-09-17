@@ -970,7 +970,7 @@ Then
 
 #### [the-superadmin-counts-every-fragment-across-scopes](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
 
-공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 전역 역할로 보호된다
+공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다
 
 Given
 
@@ -1382,7 +1382,7 @@ Then
 
 #### [the-superadmin-writes-a-public-fragment-owned-by-no-one](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
 
-슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 전역 역할로 보호된다
+슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다
 
 Given
 

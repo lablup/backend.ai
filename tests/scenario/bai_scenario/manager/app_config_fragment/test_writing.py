@@ -1,8 +1,8 @@
 """설정 조각 쓰기 — 누가 어디에 쓸 수 있고, 허용 목록 항목이 무엇을 막는가.
 
 자기 조각 쓰기와 지정한 스코프에 쓰기가 한 모듈에 있다. 소유자가 있는 쓰기는 그 소유자의
-스코프에 부여된 권한을 검사하고, 공개 조각 쓰기는 대응하는 스코프가 없어 전역 역할이 있어야
-한다.
+스코프에 부여된 권한을 검사하고, 공개 조각 쓰기는 대응하는 스코프가 없어 슈퍼관리자인지
+검사한다.
 """
 
 from __future__ import annotations
@@ -407,7 +407,7 @@ class TheSuperadminWritesAPublicFragment(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 전역 역할로 보호된다"
+        return "슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다"
 
     @override
     def given(self) -> Given[SeedingSession, ATargetAndACaller]:
