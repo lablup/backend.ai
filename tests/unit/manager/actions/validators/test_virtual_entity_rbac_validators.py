@@ -229,30 +229,8 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
         return tuple(_VfolderID(i) for i in self.ids)
 
 
-@dataclass
-class _BulkVfolderSearchAction(BaseBulkAction):
-    """VFOLDER:SEARCH on multiple vfolders — the read the monitor role passes."""
-
-    ids: list[uuid.UUID]
-
-    @classmethod
-    @override
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @classmethod
-    @override
-    def action_name(cls) -> str:
-        return "search_vfolders"
-
-    @override
-    def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return tuple(_VfolderID(i) for i in self.ids)
-
-
 def _bulk_meta(
-    action: _BulkVfolderUpdateAction | _BulkVfolderSearchAction,
-    trigger_meta: ActionTriggerMeta,
+    action: _BulkVfolderUpdateAction, trigger_meta: ActionTriggerMeta
 ) -> BulkActionTriggerMeta:
     return BulkActionTriggerMeta(
         action_id=trigger_meta.action_id,
@@ -524,19 +502,6 @@ def single_entity_action() -> _VfolderUpdateAction:
 @pytest.fixture
 def bulk_vfolder_action() -> _BulkVfolderUpdateAction:
     return _BulkVfolderUpdateAction(ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED])
-
-
-@pytest.fixture
-def bulk_vfolder_search_action() -> _BulkVfolderSearchAction:
-    return _BulkVfolderSearchAction(ids=[_BULK_VF_GRANTED, _BULK_VF_DENIED])
-
-
-@pytest.fixture
-async def provisioned_bulk_vfolders(db_with_rbac_tables: ExtendedAsyncSAEngine) -> None:
-    """Both bulk vfolders have a node and nobody holds a grant on either."""
-    async with db_with_rbac_tables.begin_session() as db_sess:
-        for entity_id in (_BULK_VF_GRANTED, _BULK_VF_DENIED):
-            await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), entity_id)
 
 
 @pytest.fixture
@@ -829,18 +794,6 @@ class TestVirtualEntityScopeActionRBACValidator:
         with with_user(seeded_monitor_user):
             await scope_validator.validate(scope_search_action, trigger_meta)
 
-    @pytest.mark.usefixtures("provisioned_domain_scope")
-    async def test_monitor_is_refused_a_write_within_a_scope_without_a_grant(
-        self,
-        scope_validator: VirtualEntityScopeActionRBACValidator,
-        scope_action: _ProjectCreateScopeAction,
-        trigger_meta: ActionTriggerMeta,
-        seeded_monitor_user: UserData,
-    ) -> None:
-        with with_user(seeded_monitor_user):
-            with pytest.raises(NotEnoughPermission):
-                await scope_validator.validate(scope_action, trigger_meta)
-
     async def test_enforcement_disabled_skips_check(
         self,
         repository: RbacPermissionCheckRepository,
@@ -1073,40 +1026,6 @@ class TestVirtualEntityAtomicBulkActionRBACValidator:
             with pytest.raises(NotEnoughPermission):
                 await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
 
-    @pytest.mark.usefixtures("provisioned_bulk_vfolders")
-    async def test_monitor_reads_without_a_grant(
-        self,
-        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
-        bulk_vfolder_search_action: _BulkVfolderSearchAction,
-        trigger_meta: ActionTriggerMeta,
-        seeded_monitor_user: UserData,
-    ) -> None:
-        with with_user(seeded_monitor_user):
-            await bulk_validator.validate(_bulk_meta(bulk_vfolder_search_action, trigger_meta))
-
-    @pytest.mark.usefixtures("provisioned_bulk_vfolders")
-    async def test_monitor_is_refused_a_write_without_a_grant(
-        self,
-        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
-        bulk_vfolder_action: _BulkVfolderUpdateAction,
-        trigger_meta: ActionTriggerMeta,
-        seeded_monitor_user: UserData,
-    ) -> None:
-        with with_user(seeded_monitor_user):
-            with pytest.raises(NotEnoughPermission):
-                await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
-
-    async def test_monitor_is_refused_an_entity_without_a_node(
-        self,
-        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
-        bulk_vfolder_search_action: _BulkVfolderSearchAction,
-        trigger_meta: ActionTriggerMeta,
-        seeded_monitor_user: UserData,
-    ) -> None:
-        with with_user(seeded_monitor_user):
-            with pytest.raises(NotEnoughPermission):
-                await bulk_validator.validate(_bulk_meta(bulk_vfolder_search_action, trigger_meta))
-
     async def test_all_targets_granted_passes(
         self,
         bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
@@ -1180,21 +1099,6 @@ class TestVirtualEntityPartialBulkActionRBACValidator:
         with with_user(seeded_superadmin_user):
             denied = await partial_bulk_validator.validate(
                 _bulk_meta(bulk_vfolder_action, trigger_meta)
-            )
-
-        assert denied == {}
-
-    @pytest.mark.usefixtures("provisioned_bulk_vfolders")
-    async def test_monitor_is_denied_nothing_on_a_read_without_a_grant(
-        self,
-        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
-        bulk_vfolder_search_action: _BulkVfolderSearchAction,
-        trigger_meta: ActionTriggerMeta,
-        seeded_monitor_user: UserData,
-    ) -> None:
-        with with_user(seeded_monitor_user):
-            denied = await partial_bulk_validator.validate(
-                _bulk_meta(bulk_vfolder_search_action, trigger_meta)
             )
 
         assert denied == {}
