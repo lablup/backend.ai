@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import sqlalchemy as sa
 from sqlalchemy.orm import (
     Mapped,
@@ -36,6 +38,9 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     scope_type: Mapped[EntityType] = mapped_column(
         "scope_type", sa.String(length=32), nullable=False
     )
+    # The one scope of ``scope_type`` the preset's role is created in; NULL creates it
+    # in every scope of the type.
+    scope_id: Mapped[UUID | None] = mapped_column("scope_id", GUID(), nullable=True)
     # Default for the ``auto_assign`` flag copied onto roles instantiated from this preset.
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()

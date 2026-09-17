@@ -18,6 +18,7 @@ _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
 _USER_OWNER_REVISION = "dc61fa027fc1_assign_every_user_their_user_owner_role"
 _DOMAIN_MEMBER_REVISION = "e7d2a9c41b60_assign_every_user_their_domain_member_role"
 _PROJECT_MEMBER_READ_REVISION = "a0f597deb5e5_grant_project_members_read_on_their_project"
+_PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -44,6 +45,11 @@ def project_member_read_migration() -> Any:
 
 
 @pytest.fixture(scope="module")
+def public_member_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_PUBLIC_MEMBER_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
 def fixture() -> dict[str, Any]:
     path = _REPOSITORY / "fixtures/manager/example-role-presets.json"
     loaded: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
@@ -56,6 +62,7 @@ class TestMigrationMatchesFixture:
         migration: Any,
         user_owner_migration: Any,
         domain_member_migration: Any,
+        public_member_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         # The user_owner revision turns that preset's auto_assign on afterwards.
@@ -77,6 +84,13 @@ class TestMigrationMatchesFixture:
             True,
             False,
         ))
+        written.add((
+            public_member_migration._PRESET_ID,
+            public_member_migration._PRESET_NAME,
+            public_member_migration._SCOPE_TYPE,
+            True,
+            False,
+        ))
         seeded = {
             (row["id"], row["name"], row["scope_type"], row["auto_assign"], row["deleted"])
             for row in fixture["role_presets"]
@@ -88,6 +102,7 @@ class TestMigrationMatchesFixture:
         migration: Any,
         domain_member_migration: Any,
         project_member_read_migration: Any,
+        public_member_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         written = {
@@ -114,6 +129,21 @@ class TestMigrationMatchesFixture:
                 bit,
             )
             for entity_type, bits in domain_member_migration._GRANTS
+            for bit in bits
+        }
+        written |= {
+            (
+                public_member_migration._identify(
+                    "role_permission_preset",
+                    public_member_migration._PRESET_ID,
+                    entity_type,
+                    str(bit),
+                ),
+                public_member_migration._PRESET_ID,
+                entity_type,
+                bit,
+            )
+            for entity_type, bits in public_member_migration._GRANTS
             for bit in bits
         }
         written.add((

@@ -1,10 +1,11 @@
-"""RolePresetWriteOps.provision_preset_roles: every domain, project and user in the graph
-gets the role of each active preset it lacks, and the roles its scope hands out on its own."""
+"""RolePresetWriteOps.provision_preset_roles: every domain, project, user and global entity in
+the graph gets the role of each active preset it lacks, and the roles its scope hands out on
+its own. A preset pointed at one scope gets its role there alone."""
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
 
 import pytest
@@ -12,16 +13,19 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.errors.role_preset import RolePresetScopeNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -76,6 +80,7 @@ _PRESETS: list[tuple[str, EntityType, bool, bool]] = [
     ("project_admin", ProjectEntityType(), False, False),
     ("project_member", ProjectEntityType(), True, False),
     ("user_owner", UserEntityType(), True, False),
+    ("public_member", GlobalEntityType(), True, False),
     ("retired", ProjectEntityType(), False, True),
 ]
 
@@ -94,10 +99,10 @@ class Scene:
 
 @pytest.fixture
 async def db(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(database_connection, _TABLES):
-        yield database_connection
+    async with with_tables(global_entity_ids, _TABLES):
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -215,9 +220,20 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
     )
 
 
-async def _provision(db: ExtendedAsyncSAEngine, scene: Scene) -> None:
+def _preset_scopes(scene: Scene) -> dict[RolePresetID, EntityIdentifier]:
+    return {scene.presets["public_member"]: global_entity_id(GlobalEntityName.PUBLIC)}
+
+
+async def _provision(
+    db: ExtendedAsyncSAEngine,
+    scene: Scene,
+    preset_scopes: Mapping[RolePresetID, EntityIdentifier] | None = None,
+) -> None:
     async with RolePresetOpsProvider(db).write_ops() as w:
-        await w.provision_preset_roles([scene.presets["project_admin"]])
+        await w.provision_preset_roles(
+            [scene.presets["project_admin"]],
+            _preset_scopes(scene) if preset_scopes is None else preset_scopes,
+        )
 
 
 async def _role(db: ExtendedAsyncSAEngine, preset_id: uuid.UUID, scope_id: uuid.UUID) -> RoleRow:
@@ -265,6 +281,7 @@ class TestProvisionPresetRoles:
             ("user_owner", users["alice"]),
             ("user_owner", users["bob"]),
             ("user_owner", users["carol"]),
+            ("public_member", global_entity_id(GlobalEntityName.PUBLIC)),
         }
 
     async def test_a_created_role_is_owned_by_its_scope(
@@ -356,6 +373,69 @@ class TestProvisionPresetRoles:
         before = await snapshot()
         await _provision(db, provisioned)
         assert await snapshot() == before
+
+
+class TestAScopedPreset:
+    """A preset pointed at one scope has its role there alone."""
+
+    async def test_the_preset_records_its_scope(
+        self, db: ExtendedAsyncSAEngine, provisioned: Scene
+    ) -> None:
+        async with db.begin_readonly_session() as sess:
+            scope_id = await sess.scalar(
+                sa.select(RolePresetRow.scope_id).where(
+                    RolePresetRow.id == provisioned.presets["public_member"]
+                )
+            )
+        assert scope_id == global_entity_id(GlobalEntityName.PUBLIC)
+
+    async def test_no_other_scope_of_its_type_gets_the_role(
+        self, db: ExtendedAsyncSAEngine, provisioned: Scene
+    ) -> None:
+        async with db.begin_readonly_session() as sess:
+            scope_ids = (
+                await sess.scalars(
+                    sa.select(RoleRow.scope_id).where(
+                        RoleRow.role_preset_id == provisioned.presets["public_member"]
+                    )
+                )
+            ).all()
+        assert scope_ids == [global_entity_id(GlobalEntityName.PUBLIC)]
+
+    async def test_the_role_holds_what_its_preset_states(
+        self, db: ExtendedAsyncSAEngine, scene: Scene
+    ) -> None:
+        async with db.begin_session() as sess:
+            sess.add(
+                RolePermissionPresetRow(
+                    role_preset_id=scene.presets["public_member"],
+                    entity_type=VFolderEntityType(),
+                    permission=Permission.READ,
+                )
+            )
+        await _provision(db, scene)
+        role = await _role(
+            db, scene.presets["public_member"], global_entity_id(GlobalEntityName.PUBLIC)
+        )
+        async with db.begin_readonly_session() as sess:
+            rows = (
+                await sess.execute(
+                    sa.select(PermissionRow.entity_type, PermissionRow.permission).where(
+                        PermissionRow.role_id == role.id
+                    )
+                )
+            ).all()
+        assert {(str(entity_type), Permission(bit)) for entity_type, bit in rows} == {
+            (str(VFolderEntityType()), Permission.READ)
+        }
+
+    async def test_a_scope_without_a_virtual_entity_is_refused(
+        self, db: ExtendedAsyncSAEngine, scene: Scene
+    ) -> None:
+        with pytest.raises(RolePresetScopeNotFound):
+            await _provision(
+                db, scene, {scene.presets["public_member"]: GlobalEntityID(uuid.uuid4())}
+            )
 
 
 class TestAHeldPresetRole:

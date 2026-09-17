@@ -4,8 +4,9 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.permission.types import Permission, role_scope_types
 
 # The vocabulary a role file writes an operation with, one name per permission bit.
@@ -22,8 +23,9 @@ class RoleSeed(BaseModel):
     """One seed role, as its file states it.
 
     The header fields are the ``role_presets`` row. The id is stated rather than
-    derived, so renaming a role leaves what points at it alone. ``permissions`` lists
-    every entity type, with an empty list where the role is granted nothing.
+    derived, so renaming a role leaves what points at it alone. ``scope`` names the one
+    global entity a ``global`` role is created in. ``permissions`` lists every entity
+    type, with an empty list where the role is granted nothing.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -31,6 +33,7 @@ class RoleSeed(BaseModel):
     id: RolePresetID
     name: str
     scope_type: EntityType
+    scope: GlobalEntityName | None = None
     auto_assign: bool
     permissions: dict[str, Permission]
 
@@ -38,10 +41,20 @@ class RoleSeed(BaseModel):
     @classmethod
     def _known_scope(cls, value: Any) -> Any:
         """The scope a role is created in, refusing one no role sits in."""
-        allowed = {str(scope) for scope in role_scope_types()}
+        allowed = {str(scope) for scope in (*role_scope_types(), GlobalEntityType())}
         if value not in allowed:
             raise ValueError(f"{value!r} is not a role scope; one of {sorted(allowed)}")
         return EntityType(value)
+
+    @model_validator(mode="after")
+    def _scope_named_for_global(self) -> Self:
+        """A ``global`` role names its scope; a role of any other type does not."""
+        is_global = self.scope_type == GlobalEntityType()
+        if is_global and self.scope is None:
+            raise ValueError("a global role names its scope")
+        if not is_global and self.scope is not None:
+            raise ValueError(f"a {self.scope_type} role is created in every {self.scope_type}")
+        return self
 
     @model_validator(mode="before")
     @classmethod

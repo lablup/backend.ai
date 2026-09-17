@@ -368,7 +368,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
     async def _preset_role_specs(
         self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
     ) -> list[_PresetRoleSpec]:
-        """The roles the active presets matching the scopes' types call for."""
+        """The roles the active presets matching the scopes' types call for. A preset
+        with a scope id calls for a role in that scope alone."""
         entities = list(entity_values)
         if not entities:
             return []
@@ -414,6 +415,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             )
             for entity in entities
             for preset in presets_by_scope_type[entity.entity_type()]
+            if preset.scope_id is None or preset.scope_id == entity
         ]
 
     def _preset_role_name(
