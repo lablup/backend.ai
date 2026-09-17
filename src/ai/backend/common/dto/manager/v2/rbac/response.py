@@ -5,6 +5,7 @@ Response DTOs for RBAC DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -30,6 +31,7 @@ __all__ = (
     "BulkRemoveRolePermissionsPayload",
     "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
+    "CreateRoleInvitationPayload",
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
@@ -95,6 +97,12 @@ class PurgeRolePayload(BaseResponseModel):
     """Payload for role purge mutation result."""
 
     id: UUID = Field(description="ID of the purged role")
+
+
+class CreateRoleInvitationPayload(BaseResponseModel):
+    """Payload of the removed role invitation creation. Never produced."""
+
+    items: list[Any] = Field(description="Created role invitations")
 
 
 class DeletePermissionPayload(BaseResponseModel):

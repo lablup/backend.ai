@@ -17,6 +17,7 @@ from alembic.util.pyfiles import load_python_file
 _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
 _USER_OWNER_REVISION = "dc61fa027fc1_assign_every_user_their_user_owner_role"
 _DOMAIN_MEMBER_REVISION = "e7d2a9c41b60_assign_every_user_their_domain_member_role"
+_PROJECT_MEMBER_READ_REVISION = "a0f597deb5e5_grant_project_members_read_on_their_project"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -35,6 +36,11 @@ def user_owner_migration() -> Any:
 @pytest.fixture(scope="module")
 def domain_member_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_DOMAIN_MEMBER_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def project_member_read_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_PROJECT_MEMBER_READ_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -78,7 +84,11 @@ class TestMigrationMatchesFixture:
         assert written == seeded
 
     def test_preset_permissions(
-        self, migration: Any, domain_member_migration: Any, fixture: dict[str, Any]
+        self,
+        migration: Any,
+        domain_member_migration: Any,
+        project_member_read_migration: Any,
+        fixture: dict[str, Any],
     ) -> None:
         written = {
             (
@@ -106,6 +116,17 @@ class TestMigrationMatchesFixture:
             for entity_type, bits in domain_member_migration._GRANTS
             for bit in bits
         }
+        written.add((
+            project_member_read_migration._identify(
+                "role_permission_preset",
+                project_member_read_migration._PRESET_ID,
+                project_member_read_migration._ENTITY_TYPE,
+                str(project_member_read_migration._READ),
+            ),
+            project_member_read_migration._PRESET_ID,
+            project_member_read_migration._ENTITY_TYPE,
+            project_member_read_migration._READ,
+        ))
         seeded = {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
             for row in fixture["role_permission_presets"]

@@ -14,8 +14,24 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     Then,
+    Told,
     Verdict,
 )
+
+
+@dataclass(frozen=True)
+class MissingResponse(Verdict):
+    """기대한 응답이 없을 때 성공 시나리오를 실패시킨다."""
+
+    raised: BaseException | None
+
+    @override
+    def told(self) -> Told:
+        if self.raised is None:
+            problem = "응답이 반환되어야 하는데 비어 있다"
+        else:
+            problem = f"응답 대신 {type(self.raised).__name__} 예외가 발생했다"
+        return Told("응답이 반환된다", problems=(problem,))
 
 
 @dataclass(frozen=True)
@@ -30,9 +46,7 @@ class NothingIsFound(Then[Any, Any]):
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
         page = answered.response
         if page is None:
-            return [
-                Refused(type(answered.raised) if answered.raised else Exception, answered.raised)
-            ]
+            return [MissingResponse(answered.raised)]
         return [
             Same("items", list(page.items), []),
             Same("total_count", page.total_count, 0),
