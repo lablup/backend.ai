@@ -325,7 +325,7 @@ async def assignment_seed(
         for scope in provisioned:
             await _provision(conn, scope)
     catalog: OpsRepository[IdleCheckerData] = OpsRepository(V2DBOpsProvider(database_engine))
-    checker = await catalog.create_global_entity(
+    checker = await catalog.create_entity(
         IdleCheckerCreator(
             name=f"icb-checker-{domain_id.hex[:8]}",
             description=None,

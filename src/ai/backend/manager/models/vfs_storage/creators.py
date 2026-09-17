@@ -6,13 +6,16 @@ from typing import override
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
 
 @dataclass
-class VFSStorageCreator(GlobalEntityCreator[VFSStorageRow, VFSStorageData]):
+class VFSStorageCreator(
+    CreatedInGlobal[VFSStorageRow], EntityCreator[VFSStorageRow, VFSStorageData]
+):
     """Creator for a VFS storage registration."""
 
     name: str

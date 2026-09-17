@@ -65,7 +65,7 @@ class IdleCheckerService:
     ) -> CreatedEntityOpsResult[IdleCheckerData]:
         await self._validate_utilization_labels(action.creator.spec)
         return CreatedEntityOpsResult(
-            data=await self._ops_repository.create_global_entity(action.to_creator())
+            data=await self._ops_repository.create_entity(action.to_creator())
         )
 
     async def update(self, action: UpdateIdleCheckerAction) -> EntityOpsResult[IdleCheckerData]:

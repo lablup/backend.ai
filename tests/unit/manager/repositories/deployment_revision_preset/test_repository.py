@@ -169,7 +169,7 @@ class TestCreate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        result = await ops.create_global_entity_with_fields(
+        result = await ops.create_entity_with_fields(
             _creator(), _slots(("cpu", "2"), ("mem", "1024"))
         )
         assert await _slot_map(database, result.data.id) == {
@@ -180,14 +180,14 @@ class TestCreate:
     async def test_first_preset_takes_the_rank_gap(
         self, ops: OpsRepository[DeploymentRevisionPresetData]
     ) -> None:
-        result = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "1")))
+        result = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "1")))
         assert result.data.rank == RANK_GAP
 
     async def test_each_preset_takes_the_next_rank(
         self, ops: OpsRepository[DeploymentRevisionPresetData]
     ) -> None:
-        first = await ops.create_global_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
-        second = await ops.create_global_entity_with_fields(_creator("p2"), _slots(("cpu", "1")))
+        first = await ops.create_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
+        second = await ops.create_entity_with_fields(_creator("p2"), _slots(("cpu", "1")))
         assert second.data.rank == first.data.rank + RANK_GAP
 
 
@@ -198,7 +198,7 @@ class TestUpdate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "2")))
+        created = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "2")))
 
         await repository.update(
             DeploymentPresetUpdater(preset_id=created.data.id),
@@ -216,7 +216,7 @@ class TestUpdate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "2")))
+        created = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "2")))
 
         updated = await repository.update(
             DeploymentPresetUpdater(
@@ -234,7 +234,7 @@ class TestUpdate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "2")))
+        created = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "2")))
 
         await repository.update(DeploymentPresetUpdater(preset_id=created.data.id), [])
 
@@ -248,7 +248,7 @@ class TestReadAndPurge:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
+        created = await ops.create_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
 
         fetched = await repository.get_by_id(created.data.id)
 
@@ -261,7 +261,7 @@ class TestReadAndPurge:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(
+        created = await ops.create_entity_with_fields(
             _creator(), _slots(("cpu", "1"), ("mem", "8"))
         )
 
@@ -287,7 +287,7 @@ class TestReadingBackWhatSqlComputed:
 
         sa.event.listen(database.sync_engine, "before_cursor_execute", record)
         try:
-            await ops.create_global_entity(_creator())
+            await ops.create_entity(_creator())
         finally:
             sa.event.remove(database.sync_engine, "before_cursor_execute", record)
 
@@ -304,7 +304,7 @@ class TestReadingBackWhatSqlComputed:
 
         sa.event.listen(database.sync_engine, "before_cursor_execute", record)
         try:
-            created = await ops.atomic_create_global_entities([
+            created = await ops.atomic_create_entities([
                 _creator("p1"),
                 _creator("p2"),
                 _creator("p3"),

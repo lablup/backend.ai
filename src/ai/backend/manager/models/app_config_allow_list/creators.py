@@ -10,12 +10,16 @@ from ai.backend.manager.data.app_config.types import AppConfigAllowListData
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class AppConfigAllowListCreator(GlobalEntityCreator[AppConfigAllowListRow, AppConfigAllowListData]):
+class AppConfigAllowListCreator(
+    CreatedInGlobal[AppConfigAllowListRow],
+    EntityCreator[AppConfigAllowListRow, AppConfigAllowListData],
+):
     """Creator for an app config allow-list entry — a global write-gate catalog row.
 
     ``rank`` is the merge priority every fragment under the entry carries; when not

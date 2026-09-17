@@ -126,7 +126,7 @@ class TestRuntimeVariantPresetRepositoryFlag:
             display_name=None,
             ui_option=None,
         )
-        created = await preset_ops.create_global_entity(creator)
+        created = await preset_ops.create_entity(creator)
 
         assert created.value_type == PresetValueType.FLAG
         assert created.preset_target == PresetTarget.ARGS
@@ -159,8 +159,8 @@ class TestRuntimeVariantPresetRepositoryFlag:
                 ui_option=None,
             )
 
-        first = await preset_ops.create_global_entity(creator_named("first"))
-        second = await preset_ops.create_global_entity(creator_named("second"))
+        first = await preset_ops.create_entity(creator_named("first"))
+        second = await preset_ops.create_entity(creator_named("second"))
 
         assert first.rank == RANK_GAP
         assert second.rank == RANK_GAP * 2
@@ -174,7 +174,7 @@ class TestRuntimeVariantPresetVersionRange:
         preset_ops: OpsRepository[RuntimeVariantPresetData],
         runtime_variant_id: uuid.UUID,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="added-at-0-9-0",
@@ -213,7 +213,7 @@ class TestRuntimeVariantPresetVersionRange:
         preset_ops: OpsRepository[RuntimeVariantPresetData],
         runtime_variant_id: uuid.UUID,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="dropped-at-0-9-0",
@@ -252,7 +252,7 @@ class TestRuntimeVariantPresetVersionRange:
         preset_ops: OpsRepository[RuntimeVariantPresetData],
         runtime_variant_id: uuid.UUID,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="added-at-0-9-0",
@@ -302,9 +302,9 @@ class TestRuntimeVariantPresetVersionRange:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("old", None))
-        await preset_ops.create_global_entity(creator_named("new-a", "0.9.0"))
-        await preset_ops.create_global_entity(creator_named("new-b", "0.9.0"))
+        await preset_ops.create_entity(creator_named("old", None))
+        await preset_ops.create_entity(creator_named("new-a", "0.9.0"))
+        await preset_ops.create_entity(creator_named("new-b", "0.9.0"))
 
         # A page of one: were the filter ignored, the two later presets would still be
         # waiting and has_next_page would be True.
@@ -410,9 +410,9 @@ class TestRuntimeVariantPresetVersionOrder:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("at-0-10-0", "0.10.0"))
-        await preset_ops.create_global_entity(creator_named("at-0-9-0", "0.9.0"))
-        await preset_ops.create_global_entity(creator_named("always", None))
+        await preset_ops.create_entity(creator_named("at-0-10-0", "0.10.0"))
+        await preset_ops.create_entity(creator_named("at-0-9-0", "0.9.0"))
+        await preset_ops.create_entity(creator_named("always", None))
 
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
@@ -446,9 +446,9 @@ class TestRuntimeVariantPresetVersionOrder:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("still-offered", None))
-        await preset_ops.create_global_entity(creator_named("gone-at-0-10-0", "0.10.0"))
-        await preset_ops.create_global_entity(creator_named("gone-at-0-9-0", "0.9.0"))
+        await preset_ops.create_entity(creator_named("still-offered", None))
+        await preset_ops.create_entity(creator_named("gone-at-0-10-0", "0.10.0"))
+        await preset_ops.create_entity(creator_named("gone-at-0-9-0", "0.9.0"))
 
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
@@ -489,10 +489,10 @@ class TestRuntimeVariantPresetVersionSegmentCount:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("one-segment", "1"))
-        await preset_ops.create_global_entity(creator_named("two-segments", "1.0"))
-        await preset_ops.create_global_entity(creator_named("three-segments", "1.0.0"))
-        await preset_ops.create_global_entity(creator_named("later", "1.0.1"))
+        await preset_ops.create_entity(creator_named("one-segment", "1"))
+        await preset_ops.create_entity(creator_named("two-segments", "1.0"))
+        await preset_ops.create_entity(creator_named("three-segments", "1.0.0"))
+        await preset_ops.create_entity(creator_named("later", "1.0.1"))
 
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
@@ -527,7 +527,7 @@ class TestRuntimeVariantPresetVersionSegmentCount:
         version: str,
         included: bool,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="two-to-three",

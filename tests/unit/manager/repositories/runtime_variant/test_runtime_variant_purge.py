@@ -90,7 +90,7 @@ async def _add_preset(
     database: ExtendedAsyncSAEngine, variant_id: RuntimeVariantID, name: str
 ) -> RuntimeVariantPresetData:
     ops: OpsRepository[RuntimeVariantPresetData] = OpsRepository(V2DBOpsProvider(database))
-    return await ops.create_global_entity(
+    return await ops.create_entity(
         RuntimeVariantPresetCreator(
             runtime_variant_id=variant_id,
             name=name,

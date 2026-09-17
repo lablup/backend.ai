@@ -120,9 +120,7 @@ async def _register(
     definition_repository: OpsRepository[AppConfigDefinitionData], config_name: str
 ) -> None:
     """Seed the FK parent: register a config_name in app_config_definitions."""
-    await definition_repository.create_global_entity(
-        AppConfigDefinitionCreator(config_name=config_name)
-    )
+    await definition_repository.create_entity(AppConfigDefinitionCreator(config_name=config_name))
 
 
 async def _create_entry(
@@ -131,7 +129,7 @@ async def _create_entry(
     scope_type: AppConfigScopeType,
     rank: int | None = None,
 ) -> AppConfigAllowListData:
-    return await repository.create_global_entity(
+    return await repository.create_entity(
         AppConfigAllowListCreator(config_name=config_name, scope_type=scope_type, rank=rank)
     )
 
@@ -325,7 +323,7 @@ class TestPurge:
         definition_repository: OpsRepository[AppConfigDefinitionData],
     ) -> None:
         # Deleting the definition cascades to its allow-list entry and its fragment.
-        definition = await definition_repository.create_global_entity(
+        definition = await definition_repository.create_entity(
             AppConfigDefinitionCreator(config_name="theme")
         )
         entry = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)

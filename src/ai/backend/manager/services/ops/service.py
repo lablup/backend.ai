@@ -477,7 +477,7 @@ class GlobalCreateService[TData: EntityData]:
         self, action: GlobalEntityCreateOpsAction[Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
-            data=await self._repository.create_global_entity(action.to_creator())
+            data=await self._repository.create_entity(action.to_creator())
         )
 
 
@@ -492,7 +492,7 @@ class GlobalCreateWithFieldsService[TData: EntityData]:
     async def execute(
         self, action: GlobalEntityWithFieldsCreateOpsAction[Any, TData, Any, Any]
     ) -> CreatedEntityWithFieldsOpsResult[TData, Any]:
-        result = await self._repository.create_global_entity_with_fields(
+        result = await self._repository.create_entity_with_fields(
             action.to_creator(), action.to_field_creators()
         )
         return CreatedEntityWithFieldsOpsResult(data=result.data, fields=result.fields)
@@ -549,7 +549,7 @@ class RoleManagedEntityCreateService[TData: EntityData]:
 
 
 class GlobalRoleManagedEntityCreateService[TData: EntityData]:
-    """Inserts the role-managed entity row created in no scope, preset roles
+    """Inserts the role-managed entity row in the global scope, preset roles
     included."""
 
     _repository: OpsRepository[TData]
@@ -561,7 +561,7 @@ class GlobalRoleManagedEntityCreateService[TData: EntityData]:
         self, action: GlobalRoleManagedEntityCreateOpsAction[Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
-            data=await self._repository.create_role_managed_global_entity(action.to_creator())
+            data=await self._repository.create_role_managed_entity(action.to_creator())
         )
 
 
@@ -799,7 +799,7 @@ class GlobalAtomicUpsertService[TData: EntityData]:
         self, action: GlobalEntityAtomicUpsertOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.atomic_upsert_global_entities(action.to_upserters())
+            items=await self._repository.atomic_upsert_entities(action.to_upserters())
         )
 
 

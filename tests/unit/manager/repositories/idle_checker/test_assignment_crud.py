@@ -258,7 +258,7 @@ class TestIdleCheckerAssignmentRepository:
         """The target every binding names, created the way the catalog creates it so
         it has the node a relation needs."""
         ops: OpsRepository[IdleCheckerData] = OpsRepository(V2DBOpsProvider(database))
-        return await ops.create_global_entity(
+        return await ops.create_entity(
             IdleCheckerCreator(
                 name="session lifetime",
                 description=None,
