@@ -73,6 +73,11 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ai.backend.manager.services.vfolder.access import (
+    ensure_writable,
+    load_access_info,
+    load_access_infos,
+)
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -641,9 +646,12 @@ class VFolderService:
         result = await self._vfolder_repository.search_user_vfolders(
             querier=action.querier, scope=action.scope
         )
+        access_infos = await load_access_infos(
+            self._vfolder_repository, result.items, action.scope.user_id
+        )
         return SearchUserVFoldersActionResult(
             user_id=action.scope.user_id,
-            data=result.items,
+            data=access_infos,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -1705,6 +1713,10 @@ class VFolderService:
         if not vfolder_data:
             raise VFolderNotFound("VFolder not found")
 
+        # Folder permission check — a folder shared read-only must refuse writes.
+        access_info = await load_access_info(self._vfolder_repository, vfolder_data, action.user_id)
+        ensure_writable(access_info, user.role)
+
         # Host permission check — resolved from user_id
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
             vfolder_data.host,
@@ -1732,7 +1744,8 @@ class VFolderService:
     async def get_v2(self, action: GetVFolderV2Action) -> GetVFolderV2ActionResult:
         """Get a single vfolder by ID (v2). RBAC is enforced at the processor level."""
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
-        return GetVFolderV2ActionResult(vfolder=vfolder_data)
+        access_info = await load_access_info(self._vfolder_repository, vfolder_data, action.user_id)
+        return GetVFolderV2ActionResult(access_info=access_info)
 
     async def get_folder_usage(self, action: GetVFolderUsageAction) -> GetVFolderUsageActionResult:
         """Fetch usage statistics on demand through the storage proxy.

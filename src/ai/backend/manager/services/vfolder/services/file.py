@@ -1,11 +1,14 @@
+import uuid
 from pathlib import PurePosixPath
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
 from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
@@ -13,6 +16,7 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.services.vfolder.access import ensure_writable, load_access_info
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateArchiveDownloadSessionActionResult,
@@ -65,6 +69,13 @@ class VFolderFileService:
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
+
+    async def _ensure_writable(
+        self, vfolder_data: VFolderData, user_id: uuid.UUID, user_role: UserRole | None
+    ) -> None:
+        """Refuse the operation when the caller only holds read access on the folder."""
+        access_info = await load_access_info(self._vfolder_repository, vfolder_data, user_id)
+        ensure_writable(access_info, user_role)
 
     async def upload_file(
         self, action: CreateUploadSessionAction
@@ -468,6 +479,7 @@ class VFolderFileService:
         )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
+        await self._ensure_writable(vfolder_data, action.user_id, user.role)
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -496,6 +508,7 @@ class VFolderFileService:
         )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
+        await self._ensure_writable(vfolder_data, action.user_id, user.role)
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -523,6 +536,7 @@ class VFolderFileService:
         )
         if not vfolder_data:
             raise VFolderInvalidParameter("The specified vfolder is not accessible.")
+        await self._ensure_writable(vfolder_data, action.user_id, user.role)
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)

@@ -73,6 +73,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
 )
 from ai.backend.manager.data.vfolder.types import (
+    VFolderAccessInfo,
     VFolderData,
     VFolderOperationStatus,
 )
@@ -197,8 +198,21 @@ class VFolderAdapter(BaseAdapter):
     """Adapter for VFolder domain operations."""
 
     @staticmethod
-    def _vfolder_data_to_node(data: VFolderData) -> VFolderNode:
-        """Convert VFolderData to VFolderNode DTO."""
+    def _vfolder_data_to_node(
+        data: VFolderData, access_info: VFolderAccessInfo | None = None
+    ) -> VFolderNode:
+        """Convert VFolderData to VFolderNode DTO.
+
+        ``access_info`` carries the mount permission the requesting user holds on
+        this folder, which is what ``access_control.permission`` reports -- a
+        folder shared read-only must not be reported as writable just because its
+        owner made it so. It is omitted on responses that are not resolved
+        against a single requesting user, such as the admin and project-wide
+        searches, where the folder's own permission is the right answer.
+        """
+        permission = data.permission
+        if access_info is not None and access_info.effective_permission is not None:
+            permission = access_info.effective_permission
         return VFolderNode(
             id=data.id,
             status=data.status.to_field(),
@@ -212,7 +226,7 @@ class VFolderAdapter(BaseAdapter):
                 cloneable=data.cloneable,
             ),
             access_control=VFolderAccessControlInfo(
-                permission=data.permission.to_field() if data.permission else None,
+                permission=permission.to_field() if permission else None,
                 ownership_type=data.ownership_type.to_field(),
             ),
             ownership=VFolderOwnershipInfo(
@@ -313,7 +327,10 @@ class VFolderAdapter(BaseAdapter):
             SearchUserVFoldersAction(scope=scope, querier=querier)
         )
         return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
+            items=[
+                self._vfolder_data_to_node(access_info.vfolder_data, access_info)
+                for access_info in action_result.data
+            ],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -414,10 +431,13 @@ class VFolderAdapter(BaseAdapter):
 
     async def get(self, vfolder_id: UUID) -> VFolderNode:
         """Get a single vfolder by ID with RBAC validation."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         result = await self._processors.vfolder.get_v2.wait_for_complete(
-            GetVFolderV2Action(vfolder_uuid=vfolder_id)
+            GetVFolderV2Action(vfolder_uuid=vfolder_id, user_id=me.user_id)
         )
-        return self._vfolder_data_to_node(result.vfolder)
+        return self._vfolder_data_to_node(result.access_info.vfolder_data, result.access_info)
 
     async def get_folder_usage(self, vfolder_id: UUID) -> VFolderUsageInfoDTO | None:
         """Fetch usage statistics on demand through the storage proxy.

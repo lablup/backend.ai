@@ -286,6 +286,29 @@ class VfolderRepository:
             return [rows_by_id.get(VFolderUUID(vfolder_id)) for vfolder_id in ids]
 
     @vfolder_repository_resilience.apply()
+    async def get_granted_mount_permissions(
+        self, vfolder_ids: Sequence[uuid.UUID], user_id: uuid.UUID
+    ) -> dict[uuid.UUID, VFolderMountPermission]:
+        """
+        Fetch the mount permissions ``user_id`` was granted on the given vfolders.
+
+        Only folders the user holds an explicit ``vfolder_permissions`` row on
+        appear in the result. Ownership and project membership are not consulted
+        here; the service layer resolves those into an effective permission.
+        """
+        if not vfolder_ids:
+            return {}
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(VFolderPermissionRow.vfolder, VFolderPermissionRow.permission).where(
+                sa.and_(
+                    VFolderPermissionRow.vfolder.in_(list(vfolder_ids)),
+                    VFolderPermissionRow.user == user_id,
+                )
+            )
+            result = await session.execute(query)
+            return {row.vfolder: row.permission for row in result}
+
+    @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(
         self, user_uuid: uuid.UUID, group_uuid: uuid.UUID | None
     ) -> VFolderHostPermissionMap:

@@ -7,7 +7,7 @@ from typing import override
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.vfolder.types import VFolderData
+from ai.backend.manager.data.vfolder.types import VFolderAccessInfo
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -55,7 +55,7 @@ class SearchUserVFoldersAction(VFolderScopeAction):
 @dataclass
 class SearchUserVFoldersActionResult(VFolderScopeActionResult):
     user_id: uuid.UUID
-    data: list[VFolderData]
+    data: list[VFolderAccessInfo]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
