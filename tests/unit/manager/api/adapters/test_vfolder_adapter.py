@@ -18,6 +18,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
+    VFolderAccessInfo,
     VFolderData,
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -78,11 +79,21 @@ class TestVFolderAdapterMySearch:
         )
 
     @pytest.fixture
-    def mock_processors(self, vfolder_data: VFolderData) -> MagicMock:
+    def access_info(self, vfolder_data: VFolderData) -> VFolderAccessInfo:
+        """The folder is owned by someone else and shared with the caller read-only,
+        so the caller's permission differs from the folder's own column."""
+        return VFolderAccessInfo(
+            vfolder_data=vfolder_data,
+            is_owner=False,
+            effective_permission=VFolderMountPermission.READ_ONLY,
+        )
+
+    @pytest.fixture
+    def mock_processors(self, access_info: VFolderAccessInfo) -> MagicMock:
         processors = MagicMock()
         result = SearchUserVFoldersActionResult(
             user_id=uuid4(),
-            data=[vfolder_data],
+            data=[access_info],
             total_count=1,
             has_next_page=False,
             has_previous_page=False,
@@ -134,6 +145,10 @@ class TestVFolderAdapterMySearch:
         assert len(result.items) == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
+        # The caller holds ro even though the folder's own permission is rw.
+        assert (
+            result.items[0].access_control.permission == VFolderMountPermission.READ_ONLY.to_field()
+        )
 
 
 class TestVFolderAdapterProjectSearch:

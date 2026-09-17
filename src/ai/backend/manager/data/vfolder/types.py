@@ -70,6 +70,10 @@ class VFolderMountPermission(enum.StrEnum):
                 return cls.OWNER_PERM
         return None
 
+    def is_writable(self) -> bool:
+        """Whether this permission lets the holder modify the folder's contents."""
+        return self in (VFolderMountPermission.READ_WRITE, VFolderMountPermission.RW_DELETE)
+
     def to_rbac_operation(self) -> set[OperationType]:
         match self:
             case VFolderMountPermission.READ_ONLY:

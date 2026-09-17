@@ -204,6 +204,11 @@ class TestVFolderServiceSearchUserVFolders:
                 has_previous_page=False,
             )
         )
+        mock_vfolder_repository.get_access_infos = AsyncMock(
+            return_value=[
+                VfolderRepository._resolve_access_info(vfolder_1, user_id, None),
+            ]
+        )
         search_scope = UserVFolderSearchScope(user_id=user_id)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUserVFoldersAction(scope=search_scope, querier=querier)
@@ -212,7 +217,9 @@ class TestVFolderServiceSearchUserVFolders:
 
         assert isinstance(result, SearchUserVFoldersActionResult)
         assert result.user_id == user_id
-        assert result.data == [vfolder_1]
+        assert [access_info.vfolder_data for access_info in result.data] == [vfolder_1]
+        assert result.data[0].is_owner is True
+        assert result.data[0].effective_permission is VFolderMountPermission.READ_WRITE
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
