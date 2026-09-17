@@ -17,20 +17,22 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
 
 @dataclass
 class ContainerRegistryCreator(
-    GlobalEntityCreator[ContainerRegistryRow, ContainerRegistryData],
+    CreatedInGlobal[ContainerRegistryRow],
+    EntityCreator[ContainerRegistryRow, ContainerRegistryData],
 ):
     """Creator for a container registry.
 
-    A registry goes under no other scope, and the entities it owns (images) resolve
-    through its own virtual entity; the projects allowed to reach them are bound to
-    that scope separately.
+    A registry is created in the `global` scope, and the entities it owns (images)
+    resolve through its own virtual entity; the projects allowed to reach them are
+    bound to that scope separately.
     """
 
     url: str

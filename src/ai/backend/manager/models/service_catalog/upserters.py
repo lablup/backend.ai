@@ -12,12 +12,15 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
+from ai.backend.manager.models.specs.upserter import EntityUpserter
 
 
 @dataclass
-class ServiceCatalogUpserter(GlobalEntityUpserter[ServiceCatalogRow, ServiceCatalogID]):
+class ServiceCatalogUpserter(
+    CreatedInGlobal[ServiceCatalogRow], EntityUpserter[ServiceCatalogRow, ServiceCatalogID]
+):
     """Registers one service instance as healthy.
 
     Conflict key: (service_group, instance_id). On conflict the reported state is

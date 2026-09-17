@@ -46,7 +46,7 @@ class ServiceCatalogRepository:
     ) -> ServiceCatalogID:
         """Upsert the service instance and replace its endpoints, in one transaction."""
         async with self._ops.write_ops() as w:
-            service_id = await w.upsert_global_entity(upserter)
+            service_id = await w.upsert_entity(upserter)
             await w.batch_purge_field_entities(service_id, ServiceCatalogEndpointBatchPurger())
             await w.atomic_create_field_entities(service_id, endpoints)
         return service_id

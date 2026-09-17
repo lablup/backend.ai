@@ -9,16 +9,27 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryCreatorMeta
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
 from ai.backend.manager.models.huggingface_registry.searchers import (
     HuggingFaceRegistrySearcher,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
@@ -396,3 +407,63 @@ class TestHuggingFaceRepository:
         # Verify ordering is ascending
         result_urls = [registry.url for registry in result.items]
         assert result_urls == sorted(result_urls)
+
+
+class TestHuggingFaceRepositoryCreate:
+    @pytest.fixture
+    async def db_with_tables(
+        self,
+        global_entity_ids: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            global_entity_ids,
+            [
+                HuggingFaceRegistryRow,
+                ArtifactRegistryRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
+            ],
+        ):
+            yield global_entity_ids
+
+    @pytest.fixture
+    def repository(self, db_with_tables: ExtendedAsyncSAEngine) -> HuggingFaceRepository:
+        return HuggingFaceRepository(
+            db=db_with_tables,
+            registry_ops_provider=ArtifactRegistryOpsProvider(db_with_tables),
+        )
+
+    async def test_new_registry_is_created_in_the_global_scope(
+        self,
+        repository: HuggingFaceRepository,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        registry = await repository.create(
+            HuggingFaceRegistryCreator(url="https://huggingface.co"),
+            ArtifactRegistryCreatorMeta(name="hf"),
+        )
+
+        async with db_with_tables.begin_readonly_session() as session:
+            node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ArtifactRegistryEntityType(),
+                    VirtualEntityRow.entity_id == registry.id,
+                )
+            )
+            holders = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.virtual_entity_id).where(
+                        EntityMembershipRow.member_entity_id == node_id
+                    )
+                )
+            ).all()
+            global_node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == GlobalEntityType(),
+                    VirtualEntityRow.entity_id == global_entity_id(GlobalEntityName.GLOBAL),
+                )
+            )
+        assert node_id is not None
+        assert set(holders) == {node_id, global_node_id}
