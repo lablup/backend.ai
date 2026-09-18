@@ -739,24 +739,32 @@ class TestTerminateActionBuilding:
 
 
 class TestTerminateDenial:
-    """A session the caller may not terminate refuses the call, not just its own item."""
+    """A session the caller may not terminate is one failed entry beside the others."""
+
+    @pytest.fixture
+    def terminating_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denied_id(self) -> SessionID:
+        return SessionID(uuid4())
 
     @pytest.fixture
     def denial(self) -> GenericForbidden:
         return GenericForbidden("no terminate on this session")
 
     @pytest.fixture
-    def processors(self, denial: GenericForbidden) -> MagicMock:
+    def processors(
+        self, terminating_id: SessionID, denied_id: SessionID, denial: GenericForbidden
+    ) -> MagicMock:
         processors = MagicMock()
         processors.terminate_sessions.run = AsyncMock(
             return_value=PartialBulkResult(
                 items=[
                     PartialBulkEntityResult[SessionTerminationStatus].succeeded(
-                        SessionID(uuid4()), SessionTerminationStatus.TERMINATING
+                        terminating_id, SessionTerminationStatus.TERMINATING
                     ),
-                    PartialBulkEntityResult[SessionTerminationStatus].denied(
-                        SessionID(uuid4()), denial
-                    ),
+                    PartialBulkEntityResult[SessionTerminationStatus].denied(denied_id, denial),
                 ]
             )
         )
@@ -766,10 +774,19 @@ class TestTerminateDenial:
     def adapter(self, processors: MagicMock) -> SessionAdapter:
         return SessionAdapter(processors, MagicMock())
 
-    async def test_the_denial_is_raised(
-        self, adapter: SessionAdapter, denial: GenericForbidden
+    async def test_the_denial_is_reported(
+        self,
+        adapter: SessionAdapter,
+        terminating_id: SessionID,
+        denied_id: SessionID,
+        denial: GenericForbidden,
     ) -> None:
-        with pytest.raises(GenericForbidden) as raised:
-            await adapter.terminate(TerminateSessionsInput(session_ids=[uuid4(), uuid4()]))
+        payload = await adapter.terminate(
+            TerminateSessionsInput(session_ids=[terminating_id, denied_id])
+        )
 
-        assert raised.value is denial
+        assert payload.terminating == [terminating_id]
+        assert payload.cancelled == payload.force_terminated == payload.skipped == []
+        assert [(one.session_id, one.message) for one in payload.failed] == [
+            (denied_id, str(denial))
+        ]
