@@ -14,7 +14,7 @@ from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseEr
 from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.scratch.types import KernelRecoveryScratchData
-from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
+from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils, StagedRecoveryData
 from ai.backend.agent.types import KernelLifecycleStatus, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
@@ -87,7 +87,7 @@ def kernel_registry_data(
 def mock_config_mgr() -> MagicMock:
     """Mock ScratchConfig manager."""
     mgr = MagicMock()
-    mgr.save_json_recovery_data = AsyncMock()
+    mgr.stage_json_recovery_data = AsyncMock(return_value=MagicMock())
     return mgr
 
 
@@ -208,11 +208,13 @@ class TestSaveKernelRegistry:
         registers its kernel in between. Measured with 27 sessions started at once: one create
         failed on `dictionary changed size during iteration`, in its own save."""
         registered_meanwhile = KernelId(uuid.uuid4())
+        staged = MagicMock()
 
-        async def _register_while_saving(_data: object, **_kwargs: object) -> None:
+        async def _register_while_saving(_data: object) -> MagicMock:
             kernel_registry_data[registered_meanwhile] = mock_kernel
+            return staged
 
-        mock_config_mgr.save_json_recovery_data = AsyncMock(side_effect=_register_while_saving)
+        mock_config_mgr.stage_json_recovery_data = AsyncMock(side_effect=_register_while_saving)
         with (
             patch.object(writer, "_parse_recovery_data_from_kernel", return_value=MagicMock()),
             patch("ai.backend.agent.kernel_registry.writer.container.KernelRecoveryScratchData"),
@@ -224,6 +226,41 @@ class TestSaveKernelRegistry:
         ):
             await writer.save_kernel_registry(kernel_registry_data, metadata)
         assert registered_meanwhile in kernel_registry_data
+        staged.commit.assert_called_once()
+
+    async def test_a_kernel_replaced_under_the_same_id_while_saving_is_not_written(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
+        existing_config_path: Path,
+        serialized_recovery_data: KernelRecoveryScratchData,
+    ) -> None:
+        """A restart destroys and re-creates a kernel under the same id and keeps its scratch
+        directory. The snapshot still holds the old object; its record must not land in the
+        new incarnation's directory, and nothing staged may be left behind."""
+        original_stage = ScratchConfig.stage_json_recovery_data
+
+        async def _replace_while_staging(
+            config: ScratchConfig, data: KernelRecoveryScratchData
+        ) -> StagedRecoveryData:
+            staged = await original_stage(config, data)
+            kernel_registry_data[mock_kernel.kernel_id] = MagicMock()
+            return staged
+
+        with (
+            patch.object(writer, "_parse_recovery_data_from_kernel", return_value=MagicMock()),
+            patch.object(
+                KernelRecoveryScratchData,
+                "from_kernel_recovery_data",
+                return_value=serialized_recovery_data,
+            ),
+            patch.object(ScratchConfig, "stage_json_recovery_data", new=_replace_while_staging),
+        ):
+            await writer.save_kernel_registry(kernel_registry_data, metadata)
+
+        assert list(existing_config_path.iterdir()) == []
 
     async def test_destroyed_kernel_is_not_saved_from_snapshot(
         self,
@@ -234,21 +271,15 @@ class TestSaveKernelRegistry:
         serialized_recovery_data: KernelRecoveryScratchData,
     ) -> None:
         destroyed_kernel_id, destroyed_config_path = registry_with_destroyable_kernel
-        original_save = ScratchConfig.save_json_recovery_data
-        save_count = 0
+        original_stage = ScratchConfig.stage_json_recovery_data
 
-        async def _destroy_after_first_save(
-            config: ScratchConfig,
-            data: KernelRecoveryScratchData,
-            *,
-            create_config_dir: bool = True,
-        ) -> None:
-            nonlocal save_count
-            await original_save(config, data, create_config_dir=create_config_dir)
-            save_count += 1
-            if save_count == 1:
+        async def _destroy_before_its_stage(
+            config: ScratchConfig, data: KernelRecoveryScratchData
+        ) -> StagedRecoveryData:
+            if config._config_path == destroyed_config_path:
                 del kernel_registry_data[destroyed_kernel_id]
                 destroyed_config_path.rmdir()
+            return await original_stage(config, data)
 
         with (
             patch.object(
@@ -261,11 +292,7 @@ class TestSaveKernelRegistry:
                 "from_kernel_recovery_data",
                 return_value=serialized_recovery_data,
             ),
-            patch.object(
-                ScratchConfig,
-                "save_json_recovery_data",
-                new=_destroy_after_first_save,
-            ),
+            patch.object(ScratchConfig, "stage_json_recovery_data", new=_destroy_before_its_stage),
         ):
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
@@ -293,7 +320,7 @@ class TestSaveKernelRegistry:
         ):
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
-        assert (existing_config_path / "recovery.json").is_file()
+        assert [p.name for p in existing_config_path.iterdir()] == ["recovery.json"]
 
     async def test_save_kernel_registry_skips_none_recovery_data(
         self,
@@ -318,4 +345,4 @@ class TestSaveKernelRegistry:
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
         # Verify save was not called since recovery data was None
-        mock_config_mgr.save_json_recovery_data.assert_not_called()
+        mock_config_mgr.stage_json_recovery_data.assert_not_called()
