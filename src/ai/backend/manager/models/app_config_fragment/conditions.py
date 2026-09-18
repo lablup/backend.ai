@@ -149,6 +149,8 @@ class AppConfigFragmentConditions:
 
         return inner
 
+    # Matches the row's own scope columns, not the ownership graph: the graph answers what a
+    # scope reaches, and a domain reaches every fragment its users hold (BA-7934).
     @staticmethod
     def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
         """The ``domain`` scope for ``domain_id``."""
@@ -161,6 +163,7 @@ class AppConfigFragmentConditions:
 
         return inner
 
+    # Matches the row's own scope columns, not the ownership graph, as by_domain_visibility.
     @staticmethod
     def by_user_visibility(user_id: UserID) -> QueryCondition:
         """The ``user`` scope for ``user_id``."""
