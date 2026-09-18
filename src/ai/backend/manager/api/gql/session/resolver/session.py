@@ -37,7 +37,6 @@ from ai.backend.manager.api.gql.session.types import (
     SessionV2FilterGQL,
     SessionV2GQL,
     SessionV2OrderByGQL,
-    TerminateSessionsFailureInfoGQL,
     TerminateSessionsPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -229,8 +228,8 @@ async def enqueue_session(
     BackendAIGQLMeta(
         added_version="26.4.4",
         description=(
-            "Terminate one or more sessions by ID. Permission is checked per session; a "
-            "session the caller is refused is reported under `failed` and the rest go on."
+            "Terminate one or more sessions by ID. Per-session RBAC permission is enforced "
+            "by the bulk validator; any denial fails the whole request."
         ),
     ),
 )
@@ -251,12 +250,6 @@ async def terminate_sessions_v2(
         terminating=[ID(str(sid)) for sid in payload.terminating],
         force_terminated=[ID(str(sid)) for sid in payload.force_terminated],
         skipped=[ID(str(sid)) for sid in payload.skipped],
-        failed=[
-            TerminateSessionsFailureInfoGQL(
-                session_id=ID(str(failure.session_id)), message=failure.message
-            )
-            for failure in payload.failed
-        ],
     )
 
 
