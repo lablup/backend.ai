@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -74,7 +75,7 @@ async def deployment_revision_presets(
     edges = [
         DeploymentRevisionPresetEdge(
             node=DeploymentRevisionPresetGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
