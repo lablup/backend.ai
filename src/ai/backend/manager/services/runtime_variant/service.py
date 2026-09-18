@@ -35,13 +35,13 @@ class RuntimeVariantService:
         ])
         return PartialBulkResult(
             items=[
-                *(
-                    PartialBulkEntityResult[RuntimeVariantData].succeeded(entity_id, data)
-                    for entity_id, data in result.successes.items()
-                ),
-                *(
-                    PartialBulkEntityResult[RuntimeVariantData].failed(entity_id, error)
-                    for entity_id, error in result.errors.items()
-                ),
+                PartialBulkEntityResult[RuntimeVariantData].succeeded(
+                    variant_id, result.successes[variant_id]
+                )
+                if variant_id in result.successes
+                else PartialBulkEntityResult[RuntimeVariantData].failed(
+                    variant_id, result.errors[variant_id]
+                )
+                for variant_id in action.ids
             ]
         )
