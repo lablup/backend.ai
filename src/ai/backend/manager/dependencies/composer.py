@@ -330,7 +330,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 appproxy_client_pool=agents.appproxy_client_pool,
                 prometheus_client=system.prometheus_client,
                 # Registry quota service
-                registry_quota_service=domain.services_ctx.per_project_container_registries_quota,
+                registry_quota_service=domain.registry_quota_service,
                 # BgtaskRegistry creation
                 agent_client_pool=agents.agent_client_pool,
                 # Lifecycle background tasks

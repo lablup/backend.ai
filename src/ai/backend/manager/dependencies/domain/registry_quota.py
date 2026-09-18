@@ -10,8 +10,8 @@ from ai.backend.manager.repositories.container_registry_quota.repository import 
     PerProjectRegistryQuotaRepository,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.service.base import ServicesContext
-from ai.backend.manager.service.container_registry.harbor import (
+from ai.backend.manager.services.container_registry.quota import (
+    AbstractPerProjectContainerRegistryQuotaService,
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
@@ -23,38 +23,30 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ServicesInput:
-    """Input required for services context setup."""
+class RegistryQuotaServiceInput:
+    """Input required for the registry quota service setup."""
 
     db: ExtendedAsyncSAEngine
 
 
-class ServicesContextDependency(DomainDependency[ServicesInput, ServicesContext]):
-    """Provides ServicesContext lifecycle management.
-
-    ServicesContext aggregates service-layer objects that are used by the API layer.
-    """
+class RegistryQuotaServiceDependency(
+    DomainDependency[RegistryQuotaServiceInput, AbstractPerProjectContainerRegistryQuotaService]
+):
+    """Provides the per-project container registry quota service."""
 
     @property
     @override
     def stage_name(self) -> str:
-        return "services-context"
+        return "registry-quota-service"
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: ServicesInput) -> AsyncIterator[ServicesContext]:
-        """Initialize and provide a ServicesContext.
-
-        Args:
-            setup_input: Input containing the database engine.
-
-        Yields:
-            Initialized ServicesContext instance.
-        """
-        per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
+    async def provide(
+        self, setup_input: RegistryQuotaServiceInput
+    ) -> AsyncIterator[AbstractPerProjectContainerRegistryQuotaService]:
+        yield PerProjectContainerRegistryQuotaService(
             repository=PerProjectRegistryQuotaRepository(
                 ContainerRegistryDBSource(V2DBOpsProvider(setup_input.db))
             ),
             client_pool=PerProjectContainerRegistryQuotaClientPool(),
         )
-        yield ServicesContext(per_project_container_registries_quota)

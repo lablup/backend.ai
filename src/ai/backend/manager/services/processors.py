@@ -42,9 +42,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
-    from ai.backend.manager.service.container_registry.harbor import (
-        AbstractPerProjectContainerRegistryQuotaService,
-    )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
     from ai.backend.manager.services.app_config.processors import (
@@ -76,6 +73,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
+    )
+    from ai.backend.manager.services.container_registry.quota import (
+        AbstractPerProjectContainerRegistryQuotaService,
     )
     from ai.backend.manager.services.container_registry.service import (
         ContainerRegistryService,
