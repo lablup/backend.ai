@@ -523,3 +523,32 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+#### [asking-for-the-first-two-login-client-types-answers-two-and-a-next-page](/tests/scenario/bai_scenario/manager/login_client_type/test_searching.py) — pass
+
+종류 셋이 있을 때 앞에서 두 건만 청해 조회하면 두 건이 반환되고 다음 페이지가 있다고 응답한다
+
+Given
+
+- 로그인 클라이언트 종류 3개와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 로그인 클라이언트 종류 other-2
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- LoginClientTypeAdapter.search — user-1이 앞에서 2건만 청해 조회
+
+Then
+
+- 청한 크기의 첫 페이지가 반환된다
+  - len(items) = 2
+  - total_count = 3
+  - has_next_page = True
+  - has_previous_page = False
+

@@ -1,9 +1,9 @@
 ---
 name: login-client-type-adapter-scenarios
 type: reference
-description: what the login client type adapter guarantees, as scenarios; the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the page size of fifty
+description: what the login client type adapter guarantees, as scenarios; the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the search that cuts a page by the cursor count it is asked for
 scope: src/ai/backend/manager/api/adapters/login_client_type
-keywords: [login client type, scenario, adapter, superadmin, public read, page size]
+keywords: [login client type, scenario, adapter, superadmin, public read, cursor]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
@@ -50,9 +50,12 @@ status: draft
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | 아무 권한도 없는 사용자가 검색한다 | `login_client_type` 둘, 아무 권한도 없음 | 전체 조회 | 둘 다 반환된다 |
+| `first`만 지정해 검색한다 | `login_client_type` 셋 | `first` 값을 2로 지정해 조회 | 두 건이 반환되고 다음 페이지가 있다고 응답한다 |
 
-이름 필터가 무엇을 좁히는지와 페이지 방식 — 기본 크기 50, `first`만 지정한 요청을 커서로 읽는지
-(BA-7927) — 는 시나리오로 두지 않는다. 필터를 조건으로 옮기고 페이지를 자르는 것은 단위 테스트의
+요청 타입이 받는 페이지 필드는 모두 읽힌다. `limit`·`offset`과 `first`·`after`·`last`·`before`
+필드다. 받아 놓고 무시하는 필드는 없다. 두 방식을 한 요청에 함께 지정하면 거부된다.
+
+이름 필터가 무엇을 좁히는지는 시나리오로 두지 않는다. 필터를 조건으로 옮기는 것은 단위 테스트의
 자리다.
 
 ## 수정

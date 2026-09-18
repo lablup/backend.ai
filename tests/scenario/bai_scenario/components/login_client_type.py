@@ -195,6 +195,31 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
 
 @dataclass(frozen=True)
+class TheFirstPageOfTypes(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
+    """앞에서 청한 만큼만 반환되고 다음 페이지가 있다고 응답한다."""
+
+    size: int
+
+    @override
+    def says(self) -> str:
+        return "청한 크기의 첫 페이지가 반환된다"
+
+    @override
+    def look(
+        self, laid: ManyTypesAndACaller, answered: Answered[SearchLoginClientTypesPayload]
+    ) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [Refused(EntityNotFoundError, answered.raised)]
+        return [
+            Same("len(items)", len(page.items), self.size),
+            Same("total_count", page.total_count, len(laid.laid)),
+            Same("has_next_page", page.has_next_page, True),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
 class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
     """삭제한 종류의 id를 담은 응답."""
 
