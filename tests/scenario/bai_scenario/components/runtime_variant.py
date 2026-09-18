@@ -323,13 +323,16 @@ class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload])
         return [Held[UUID]("id", payload.id, SameAs[UUID](laid.variant.id, "미리 만들어 둔 변형"))]
 
 
+MESSAGE_IS_FREE_TEXT = "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"
+
+
 @dataclass(frozen=True)
-class TheCountAsked(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
-    """요청한 id의 수를 그대로 응답한다."""
+class EveryLaidVariantIsDeleted(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
+    """미리 만들어 둔 변형의 id가 요청한 순서대로 삭제된 목록에 반환되고, 실패 목록은 비어 있다."""
 
     @override
     def says(self) -> str:
-        return "요청한 id의 수가 반환된다"
+        return "미리 만들어 둔 변형 전부가 삭제된 목록에 반환되고, 실패 목록은 비어 있다"
 
     @override
     def look(
@@ -338,4 +341,67 @@ class TheCountAsked(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Same("deleted_count", payload.deleted_count, len(laid.laid))]
+        return [
+            Held[list[UUID]](
+                "items",
+                list(payload.items),
+                SameAs[list[UUID]]([one.id for one in laid.laid], "미리 만들어 둔 변형들"),
+            ),
+            Same("failed", list(payload.failed), []),
+            Same("deleted_count", payload.deleted_count, len(laid.laid)),
+        ]
+
+
+@dataclass(frozen=True)
+class TheLaidOneIsDeletedTheUnknownFails(Then[AVariantAndACaller, DeleteRuntimeVariantsPayload]):
+    """미리 만들어 둔 변형은 삭제된 목록에, 없는 id는 실패 목록에 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "미리 만들어 둔 변형은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
+
+    @override
+    def look(
+        self, laid: AVariantAndACaller, answered: Answered[DeleteRuntimeVariantsPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(EntityNotFoundError, answered.raised)]
+        return [
+            Held[list[UUID]](
+                "items",
+                list(payload.items),
+                SameAs[list[UUID]]([laid.variant.id], "미리 만들어 둔 변형"),
+            ),
+            Same("len(failed)", len(payload.failed), 1),
+            Skipped("failed[0].id", "호출이 만든 없는 id라 미리 알 수 없다"),
+            Skipped("failed[0].message", MESSAGE_IS_FREE_TEXT),
+            Same("deleted_count", payload.deleted_count, 1),
+        ]
+
+
+@dataclass(frozen=True)
+class EveryLaidVariantIsRefused(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
+    """미리 만들어 둔 변형 전부가 요청한 순서대로 실패 목록에 반환되고, 삭제된 목록은 비어 있다."""
+
+    @override
+    def says(self) -> str:
+        return "미리 만들어 둔 변형 전부가 실패 목록에 반환되고, 삭제된 목록은 비어 있다"
+
+    @override
+    def look(
+        self, laid: ManyVariantsAndACaller, answered: Answered[DeleteRuntimeVariantsPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(EntityNotFoundError, answered.raised)]
+        return [
+            Same("items", list(payload.items), []),
+            Held[list[UUID]](
+                "failed[*].id",
+                [one.id for one in payload.failed],
+                SameAs[list[UUID]]([one.id for one in laid.laid], "미리 만들어 둔 변형들"),
+            ),
+            Skipped("failed[*].message", MESSAGE_IS_FREE_TEXT),
+            Same("deleted_count", payload.deleted_count, 0),
+        ]

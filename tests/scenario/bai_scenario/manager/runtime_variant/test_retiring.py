@@ -1,7 +1,7 @@
 """런타임 변형 삭제 — 하나씩, 그리고 여럿을 한 번에.
 
-일괄 삭제는 단건 삭제를 id마다 반복하는 것이라 한 트랜잭션이 아니다. 응답은 끝까지 성공한
-뒤에만 오므로 응답의 수는 요청한 id의 수와 같다.
+일괄 삭제는 id마다 자기 savepoint 안에서 지우고 따로 답한다. 없는 id와 권한이 없는 id는 실패
+목록에 들어가고, 나머지는 삭제된 채 삭제된 목록에 들어간다. 호출 자체는 거부되지 않는다.
 """
 
 from __future__ import annotations
@@ -28,10 +28,12 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
     AVariantAndSomeone,
+    EveryLaidVariantIsDeleted,
+    EveryLaidVariantIsRefused,
     ManyVariantsAndACaller,
     ManyVariantsAndSomeone,
-    TheCountAsked,
     TheDeletedVariantId,
+    TheLaidOneIsDeletedTheUnknownFails,
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
@@ -231,7 +233,7 @@ class ManyAreDeletedAtOnce(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형 둘을 한 번에 삭제하면, 응답에는 요청한 id의 수가 그대로 담긴다"
+        return "슈퍼관리자가 변형 둘을 한 번에 삭제하면, 둘 다 삭제된 목록에 반환되고 실패 목록은 비어 있다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
@@ -245,24 +247,24 @@ class ManyAreDeletedAtOnce(
 
     @override
     def then(self) -> Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]:
-        return TheCountAsked()
+        return EveryLaidVariantIsDeleted()
 
 
 @dataclass(frozen=True)
-class AnUnknownIdInTheListIsNotFound(
+class AnUnknownIdInTheListFailsAlone(
     Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "an-unknown-id-in-a-bulk-delete-is-not-found-after-the-ones-before-it-are-gone"
+        return "an-unknown-id-in-a-bulk-delete-fails-alone-while-the-known-one-is-deleted"
 
     @override
     def describe(self) -> str:
         return (
-            "있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면 대상을 찾을 수 없다는 이유로 거부된다. "
-            "한 트랜잭션이 아니므로 앞의 것은 이미 삭제되어 있다"
+            "있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면, 있는 것은 삭제된 목록에, "
+            "없는 id는 실패 목록에 반환된다"
         )
 
     @override
@@ -277,22 +279,25 @@ class AnUnknownIdInTheListIsNotFound(
 
     @override
     def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantsPayload]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheLaidOneIsDeletedTheUnknownFails()
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotDeleteMany(
+class AUserGrantedNothingHasEveryVariantRefused(
     Scenario[
         SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-delete-many-variants"
+        return "a-user-granted-nothing-has-every-variant-refused-in-a-bulk-delete"
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면 권한 부족으로 거부된다"
+        return (
+            "아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면, 둘 다 실패 목록에 반환되고 "
+            "아무것도 삭제되지 않는다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
@@ -306,7 +311,7 @@ class AUserGrantedNothingMayNotDeleteMany(
 
     @override
     def then(self) -> Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return EveryLaidVariantIsRefused()
 
 
 # TODO(BA-7931): enable once the preset seed from #14536 has landed and the ORM column
@@ -365,8 +370,8 @@ SCENARIOS: list[RetiringStep] = [
     AUserGrantedNothingMayNotDelete(),
     EnforcementOffLetsAnyoneDelete(),
     ManyAreDeletedAtOnce(),
-    AnUnknownIdInTheListIsNotFound(),
-    AUserGrantedNothingMayNotDeleteMany(),
+    AnUnknownIdInTheListFailsAlone(),
+    AUserGrantedNothingHasEveryVariantRefused(),
     # AVariantWithAPresetGoesWithIt(),  # TODO(BA-7931)
 ]
 

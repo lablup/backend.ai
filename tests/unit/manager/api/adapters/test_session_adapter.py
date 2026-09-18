@@ -28,7 +28,13 @@ from ai.backend.common.dto.manager.v2.session.types import (
     CreateSessionTypeEnum,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.types import ClusterMode, KernelId, SessionResult, SessionTypes
+from ai.backend.common.types import (
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionResult,
+    SessionTypes,
+)
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
@@ -366,6 +372,77 @@ class TestBatchLoadSessions:
         processors.bulk_get.run.assert_not_awaited()
 
 
+class TestBatchResourceAllocationBySession:
+    """The allocation DataLoader path: a denied session answers with its denial."""
+
+    @pytest.fixture
+    def readable_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denied_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def empty_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this session")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable_id: SessionID,
+        denied_id: SessionID,
+        empty_id: SessionID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        processors = MagicMock()
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[ResourceAllocationAggregate].succeeded(
+                        readable_id,
+                        ResourceAllocationAggregate(
+                            requested=ResourceSlot({"cpu": Decimal("2")}),
+                            used=ResourceSlot({"cpu": Decimal("1")}),
+                            allocated=ResourceSlot({"cpu": Decimal("1")}),
+                        ),
+                    ),
+                    PartialBulkEntityResult[ResourceAllocationAggregate].denied(denied_id, denial),
+                    PartialBulkEntityResult[ResourceAllocationAggregate].nothing(empty_id),
+                ]
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable_id: SessionID,
+        denied_id: SessionID,
+        empty_id: SessionID,
+        denial: GenericForbidden,
+    ) -> None:
+        allocated, refused, empty = await adapter.batch_resource_allocation_by_session([
+            readable_id,
+            denied_id,
+            empty_id,
+        ])
+
+        assert allocated == _create_allocation(
+            requested={"cpu": Decimal("2")}, used={"cpu": Decimal("1")}
+        )
+        assert refused is denial
+        assert empty == _create_allocation()
+
+
 class TestBatchLoadKernels:
     """The kernel DataLoader path: each kernel is answered for by its session."""
 
@@ -659,3 +736,40 @@ class TestTerminateActionBuilding:
         await adapter.terminate(dto)
         action = mock_processors.session.terminate_sessions.run.call_args[0][0]
         assert len(action.session_ids) == 3
+
+
+class TestTerminateDenial:
+    """A session the caller may not terminate refuses the call, not just its own item."""
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no terminate on this session")
+
+    @pytest.fixture
+    def processors(self, denial: GenericForbidden) -> MagicMock:
+        processors = MagicMock()
+        processors.terminate_sessions.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                        SessionID(uuid4()), SessionTerminationStatus.TERMINATING
+                    ),
+                    PartialBulkEntityResult[SessionTerminationStatus].denied(
+                        SessionID(uuid4()), denial
+                    ),
+                ]
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_the_denial_is_raised(
+        self, adapter: SessionAdapter, denial: GenericForbidden
+    ) -> None:
+        with pytest.raises(GenericForbidden) as raised:
+            await adapter.terminate(TerminateSessionsInput(session_ids=[uuid4(), uuid4()]))
+
+        assert raised.value is denial
