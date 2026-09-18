@@ -12,7 +12,11 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
     SearchRetentionPoliciesInput,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
+<<<<<<< HEAD
 from ai.backend.common.identifier.retention_policy import RetentionPolicyID
+=======
+from ai.backend.manager.api.gql.base import encode_cursor
+>>>>>>> 1289b881 (fix(BA-7985): encode relay cursors emitted by GQL resolvers (#14747))
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.retention_policy.types import (
     CreateRetentionPolicyInputGQL,
@@ -75,7 +79,7 @@ async def admin_retention_policies(
     edges = [
         RetentionPolicyEdge(
             node=RetentionPolicyGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
