@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, override
@@ -10,6 +10,7 @@ from typing import Any, override
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.filter_specs import (
     StringInMatchSpec,
     StringMatchSpec,
@@ -21,6 +22,7 @@ from ai.backend.common.dto.manager.query import (
     EnumFilter,
     IntFilter,
     StringFilter,
+    ToManyFilter,
     UUIDFilter,
 )
 from ai.backend.manager.models.clauses import QueryCondition
@@ -30,6 +32,7 @@ from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 FIRST_ID = uuid.UUID(int=1)
@@ -83,59 +86,41 @@ class RecordingUUIDConditions(UUIDConditions):
 
 class RecordingDateTimeConditions(DateTimeConditions):
     @override
-    def equals(self, value: datetime | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def equals(self, value: datetime) -> QueryCondition:
         return Recorded("equals", value)
 
     @override
-    def before(self, value: datetime | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def before(self, value: datetime) -> QueryCondition:
         return Recorded("before", value)
 
     @override
-    def after(self, value: datetime | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def after(self, value: datetime) -> QueryCondition:
         return Recorded("after", value)
 
 
 class RecordingIntConditions(IntConditions):
     @override
-    def equals(self, value: int | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def equals(self, value: int) -> QueryCondition:
         return Recorded("equals", value)
 
     @override
-    def not_equals(self, value: int | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def not_equals(self, value: int) -> QueryCondition:
         return Recorded("not_equals", value)
 
     @override
-    def greater_than(self, value: int | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def greater_than(self, value: int) -> QueryCondition:
         return Recorded("greater_than", value)
 
     @override
-    def greater_than_or_equal(self, value: int | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def greater_than_or_equal(self, value: int) -> QueryCondition:
         return Recorded("greater_than_or_equal", value)
 
     @override
-    def less_than(self, value: int | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def less_than(self, value: int) -> QueryCondition:
         return Recorded("less_than", value)
 
     @override
-    def less_than_or_equal(self, value: int | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def less_than_or_equal(self, value: int) -> QueryCondition:
         return Recorded("less_than_or_equal", value)
 
 
@@ -155,36 +140,44 @@ class RequestStatusFilter(EnumFilter[RequestStatus]):
 
 class RecordingEnumConditions(EnumConditions[ColumnStatus]):
     @override
-    def equals(self, value: ColumnStatus | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def equals(self, value: ColumnStatus) -> QueryCondition:
         return Recorded("equals", value)
 
     @override
-    def not_equals(self, value: ColumnStatus | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def not_equals(self, value: ColumnStatus) -> QueryCondition:
         return Recorded("not_equals", value)
 
     @override
-    def in_(self, values: Collection[ColumnStatus] | None) -> QueryCondition | None:
-        if values is None:
-            return None
+    def in_(self, values: Collection[ColumnStatus]) -> QueryCondition:
         return Recorded("in_", list(values))
 
     @override
-    def not_in(self, values: Collection[ColumnStatus] | None) -> QueryCondition | None:
-        if values is None:
-            return None
+    def not_in(self, values: Collection[ColumnStatus]) -> QueryCondition:
         return Recorded("not_in", list(values))
 
 
 class RecordingBoolConditions(BoolConditions):
     @override
-    def equals(self, value: bool | None) -> QueryCondition | None:
-        if value is None:
-            return None
+    def equals(self, value: bool) -> QueryCondition:
         return Recorded("equals", value)
+
+
+class RecordingToManyCorrelation(ToManyCorrelation):
+    @override
+    def some(self, conditions: list[QueryCondition]) -> QueryCondition:
+        return Recorded("some", conditions)
+
+    @override
+    def every(self, conditions: list[QueryCondition]) -> QueryCondition:
+        return Recorded("every", conditions)
+
+    @override
+    def none(self, conditions: list[QueryCondition]) -> QueryCondition:
+        return Recorded("none", conditions)
+
+
+class RowFilter(BaseRequestModel):
+    key: str | None = None
 
 
 @pytest.fixture
@@ -558,3 +551,62 @@ class TestApplyBoolFilter:
         self, adapter: BaseFilterAdapter, column: sa.sql.expression.ColumnClause[Any]
     ) -> None:
         assert adapter.apply_bool_filter(None, RecordingBoolConditions(column)) == []
+
+
+class TestApplyToManyFilter:
+    @pytest.fixture
+    def correlation(
+        self, column: sa.sql.expression.ColumnClause[Any]
+    ) -> RecordingToManyCorrelation:
+        return RecordingToManyCorrelation(sa.table("rows"), sa.table("owners"), column == column)
+
+    @pytest.fixture
+    def row_conditions(self) -> Callable[[RowFilter], list[QueryCondition]]:
+        def convert(row_filter: RowFilter) -> list[QueryCondition]:
+            return [Recorded("row", row_filter.key)]
+
+        return convert
+
+    @pytest.mark.parametrize("quantifier", ["some", "every", "none"])
+    def test_each_quantifier_wraps_the_row_conditions(
+        self,
+        adapter: BaseFilterAdapter,
+        correlation: RecordingToManyCorrelation,
+        row_conditions: Callable[[RowFilter], list[QueryCondition]],
+        quantifier: str,
+    ) -> None:
+        applied = adapter.apply_to_many_filter(
+            ToManyFilter[RowFilter].model_validate({quantifier: {"key": "a"}}),
+            correlation,
+            row_conditions,
+        )
+
+        assert applied == [Recorded(quantifier, [Recorded("row", "a")])]
+
+    def test_every_set_quantifier_applies_in_order(
+        self,
+        adapter: BaseFilterAdapter,
+        correlation: RecordingToManyCorrelation,
+        row_conditions: Callable[[RowFilter], list[QueryCondition]],
+    ) -> None:
+        applied = adapter.apply_to_many_filter(
+            ToManyFilter[RowFilter](
+                none=RowFilter(key="c"), every=RowFilter(key="b"), some=RowFilter(key="a")
+            ),
+            correlation,
+            row_conditions,
+        )
+
+        assert applied == [
+            Recorded("some", [Recorded("row", "a")]),
+            Recorded("every", [Recorded("row", "b")]),
+            Recorded("none", [Recorded("row", "c")]),
+        ]
+
+    def test_none_applies_nothing(
+        self,
+        adapter: BaseFilterAdapter,
+        correlation: RecordingToManyCorrelation,
+        row_conditions: Callable[[RowFilter], list[QueryCondition]],
+    ) -> None:
+        assert adapter.apply_to_many_filter(None, correlation, row_conditions) == []

@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageModeFilter
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -42,13 +43,14 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerierResult,
     execute_batch_querier,
@@ -70,6 +72,10 @@ async def _search_vfolders(
 
 class TestVfolderSearchFilter:
     """Tests for search_user_vfolders with filters."""
+
+    @pytest.fixture
+    def filter_adapter(self) -> BaseFilterAdapter:
+        return BaseFilterAdapter()
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -412,12 +418,15 @@ class TestVfolderSearchFilter:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
+        filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable={eq: true} returns only cloneable=true vfolders (owned + shared)."""
         scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[VFolderConditions.by_cloneable(True)],
+            conditions=filter_adapter.apply_bool_filter(
+                True, VFolderSearchableFields.cloneable.filter
+            ),
             orders=[],
         )
 
@@ -435,12 +444,15 @@ class TestVfolderSearchFilter:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
+        filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable={eq: false} returns only cloneable=false vfolders."""
         scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[VFolderConditions.by_cloneable(False)],
+            conditions=filter_adapter.apply_bool_filter(
+                False, VFolderSearchableFields.cloneable.filter
+            ),
             orders=[],
         )
 
@@ -478,12 +490,15 @@ class TestVfolderSearchFilter:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
+        filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable filter works with pagination (correct total_count and has_next_page)."""
         scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
-            conditions=[VFolderConditions.by_cloneable(True)],
+            conditions=filter_adapter.apply_bool_filter(
+                True, VFolderSearchableFields.cloneable.filter
+            ),
             orders=[],
         )
 
@@ -497,14 +512,18 @@ class TestVfolderSearchFilter:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         cloneable_data: dict[str, uuid.UUID],
+        filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable filter combines correctly with other conditions (usage_mode)."""
         scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                VFolderConditions.by_cloneable(True),
-                VFolderConditions.by_usage_mode_in([VFolderUsageMode.GENERAL]),
+                *filter_adapter.apply_bool_filter(True, VFolderSearchableFields.cloneable.filter),
+                *filter_adapter.apply_enum_filter(
+                    VFolderUsageModeFilter(in_=[VFolderUsageMode.GENERAL]),
+                    VFolderSearchableFields.usage_mode.filter,
+                ),
             ],
             orders=[],
         )

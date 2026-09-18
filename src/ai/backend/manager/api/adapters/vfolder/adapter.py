@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
@@ -64,8 +65,10 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     FileEntryType,
+    OrderDirection,
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
+    VFolderOrderField,
     VFolderOwnershipInfo,
     VFolderPermissionField,
     VFolderQuotaInfo,
@@ -100,24 +103,17 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPolicyData,
-    VFolderOperationStatus,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
     VFolderBaseCreator,
 )
-from ai.backend.manager.models.vfolder.orders import (
-    DEFAULT_FORWARD_ORDER as VFOLDER_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.vfolder.orders import (
-    resolve_order as resolve_vfolder_order,
-)
 from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -173,7 +169,7 @@ from ai.backend.manager.services.vfolder.processors import (
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=VFOLDER_DEFAULT_FORWARD_ORDER,
+    forward_order=VFolderSearchableFields.created_at.order.apply(ascending=False),
     cursor_column=VFolderRow.id,
 )
 
@@ -872,77 +868,18 @@ class VFolderAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.name is not None:
-            c = self.convert_string_filter(
-                f.name,
-                contains_factory=VFolderConditions.by_name_contains,
-                equals_factory=VFolderConditions.by_name_equals,
-                starts_with_factory=VFolderConditions.by_name_starts_with,
-                ends_with_factory=VFolderConditions.by_name_ends_with,
-                in_factory=VFolderConditions.by_name_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.host is not None:
-            c = self.convert_string_filter(
-                f.host,
-                contains_factory=VFolderConditions.by_host_contains,
-                equals_factory=VFolderConditions.by_host_equals,
-                starts_with_factory=VFolderConditions.by_host_starts_with,
-                ends_with_factory=VFolderConditions.by_host_ends_with,
-                in_factory=VFolderConditions.by_host_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.status is not None:
-            if f.status.equals is not None:
-                conditions.append(
-                    VFolderConditions.by_status_equals(VFolderOperationStatus(f.status.equals))
-                )
-            if f.status.in_ is not None:
-                status_values = [VFolderOperationStatus(s) for s in f.status.in_]
-                conditions.append(VFolderConditions.by_status_in(status_values))
-            if f.status.not_equals is not None:
-                conditions.append(
-                    VFolderConditions.by_status_not_equals(
-                        VFolderOperationStatus(f.status.not_equals)
-                    )
-                )
-            if f.status.not_in is not None:
-                status_values = [VFolderOperationStatus(s) for s in f.status.not_in]
-                conditions.append(VFolderConditions.by_status_not_in(status_values))
-        if f.usage_mode is not None:
-            if f.usage_mode.equals is not None:
-                conditions.append(
-                    VFolderConditions.by_usage_mode_equals(VFolderUsageMode(f.usage_mode.equals))
-                )
-            if f.usage_mode.in_ is not None:
-                mode_values = [VFolderUsageMode(m) for m in f.usage_mode.in_]
-                conditions.append(VFolderConditions.by_usage_mode_in(mode_values))
-            if f.usage_mode.not_equals is not None:
-                conditions.append(
-                    VFolderConditions.by_usage_mode_not_equals(
-                        VFolderUsageMode(f.usage_mode.not_equals)
-                    )
-                )
-            if f.usage_mode.not_in is not None:
-                mode_values = [VFolderUsageMode(m) for m in f.usage_mode.not_in]
-                conditions.append(VFolderConditions.by_usage_mode_not_in(mode_values))
-        if f.created_at is not None:
-            c = f.created_at.build_query_condition(
-                before_factory=VFolderConditions.by_created_at_before,
-                after_factory=VFolderConditions.by_created_at_after,
-                equals_factory=VFolderConditions.by_created_at_equals,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.cloneable is not None:
-            conditions.append(VFolderConditions.by_cloneable(f.cloneable))
-        if f.labels is not None:
-            conditions.extend(
-                self._convert_entity_label_nested_filter(f.labels, VFolderConditions.labels)
-            )
+        fields = VFolderSearchableFields
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_string_filter(f.host, fields.host.filter),
+            *self.apply_enum_filter(f.status, fields.status.filter),
+            *self.apply_enum_filter(f.usage_mode, fields.usage_mode.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_bool_filter(f.cloneable, fields.cloneable.filter),
+            *self.apply_to_many_filter(
+                f.labels, fields.labels.correlation, self._convert_entity_label_filter
+            ),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_vfolder_filter(sub))
@@ -960,6 +897,22 @@ class VFolderAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_vfolder_orders(orders: list[VFolderOrder]) -> list[QueryOrder]:
-        return [resolve_vfolder_order(o.field, o.direction) for o in orders]
+    def _convert_vfolder_orders(self, orders: list[VFolderOrder]) -> list[QueryOrder]:
+        return [self._convert_vfolder_order(order) for order in orders]
+
+    def _convert_vfolder_order(self, order: VFolderOrder) -> QueryOrder:
+        fields = VFolderSearchableFields
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case VFolderOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case VFolderOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case VFolderOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case VFolderOrderField.USAGE_MODE:
+                return fields.usage_mode.order.apply(ascending)
+            case VFolderOrderField.HOST:
+                return fields.host.order.apply(ascending)
+            case _:
+                assert_never(order.field)

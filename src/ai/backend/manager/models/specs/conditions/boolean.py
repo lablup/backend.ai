@@ -9,17 +9,14 @@ from ai.backend.manager.models.specs.conditions.types import FilterColumn
 
 
 class BoolConditions:
-    """Boolean equality on one column; a ``None`` value gives no condition."""
+    """Boolean equality on one column."""
 
     _column: FilterColumn
 
     def __init__(self, column: FilterColumn) -> None:
         self._column = column
 
-    def equals(self, value: bool | None) -> QueryCondition | None:
-        if value is None:
-            return None
-
+    def equals(self, value: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return self._column == value
 

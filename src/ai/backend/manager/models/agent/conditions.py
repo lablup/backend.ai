@@ -11,9 +11,7 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.models.entity_label.conditions import (
-    make_entity_label_nested_conditions,
-)
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelCorrelation
 
 from .row import AgentRow
 
@@ -21,7 +19,7 @@ from .row import AgentRow
 class AgentConditions:
     """Query condition factories for filtering agent rows."""
 
-    labels = make_entity_label_nested_conditions(AgentRow, AgentRow.uuid, AgentEntityType())
+    labels = EntityLabelCorrelation(AgentRow, AgentEntityType(), AgentRow.uuid)
     """The `labels` nested filter: some / every / none over the labels on a agent."""
 
     @staticmethod

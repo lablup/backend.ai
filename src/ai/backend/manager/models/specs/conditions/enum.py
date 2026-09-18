@@ -12,7 +12,7 @@ from ai.backend.manager.models.specs.conditions.types import FilterColumn
 
 
 class EnumConditions[E: Enum]:
-    """Enum equality and membership on one column; a ``None`` value gives no condition."""
+    """Enum equality and membership on one column."""
 
     _column: FilterColumn
     _enum_type: type[E]
@@ -21,48 +21,29 @@ class EnumConditions[E: Enum]:
         self._column = column
         self._enum_type = enum_type
 
-    def to_value(self, value: object | None) -> E | None:
+    def to_value(self, value: object) -> E:
         """Look ``value`` up in the column's enum, e.g. a request-side member of the same value."""
-        if value is None:
-            return None
         return self._enum_type(value)
 
-    def to_values(self, values: Collection[object] | None) -> list[E] | None:
-        if values is None:
-            return None
-        return [self._enum_type(value) for value in values]
-
-    def equals(self, value: E | None) -> QueryCondition | None:
-        if value is None:
-            return None
-
+    def equals(self, value: E) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return self._column == value
 
         return inner
 
-    def not_equals(self, value: E | None) -> QueryCondition | None:
-        if value is None:
-            return None
-
+    def not_equals(self, value: E) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return self._column != value
 
         return inner
 
-    def in_(self, values: Collection[E] | None) -> QueryCondition | None:
-        if values is None:
-            return None
-
+    def in_(self, values: Collection[E]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return self._column.in_(values)
 
         return inner
 
-    def not_in(self, values: Collection[E] | None) -> QueryCondition | None:
-        if values is None:
-            return None
-
+    def not_in(self, values: Collection[E]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return self._column.not_in(values)
 

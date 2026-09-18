@@ -140,6 +140,16 @@ class EnumFilter[E: Enum](BaseRequestModel):
     not_in: list[E] | None = Field(default=None, description="Exclude any of the provided values.")
 
 
+class ToManyFilter[F](BaseRequestModel):
+    """Filter over the rows a to-many relation reaches; each quantifier takes one row filter."""
+
+    some: F | None = Field(default=None, description="At least one related row matches.")
+    every: F | None = Field(
+        default=None, description="Every related row matches; true when there is none."
+    )
+    none: F | None = Field(default=None, description="No related row matches.")
+
+
 class DateTimeFilter(BaseRequestModel):
     """Filter for datetime fields supporting range and equality operations."""
 

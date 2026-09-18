@@ -34,6 +34,17 @@ def items_table() -> sa.Table:
 
 
 @pytest.fixture
+def tags_table() -> sa.Table:
+    """Rows several of which point at one ``items`` row."""
+    return sa.Table(
+        "tags",
+        sa.MetaData(),
+        sa.Column("item_id", sa.Uuid),
+        sa.Column("key", sa.String),
+    )
+
+
+@pytest.fixture
 def render() -> Callable[[sa.sql.ClauseElement], str]:
     """Render an expression as PostgreSQL SQL with its values inlined, whitespace collapsed."""
 

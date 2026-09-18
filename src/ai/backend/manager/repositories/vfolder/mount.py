@@ -10,7 +10,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -39,8 +39,8 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.project import groups as groups_table
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.user.queries import joined_project_ids_query
-from ai.backend.manager.models.vfolder.orders import VFolderOrders
 from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
     VFolderRow,
@@ -54,6 +54,7 @@ from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
 )
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.types import UserScope
 
@@ -104,13 +105,15 @@ async def query_reachable_vfolders(
     project_ids = (await conn.scalars(joined_project_ids_query(user_id))).all()
     scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
     scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
+    membership = VFolderSearchableFields.membership.filter
+    project_id = ProjectID(user_scope.group_id)
     rows = (
         await conn.execute(
             sa.select(vfolders)
             .where(conditions, sa.or_(*(scope.to_condition()() for scope in scopes)))
             .order_by(
-                VFolderOrders.project_first(ProjectID(user_scope.group_id)),
-                VFolderOrders.shared_last(user_id),
+                ConditionOrder(membership.reached_by(ProjectEntityType(), project_id)).first(),
+                ConditionOrder(membership.shared_to(user_id)).last(),
             )
         )
     ).all()

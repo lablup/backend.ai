@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.query import (
     EnumFilter,
     IntFilter,
     StringFilter,
+    ToManyFilter,
     UUIDFilter,
 )
 from ai.backend.manager.models.clauses import QueryCondition
@@ -29,6 +30,7 @@ from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 
 
 class BaseFilterAdapter:
@@ -318,12 +320,13 @@ class BaseFilterAdapter:
         """Apply the first of ``equals``, ``before``, ``after``; ``not_equals`` is not applied."""
         if datetime_filter is None:
             return []
-        candidates = [
-            conditions.equals(datetime_filter.equals),
-            conditions.before(datetime_filter.before),
-            conditions.after(datetime_filter.after),
-        ]
-        return [condition for condition in candidates if condition is not None][:1]
+        if datetime_filter.equals is not None:
+            return [conditions.equals(datetime_filter.equals)]
+        if datetime_filter.before is not None:
+            return [conditions.before(datetime_filter.before)]
+        if datetime_filter.after is not None:
+            return [conditions.after(datetime_filter.after)]
+        return []
 
     @final
     def apply_int_filter(
@@ -332,15 +335,18 @@ class BaseFilterAdapter:
         """Apply the first comparison ``int_filter`` sets."""
         if int_filter is None:
             return []
-        candidates = [
-            conditions.equals(int_filter.equals),
-            conditions.not_equals(int_filter.not_equals),
-            conditions.greater_than(int_filter.greater_than),
-            conditions.greater_than_or_equal(int_filter.greater_than_or_equal),
-            conditions.less_than(int_filter.less_than),
-            conditions.less_than_or_equal(int_filter.less_than_or_equal),
+        operations: list[tuple[int | None, Callable[[int], QueryCondition]]] = [
+            (int_filter.equals, conditions.equals),
+            (int_filter.not_equals, conditions.not_equals),
+            (int_filter.greater_than, conditions.greater_than),
+            (int_filter.greater_than_or_equal, conditions.greater_than_or_equal),
+            (int_filter.less_than, conditions.less_than),
+            (int_filter.less_than_or_equal, conditions.less_than_or_equal),
         ]
-        return [condition for condition in candidates if condition is not None][:1]
+        for value, operation in operations:
+            if value is not None:
+                return [operation(value)]
+        return []
 
     @final
     def apply_enum_filter(
@@ -349,17 +355,43 @@ class BaseFilterAdapter:
         """Apply every operation ``enum_filter`` sets, each as its own condition."""
         if enum_filter is None:
             return []
-        candidates = [
-            conditions.equals(conditions.to_value(enum_filter.equals)),
-            conditions.in_(conditions.to_values(enum_filter.in_)),
-            conditions.not_equals(conditions.to_value(enum_filter.not_equals)),
-            conditions.not_in(conditions.to_values(enum_filter.not_in)),
-        ]
-        return [condition for condition in candidates if condition is not None]
+        applied: list[QueryCondition] = []
+        if enum_filter.equals is not None:
+            applied.append(conditions.equals(conditions.to_value(enum_filter.equals)))
+        if enum_filter.in_ is not None:
+            applied.append(conditions.in_([conditions.to_value(v) for v in enum_filter.in_]))
+        if enum_filter.not_equals is not None:
+            applied.append(conditions.not_equals(conditions.to_value(enum_filter.not_equals)))
+        if enum_filter.not_in is not None:
+            applied.append(conditions.not_in([conditions.to_value(v) for v in enum_filter.not_in]))
+        return applied
 
     @final
     def apply_bool_filter(
         self, bool_filter: bool | None, conditions: BoolConditions
     ) -> list[QueryCondition]:
-        condition = conditions.equals(bool_filter)
-        return [] if condition is None else [condition]
+        if bool_filter is None:
+            return []
+        return [conditions.equals(bool_filter)]
+
+    @final
+    def apply_to_many_filter[F](
+        self,
+        to_many_filter: ToManyFilter[F] | None,
+        correlation: ToManyCorrelation,
+        row_conditions: Callable[[F], list[QueryCondition]],
+    ) -> list[QueryCondition]:
+        """Apply every quantifier ``to_many_filter`` sets, each as its own condition.
+
+        ``row_conditions`` turns the row filter into the conditions one related row must meet.
+        """
+        if to_many_filter is None:
+            return []
+        applied: list[QueryCondition] = []
+        if to_many_filter.some is not None:
+            applied.append(correlation.some(row_conditions(to_many_filter.some)))
+        if to_many_filter.every is not None:
+            applied.append(correlation.every(row_conditions(to_many_filter.every)))
+        if to_many_filter.none is not None:
+            applied.append(correlation.none(row_conditions(to_many_filter.none)))
+        return applied

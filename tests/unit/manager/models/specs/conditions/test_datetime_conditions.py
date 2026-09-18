@@ -10,7 +10,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 
 type Render = Callable[[sa.sql.ClauseElement], str]
-type Operation = Callable[[DateTimeConditions, datetime | None], QueryCondition | None]
+type Operation = Callable[[DateTimeConditions, datetime], QueryCondition]
 
 MOMENT = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -29,12 +29,4 @@ class TestDateTimeConditions:
     ) -> None:
         condition = operation(DateTimeConditions(items_table.c.created_at), MOMENT)
 
-        assert condition is not None
         assert render(condition()) == expected
-
-    @pytest.mark.parametrize(
-        "operation",
-        [DateTimeConditions.equals, DateTimeConditions.before, DateTimeConditions.after],
-    )
-    def test_none_gives_no_condition(self, items_table: sa.Table, operation: Operation) -> None:
-        assert operation(DateTimeConditions(items_table.c.created_at), None) is None

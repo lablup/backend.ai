@@ -1711,7 +1711,9 @@ class DeploymentAdapter(BaseAdapter):
                 )
         if f.labels is not None:
             conditions.extend(
-                self._convert_entity_label_nested_filter(f.labels, DeploymentConditions.labels)
+                self.apply_to_many_filter(
+                    f.labels, DeploymentConditions.labels, self._convert_entity_label_filter
+                )
             )
         if f.AND:
             for sub in f.AND:

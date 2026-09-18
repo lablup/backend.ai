@@ -26,7 +26,6 @@ class TestEnumConditions:
 
         condition = conditions.equals(item_status_type("active"))
 
-        assert condition is not None
         assert render(condition()) == "items.status = 'ACTIVE'"
 
     def test_not_equals(
@@ -36,7 +35,6 @@ class TestEnumConditions:
 
         condition = conditions.not_equals(item_status_type("active"))
 
-        assert condition is not None
         assert render(condition()) == "items.status != 'ACTIVE'"
 
     def test_in(
@@ -46,7 +44,6 @@ class TestEnumConditions:
 
         condition = conditions.in_([item_status_type("active"), item_status_type("deleted")])
 
-        assert condition is not None
         assert render(condition()) == "items.status IN ('ACTIVE', 'DELETED')"
 
     def test_not_in(
@@ -56,20 +53,7 @@ class TestEnumConditions:
 
         condition = conditions.not_in([item_status_type("deleted")])
 
-        assert condition is not None
         assert render(condition()) == "(items.status NOT IN ('DELETED'))"
-
-    def test_none_gives_no_condition(
-        self, items_table: sa.Table, item_status_type: type[enum.StrEnum]
-    ) -> None:
-        conditions = EnumConditions(items_table.c.status, item_status_type)
-
-        assert [
-            conditions.equals(None),
-            conditions.not_equals(None),
-            conditions.in_(None),
-            conditions.not_in(None),
-        ] == [None, None, None, None]
 
 
 class TestEnumConditionsToValue:
@@ -79,23 +63,6 @@ class TestEnumConditionsToValue:
         conditions = EnumConditions(items_table.c.status, item_status_type)
 
         assert conditions.to_value(ItemStatusField.DELETED) is item_status_type("deleted")
-
-    def test_request_members_become_column_members(
-        self, items_table: sa.Table, item_status_type: type[enum.StrEnum]
-    ) -> None:
-        conditions = EnumConditions(items_table.c.status, item_status_type)
-
-        assert conditions.to_values([ItemStatusField.ACTIVE, ItemStatusField.DELETED]) == [
-            item_status_type("active"),
-            item_status_type("deleted"),
-        ]
-
-    def test_none_stays_none(
-        self, items_table: sa.Table, item_status_type: type[enum.StrEnum]
-    ) -> None:
-        conditions = EnumConditions(items_table.c.status, item_status_type)
-
-        assert (conditions.to_value(None), conditions.to_values(None)) == (None, None)
 
     def test_unknown_value_is_rejected(
         self, items_table: sa.Table, item_status_type: type[enum.StrEnum]

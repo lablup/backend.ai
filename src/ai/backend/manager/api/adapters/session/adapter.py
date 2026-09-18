@@ -828,7 +828,9 @@ class SessionAdapter(BaseAdapter):
                 conditions.append(c)
         if f.labels is not None:
             conditions.extend(
-                self._convert_entity_label_nested_filter(f.labels, SessionConditions.labels)
+                self.apply_to_many_filter(
+                    f.labels, SessionConditions.labels, self._convert_entity_label_filter
+                )
             )
         if f.AND:
             for sub in f.AND:

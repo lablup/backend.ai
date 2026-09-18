@@ -23,8 +23,4 @@ class TestBoolConditions:
     ) -> None:
         condition = BoolConditions(items_table.c.flag).equals(value)
 
-        assert condition is not None
         assert render(condition()) == expected
-
-    def test_none_gives_no_condition(self, items_table: sa.Table) -> None:
-        assert BoolConditions(items_table.c.flag).equals(None) is None

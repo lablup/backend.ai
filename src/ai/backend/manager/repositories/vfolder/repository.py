@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -113,7 +114,6 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -131,6 +131,7 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderUserMountPolicyQuerier,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
@@ -247,7 +248,10 @@ class VfolderRepository:
         if not ids:
             return []
         async with self._db.begin_readonly_session() as session:
-            query = sa.select(VFolderRow).where(VFolderConditions.by_ids(ids)())
+            id_in = VFolderSearchableFields.id.filter.in_(
+                UUIDInMatchSpec(values=list(ids), negated=False)
+            )
+            query = sa.select(VFolderRow).where(id_in())
             result = await session.execute(query)
             rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
             return [rows_by_id.get(VFolderUUID(vfolder_id)) for vfolder_id in ids]
