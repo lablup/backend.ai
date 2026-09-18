@@ -6206,6 +6206,14 @@ input DeleteRuntimeVariantsInput
 type DeleteRuntimeVariantsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.9.0. Runtime variants that were deleted."""
+  items: [RuntimeVariant!]!
+
+  """
+  Added in 26.9.0. Runtime variants that could not be deleted, with the reason each.
+  """
+  failed: [RuntimeVariantBulkFailureInfo!]!
+
   """Number of runtime variants successfully deleted."""
   deletedCount: Int!
 }
@@ -20461,6 +20469,19 @@ type RuntimeVariant implements Node
 
   """Timestamp of the last modification to this runtime variant."""
   updatedAt: DateTime
+}
+
+"""
+Added in 26.9.0. Failure detail for a single runtime variant ID in a bulk operation.
+"""
+type RuntimeVariantBulkFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Runtime variant ID that the operation failed on."""
+  id: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """Added in 26.4.2. Paginated list of runtime variants."""

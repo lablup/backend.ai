@@ -311,20 +311,20 @@ class ProcessorGroup[TData: EntityData]:
         action_cls: type[TAction],
         func: Callable[[TAction], Awaitable[PartialBulkResult[TValue]]],
         *,
-        atomic_validators: Sequence[AtomicBulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> PartialBulkActionProcessor[TAction, TValue]:
         """Several entities read or written by a service, answered for one by one.
 
         The service answers with the standard result, so the processor is the one that
-        completes and orders it. Gated atomically for now: nothing narrows until the
-        permission check answers per entity.
+        completes and orders it. Gated per entity: a denied one is a failed item, and
+        the service runs over the action narrowed to the rest.
         """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
         return PartialBulkActionProcessor(
             func,
             monitors=(*self._deps.monitors.bulk, *monitors),
-            atomic_validators=(*self._deps.validators.atomic_bulk, *atomic_validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def legacy_partial_bulk[TAction: BaseBulkAction, TResult: BasePartialBulkActionResult](

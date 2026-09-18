@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     CreateRuntimeVariantPayload,
     DeleteRuntimeVariantPayload,
     DeleteRuntimeVariantsPayload,
+    RuntimeVariantBulkFailureInfo,
     RuntimeVariantModelDefinitionInfo,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
@@ -35,6 +36,9 @@ from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSe
 from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
 from ai.backend.manager.services.runtime_variant.actions.bulk_get import (
     PublicBulkGetRuntimeVariantsAction,
+)
+from ai.backend.manager.services.runtime_variant.actions.bulk_purge import (
+    BulkPurgeRuntimeVariantsAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.create import CreateRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
@@ -152,12 +156,24 @@ class RuntimeVariantAdapter(BaseAdapter):
         return DeleteRuntimeVariantPayload(id=result.data.id)
 
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
-        """Delete multiple runtime variants by ID."""
-        for variant_id in input.ids:
-            await self._runtime_variant.purge.run(
-                PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
+        """Delete the named runtime variants, answering for each one."""
+        result = await self._runtime_variant.bulk_purge.run(
+            BulkPurgeRuntimeVariantsAction(
+                ids=[RuntimeVariantID(variant_id) for variant_id in input.ids]
             )
-        return DeleteRuntimeVariantsPayload(deleted_count=len(input.ids))
+        )
+        items = [self._data_to_node(item.value) for item in result.items if item.value is not None]
+        return DeleteRuntimeVariantsPayload(
+            items=items,
+            failed=[
+                RuntimeVariantBulkFailureInfo(
+                    id=RuntimeVariantID(item.entity_id), message=str(item.error)
+                )
+                for item in result.items
+                if item.error is not None
+            ],
+            deleted_count=len(items),
+        )
 
     async def resolve_by_name(self, name: str) -> RuntimeVariantID:
         """Resolve a variant name into its ``RuntimeVariantID``.

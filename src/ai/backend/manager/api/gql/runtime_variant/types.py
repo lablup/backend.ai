@@ -33,6 +33,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     DeleteRuntimeVariantsPayload as DeleteRuntimeVariantsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    RuntimeVariantBulkFailureInfo as RuntimeVariantBulkFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     RuntimeVariantModelConfigInfo as RuntimeVariantModelConfigInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
@@ -304,6 +307,19 @@ class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Failure detail for a single runtime variant ID in a bulk operation.",
+    ),
+    model=RuntimeVariantBulkFailureInfoDTO,
+    name="RuntimeVariantBulkFailureInfo",
+)
+class RuntimeVariantBulkFailureInfoGQL(PydanticOutputMixin[RuntimeVariantBulkFailureInfoDTO]):
+    id: UUID = gql_field(description="Runtime variant ID that the operation failed on.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload for bulk runtime variant deletion.",
     ),
@@ -311,4 +327,16 @@ class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInpu
     name="DeleteRuntimeVariantsPayload",
 )
 class DeleteRuntimeVariantsPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantsPayloadDTO]):
+    items: list[RuntimeVariantGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Runtime variants that were deleted.",
+        ),
+    )
+    failed: list[RuntimeVariantBulkFailureInfoGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Runtime variants that could not be deleted, with the reason each.",
+        ),
+    )
     deleted_count: int = gql_field(description="Number of runtime variants successfully deleted.")
