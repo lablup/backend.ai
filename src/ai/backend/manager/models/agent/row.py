@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -17,7 +17,7 @@ from sqlalchemy.sql.expression import false, true
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataForHeartbeatUpdate,
@@ -31,7 +31,6 @@ from ai.backend.manager.models.base import (
     EnumType,
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -155,23 +154,6 @@ class AgentRow(Base):
             public_key=self.public_key,
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
         )
-
-    @classmethod
-    async def get_occupied_slots(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        agent_id: AgentId,
-        known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> ResourceSlot:
-        async with db.begin_readonly_session() as db_session:
-            query = sa.select(AgentResourceRow.slot_name, AgentResourceRow.used).where(
-                AgentResourceRow.agent_id == agent_id,
-            )
-            result = await db_session.execute(query)
-            occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
-            for row in result:
-                occupied_slots[row.slot_name] = row.used
-            return occupied_slots
 
 
 # For compatibility

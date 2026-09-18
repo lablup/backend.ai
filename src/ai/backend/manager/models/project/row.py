@@ -721,32 +721,6 @@ class ProjectPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
-async def get_projects(
-    target_scope: ScopeType,
-    requested_permission: ProjectPermission,
-    project_id: uuid.UUID | None = None,
-    project_name: str | None = None,
-    *,
-    ctx: ClientContext,
-    db_conn: SAConnection,
-) -> list[ProjectModel]:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        builder = ProjectPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        query_stmt = await permission_ctx.build_query()
-        if query_stmt is None:
-            return []
-        if project_id is not None:
-            query_stmt = query_stmt.where(ProjectRow.id == project_id)
-        if project_name is not None:
-            query_stmt = query_stmt.where(ProjectRow.name == project_name)
-        result: list[ProjectModel] = []
-        async for row in await db_session.stream_scalars(query_stmt):
-            permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(ProjectModel.from_row(row, permissions))
-    return result
-
-
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,

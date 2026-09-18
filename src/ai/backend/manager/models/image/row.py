@@ -39,9 +39,7 @@ from ai.backend.common.types import (
     BinarySize,
     ImageCanonical,
     ImageID,
-    ResourceSlot,
     SlotName,
-    SlotTypes,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -399,32 +397,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
-
-    async def get_min_slot(self, slot_units: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
-        min_slot = ResourceSlot()
-
-        for slot_key, resource in self.resources.items():
-            slot_unit = slot_units.get(slot_key)
-            if slot_unit is None:
-                # ignore unknown slots
-                continue
-            min_value = resource.get("min")
-            if min_value is None:
-                min_value = Decimal(0)
-            if slot_unit == "bytes":
-                if not isinstance(min_value, Decimal):
-                    min_value = BinarySize.from_str(min_value)
-            else:
-                if not isinstance(min_value, Decimal):
-                    min_value = Decimal(min_value)
-            min_slot[slot_key] = min_value
-
-        # fill missing
-        for slot_key in slot_units.keys():
-            if slot_key not in min_slot:
-                min_slot[slot_key] = Decimal(0)
-
-        return min_slot
 
     def _parse_row(self) -> dict[str, Any]:
         res_limits = []
