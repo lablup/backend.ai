@@ -26,3 +26,22 @@ class ContainerRegistrySearcher(Searcher[ContainerRegistryRow, ContainerRegistry
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
         return ContainerRegistrySearchableFields.own.to_data(row)
+
+
+@dataclass(kw_only=True)
+class ContainerRegistryByNameAndProjectSearcher(
+    Searcher[ContainerRegistryRow, ContainerRegistryData]
+):
+    registry_name: str
+    project_name: str
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(ContainerRegistryRow).where(
+            ContainerRegistryRow.registry_name == self.registry_name,
+            ContainerRegistryRow.project == self.project_name,
+        )
+
+    @override
+    def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
+        return row.to_dataclass()

@@ -7,9 +7,10 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import (
@@ -19,6 +20,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
 )
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
@@ -28,7 +30,7 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import GenericBadRequest
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.image import ContainerRegistryNotFound, ImageNotFound
 from ai.backend.manager.errors.kernel import (
     MainKernelNotFound,
     SessionAlreadyExists,
@@ -282,28 +284,33 @@ class SessionDBSource:
                 kernel.session_name = new_name
             return session_row
 
+    async def get_container_registry_by_id(
+        self, registry_id: ContainerRegistryID
+    ) -> ContainerRegistryData:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            row: ContainerRegistryRow | None = await db_session.scalar(
+                sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+            if row is None:
+                raise ContainerRegistryNotFound(f"Container registry {registry_id} not found")
+            return row.to_dataclass()
+
     async def get_container_registry(
         self,
         registry_hostname: str,
         registry_project: str,
-    ) -> ContainerRegistryRow | None:
+    ) -> ContainerRegistryData:
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ContainerRegistryRow)
-                .where(
-                    (ContainerRegistryRow.registry_name == registry_hostname)
-                    & (ContainerRegistryRow.project == registry_project)
-                )
-                .options(
-                    load_only(
-                        ContainerRegistryRow.url,
-                        ContainerRegistryRow.username,
-                        ContainerRegistryRow.password,
-                        ContainerRegistryRow.project,
-                    )
-                )
+            query = sa.select(ContainerRegistryRow).where(
+                (ContainerRegistryRow.registry_name == registry_hostname)
+                & (ContainerRegistryRow.project == registry_project)
             )
-            return cast(ContainerRegistryRow | None, await db_session.scalar(query))
+            row = await db_session.scalar(query)
+            if row is None:
+                raise ContainerRegistryNotFound(
+                    f"Project {registry_project} not found in registry {registry_hostname}"
+                )
+            return row.to_dataclass()
 
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:
         async with self._ops_provider.read_ops() as r:

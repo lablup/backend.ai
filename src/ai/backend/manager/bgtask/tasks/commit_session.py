@@ -12,6 +12,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskResult,
 )
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
@@ -29,7 +30,6 @@ from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 
 if TYPE_CHECKING:
@@ -62,6 +62,9 @@ class CommitSessionManifest(BaseBackgroundTaskManifest):
     """
 
     session_id: SessionId = Field(description="Session ID to commit")
+    registry_id: ContainerRegistryID | None = Field(
+        default=None, description="Selected container registry ID"
+    )
     registry_hostname: str = Field(description="Registry hostname to push the image")
     registry_project: str = Field(description="Registry project name")
     image_name: str = Field(description="Name for the customized image")
@@ -116,12 +119,13 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 raise SessionNotFound(f"Session {manifest.session_id} not found")
 
             # Get registry configuration
-            registry_conf = await self._session_repository.get_container_registry(
-                manifest.registry_hostname, manifest.registry_project
-            )
-            if not registry_conf:
-                raise ContainerRegistryNotFound(
-                    f"Project {manifest.registry_project} not found in registry {manifest.registry_hostname}"
+            if manifest.registry_id is not None:
+                registry_conf = await self._session_repository.get_container_registry_by_id(
+                    manifest.registry_id
+                )
+            else:
+                registry_conf = await self._session_repository.get_container_registry(
+                    manifest.registry_hostname, manifest.registry_project
                 )
 
             # Resolve base image
