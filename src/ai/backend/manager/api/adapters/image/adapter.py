@@ -53,7 +53,10 @@ from ai.backend.common.dto.manager.v2.image.types import (
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -150,11 +153,16 @@ class ImageAdapter(BaseAdapter):
         """Search images with admin scope, by cursor or by offset as the request names."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        names_cursor = any(
-            value is not None for value in (input.first, input.after, input.last, input.before)
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
         limit = input.limit
-        if limit is None and not names_cursor:
+        if limit is None and not options.has_cursor:
             limit = DEFAULT_PAGE_LIMIT
         querier = self._build_querier(
             conditions=conditions,
