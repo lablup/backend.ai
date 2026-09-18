@@ -88,10 +88,8 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     StrEnumType,
 )
-from ai.backend.manager.models.routing import RouteStatus
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.creator import DeploymentCreator
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
     from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -490,72 +488,6 @@ class EndpointRow(Base):
         result = await session.execute(query)
         return result.scalars().all()
 
-    @classmethod
-    async def list_by_model(
-        cls,
-        session: AsyncSession,
-        model_id: UUID,
-        domain: str | None = None,
-        project: UUID | None = None,
-        user_uuid: UUID | None = None,
-        load_routes: bool = False,
-        load_tokens: bool = False,
-        load_created_user: bool = False,
-        load_session_owner: bool = False,
-        load_revisions: bool = False,
-        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-        from ai.backend.manager.models.replica_group import ReplicaGroupRow
-
-        # Join through the primary replica group's current revision to find
-        # endpoints by model.
-        query = (
-            sa.select(EndpointRow)
-            .join(
-                ReplicaGroupRow,
-                EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
-            )
-            .join(
-                DeploymentRevisionRow,
-                ReplicaGroupRow.current_revision_id == DeploymentRevisionRow.id,
-            )
-            .where(
-                EndpointRow.lifecycle_stage.in_(status_filter)
-                & (DeploymentRevisionRow.model == model_id)
-            )
-            .order_by(sa.desc(EndpointRow.created_at))
-        )
-        if load_routes:
-            query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
-        if load_created_user:
-            query = query.options(selectinload(EndpointRow.created_user_row))
-        if load_session_owner:
-            query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
-            query = query.options(
-                # Revision-resolution helpers (``_find_current_revision`` /
-                # ``_find_active_revision``) read the group-sourced
-                # current/deploying revision relationships, so load only those
-                # two revision rows — not the full revision history.
-                selectinload(EndpointRow.current_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-                selectinload(EndpointRow.deploying_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-            )
-        if project:
-            query = query.filter(EndpointRow.project == project)
-        if domain:
-            query = query.filter(EndpointRow.domain == domain)
-        if user_uuid:
-            query = query.filter(EndpointRow.session_owner == user_uuid)
-        result = await session.execute(query)
-        return result.scalars().all()
-
     async def create_auto_scaling_rule(
         self,
         session: AsyncSession,
@@ -582,19 +514,6 @@ class EndpointRow(Base):
         )
         session.add(row)
         return row
-
-    @property
-    def terminatable_route_statuses(self) -> set[RouteStatus]:
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
-            return {
-                RouteStatus.PROVISIONING,
-                RouteStatus.RUNNING,
-                RouteStatus.FAILED_TO_START,
-            }
-        return {
-            RouteStatus.RUNNING,
-            RouteStatus.FAILED_TO_START,
-        }
 
     @staticmethod
     async def delegate_endpoint_ownership(
@@ -755,33 +674,6 @@ class EndpointRow(Base):
             routings=[routing.to_data() for routing in self.routings]
             if self.routings is not None
             else [],
-        )
-
-    @classmethod
-    def from_deployment_creator(
-        cls,
-        creator: DeploymentCreator,
-    ) -> Self:
-        """Create an EndpointRow instance from a DeploymentCreator.
-
-        Revision-level fields (image, resources, etc.) are not set on EndpointRow;
-        they belong in DeploymentRevisionRow.
-        """
-        return cls(
-            name=creator.metadata.name,
-            created_user=creator.metadata.created_user,
-            session_owner=creator.metadata.session_owner,
-            replicas=creator.replica_spec.replica_count,
-            domain=creator.metadata.domain,
-            project=creator.metadata.project,
-            resource_group=creator.metadata.resource_group,
-            tag=creator.metadata.tag,
-            open_to_public=creator.network.open_to_public,
-            url=creator.network.url,
-            # Fields not in creator - use defaults
-            lifecycle_stage=EndpointLifecycle.PENDING,
-            retries=0,
-            revision_history_limit=creator.metadata.revision_history_limit,
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
@@ -1143,12 +1035,6 @@ class EndpointAutoScalingRuleRow(Base):
         if not row:
             raise AutoScalingRuleNotFound()
         return row
-
-    async def remove_rule(
-        self,
-        session: AsyncSession,
-    ) -> None:
-        await session.delete(self)
 
     def to_data(self) -> EndpointAutoScalingRuleData:
         if self.max_threshold is not None:

@@ -86,7 +86,6 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
 from ai.backend.manager.models.storage import (
@@ -1296,25 +1295,6 @@ async def get_vfolders(
             permissions = await permission_ctx.calculate_final_permission(row)
             result.append(VFolderWithPermissionSet(row, permissions))
         return result
-
-
-async def validate_permission(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: ScopeType,
-    *,
-    permission: VFolderRBACPermission,
-    vfolder_id: uuid.UUID,
-) -> None:
-    vfolders = await get_vfolders(
-        db_conn,
-        ctx,
-        target_scope,
-        permission,
-        vfolder_id=vfolder_id,
-    )
-    if not vfolders:
-        raise NotEnoughPermission(f"'{permission.name}' not allowed in {target_scope!s}")
 
 
 async def get_permission_ctx(
