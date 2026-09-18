@@ -111,6 +111,7 @@ class KernelResourceAllocationCreator(
     @override
     def to_data(self, row: ResourceAllocationRow) -> ResourceAllocationData:
         return ResourceAllocationData(
+            id=row.id,
             kernel_id=row.kernel_id,
             slot_name=row.slot_name,
             requested=row.requested,

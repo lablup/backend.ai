@@ -551,6 +551,12 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the resource allocation.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )

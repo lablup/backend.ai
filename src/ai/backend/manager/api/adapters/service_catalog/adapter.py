@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
@@ -16,6 +18,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
     EndpointInfo,
     ServiceCatalogStatusFilter,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
@@ -25,17 +28,22 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
 from ai.backend.manager.models.service_catalog.orders import (
     DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+@lru_cache(maxsize=1)
+def _get_service_catalog_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DEFAULT_FORWARD_ORDER,
+        cursor_column=ServiceCatalogRow.id,
+    )
 
 
 class ServiceCatalogAdapter(BaseAdapter):
@@ -74,11 +82,19 @@ class ServiceCatalogAdapter(BaseAdapter):
     def build_searcher(self, input: AdminSearchServiceCatalogsInput) -> ServiceCatalogSearcher:
         """Build the search spec from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
-        orders.append(TIEBREAKER_ORDER)
-        pagination = self._build_pagination(input)
-
-        return ServiceCatalogSearcher(pagination=pagination, conditions=conditions, orders=orders)
+        orders = self._convert_orders(input.order) if input.order else []
+        return self._build_searcher(
+            ServiceCatalogSearcher,
+            pagination_spec=_get_service_catalog_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _convert_filter(self, filter: ServiceCatalogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -131,13 +147,6 @@ class ServiceCatalogAdapter(BaseAdapter):
     @staticmethod
     def _convert_orders(order: list[ServiceCatalogOrder]) -> list[QueryOrder]:
         return [resolve_order(o.field, o.direction) for o in order]
-
-    @staticmethod
-    def _build_pagination(input: AdminSearchServiceCatalogsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     @staticmethod
     def _data_to_dto(data: ServiceCatalogData) -> ServiceCatalogNode:

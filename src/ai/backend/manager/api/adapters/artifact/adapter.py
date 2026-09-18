@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.data.entity.artifact import ArtifactID
@@ -45,6 +46,7 @@ from ai.backend.common.dto.manager.v2.artifact.types import (
     ArtifactTypeFilter,
     OrderDirection,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability as DataArtifactAvailability,
@@ -69,7 +71,6 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.models.artifact.conditions import ArtifactConditions
 from ai.backend.manager.models.artifact.orders import (
     DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
     resolve_order,
 )
 from ai.backend.manager.models.artifact.row import ArtifactRow
@@ -81,7 +82,6 @@ from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
@@ -129,7 +129,21 @@ from ai.backend.manager.services.artifact.revision.actions.search import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+@lru_cache(maxsize=1)
+def _get_artifact_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DEFAULT_FORWARD_ORDER,
+        cursor_column=ArtifactRow.id,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_artifact_revision_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ArtifactRevisionRow.id.desc(),
+        cursor_column=ArtifactRevisionRow.id,
+    )
 
 
 class ArtifactAdapter(BaseAdapter):
@@ -166,20 +180,21 @@ class ArtifactAdapter(BaseAdapter):
         if input.filter is not None:
             conditions.extend(self._convert_gql_filter(input.filter))
 
-        orders: list[QueryOrder] = []
-        if input.order is not None:
-            orders.extend(self._convert_gql_orders(input.order))
-        else:
-            orders.append(DEFAULT_FORWARD_ORDER)
-        orders.append(TIEBREAKER_ORDER)
-
-        pagination = self._build_gql_pagination_artifacts(input)
+        orders = self._convert_gql_orders(input.order) if input.order is not None else []
+        searcher = self._build_searcher(
+            ArtifactSearcher,
+            pagination_spec=_get_artifact_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         action_result = await self._artifact.search_artifacts.run(
-            SearchArtifactsAction(
-                searcher=ArtifactSearcher(
-                    pagination=pagination, conditions=conditions, orders=orders
-                )
-            )
+            SearchArtifactsAction(searcher=searcher)
         )
 
         return AdminSearchArtifactsPayload(
@@ -199,20 +214,21 @@ class ArtifactAdapter(BaseAdapter):
         if input.filter is not None:
             conditions.extend(self._convert_gql_revision_filter(input.filter))
 
-        orders: list[QueryOrder] = []
-        if input.order is not None:
-            orders.extend(self._convert_gql_revision_orders(input.order))
-        else:
-            orders.append(ArtifactRevisionRow.id.desc())
-        orders.append(ArtifactRevisionRow.id.asc())  # tiebreaker
-
-        pagination = self._build_gql_pagination_revisions(input)
+        orders = self._convert_gql_revision_orders(input.order) if input.order is not None else []
+        searcher = self._build_searcher(
+            ArtifactRevisionSearcher,
+            pagination_spec=_get_artifact_revision_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         action_result = await self._artifact.revision.search_revision.run(
-            SearchArtifactRevisionsAction(
-                searcher=ArtifactRevisionSearcher(
-                    pagination=pagination, conditions=conditions, orders=orders
-                )
-            )
+            SearchArtifactRevisionsAction(searcher=searcher)
         )
 
         return AdminSearchArtifactRevisionsPayload(
@@ -456,10 +472,18 @@ class ArtifactAdapter(BaseAdapter):
     def build_searcher(self, input: AdminSearchArtifactsInput) -> ArtifactSearcher:
         """Build an artifact searcher from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
-        orders.append(TIEBREAKER_ORDER)
-        return ArtifactSearcher(
-            pagination=self._build_pagination(input), conditions=conditions, orders=orders
+        orders = self._convert_orders(input.order) if input.order else []
+        return self._build_searcher(
+            ArtifactSearcher,
+            pagination_spec=_get_artifact_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
 
     def _convert_gql_filter(
@@ -743,31 +767,6 @@ class ArtifactAdapter(BaseAdapter):
     @staticmethod
     def _convert_orders(order: list[ArtifactOrder]) -> list[QueryOrder]:
         return [resolve_order(o.field, o.direction) for o in order]
-
-    @staticmethod
-    def _build_pagination(input: AdminSearchArtifactsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    @staticmethod
-    def _build_gql_pagination_artifacts(
-        input: AdminSearchArtifactsGQLInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    @staticmethod
-    def _build_gql_pagination_revisions(
-        input: AdminSearchArtifactRevisionsInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     @staticmethod
     def _data_to_dto(data: ArtifactData) -> ArtifactNode:

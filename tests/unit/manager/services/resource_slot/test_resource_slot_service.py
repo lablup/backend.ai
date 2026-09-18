@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     AgentResourceSearchResult,
@@ -135,7 +136,11 @@ class TestResourceAllocations:
     ) -> None:
         kernel_id = uuid.uuid4()
         item = ResourceAllocationData(
-            kernel_id=kernel_id, slot_name="cpu", requested=Decimal("4"), used=Decimal("2")
+            id=ResourceAllocationID(uuid.uuid4()),
+            kernel_id=kernel_id,
+            slot_name="cpu",
+            requested=Decimal("4"),
+            used=Decimal("2"),
         )
         mock_repository.search_resource_allocations = AsyncMock(
             return_value=ResourceAllocationSearchResult(

@@ -63,6 +63,7 @@ class ResourceSlotService:
         )
         return GetKernelAllocationBySlotResult(
             item=ResourceAllocationData(
+                id=row.id,
                 kernel_id=row.kernel_id,
                 slot_name=row.slot_name,
                 requested=row.requested,
