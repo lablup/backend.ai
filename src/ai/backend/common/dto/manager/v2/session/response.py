@@ -44,6 +44,7 @@ __all__ = (
     "SessionRuntimeInfoGQLDTO",
     "StartServicePayload",
     "StartSessionServicePayload",
+    "TerminateSessionsFailureInfo",
     "TerminateSessionsPayload",
     "UpdateSessionPayload",
 )
@@ -261,6 +262,17 @@ class AdminSearchSessionsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
+class TerminateSessionsFailureInfo(BaseResponseModel):
+    """Why one session was not acted on."""
+
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the session was not acted on."
+    )
+
+
 class TerminateSessionsPayload(BaseResponseModel):
     """Payload for session termination with per-session outcome."""
 
@@ -275,6 +287,10 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
     skipped: list[SessionId] = Field(
         default_factory=list, description="Sessions already terminated or not found."
+    )
+    failed: list[TerminateSessionsFailureInfo] = Field(
+        default_factory=list,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Sessions the caller was refused.",
     )
 
 
