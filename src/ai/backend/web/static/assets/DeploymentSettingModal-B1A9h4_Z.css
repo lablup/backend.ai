@@ -1,0 +1,25 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for DeploymentRevisionDetail (P17).
+
+ 1. Overflow containment — the antd-era `createStyles` rule pinned the
+    Descriptions <table> to `table-layout: fixed` so long values (model
+    paths, image refs, shell commands) wrapped inside their cell instead of
+    widening past the drawer's right edge. MetadataList is a grid of
+    <dt>/<dd> pairs, so the equivalent is wrapping rules on the value cell,
+    scoped to this component's own class hook (no `.ant-*` / `.astryx-*`
+    selectors).
+
+ 2. Spinner — the "Applying" badge's LoaderCircle icon previously spun via
+    antd's own icon-spin class; that class dies with the conversion, so the
+    rotation keyframes live here under a component-scoped class.
+
+    (to-astryx final-B: the antd class name is spelled out in prose rather
+    than quoted verbatim, a habit left over from when a build-output scan
+    treated a quoted antd class name in `build/web/assets/*.css` as evidence
+    of a real reintroduction. antd is no longer a dependency of this repo at
+    all, so there's nothing left to scan for — kept unquoted here purely for
+    consistency with the rest of the codebase.)
+*/.deployment-revision-detail-metadata dd{min-width:0;word-break:break-word;overflow-wrap:anywhere}.deployment-revision-detail-metadata dd>*{max-width:100%;min-width:0}.deployment-revision-detail-metadata pre{overflow-x:auto;max-width:100%}.deployment-revision-detail-spin{animation:deployment-revision-detail-spin 1s linear infinite}@keyframes deployment-revision-detail-spin{0%{transform:rotate(0)}to{transform:rotate(360deg)}}

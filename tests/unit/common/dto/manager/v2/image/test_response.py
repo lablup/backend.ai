@@ -27,8 +27,10 @@ from ai.backend.common.dto.manager.v2.image.types import (
 
 def make_image_node(**kwargs: object) -> ImageNode:
     """Helper to create a minimal valid ImageNode."""
+    image_id = uuid.uuid4()
     defaults: dict[str, object] = {
-        "id": uuid.uuid4(),
+        "id": image_id,
+        "entity_id": image_id,
         "name": "python:3.11-cuda12",
         "image": "stable/python",
         "registry": "registry.example.com",
@@ -63,6 +65,7 @@ class TestImageNodeCreation:
         now = datetime.now(tz=UTC)
         node = ImageNode(
             id=image_id,
+            entity_id=image_id,
             name="python:3.11",
             image="stable/python",
             registry="registry.example.com",

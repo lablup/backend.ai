@@ -12,9 +12,6 @@ from collections.abc import Sequence
 from typing import Any
 
 import pytest
-from bai_scenario.fakes.deployment import FakeDeploymentCoordinator, FakeValkeyScheduleClient
-from bai_scenario.fakes.storage_proxy import FakeStorageSessionManager
-from bai_scenario.runner.unwired import unwired
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -52,6 +49,9 @@ from ai.backend.manager.sokovan.deployment.revision_draft.reader import Revision
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+from bai_scenario.fakes.deployment import FakeDeploymentCoordinator, FakeValkeyScheduleClient
+from bai_scenario.fakes.storage_proxy import FakeStorageSessionManager
+from bai_scenario.runner.unwired import unwired
 
 
 @pytest.fixture
@@ -121,7 +121,7 @@ async def adapter(
             storage_manager=FakeStorageSessionManager({}),
             event_producer=unwired(EventProducer, "nothing here waits on the event"),
             valkey_schedule=schedule,
-            revision_draft_reader=unwired(RevisionDraftReader, "only a revision reads a draft"),
+            revision_draft_reader=RevisionDraftReader(repository),
             deployment_revision_preset_repository=None,
         )
     )

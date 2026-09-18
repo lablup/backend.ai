@@ -17,6 +17,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import StringConditions, make_string_in_factory
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 
@@ -137,38 +138,6 @@ class RoleConditions:
         return inner
 
     @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RoleRow.created_at).where(RoleRow.id == cursor_uuid).scalar_subquery()
-            )
-            return RoleRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(RoleRow.created_at).where(RoleRow.id == cursor_uuid).scalar_subquery()
-            )
-            return RoleRow.created_at > subquery
-
-        return inner
-
-    @staticmethod
     def by_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleRow.id.in_(role_ids)
@@ -238,6 +207,22 @@ class RoleConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
+
+        return inner
+
+    @staticmethod
+    def exists_permission_combined(permission_conditions: list[QueryCondition]) -> QueryCondition:
+        """Match roles whose permission rows satisfy every one of ``permission_conditions``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .where(PermissionRow.role_id == RoleRow.id)
+                .correlate(RoleRow)
+            )
+            for cond in permission_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
 
         return inner
 

@@ -172,6 +172,9 @@ class SessionNode(BaseResponseModel):
     """Node model representing a session entity with nested info sub-models."""
 
     id: UUID = Field(description="Session ID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the session. Added in {NEXT_RELEASE_VERSION}.",
+    )
     image_ids: list[UUID] | None = Field(
         default=None,
         description=(

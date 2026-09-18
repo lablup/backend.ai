@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.services.notification.actions import ProcessNotificationAction
-
-if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.notification.service import NotificationService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -22,16 +18,16 @@ class NotificationEventHandler:
     Event handler for notification events.
 
     Receives NotificationTriggeredEvent anycast events and delegates
-    processing to NotificationProcessors.
+    processing to NotificationService.
     """
 
-    _processors_factory: Callable[[], Processors]
+    _notification_service: NotificationService
 
     def __init__(
         self,
-        processors_factory: Callable[[], Processors],
+        notification_service: NotificationService,
     ) -> None:
-        self._processors_factory = processors_factory
+        self._notification_service = notification_service
 
     async def handle_notification_triggered(
         self,
@@ -40,7 +36,7 @@ class NotificationEventHandler:
         event: NotificationTriggeredEvent,
     ) -> None:
         """
-        Handle NotificationTriggeredEvent by delegating to the processor.
+        Handle NotificationTriggeredEvent by delegating to the service.
 
         Args:
             context: Event context (unused for notifications)
@@ -69,9 +65,9 @@ class NotificationEventHandler:
             # Re-raise to let the caller know validation failed
             raise
 
-        # Delegate to processor for business logic
-        processors = self._processors_factory()
-        await processors.notification.process_notification.run(
+        # Delegate to service for business logic
+        # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.
+        await self._notification_service.process_notification(
             ProcessNotificationAction(
                 rule_type=rule_type,
                 timestamp=event.timestamp,

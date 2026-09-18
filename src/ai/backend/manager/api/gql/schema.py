@@ -3,13 +3,11 @@ from typing import override
 
 import strawberry
 from graphql import GraphQLError
-from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
-from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
@@ -357,12 +355,25 @@ from .rbac import (
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    my_atomic_bulk_scope_permissions,
     my_roles,
     my_roles_v2,
+    my_scope_permissions,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+)
+from .rbac.resolver.entity import admin_entities
+from .rbac.resolver.role_invitation import (
+    accept_role_invitation,
+    admin_cancel_role_invitation,
+    admin_role_invitations,
+    create_role_invitation,
+    my_role_invitations,
+    my_sent_role_invitations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -554,11 +565,14 @@ from .vfolder_v2 import (
     purge_vfolder_v2,
     restore_vfolder_v2,
     scoped_vfolders_v2,
+    set_vfolder_mount_policy,
+    unset_vfolder_mount_policy,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
     vfolder_list_files_v2,
     vfolder_mkdir_v2,
+    vfolder_mount_policies,
     vfolder_move_file_v2,
     vfolder_v2,
 )
@@ -677,6 +691,11 @@ class Query:
     admin_roles = admin_roles
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
+    admin_entities = admin_entities
+    admin_role_invitations = admin_role_invitations
+    my_role_invitations = my_role_invitations
+    my_sent_role_invitations = my_sent_role_invitations
+    role_scoped_role_invitations = role_scoped_role_invitations
     # Keypair self-service queries
     my_keypairs = my_keypairs
     # Keypair admin queries
@@ -695,6 +714,8 @@ class Query:
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
+    my_scope_permissions = my_scope_permissions
+    my_atomic_bulk_scope_permissions = my_atomic_bulk_scope_permissions
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -811,6 +832,7 @@ class Query:
     vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
     scoped_vfolders_v2 = scoped_vfolders_v2
+    vfolder_mount_policies = vfolder_mount_policies
     my_vfolders = my_vfolders
 
 
@@ -1005,6 +1027,10 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
+    create_role_invitation = create_role_invitation
+    accept_role_invitation = accept_role_invitation
+    reject_role_invitation = reject_role_invitation
+    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
@@ -1066,6 +1092,8 @@ class Mutation:
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2
+    set_vfolder_mount_policy = set_vfolder_mount_policy
+    unset_vfolder_mount_policy = unset_vfolder_mount_policy
     deploy_vfolder_v2 = deploy_vfolder_v2
     bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
     bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2
@@ -1114,15 +1142,6 @@ class CustomizedSchema(Schema):
 
     @override
     def as_str(self) -> str:
-        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
-        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
-        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
-        for type_def in self._schema.type_map.values():
-            if not hasattr(type_def, "fields"):
-                continue
-            for field in type_def.fields.values():
-                if isinstance(getattr(field, "default_value", None), BackendSentinel):
-                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable")
         # PageInfo is force-marked @shareable above, so the directive must be imported from the

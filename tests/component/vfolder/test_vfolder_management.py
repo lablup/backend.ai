@@ -25,12 +25,11 @@ from ai.backend.common.dto.manager.vfolder import (
     RestoreVFolderReq,
     UpdateVFolderOptionsReq,
 )
-from ai.backend.manager.data.vfolder.types import (
-    VFolderInvitationState,
-    VFolderOperationStatus,
-)
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
+from ai.backend.manager.models.vfolder import VFolderUserMountPolicyRow, vfolders
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -288,34 +287,54 @@ class TestVFolderInviteCreate:
             row = (
                 await conn.execute(
                     sa.select(
-                        vfolder_invitations.c.state,
-                        vfolder_invitations.c.invitee,
+                        EntityShareRow.status,
+                        EntityShareRow.recipient_email,
                     ).where(
                         sa.and_(
-                            vfolder_invitations.c.vfolder == target_vfolder["id"],
-                            vfolder_invitations.c.invitee == result.invited_ids[0],
+                            EntityShareRow.target_entity_id == target_vfolder["id"],
+                            EntityShareRow.recipient_email == result.invited_ids[0],
                         )
                     )
                 )
             ).first()
             assert row is not None
-            assert row.state == VFolderInvitationState.PENDING
-            assert row.invitee == regular_user_fixture.email
+            assert row.status == EntityShareStatus.PENDING
+            assert row.recipient_email == regular_user_fixture.email
 
-    async def test_invite_nonexistent_email_raises_error(
+    async def test_invite_address_without_account_gets_the_offer_alone(
         self,
         admin_registry: BackendAIClientRegistry,
         target_vfolder: VFolderFixtureData,
+        db_engine: SAEngine,
     ) -> None:
-        """F-INVITE-2: Inviting a non-existent email raises an error."""
-        with pytest.raises(BackendAPIError):
-            await admin_registry.vfolder.invite(
-                target_vfolder["name"],
-                InviteVFolderReq(
-                    permission=VFolderPermissionField.READ_ONLY,
-                    emails=["nonexistent-xyz-99999@example.invalid"],
-                ),
-            )
+        """F-INVITE-2: An address with no account is offered the folder and set no mount level."""
+        email = "nonexistent-xyz-99999@example.invalid"
+        result = await admin_registry.vfolder.invite(
+            target_vfolder["name"],
+            InviteVFolderReq(permission=VFolderPermissionField.READ_ONLY, emails=[email]),
+        )
+        assert result.invited_ids == [email]
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(EntityShareRow.status, EntityShareRow.recipient_entity_id).where(
+                        EntityShareRow.target_entity_id == target_vfolder["id"],
+                        EntityShareRow.recipient_email == email,
+                    )
+                )
+            ).first()
+            assert row is not None
+            assert row.status == EntityShareStatus.PENDING
+            assert row.recipient_entity_id is None
+            policies = (
+                await conn.execute(
+                    sa.select(VFolderUserMountPolicyRow.user_id).where(
+                        VFolderUserMountPolicyRow.vfolder_id == target_vfolder["id"]
+                    )
+                )
+            ).fetchall()
+            assert policies == []
 
     async def test_duplicate_invite_is_skipped(
         self,
@@ -354,7 +373,7 @@ class TestVFolderInviteAcceptReject:
         user_system_role: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """S-4: Invitee accepts → state becomes ACCEPTED, vfolder_permissions row created."""
+        """S-4: Invitee accepts → the offer's status becomes ACCEPTED."""
         vf = await vfolder_factory()
         # invite() returns the invited emails, not invitation ids, so the invitee
         # looks up the actual invitation id via list_invitations before accepting.
@@ -376,13 +395,11 @@ class TestVFolderInviteAcceptReject:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == uuid.UUID(inv_id)
-                    )
+                    sa.select(EntityShareRow.status).where(EntityShareRow.id == uuid.UUID(inv_id))
                 )
             ).first()
             assert row is not None
-            assert row.state == VFolderInvitationState.ACCEPTED
+            assert row.status == EntityShareStatus.ACCEPTED
 
     async def test_accept_fails_when_invitee_has_no_virtual_entity(
         self,
@@ -445,13 +462,11 @@ class TestVFolderInviteAcceptReject:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == inv["id"]
-                    )
+                    sa.select(EntityShareRow.status).where(EntityShareRow.id == inv["id"])
                 )
             ).first()
             assert row is not None
-            assert row.state == VFolderInvitationState.REJECTED
+            assert row.status == EntityShareStatus.REJECTED
 
     async def test_inviter_cancels_invitation(
         self,
@@ -476,13 +491,11 @@ class TestVFolderInviteAcceptReject:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == inv["id"]
-                    )
+                    sa.select(EntityShareRow.status).where(EntityShareRow.id == inv["id"])
                 )
             ).first()
             assert row is not None
-            assert row.state == VFolderInvitationState.CANCELED
+            assert row.status == EntityShareStatus.CANCELED
 
     async def test_accept_nonexistent_invitation_raises_error(
         self,
@@ -627,7 +640,7 @@ class TestVFolderPermissionControl:
         await invitation_factory(
             vfolder_id=vf["id"],
             invitee_email=regular_user_fixture.email,
-            state=VFolderInvitationState.CANCELED,
+            status=EntityShareStatus.CANCELED,
         )
 
         # Re-invite
@@ -647,14 +660,14 @@ class TestVFolderPermissionControl:
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
+                    sa.select(EntityShareRow.status).where(
                         sa.and_(
-                            vfolder_invitations.c.vfolder == vf["id"],
-                            vfolder_invitations.c.invitee == new_inv_email,
-                            vfolder_invitations.c.state == VFolderInvitationState.PENDING,
+                            EntityShareRow.target_entity_id == vf["id"],
+                            EntityShareRow.recipient_email == new_inv_email,
+                            EntityShareRow.status == EntityShareStatus.PENDING,
                         )
                     )
                 )
             ).first()
             assert row is not None
-            assert row.state == VFolderInvitationState.PENDING
+            assert row.status == EntityShareStatus.PENDING

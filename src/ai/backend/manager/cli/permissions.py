@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import click
 from tabulate import tabulate
@@ -17,11 +17,15 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.registry.types import WiredProcessor
 from ai.backend.manager.actions.types import ActionGate
 from ai.backend.manager.cli.role_fixture import RoleFixture
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.seed.check import RoleSeedChecker
 from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.data.permission.seed.role import RoleSeed
 from ai.backend.manager.services.catalog import load_wiring_catalog
+
+if TYPE_CHECKING:
+    from ai.backend.manager.cli.context import CLIContext
 
 # The letters a mask prints as, in the order a cell spells them.
 _LETTERS: Final[tuple[tuple[Permission, str], ...]] = (
@@ -146,6 +150,11 @@ def _load() -> list[RoleSeed]:
     return RoleSeedLoader().load()
 
 
+def _column(seed: RoleSeed) -> str:
+    """The role's column header, naming the scope a scoped role is created in."""
+    return seed.name if seed.scope is None else f"{seed.name}@{seed.scope}"
+
+
 def _rows(seeds: Sequence[RoleSeed], entity: str | None, granted_only: bool) -> list[str]:
     kinds = sorted({kind for seed in seeds for kind in seed.permissions})
     if entity is not None:
@@ -176,7 +185,7 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
     Print the seed roles as a grid: one row per kind, one column per role.
 
     The role files are the declaration; this prints them side by side, which is where
-    two roles are compared.
+    two roles are compared. A role created in one named scope is headed `name@scope`.
 
     Examples:
 
@@ -196,7 +205,7 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
                         {
                             "entity_type": kind,
                             **{
-                                seed.name: _cell(seed.permissions.get(kind, Permission.NONE))
+                                _column(seed): _cell(seed.permissions.get(kind, Permission.NONE))
                                 for seed in seeds
                             },
                         }
@@ -206,18 +215,18 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
                 )
             )
         case "tsv":
-            print("\t".join(["entity_type", *(seed.name for seed in seeds)]))
+            print("\t".join(["entity_type", *(_column(seed) for seed in seeds)]))
             for kind in kinds:
                 cells = (_cell(seed.permissions.get(kind, Permission.NONE)) for seed in seeds)
                 print("\t".join([kind, *cells]))
         case _:
             width = max((len(kind) for kind in kinds), default=0)
             width = max(width, len("entity type"))
-            header = "  ".join(seed.name for seed in seeds)
+            header = "  ".join(_column(seed) for seed in seeds)
             print(f"{'entity type':<{width}}  {header}")
             for kind in kinds:
                 row = "  ".join(
-                    _cell(seed.permissions.get(kind, Permission.NONE)).ljust(len(seed.name))
+                    _cell(seed.permissions.get(kind, Permission.NONE)).ljust(len(_column(seed)))
                     for seed in seeds
                 )
                 print(f"{kind:<{width}}  {row}")
@@ -318,17 +327,14 @@ def operations(role: str, verdict: str | None, entity: str | None, output: str) 
             print(f"{len(readings)} operations read against {role}")
 
 
-# The checkout this command reads the account fixtures from and writes the seed to.
+# The checkout this command writes the seed to.
 _REPOSITORY: Final[Path] = Path(__file__).resolve().parents[5]
-# The installer fixtures of the same names are symlinks to these. The presets are
-# populated before the roles that name them.
+# The installer fixture of the same name is a symlink to this one.
 _PRESETS_TARGET: Final[Path] = Path("fixtures/manager/example-role-presets.json")
-_ROLES_TARGET: Final[Path] = Path("fixtures/manager/example-roles.json")
 
 
-def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]:
-    fixture = RoleFixture(seeds, root / "fixtures" / "manager")
-    return {_PRESETS_TARGET: fixture.render_presets(), _ROLES_TARGET: fixture.render_roles()}
+def _render(seeds: Sequence[RoleSeed]) -> dict[Path, dict[str, Any]]:
+    return {_PRESETS_TARGET: RoleFixture(seeds).render_presets()}
 
 
 @cli.command(name="emit")
@@ -336,16 +342,15 @@ def _render(seeds: Sequence[RoleSeed], root: Path) -> dict[Path, dict[str, Any]]
     "--repository",
     default=None,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Read the account fixtures from, and write the seed into, this checkout.",
+    help="Write the seed into this checkout.",
 )
 @click.option("--check", is_flag=True, help="Report whether the files are current, write nothing.")
 def emit(repository: Path | None, check: bool) -> None:
     """
-    Write the seed fixtures from the role files and the account fixtures.
+    Write the preset fixture from the role files.
 
-    The written files are generated: edit the role files and run this, never the JSON.
-    Users, projects and the domain come from the account fixtures beside the targets, so
-    they are stated in one place.
+    The written file is generated: edit the role files and run this, never the JSON.
+    The roles the presets call for are created in each scope by `provision`.
 
     Examples:
 
@@ -354,7 +359,7 @@ def emit(repository: Path | None, check: bool) -> None:
       $ backend.ai mgr permissions emit --check
     """
     root = repository if repository is not None else _REPOSITORY
-    rendered = _render(_load(), root)
+    rendered = _render(_load())
     for tables in rendered.values():
         for table, rows in tables.items():
             if not table.startswith("__"):
@@ -375,6 +380,50 @@ def emit(repository: Path | None, check: bool) -> None:
     for target, body in bodies.items():
         (root / target).write_text(body, encoding="utf-8")
         print(f"wrote {target}")
+
+
+# The preset whose role a project's creator holds while still on its roster.
+_CREATOR_PRESET: Final[str] = "project_admin"
+
+
+@cli.command(name="provision")
+@click.pass_obj
+def provision(cli_ctx: CLIContext) -> None:
+    """
+    Instantiate the presets in every domain, project and user that lacks their role.
+
+    A preset whose role file names a scope is pointed at that scope's id first and
+    instantiated there alone. Grants what each scope assigns on its own, and the project
+    admin role to a project's creator still on its roster. Running it again changes nothing.
+
+    Examples:
+
+    \b
+      $ backend.ai mgr permissions provision
+    """
+    from ai.backend.manager.models.base import ensure_all_tables_registered
+    from ai.backend.manager.repositories.db.engine import connect_database
+    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+    from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
+    from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
+
+    seeds = _load()
+    creator_preset_ids = [seed.id for seed in seeds if seed.name == _CREATOR_PRESET]
+
+    async def _provision() -> None:
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
+        # A standalone CLI process has not imported the full model tree.
+        ensure_all_tables_registered()
+        async with connect_database(bootstrap_config.db) as db:
+            await GlobalEntityIDLoader(db).load()
+            preset_scopes = {
+                seed.id: global_entity_id(seed.scope) for seed in seeds if seed.scope is not None
+            }
+            repository = RolePresetRepository(RolePresetOpsProvider(db))
+            await repository.provision_roles(creator_preset_ids, preset_scopes)
+
+    asyncio.run(_provision())
+    print("Provisioned the preset roles.")
 
 
 if __name__ == "__main__":

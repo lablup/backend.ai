@@ -13,12 +13,15 @@ from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.retention import RetentionPolicyConflict
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class RetentionPolicyCreator(GlobalEntityCreator[RetentionPolicyRow, RetentionPolicyData]):
+class RetentionPolicyCreator(
+    CreatedInGlobal[RetentionPolicyRow], EntityCreator[RetentionPolicyRow, RetentionPolicyData]
+):
     """Creator for a retention policy — one row per category, admin-managed."""
 
     category: RetentionCategory

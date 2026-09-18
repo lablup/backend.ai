@@ -7,21 +7,9 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import pairwise
 from typing import Any, override
+from uuid import UUID
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
-from bai_scenario.components.user import AGrant, KeypairNodeLook, UserNodeLook
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.fields import SeedKeypairOf
-from bai_scenario.seeds.user.user import SeedUserOf
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.keypair import (
@@ -57,6 +45,19 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.components.user import AGrant, KeypairNodeLook, UserNodeLook
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.user.fields import SeedKeypairOf
+from bai_scenario.seeds.user.user import SeedUserOf
 
 SERVER_RATE_LIMIT = 10000
 """키 행의 요청 한도 기본값. 시드는 한도를 적지 않으므로 컬럼 기본값이 들어간다."""
@@ -553,15 +554,15 @@ class OnlyMyTwoKeys(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class NewestFirst(Condition[list[tuple[datetime, str]]]):
-    """생성 시각 내림차순, 같은 시각이면 access key 오름차순."""
+class NewestFirst(Condition[list[tuple[datetime, UUID]]]):
+    """생성 시각 내림차순, 같은 시각이면 field id 오름차순."""
 
     @override
     def says(self) -> str:
-        return "생성 시각 내림차순, 같은 시각이면 access key 오름차순"
+        return "생성 시각 내림차순, 같은 시각이면 field id 오름차순"
 
     @override
-    def holds(self, got: list[tuple[datetime, str]]) -> bool:
+    def holds(self, got: list[tuple[datetime, UUID]]) -> bool:
         return all(a[0] > b[0] or (a[0] == b[0] and a[1] < b[1]) for a, b in pairwise(got))
 
 
@@ -585,8 +586,8 @@ class TheFirstTenOfEleven(Then[Keyholder, Answer]):
             Same("has_previous_page", page.has_previous_page, False),
             Same("items.length", len(items), 10),
             Held(
-                "items(created_at, access_key)",
-                [(one.created_at, one.access_key) for one in items if one.created_at is not None],
+                "items(created_at, field_id)",
+                [(one.created_at, one.field_id) for one in items if one.created_at is not None],
                 NewestFirst(),
             ),
             Held(

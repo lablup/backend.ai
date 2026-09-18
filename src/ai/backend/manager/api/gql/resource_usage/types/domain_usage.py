@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Self
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     DomainUsageBucketNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -65,6 +67,12 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
     """Domain-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the usage bucket.",
+        ),
+    )
     domain_name: str = gql_field(description="Name of the domain this usage bucket belongs to.")
     resource_group_name: str = gql_field(
         description="Name of the scaling group this usage was recorded in."

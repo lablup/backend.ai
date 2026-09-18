@@ -48,5 +48,4 @@ permissions:
   user:                             [read, update, soft_delete, hard_delete]
   user_resource_policy:             [read]
   vfolder:                          [read, update, create, soft_delete, hard_delete]
-  vfolder_invitation:               []
   vfs_storage:                      []

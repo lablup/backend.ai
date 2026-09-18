@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareSideDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -124,7 +125,7 @@ def _to_orders(
 
 def _to_connection(result: SearchEntitySharesPayload) -> EntityShareConnection:
     edges = [
-        EntityShareEdge(node=EntityShareGQL.from_pydantic(item), cursor=str(item.id))
+        EntityShareEdge(node=EntityShareGQL.from_pydantic(item), cursor=encode_cursor(item.id))
         for item in result.items
     ]
     return EntityShareConnection(

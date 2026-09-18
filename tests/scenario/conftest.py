@@ -13,6 +13,21 @@ from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 import pytest
+
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
+from ai.backend.manager.actions.validators.build import build_action_validators
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.testutils.bootstrap import flush_redis
+from ai.backend.testutils.scenario_steps import Configured
 from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
 from bai_scenario.db import (
     TemplateDatabase,
@@ -26,19 +41,6 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
 from bai_scenario.valkey import ScenarioValkey
-
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.actions.monitors import ActionMonitors
-from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.build import build_action_validators
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
-from ai.backend.manager.repositories.rbac.permission_check_repository import (
-    RbacPermissionCheckRepository,
-)
-from ai.backend.testutils.bootstrap import flush_redis
-from ai.backend.testutils.scenario_steps import Configured
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
@@ -75,8 +77,12 @@ async def test_db(template: TemplateDatabase) -> AsyncIterator[str]:
 @pytest.fixture
 async def engine(template: TemplateDatabase, test_db: str) -> AsyncIterator[Any]:
     engine = engine_for(template.addr, test_db)
-    yield engine
-    await engine.dispose()
+    await GlobalEntityIDLoader(engine).load()
+    try:
+        yield engine
+    finally:
+        GlobalEntityIDCache.clear()
+        await engine.dispose()
 
 
 @pytest.fixture(scope="session")

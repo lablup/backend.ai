@@ -2615,7 +2615,7 @@ Then
   - has_next_page = True
   - has_previous_page = False
   - items.length = 10
-  - items(created_at, access_key): 생성 시각 내림차순, 같은 시각이면 access key 오름차순
+  - items(created_at, field_id): 생성 시각 내림차순, 같은 시각이면 field id 오름차순
   - items.user_id: 모두 부른 사람와 같다
   - items.created_at: 이 실행이 쓴 시각
   - items의 나머지 자리: 무시함 — 순서와 개수를 보는 행이다. 키 노드 전체는 다른 행이 본다
@@ -2916,7 +2916,7 @@ Then
   - [0].container.container_gids = None
   - [0].timestamps.created_at: 이 실행이 쓴 시각
   - [0].timestamps.modified_at: 이 실행이 쓴 시각
-  - [1]: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - [1] = None
 
 ### retiring
 

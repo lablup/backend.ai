@@ -7,12 +7,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from bai_scenario.fakes.storage_proxy import (
-    FakeStorageProxyManagerFacingClient,
-    FakeStorageSessionManager,
-)
-from bai_scenario.runner.unwired import unwired
-from bai_scenario.valkey import ScenarioValkey
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
@@ -37,9 +31,18 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import (
+    VFolderMountPolicyProcessors,
+)
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from bai_scenario.fakes.storage_proxy import (
+    FakeStorageProxyManagerFacingClient,
+    FakeStorageSessionManager,
+)
+from bai_scenario.runner.unwired import unwired
+from bai_scenario.valkey import ScenarioValkey
 
 
 @pytest.fixture
@@ -93,4 +96,5 @@ async def adapter(
         unwired(VFolderFileProcessors, "no file operation is exercised here"),
         unwired(VFolderAdminProcessors, "no admin operation is exercised here"),
         unwired(DeploymentProcessors, "only deploy() reaches it"),
+        unwired(VFolderMountPolicyProcessors, "no mount policy operation is exercised here"),
     )

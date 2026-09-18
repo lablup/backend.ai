@@ -101,14 +101,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
     forward_order=ProjectOrders.created_at(ascending=False),
-    backward_order=ProjectOrders.created_at(ascending=True),
-    forward_condition_factory=lambda cursor_id: ProjectConditions.by_cursor_forward(
-        UUID(cursor_id)
-    ),
-    backward_condition_factory=lambda cursor_id: ProjectConditions.by_cursor_backward(
-        UUID(cursor_id)
-    ),
-    tiebreaker_order=ProjectRow.id.asc(),
+    cursor_column=ProjectRow.id,
 )
 
 
@@ -608,6 +601,7 @@ class ProjectAdapter(BaseAdapter):
 
         return ProjectNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=ProjectBasicInfo(
                 name=data.name,
                 description=data.description,

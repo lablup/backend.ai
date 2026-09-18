@@ -21,13 +21,13 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderMount,
     VFolderMountOptions,
+    VFolderMountPolicy,
     VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -44,6 +44,7 @@ from ai.backend.manager.models.vfolder.orders import VFolderOrders
 from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
     VFolderRow,
+    VFolderUserMountPolicyRow,
     check_overlapping_mounts,
     ensure_host_permission_allowed,
     is_mount_duplicate,
@@ -53,6 +54,7 @@ from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
 )
+from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -94,7 +96,9 @@ async def query_reachable_vfolders(
     """The vfolders matching ``conditions`` that the user's personal project or a joined
     project holds and the user may read, the session's project first.
 
-    Each row carries the mount permission the user's bits answer as.
+    Each row carries the mount level the user gets on it: the folder's default, the
+    user's own policy row over it, and read-write for the owner. ``none`` is kept on
+    the row so a request naming the folder can be refused rather than not found.
     """
     user_id = UserID(user_scope.user_uuid)
     project_ids = (await conn.scalars(joined_project_ids_query(user_id))).all()
@@ -110,13 +114,34 @@ async def query_reachable_vfolders(
             )
         )
     ).all()
-    held = await held_permissions([VFolderUUID(row.id) for row in rows])
+    vfolder_ids = [VFolderUUID(row.id) for row in rows]
+    held = await held_permissions(vfolder_ids)
+    policies = {
+        VFolderUUID(policy.vfolder_id): VFolderMountPolicy(policy.permission)
+        for policy in (
+            await conn.execute(
+                sa.select(
+                    VFolderUserMountPolicyRow.vfolder_id, VFolderUserMountPolicyRow.permission
+                ).where(
+                    VFolderUserMountPolicyRow.user_id == user_id,
+                    VFolderUserMountPolicyRow.vfolder_id.in_(vfolder_ids),
+                )
+            )
+        ).all()
+    }
     reachable: list[dict[str, Any]] = []
     for row in rows:
         bits = held.get(VFolderUUID(row.id), Permission.NONE)
         if not bits.covers(Permission.READ):
             continue
-        reachable.append({**row._mapping, "permission": VFolderPermission.from_rbac(bits)})
+        level = resolve_mount_policy(
+            user_id,
+            owner_user_id=row.user,
+            default_mount_permission=row.default_mount_permission,
+            held=bits,
+            user_policy=policies.get(VFolderUUID(row.id)),
+        )
+        reachable.append({**row._mapping, "permission": level})
     return reachable
 
 
@@ -264,6 +289,13 @@ async def prepare_vfolder_mounts(
     for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        if vfolder["permission"] == VFolderMountPolicy.NONE:
+            if vfolder["name"].startswith("."):
+                log.warning(
+                    "Skipping auto-mount VFolder '{}': it mounts to nobody", vfolder["name"]
+                )
+                continue
+            raise VFolderPermissionError(f"VFolder {vfolder_name} is not permitted to be mounted.")
         try:
             await ensure_host_permission_allowed(
                 conn,
@@ -303,7 +335,7 @@ async def prepare_vfolder_mounts(
                     vfsubpath=vfsubpath,
                     host_path=PurePosixPath(unmanaged_path),
                     kernel_path=kernel_path,
-                    mount_perm=vfolder["permission"],
+                    mount_perm=MountPermission(vfolder["permission"].value),
                     usage_mode=vfolder["usage_mode"],
                 )
             )
@@ -353,7 +385,7 @@ async def prepare_vfolder_mounts(
                     vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
-                    mount_perm=vfolder["permission"],
+                    mount_perm=MountPermission(vfolder["permission"].value),
                     usage_mode=vfolder["usage_mode"],
                 )
             )
@@ -378,14 +410,14 @@ async def prepare_vfolder_mounts(
                     case MountPermission.READ_ONLY:
                         mount_perm = MountPermission.READ_ONLY
                     case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
-                        if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                        if vfolder["permission"] == VFolderMountPolicy.READ_ONLY:
                             raise VFolderPermissionError(
                                 f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
                                 f"but attempted with '{mount_opts.permission.value}' mode."
                             )
                         mount_perm = mount_opts.permission
                     case _:  # None if unset
-                        mount_perm = vfolder["permission"]
+                        mount_perm = MountPermission(vfolder["permission"].value)
 
             matched_vfolder_mounts.append(
                 VFolderMount(

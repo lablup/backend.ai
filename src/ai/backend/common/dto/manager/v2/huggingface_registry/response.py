@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchHuggingFaceRegistriesPayload",
@@ -21,6 +22,9 @@ class HuggingFaceRegistryNode(BaseResponseModel):
     """Node model representing a HuggingFace registry."""
 
     id: UUID = Field(description="Registry ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the HuggingFace registry. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Registry name")
     url: str = Field(description="HuggingFace Hub URL")
     token: str | None = Field(default=None, description="Access token for the registry")

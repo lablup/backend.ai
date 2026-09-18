@@ -49,6 +49,9 @@ from ai.backend.common.dto.manager.v2.rbac import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
+    MyAtomicBulkScopePermissionsInput,
+    MyScopePermissionsInput,
+    PermissionTarget,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
 )
@@ -109,6 +112,11 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UserNestedFilter as UserNestedFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    MyAtomicBulkScopePermissionsPayload,
+    MyScopePermissionsPayload,
+    ScopeEntityPermission,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
@@ -139,6 +147,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import GrantableOperation
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
+from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.permission import (
     PermissionAlreadyGranted,
@@ -188,6 +197,9 @@ from ai.backend.manager.services.permission_contoller.actions.delete_permission 
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
+    ScopedGetHeldPermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
     PublicGetPermissionMatrixAction,
 )
@@ -247,10 +259,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _permission_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ScopedPermissionOrders.created_at(ascending=False),
-        backward_order=ScopedPermissionOrders.created_at(ascending=True),
-        forward_condition_factory=ScopedPermissionConditions.by_cursor_forward,
-        backward_condition_factory=ScopedPermissionConditions.by_cursor_backward,
-        tiebreaker_order=PermissionRow.id.asc(),
+        cursor_column=PermissionRow.id,
     )
 
 
@@ -258,10 +267,7 @@ def _permission_pagination_spec() -> PaginationSpec:
 def _role_gql_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RoleOrders.created_at(ascending=False),
-        backward_order=RoleOrders.created_at(ascending=True),
-        forward_condition_factory=RoleConditions.by_cursor_forward,
-        backward_condition_factory=RoleConditions.by_cursor_backward,
-        tiebreaker_order=RoleRow.id.asc(),
+        cursor_column=RoleRow.id,
     )
 
 
@@ -269,10 +275,7 @@ def _role_gql_pagination_spec() -> PaginationSpec:
 def _assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AssignedUserOrders.granted_at(ascending=False),
-        backward_order=AssignedUserOrders.granted_at(ascending=True),
-        forward_condition_factory=AssignedUserConditions.by_cursor_forward,
-        backward_condition_factory=AssignedUserConditions.by_cursor_backward,
-        tiebreaker_order=UserRoleRow.id.asc(),
+        cursor_column=UserRoleRow.id,
     )
 
 
@@ -399,6 +402,53 @@ class RBACAdapter(BaseAdapter):
         for item in found.items:
             result_map[item.role_id].append(self._permission_data_to_node(item))
         return [result_map.get(role_id, []) for role_id in role_ids]
+
+    # ------------------------------------------------------------------ held permissions
+
+    async def my_scope_permissions(
+        self, input: MyScopePermissionsInput
+    ) -> MyScopePermissionsPayload:
+        """The bits the current user holds on one entity type within one scope."""
+        items = await self._scope_permissions([input.target])
+        return MyScopePermissionsPayload(item=items[0])
+
+    async def my_atomic_bulk_scope_permissions(
+        self, input: MyAtomicBulkScopePermissionsInput
+    ) -> MyAtomicBulkScopePermissionsPayload:
+        """The same answer for several targets, resolved in one grouped pass."""
+        return MyAtomicBulkScopePermissionsPayload(
+            items=await self._scope_permissions(input.targets)
+        )
+
+    async def _scope_permissions(
+        self, targets: Sequence[PermissionTarget]
+    ) -> list[ScopeEntityPermission]:
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        user_id = UserID(me.user_id)
+        keys = [self._govern_check_key(user_id, target) for target in targets]
+        action_result = await self._permission_controller.scoped_get_held_permissions.run(
+            ScopedGetHeldPermissionsAction(user_id=user_id, keys=keys)
+        )
+        granted = action_result.granted
+        return [
+            ScopeEntityPermission(
+                scope_type=target.scope_type,
+                scope_id=target.scope_id,
+                entity_type=target.entity_type,
+                permissions=[PermissionBitDTO.of(bit) for bit in granted.get(key, Permission.NONE)],
+            )
+            for target, key in zip(targets, keys, strict=True)
+        ]
+
+    def _govern_check_key(self, user_id: UserID, target: PermissionTarget) -> GovernCheckKey:
+        scope_type = EntityType.from_name(target.scope_type)
+        return GovernCheckKey(
+            user_id=user_id,
+            scope=self._scope_identifier(scope_type, str(target.scope_id)),
+            entity_type=EntityType.from_name(target.entity_type),
+        )
 
     # ------------------------------------------------------------------ permission catalog
 
@@ -1085,6 +1135,12 @@ class RBACAdapter(BaseAdapter):
             conditions.extend(self._convert_user_nested_filter(f.assigned_user))
         if f.mapped_scope is not None:
             conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
+        if f.permission is not None:
+            conditions.extend(
+                self._convert_permission_nested_filter(
+                    RoleConditions.exists_permission_combined, f.permission
+                )
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1237,6 +1293,8 @@ class RBACAdapter(BaseAdapter):
                 raw_conditions.append(
                     RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
                 )
+        if f.mapped_scope is not None:
+            raw_conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
         conditions: list[QueryCondition] = []
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_role_combined(raw_conditions))
@@ -1258,7 +1316,9 @@ class RBACAdapter(BaseAdapter):
         return conditions
 
     def _convert_permission_nested_filter(
-        self, f: PermissionNestedFilterDTO
+        self,
+        exists_factory: Callable[[list[QueryCondition]], QueryCondition],
+        f: PermissionNestedFilterDTO,
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if f.entity_type is not None:
@@ -1284,20 +1344,20 @@ class RBACAdapter(BaseAdapter):
             )
         conditions: list[QueryCondition] = []
         if raw_conditions:
-            conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))
+            conditions.append(exists_factory(raw_conditions))
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_permission_nested_filter(sub))
+                conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_nested_filter(sub))
+                or_conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_nested_filter(sub))
+                not_conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
@@ -1315,7 +1375,11 @@ class RBACAdapter(BaseAdapter):
         if f.role is not None:
             conditions.extend(self._convert_role_nested_filter(f.role))
         if f.permission is not None:
-            conditions.extend(self._convert_permission_nested_filter(f.permission))
+            conditions.extend(
+                self._convert_permission_nested_filter(
+                    AssignedUserConditions.exists_permission_combined, f.permission
+                )
+            )
         if f.username is not None:
             condition = self.convert_string_filter(
                 f.username,
@@ -1380,6 +1444,7 @@ class RBACAdapter(BaseAdapter):
     def _role_data_to_node(data: RoleData) -> RoleNode:
         return RoleNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             source=RoleSourceDTO(data.source.value),
@@ -1396,6 +1461,7 @@ class RBACAdapter(BaseAdapter):
     def _role_detail_to_node(data: RoleDetailData) -> RoleNode:
         return RoleNode(
             id=data.id,
+            entity_id=data.id,
             name=data.name,
             description=data.description,
             source=RoleSourceDTO(data.source.value),
@@ -1412,6 +1478,7 @@ class RBACAdapter(BaseAdapter):
     def _permission_data_to_node(data: PermissionData) -> PermissionNode:
         return PermissionNode(
             id=data.id,
+            field_id=data.id,
             role_id=data.role_id,
             entity_type=EntityType(data.entity_type),
             permission=PermissionBitDTO.of(data.permission),

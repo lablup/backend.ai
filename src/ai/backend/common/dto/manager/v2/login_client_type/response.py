@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "SearchLoginClientTypesPayload",
@@ -22,6 +23,9 @@ class LoginClientTypeNode(BaseResponseModel):
     """Node model representing a login client type entity."""
 
     id: UUID = Field(description="Login client type UUID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the login client type. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Unique login client type name.")
     description: str | None = Field(description="Optional description.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")

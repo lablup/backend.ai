@@ -274,7 +274,7 @@ class DeploymentProcessors:
     search_revisions: ScopeActionProcessor[
         SearchRevisionsAction, ScopedFieldsOpsResult[ModelRevisionData]
     ]
-    search_revision_resource_slots: GlobalActionProcessor[
+    search_revision_resource_slots: SingleFieldActionProcessor[
         SearchRevisionResourceSlotsAction, SearchRevisionResourceSlotsActionResult
     ]
     activate_revision: SingleEntityActionProcessor[
@@ -479,7 +479,7 @@ class DeploymentProcessors:
         )
         self.get_revision_by_id = revisions.get_ops(GetRevisionByIdAction)
         self.search_revisions = revisions.search_ops(SearchRevisionsAction)
-        self.search_revision_resource_slots = group.global_scope(
+        self.search_revision_resource_slots = revisions.single_field(
             SearchRevisionResourceSlotsAction, service.search_revision_resource_slots
         )
         self.activate_revision = group.single_entity(

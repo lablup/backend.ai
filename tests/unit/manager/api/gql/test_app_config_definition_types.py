@@ -27,6 +27,7 @@ class TestAppConfigDefinitionGQL:
         updated = datetime(2026, 1, 2, 12, 0, 0, tzinfo=UTC)
         node = AppConfigDefinitionNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             config_name="theme",
             created_at=created,
             updated_at=updated,

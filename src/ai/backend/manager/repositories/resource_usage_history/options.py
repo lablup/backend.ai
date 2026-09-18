@@ -274,42 +274,6 @@ class DomainUsageBucketConditions:
 
         return inner
 
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get period_start of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DomainUsageBucketRow.period_start)
-                .where(DomainUsageBucketRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DomainUsageBucketRow.period_start < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get period_start of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(DomainUsageBucketRow.period_start)
-                .where(DomainUsageBucketRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return DomainUsageBucketRow.period_start > subquery
-
-        return inner
-
 
 class DomainUsageBucketOrders:
     """Query orders for DomainUsageBucketRow."""
@@ -539,42 +503,6 @@ class ProjectUsageBucketConditions:
     def by_period_end_after(after: date) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectUsageBucketRow.period_end > after
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get period_start of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ProjectUsageBucketRow.period_start)
-                .where(ProjectUsageBucketRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ProjectUsageBucketRow.period_start < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get period_start of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ProjectUsageBucketRow.period_start)
-                .where(ProjectUsageBucketRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ProjectUsageBucketRow.period_start > subquery
 
         return inner
 
@@ -823,42 +751,6 @@ class UserUsageBucketConditions:
     def by_period_end_after(after: date) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserUsageBucketRow.period_end > after
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get period_start of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(UserUsageBucketRow.period_start)
-                .where(UserUsageBucketRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return UserUsageBucketRow.period_start < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get period_start of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(UserUsageBucketRow.period_start)
-                .where(UserUsageBucketRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return UserUsageBucketRow.period_start > subquery
 
         return inner
 

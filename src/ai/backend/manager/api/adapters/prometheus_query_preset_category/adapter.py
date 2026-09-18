@@ -143,10 +143,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
     _PAGINATION_SPEC = PaginationSpec(
         forward_order=PrometheusQueryPresetCategoryOrders.created_at(ascending=False),
-        backward_order=PrometheusQueryPresetCategoryOrders.created_at(ascending=True),
-        forward_condition_factory=PrometheusQueryPresetCategoryConditions.by_cursor_forward,
-        backward_condition_factory=PrometheusQueryPresetCategoryConditions.by_cursor_backward,
-        tiebreaker_order=PrometheusQueryPresetCategoryRow.id.asc(),
+        cursor_column=PrometheusQueryPresetCategoryRow.id,
     )
 
     def build_searcher(self, input: SearchCategoriesInput) -> PrometheusQueryPresetCategorySearcher:
@@ -216,6 +213,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return CategoryNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             created_at=data.created_at,

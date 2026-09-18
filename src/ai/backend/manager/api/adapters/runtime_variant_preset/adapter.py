@@ -77,10 +77,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RuntimeVariantPresetOrders.created_at(ascending=False),
-        backward_order=RuntimeVariantPresetOrders.created_at(ascending=True),
-        forward_condition_factory=RuntimeVariantPresetConditions.by_cursor_forward,
-        backward_condition_factory=RuntimeVariantPresetConditions.by_cursor_backward,
-        tiebreaker_order=RuntimeVariantPresetRow.id.asc(),
+        cursor_column=RuntimeVariantPresetRow.id,
     )
 
 
@@ -276,6 +273,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     def _data_to_node(data: RuntimeVariantPresetData) -> RuntimeVariantPresetNode:
         return RuntimeVariantPresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             runtime_variant_id=data.runtime_variant_id,
             name=data.name,
             description=data.description,

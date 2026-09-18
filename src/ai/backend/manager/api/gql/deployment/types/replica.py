@@ -42,6 +42,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
 )
@@ -222,6 +223,12 @@ class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the replica.",
+        ),
+    )
     session_id: ID | None
     revision_id: ID
     deployment_id: ID = gql_added_field(

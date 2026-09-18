@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class RuntimeVariantModelHealthCheckInfo(BaseResponseModel):
@@ -63,6 +64,9 @@ class RuntimeVariantModelDefinitionInfo(BaseResponseModel):
 
 class RuntimeVariantNode(BaseResponseModel):
     id: UUID = Field(description="ID of the runtime variant.")
+    entity_id: UUID = Field(
+        description=f"UUID of the runtime variant. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Unique name of the runtime variant.")
     description: str | None = Field(default=None, description="Description.")
     reads_vfolder_config_files: bool = Field(

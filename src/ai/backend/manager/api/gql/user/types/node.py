@@ -102,6 +102,12 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     """User entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier for the user (UUID).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the user.",
+        ),
+    )
     basic_info: UserBasicInfoGQL = gql_field(
         description="Basic profile information including username, email, and display name."
     )

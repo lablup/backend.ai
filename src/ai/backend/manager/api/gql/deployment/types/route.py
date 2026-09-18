@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
@@ -61,7 +62,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.row import RoutingRow
 
@@ -107,6 +107,12 @@ RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = gql_enum(
 )
 class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the route.",
+        ),
+    )
     deployment_id: ID
     session_id: ID | None
     revision_id: ID | None
@@ -252,10 +258,7 @@ class RouteOrderBy(PydanticInputMixin[RouteOrderDTO]):
 def get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RouteOrders.created_at(ascending=False),
-        backward_order=RouteOrders.created_at(ascending=True),
-        forward_condition_factory=RouteConditions.by_cursor_forward,
-        backward_condition_factory=RouteConditions.by_cursor_backward,
-        tiebreaker_order=RoutingRow.id.asc(),
+        cursor_column=RoutingRow.id,
     )
 
 

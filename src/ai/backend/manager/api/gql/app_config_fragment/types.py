@@ -49,6 +49,7 @@ from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, Stri
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -149,6 +150,12 @@ class MyUpsertAppConfigFragmentsInputGQL(PydanticInputMixin[MyUpsertAppConfigFra
 class AppConfigFragmentGQL(PydanticNodeMixin[AppConfigFragmentNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config fragment."
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the app config fragment.",
+        ),
     )
     config_name: str = gql_field(description="Config name the fragment belongs to.")
     scope_type: AppConfigScopeType = gql_field(

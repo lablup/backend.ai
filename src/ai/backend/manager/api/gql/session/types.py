@@ -378,6 +378,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     """Session type representing a compute session."""
 
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the session.",
+        ),
+    )
 
     # Image IDs for this session (used by images resolver)
     image_ids: list[strawberry.ID] | None = gql_field(

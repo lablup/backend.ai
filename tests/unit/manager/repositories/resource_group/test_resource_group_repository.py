@@ -91,11 +91,11 @@ class TestScalingGroupRepositoryDB:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 # FK dependency order: parents before children
                 DomainRow,
@@ -138,7 +138,7 @@ class TestScalingGroupRepositoryDB:
                 ResourcePresetRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     def _create_scaling_group_creator(
         self,

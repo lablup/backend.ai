@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import LoginSessionStatus
 
@@ -24,6 +25,9 @@ class LoginSessionNode(BaseResponseModel):
     """Node model representing a login session entry."""
 
     id: UUID = Field(description="Login session ID")
+    field_id: UUID = Field(
+        description=f"UUID of the login session. Added in {NEXT_RELEASE_VERSION}.",
+    )
     user_id: UUID = Field(description="UUID of the user who owns the session")
     access_key: str = Field(description="Access key associated with the session")
     status: LoginSessionStatus = Field(description="Current status of the login session")

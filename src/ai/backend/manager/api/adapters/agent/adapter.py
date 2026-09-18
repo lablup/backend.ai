@@ -40,11 +40,10 @@ from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
-    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
@@ -73,10 +72,7 @@ from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPol
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEFAULT_FORWARD_ORDER,
-    backward_order=DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=AgentConditions.by_cursor_forward,
-    backward_condition_factory=AgentConditions.by_cursor_backward,
-    tiebreaker_order=TIEBREAKER_ORDER,
+    cursor_column=AgentRow.uuid,
 )
 
 
@@ -396,6 +392,7 @@ class AgentAdapter(BaseAdapter):
         occupied_slots = detail.occupied_slots()
         return AgentNode(
             id=str(data.id),
+            entity_id=data.entity_id(),
             uuid=data.uuid,
             resource_info=AgentResourceInfo(
                 capacity=dict(available_slots.to_json()),

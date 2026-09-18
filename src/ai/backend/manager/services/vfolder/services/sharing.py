@@ -4,6 +4,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
@@ -113,7 +114,7 @@ class VFolderSharingService:
                     folder_type=folder_type,
                     shared_user_uuid=row["user"],
                     shared_user_email=row["email"],
-                    permission=row["permission"],
+                    permission=VFolderMountPolicy(row["permission"]),
                 )
             )
         return shared_info
@@ -147,5 +148,6 @@ class VFolderSharingService:
             action.vfolder_uuid,
             action.to_delete,
             action.to_update,
+            sharer_id=UserID(self._requester().user_id),
         )
         return UpdateVFolderSharingStatusActionResult()

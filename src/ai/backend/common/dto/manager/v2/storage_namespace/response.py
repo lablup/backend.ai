@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchStorageNamespacesPayload",
@@ -21,6 +22,9 @@ class StorageNamespaceNode(BaseResponseModel):
     """Node model representing a storage namespace."""
 
     id: UUID = Field(description="Namespace ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the storage namespace. Added in {NEXT_RELEASE_VERSION}.",
+    )
     storage_id: UUID = Field(description="Parent storage ID")
     namespace: str = Field(description="Namespace bucket or path prefix")
 

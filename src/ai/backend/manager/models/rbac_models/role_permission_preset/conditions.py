@@ -85,21 +85,3 @@ class RolePermissionPresetConditions:
             return RolePermissionPresetRow.created_at >= value
 
         return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.id < cursor_uuid
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        cursor_uuid = UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePermissionPresetRow.id > cursor_uuid
-
-        return inner

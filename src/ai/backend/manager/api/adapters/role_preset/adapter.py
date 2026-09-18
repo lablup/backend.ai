@@ -103,20 +103,14 @@ from ai.backend.manager.types import OptionalState
 def _role_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RolePresetOrders.created_at(ascending=False),
-        backward_order=RolePresetOrders.created_at(ascending=True),
-        forward_condition_factory=RolePresetConditions.by_cursor_forward,
-        backward_condition_factory=RolePresetConditions.by_cursor_backward,
-        tiebreaker_order=RolePresetRow.id.asc(),
+        cursor_column=RolePresetRow.id,
     )
 
 
 def _role_permission_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RolePermissionPresetOrders.id(ascending=False),
-        backward_order=RolePermissionPresetOrders.id(ascending=True),
-        forward_condition_factory=RolePermissionPresetConditions.by_cursor_forward,
-        backward_condition_factory=RolePermissionPresetConditions.by_cursor_backward,
-        tiebreaker_order=RolePermissionPresetRow.id.asc(),
+        cursor_column=RolePermissionPresetRow.id,
     )
 
 
@@ -493,6 +487,7 @@ class RolePresetAdapter(BaseAdapter):
     def _data_to_node(data: RolePresetData) -> RolePresetNode:
         return RolePresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             scope_type=data.scope_type,
             auto_assign=data.auto_assign,
@@ -505,6 +500,7 @@ class RolePresetAdapter(BaseAdapter):
     def _permission_data_to_node(data: RolePermissionPresetData) -> RolePermissionPresetNode:
         return RolePermissionPresetNode(
             id=data.id,
+            field_id=data.id,
             role_preset_id=data.role_preset_id,
             entity_type=data.entity_type,
             permission=PermissionBitDTO.of(data.permission),

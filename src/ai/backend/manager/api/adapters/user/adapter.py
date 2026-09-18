@@ -179,18 +179,12 @@ from ai.backend.manager.services.user.processors import UserProcessors
 
 _USER_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserOrders.created_at(ascending=False),
-    backward_order=UserOrders.created_at(ascending=True),
-    forward_condition_factory=UserConditions.by_cursor_forward,
-    backward_condition_factory=UserConditions.by_cursor_backward,
-    tiebreaker_order=UserRow.uuid.asc(),
+    cursor_column=UserRow.uuid,
 )
 
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairOrders.created_at(ascending=False),
-    backward_order=KeypairOrders.created_at(ascending=True),
-    forward_condition_factory=KeypairConditions.by_cursor_forward,
-    backward_condition_factory=KeypairConditions.by_cursor_backward,
-    tiebreaker_order=KeyPairRow.access_key.asc(),
+    cursor_column=KeyPairRow.id,
 )
 
 
@@ -780,6 +774,7 @@ class UserAdapter(BaseAdapter):
         """Convert KeyPairData to KeypairNode DTO."""
         return KeypairNode(
             id=str(data.access_key),
+            field_id=data.id,
             access_key=str(data.access_key),
             is_active=data.is_active,
             is_admin=data.is_admin,
@@ -1601,6 +1596,7 @@ class UserAdapter(BaseAdapter):
         """Convert UserData to UserNode DTO."""
         return UserNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=UserBasicInfo(
                 username=data.username,
                 email=data.email,

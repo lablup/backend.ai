@@ -152,10 +152,7 @@ def _build_policy_from_strategy_input(
 def _model_card_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ModelCardOrders.created_at(ascending=False),
-        backward_order=ModelCardOrders.created_at(ascending=True),
-        forward_condition_factory=ModelCardConditions.by_cursor_forward,
-        backward_condition_factory=ModelCardConditions.by_cursor_backward,
-        tiebreaker_order=ModelCardRow.id.asc(),
+        cursor_column=ModelCardRow.id,
     )
 
 
@@ -659,6 +656,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> ModelCardNode:
         return ModelCardNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             vfolder_id=data.vfolder_id,
             domain_name=data.domain,

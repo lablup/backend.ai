@@ -6,11 +6,6 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.dto.manager.v2.deployment.request import SyncReplicaInput
 from ai.backend.common.dto.manager.v2.deployment.response import SyncReplicaPayload
@@ -29,6 +24,11 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 type SyncingStep = Scenario[
     SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload

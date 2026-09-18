@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
@@ -25,7 +26,6 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -40,7 +40,6 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -165,7 +164,7 @@ def _make_vfolder_data(
         domain_name="default",
         quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_id),
         usage_mode=usage_mode,
-        permission=VFolderMountPermission.READ_WRITE,
+        default_mount_permission=VFolderMountPolicy.READ_WRITE,
         max_files=0,
         max_size=None,
         num_files=0,
@@ -239,7 +238,7 @@ class TestCreateVFolderAction:
                 creator_id=user_uuid,
                 user=UserID(user_uuid),
                 usage_mode=usage_mode,
-                permission=VFolderPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 cloneable=False,
             ),
         )
@@ -261,7 +260,7 @@ class TestCreateVFolderAction:
                 creator_id=user_uuid,
                 project=ProjectID(project_id),
                 usage_mode=usage_mode,
-                permission=VFolderPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 cloneable=False,
             ),
         )
@@ -698,7 +697,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         result = await vfolder_service.clone(action)
@@ -727,7 +726,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(Forbidden, match="not permitted to be cloned"):
@@ -758,7 +757,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(VFolderAlreadyExists):
@@ -791,7 +790,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(VFolderInvalidParameter, match="cannot create more"):
@@ -852,7 +851,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=target_quota_scope_id,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         result = await vfolder_service.clone(action)
@@ -887,7 +886,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         result = await vfolder_service.clone(action)
@@ -922,7 +921,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=unauthorized_scope,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -970,7 +969,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         await vfolder_service.clone(action)

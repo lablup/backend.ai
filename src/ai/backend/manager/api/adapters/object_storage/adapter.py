@@ -250,6 +250,7 @@ class ObjectStorageAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return ObjectStorageNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             host=data.host,
             access_key=data.access_key,

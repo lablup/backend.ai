@@ -10,6 +10,8 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
@@ -242,9 +244,7 @@ from ai.backend.manager.models.endpoint.searchers import DeploymentAccessTokenSe
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-    ALLOCATED_SLOT_REVISION_TIEBREAKER,
     resolve_allocated_slot_revision_order,
 )
 from ai.backend.manager.models.routing import RoutingRow
@@ -445,20 +445,14 @@ def _model_definition_to_dto(
 def _get_deployment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DeploymentOrders.created_at(ascending=False),
-        backward_order=DeploymentOrders.created_at(ascending=True),
-        forward_condition_factory=DeploymentConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentConditions.by_cursor_backward,
-        tiebreaker_order=EndpointRow.id.asc(),
+        cursor_column=EndpointRow.id,
     )
 
 
 def _get_deployment_policy_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DeploymentPolicyRow.created_at.desc(),
-        backward_order=DeploymentPolicyRow.created_at.asc(),
-        forward_condition_factory=DeploymentConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentPolicyRow.id.asc(),
+        cursor_column=DeploymentPolicyRow.id,
     )
 
 
@@ -466,10 +460,7 @@ def _get_deployment_policy_pagination_spec() -> PaginationSpec:
 def _get_revision_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RevisionOrders.created_at(ascending=False),
-        backward_order=RevisionOrders.created_at(ascending=True),
-        forward_condition_factory=RevisionConditions.by_cursor_forward,
-        backward_condition_factory=RevisionConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentRevisionRow.id.asc(),
+        cursor_column=DeploymentRevisionRow.id,
     )
 
 
@@ -477,10 +468,7 @@ def _get_revision_pagination_spec() -> PaginationSpec:
 def _get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RouteOrders.created_at(ascending=False),
-        backward_order=RouteOrders.created_at(ascending=True),
-        forward_condition_factory=RouteConditions.by_cursor_forward,
-        backward_condition_factory=RouteConditions.by_cursor_backward,
-        tiebreaker_order=RoutingRow.id.asc(),
+        cursor_column=RoutingRow.id,
     )
 
 
@@ -488,10 +476,7 @@ def _get_route_pagination_spec() -> PaginationSpec:
 def _get_access_token_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AccessTokenOrders.created_at(ascending=False),
-        backward_order=AccessTokenOrders.created_at(ascending=True),
-        forward_condition_factory=AccessTokenConditions.by_cursor_forward,
-        backward_condition_factory=AccessTokenConditions.by_cursor_backward,
-        tiebreaker_order=EndpointTokenRow.id.asc(),
+        cursor_column=EndpointTokenRow.id,
     )
 
 
@@ -499,10 +484,7 @@ def _get_access_token_pagination_spec() -> PaginationSpec:
 def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AutoScalingRuleOrders.created_at(ascending=False),
-        backward_order=AutoScalingRuleOrders.created_at(ascending=True),
-        forward_condition_factory=AutoScalingRuleConditions.by_cursor_forward,
-        backward_condition_factory=AutoScalingRuleConditions.by_cursor_backward,
-        tiebreaker_order=EndpointAutoScalingRuleRow.id.asc(),
+        cursor_column=EndpointAutoScalingRuleRow.id,
     )
 
 
@@ -510,10 +492,7 @@ def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
 def _get_replica_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RouteOrders.created_at(ascending=False),
-        backward_order=RouteOrders.created_at(ascending=True),
-        forward_condition_factory=RouteConditions.by_cursor_forward,
-        backward_condition_factory=RouteConditions.by_cursor_backward,
-        tiebreaker_order=RoutingRow.id.asc(),
+        cursor_column=RoutingRow.id,
     )
 
 
@@ -521,10 +500,7 @@ def _get_replica_pagination_spec() -> PaginationSpec:
 def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
-        forward_condition_factory=RevisionResourceSlotConditions.by_cursor_forward,
-        backward_condition_factory=RevisionResourceSlotConditions.by_cursor_backward,
-        tiebreaker_order=ALLOCATED_SLOT_REVISION_TIEBREAKER,
+        cursor_column=DeploymentRevisionResourceSlotRow.id,
     )
 
 
@@ -1123,7 +1099,7 @@ class DeploymentAdapter(BaseAdapter):
         for rule_id in input.ids:
             try:
                 rule_deployments[rule_id] = await self._auto_scaling_rule_deployment(rule_id)
-            except GenericBadRequest:
+            except (GenericBadRequest, FieldNotFoundError):
                 continue
         if not rule_deployments:
             return BulkDeleteAutoScalingRulesPayload(ids=[])
@@ -2397,6 +2373,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return DeploymentNode(
             id=data.id,
+            entity_id=data.entity_id(),
             metadata=DeploymentMetadataInfoDTO(
                 project_id=str(data.metadata.project_id),
                 domain_name=data.metadata.domain_name,
@@ -2447,6 +2424,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return RevisionNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             revision_number=data.revision_number,
             image_id=data.image_id,
@@ -2505,6 +2483,7 @@ class DeploymentAdapter(BaseAdapter):
     def _route_info_to_dto(data: RouteInfo) -> RouteNode:
         return RouteNode(
             id=data.route_id,
+            field_id=data.route_id,
             deployment_id=data.deployment_id,
             session_id=str(data.session_id) if data.session_id is not None else None,
             status=RouteStatus(data.status.value),
@@ -2520,6 +2499,7 @@ class DeploymentAdapter(BaseAdapter):
     def _access_token_data_to_dto(data: ModelDeploymentAccessTokenData) -> AccessTokenNode:
         return AccessTokenNode(
             id=data.id,
+            field_id=data.id,
             token=data.token,
             expires_at=data.expires_at,
             created_at=data.created_at,
@@ -2531,6 +2511,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AutoScalingRuleNode:
         return AutoScalingRuleNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.model_deployment_id,
             metric_source=data.metric_source.name,
             metric_name=data.metric_name,
@@ -2562,6 +2543,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return DeploymentPolicyNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.endpoint,
             strategy_spec=strategy_spec,
             created_at=data.created_at,
@@ -2572,6 +2554,7 @@ class DeploymentAdapter(BaseAdapter):
     def _replica_data_to_dto(data: ModelReplicaData) -> ReplicaNode:
         return ReplicaNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             revision_id=data.revision_id,
             session_id=data.session_id,

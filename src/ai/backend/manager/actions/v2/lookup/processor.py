@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
@@ -42,7 +43,8 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
 
     Where post-validators are wired, a key naming nothing and a key the caller may not
     reach raise the same exception, so the status code cannot be read as an answer to
-    whether the key exists. The audit record keeps the two apart.
+    whether the key exists. A superadmin, who passes every check, gets the miss as is.
+    The audit record keeps the two apart.
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
@@ -94,6 +96,11 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         for validator in self._post_validators:
             await validator.validate(meta)
 
+    def _caller_is_superadmin(self) -> bool:
+        """Whether the acting user is a superadmin."""
+        user = current_user()
+        return user is not None and user.is_superadmin
+
     def _unresolvable(self, action: TAction) -> GenericBadRequest:
         """The single answer a gated lookup gives to either failure.
 
@@ -124,7 +131,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
                 result = await self._func(action)
             except NotFoundError as e:
                 run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                if not self._post_validators:
+                if not self._post_validators or self._caller_is_superadmin():
                     raise
                 raise self._unresolvable(action) from e
             except BaseException as e:

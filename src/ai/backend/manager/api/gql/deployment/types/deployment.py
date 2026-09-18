@@ -363,6 +363,12 @@ class ModelDeploymentNetworkAccess:
 )
 class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment.",
+        ),
+    )
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     current_revision_id: ID | None = None
@@ -513,7 +519,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
         nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
-        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+        edges = [ModelReplicaEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ModelReplicaConnection(
             count=payload.total_count,
             edges=edges,

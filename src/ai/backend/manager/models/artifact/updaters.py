@@ -22,7 +22,7 @@ from ai.backend.manager.models.specs.updater import (
     DataUpdater,
     GuardedDataUpdater,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -33,7 +33,7 @@ class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
     """
 
     artifact_id: ArtifactID
-    readonly: TriState[bool] = field(default_factory=TriState[bool].nop)
+    readonly: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
 
     @property

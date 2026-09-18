@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, ResourceSlotEntryInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchResourcePresetsPayload",
@@ -22,6 +23,9 @@ class ResourcePresetNode(BaseResponseModel):
     """Node model representing a resource preset entity."""
 
     id: UUID = Field(description="Resource preset UUID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the resource preset. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Resource preset name.")
     resource_slots: list[ResourceSlotEntryInfo] = Field(description="Resource slot allocations.")
     shared_memory: BinarySizeInfo | None = Field(

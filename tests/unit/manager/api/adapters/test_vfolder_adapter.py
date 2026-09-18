@@ -18,11 +18,10 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderUsageData,
@@ -66,7 +65,7 @@ class TestVFolderAdapterMySearch:
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderMountPermission.READ_WRITE,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
             max_files=0,
             max_size=None,
             num_files=0,
@@ -100,6 +99,7 @@ class TestVFolderAdapterMySearch:
             mock_processors.vfolder_file,
             mock_processors.vfolder_admin,
             mock_processors.deployment,
+            mock_processors.vfolder_mount_policy,
         )
 
     async def test_my_search_calls_processor_with_user_scope(
@@ -158,7 +158,7 @@ class TestVFolderAdapterProjectSearch:
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderMountPermission.READ_WRITE,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
             max_files=0,
             max_size=None,
             num_files=0,
@@ -196,6 +196,7 @@ class TestVFolderAdapterProjectSearch:
             mock_processors.vfolder_file,
             mock_processors.vfolder_admin,
             mock_processors.deployment,
+            mock_processors.vfolder_mount_policy,
         )
 
     async def test_project_search_calls_processor_with_project_scope(
@@ -235,7 +236,7 @@ class TestVFolderAdapterConvertFilter:
 
     @pytest.fixture
     def adapter(self) -> VFolderAdapter:
-        return VFolderAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+        return VFolderAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
     @pytest.mark.parametrize("value", [True, False])
     def test_cloneable_filter_produces_condition(
@@ -275,6 +276,7 @@ class TestVFolderAdapterGetFolderUsage:
             mock_processors.vfolder_file,
             mock_processors.vfolder_admin,
             mock_processors.deployment,
+            mock_processors.vfolder_mount_policy,
         )
 
     async def test_maps_usage_data_to_dto(

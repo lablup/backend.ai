@@ -86,6 +86,7 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
 )
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.types import (
+    OptionalState,
     TriState,
 )
 
@@ -286,6 +287,7 @@ class TestArtifactService:
         """Test updating an artifact"""
         updater = ArtifactUpdater(
             artifact_id=sample_artifact_data.id,
+            readonly=OptionalState.update(True),
             description=TriState.update("Updated description"),
         )
         updated_artifact = ArtifactData(

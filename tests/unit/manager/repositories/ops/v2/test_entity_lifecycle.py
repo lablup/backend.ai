@@ -40,6 +40,7 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
     FieldType,
+    GlobalEntityType,
 )
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
@@ -335,10 +336,10 @@ class _Upserter(EntityUpserter[EntityLifecycleTestRow, _EntityData]):
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -357,7 +358,7 @@ async def database(
             EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -625,7 +626,11 @@ class TestEntityCreate:
         assert await _row_count(database) == 0
         async with database.begin_readonly_session() as sess:
             assert (
-                await sess.scalar(sa.select(sa.func.count()).select_from(VirtualEntityRow))
+                await sess.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(VirtualEntityRow)
+                    .where(VirtualEntityRow.entity_type != GlobalEntityType())
+                )
             ) == 0
 
     async def test_create_never_consults_presets(
@@ -683,7 +688,7 @@ class TestEntityCreate:
 
 
 class TestRoleManagedGlobalEntityCreate:
-    async def test_create_is_owned_and_governed_by_nothing(
+    async def test_create_is_governed_by_itself_and_the_global_scope(
         self,
         database: ExtendedAsyncSAEngine,
         repository: OpsRepository[_EntityData],
@@ -693,7 +698,7 @@ class TestRoleManagedGlobalEntityCreate:
         )
 
         assert await _self_binding_exists(database, data.id)
-        assert await _govern_count(database, data.id) == 1
+        assert await _govern_count(database, data.id) == 2
 
     async def test_create_provisions_preset_roles_with_generated_names(
         self,

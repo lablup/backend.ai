@@ -68,6 +68,7 @@ class LoginClientTypeAdapter(BaseAdapter):
     def _data_to_node(data: LoginClientTypeData) -> LoginClientTypeNode:
         return LoginClientTypeNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             created_at=data.created_at,

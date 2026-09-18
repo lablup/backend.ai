@@ -48,10 +48,7 @@ from ai.backend.manager.services.client_ip_masking.processors import ClientIPMas
 def _pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ClientIPMaskingPolicyOrders.target_type(ascending=True),
-        backward_order=ClientIPMaskingPolicyOrders.target_type(ascending=False),
-        forward_condition_factory=ClientIPMaskingPolicyConditions.by_cursor_forward,
-        backward_condition_factory=ClientIPMaskingPolicyConditions.by_cursor_backward,
-        tiebreaker_order=ClientIPMaskingPolicyRow.id.asc(),
+        cursor_column=ClientIPMaskingPolicyRow.id,
     )
 
 
@@ -144,6 +141,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
     def _data_to_node(data: ClientIPMaskingPolicyData) -> ClientIPMaskingPolicyNode:
         return ClientIPMaskingPolicyNode(
             id=data.id,
+            entity_id=data.entity_id(),
             target_type=ClientIPMaskingTargetDTO(data.target_type.value),
             mode=ClientIPMaskingModeDTO(data.mode.value),
             ipv4_prefix=data.ipv4_prefix,

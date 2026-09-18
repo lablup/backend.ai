@@ -67,11 +67,10 @@ from ai.backend.manager.models.replica_group_history.conditions import (
     ReplicaGroupHistoryConditions,
 )
 from ai.backend.manager.models.replica_group_history.orders import (
-    REPLICA_GROUP_DEFAULT_BACKWARD_ORDER,
     REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
-    REPLICA_GROUP_TIEBREAKER_ORDER,
     resolve_replica_group_order,
 )
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     KernelSchedulingHistoryConditions,
@@ -79,22 +78,20 @@ from ai.backend.manager.models.scheduling_history.conditions import (
     SessionSchedulingHistoryConditions,
 )
 from ai.backend.manager.models.scheduling_history.orders import (
-    DEPLOYMENT_DEFAULT_BACKWARD_ORDER,
     DEPLOYMENT_DEFAULT_FORWARD_ORDER,
-    DEPLOYMENT_TIEBREAKER_ORDER,
-    KERNEL_DEFAULT_BACKWARD_ORDER,
     KERNEL_DEFAULT_FORWARD_ORDER,
-    KERNEL_TIEBREAKER_ORDER,
-    ROUTE_DEFAULT_BACKWARD_ORDER,
     ROUTE_DEFAULT_FORWARD_ORDER,
-    ROUTE_TIEBREAKER_ORDER,
-    SESSION_DEFAULT_BACKWARD_ORDER,
     SESSION_DEFAULT_FORWARD_ORDER,
-    SESSION_TIEBREAKER_ORDER,
     resolve_deployment_order,
     resolve_kernel_order,
     resolve_route_order,
     resolve_session_order,
+)
+from ai.backend.manager.models.scheduling_history.row import (
+    DeploymentHistoryRow,
+    KernelSchedulingHistoryRow,
+    RouteHistoryRow,
+    SessionSchedulingHistoryRow,
 )
 from ai.backend.manager.models.scheduling_history.scopes import (
     DeploymentHistoryOperationScope,
@@ -154,42 +151,27 @@ from ai.backend.manager.services.scheduling_history.processors import Scheduling
 
 _SESSION_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=SESSION_DEFAULT_FORWARD_ORDER,
-    backward_order=SESSION_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_forward,
-    backward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_backward,
-    tiebreaker_order=SESSION_TIEBREAKER_ORDER,
+    cursor_column=SessionSchedulingHistoryRow.id,
 )
 
 _KERNEL_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
-    backward_order=KERNEL_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=KernelSchedulingHistoryConditions.by_cursor_forward,
-    backward_condition_factory=KernelSchedulingHistoryConditions.by_cursor_backward,
-    tiebreaker_order=KERNEL_TIEBREAKER_ORDER,
+    cursor_column=KernelSchedulingHistoryRow.id,
 )
 
 _DEPLOYMENT_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEPLOYMENT_DEFAULT_FORWARD_ORDER,
-    backward_order=DEPLOYMENT_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=DeploymentHistoryConditions.by_cursor_forward,
-    backward_condition_factory=DeploymentHistoryConditions.by_cursor_backward,
-    tiebreaker_order=DEPLOYMENT_TIEBREAKER_ORDER,
+    cursor_column=DeploymentHistoryRow.id,
 )
 
 _REPLICA_GROUP_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
-    backward_order=REPLICA_GROUP_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=ReplicaGroupHistoryConditions.by_cursor_forward,
-    backward_condition_factory=ReplicaGroupHistoryConditions.by_cursor_backward,
-    tiebreaker_order=REPLICA_GROUP_TIEBREAKER_ORDER,
+    cursor_column=ReplicaGroupHistoryRow.id,
 )
 
 _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=ROUTE_DEFAULT_FORWARD_ORDER,
-    backward_order=ROUTE_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=RouteHistoryConditions.by_cursor_forward,
-    backward_condition_factory=RouteHistoryConditions.by_cursor_backward,
-    tiebreaker_order=ROUTE_TIEBREAKER_ORDER,
+    cursor_column=RouteHistoryRow.id,
 )
 
 
@@ -1195,6 +1177,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _session_data_to_dto(data: SessionSchedulingHistoryData) -> SessionHistoryNode:
         return SessionHistoryNode(
             id=data.id,
+            field_id=data.id,
             session_id=data.session_id,
             phase=data.phase,
             from_status=data.from_status.value if data.from_status else None,
@@ -1222,6 +1205,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _kernel_data_to_dto(data: KernelSchedulingHistoryData) -> KernelHistoryNode:
         return KernelHistoryNode(
             id=data.id,
+            field_id=data.id,
             kernel_id=data.kernel_id,
             session_id=data.session_id,
             phase=data.phase,
@@ -1239,6 +1223,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _deployment_data_to_dto(data: DeploymentHistoryData) -> DeploymentHistoryNode:
         return DeploymentHistoryNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             category=data.handler_category.value,
             phase=data.phase,
@@ -1267,6 +1252,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _replica_group_data_to_dto(data: ReplicaGroupHistoryData) -> ReplicaGroupHistoryNode:
         return ReplicaGroupHistoryNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             category=data.category.value,
             phase=data.phase,
@@ -1295,6 +1281,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _route_data_to_dto(data: RouteHistoryData) -> RouteHistoryNode:
         return RouteHistoryNode(
             id=data.id,
+            field_id=data.id,
             route_id=data.route_id,
             deployment_id=data.deployment_id,
             category=data.category,

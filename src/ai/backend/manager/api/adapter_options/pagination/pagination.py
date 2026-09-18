@@ -7,17 +7,23 @@ both the GQL adapter (BaseGQLAdapter) and domain adapters (BaseAdapter).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
+from uuid import UUID
+
+import sqlalchemy as sa
+from sqlalchemy.orm import QueryableAttribute
+from sqlalchemy.sql import operators
 
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
-from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
     QueryPagination,
 )
-from ai.backend.manager.repositories.base import CursorConditionFactory
 
 DEFAULT_PAGINATION_LIMIT = 10
 
@@ -38,27 +44,80 @@ class PaginationOptions:
 class PaginationSpec:
     """Domain-specific configuration for cursor-based pagination.
 
-    For typical "newest first" lists:
-    - Forward (first/after): DESC order, shows newer items first
-    - Backward (last/before): ASC order, fetches older items first (reversed for display)
+    ``cursor_column`` ASC breaks ties of ``forward_order``.
+    Backward pagination reverses both.
     """
 
     forward_order: QueryOrder
     """Order for forward pagination (e.g., created_at DESC for newest first).
     Also used as default order for offset pagination when order is not provided."""
 
-    backward_order: QueryOrder
-    """Order for backward pagination (e.g., created_at ASC, results reversed for display)."""
+    cursor_column: QueryableAttribute[Any]
+    """Unique UUID column whose value the cursor carries."""
 
-    forward_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for forward pagination (e.g., created_at < cursor)."""
+    @property
+    def backward_order(self) -> QueryOrder:
+        column, ascending = self._unpack(self.forward_order)
+        if ascending:
+            return column.desc()
+        return column.asc()
 
-    backward_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
+    @property
+    def tiebreaker_order(self) -> QueryOrder:
+        """Last ORDER BY clause of forward and offset pagination."""
+        return self.cursor_column.asc()
 
-    tiebreaker_order: QueryOrder
-    """Tiebreaker order for deterministic pagination (e.g., RowClass.id.asc()).
-    Applied as the last ORDER BY clause to ensure stable ordering."""
+    @property
+    def backward_tiebreaker_order(self) -> QueryOrder:
+        """Last ORDER BY clause of backward pagination."""
+        return self.cursor_column.desc()
+
+    def forward_condition(self, cursor: str) -> QueryCondition:
+        """Condition selecting the rows after the cursor row in forward order."""
+        return self._condition(self.forward_order, True, cursor)
+
+    def backward_condition(self, cursor: str) -> QueryCondition:
+        """Condition selecting the rows after the cursor row in backward order."""
+        return self._condition(self.backward_order, False, cursor)
+
+    def _condition(
+        self, order: QueryOrder, tiebreaker_ascending: bool, cursor: str
+    ) -> QueryCondition:
+        cursor_value = UUID(cursor)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_column = self.cursor_column.expression
+            order_column, order_ascending = self._unpack(order)
+            if order_column.compare(cursor_column):
+                return self._past(cursor_column, order_ascending, cursor_value)
+            cursor_row_value = (
+                sa.select(order_column).where(cursor_column == cursor_value).scalar_subquery()
+            )
+            return sa.or_(
+                self._past(order_column, order_ascending, cursor_row_value),
+                sa.and_(
+                    order_column == cursor_row_value,
+                    self._past(cursor_column, tiebreaker_ascending, cursor_value),
+                ),
+            )
+
+        return inner
+
+    def _past(
+        self, column: sa.sql.expression.ColumnElement[Any], ascending: bool, value: Any
+    ) -> sa.sql.expression.ColumnElement[bool]:
+        past: sa.sql.expression.ColumnElement[bool] = (
+            column > value if ascending else column < value
+        )
+        return past
+
+    def _unpack(self, order: QueryOrder) -> tuple[sa.sql.expression.ColumnElement[Any], bool]:
+        if isinstance(order, sa.sql.expression.UnaryExpression):
+            if order.modifier is operators.asc_op:
+                return order.element, True
+            if order.modifier is operators.desc_op:
+                return order.element, False
+        raise ServerMisconfiguredError(f"Pagination order must be a plain ASC/DESC column: {order}")
 
 
 def build_pagination(
@@ -67,13 +126,13 @@ def build_pagination(
 ) -> QueryPagination:
     """Build QueryPagination from pagination arguments and domain spec.
 
-    For cursor-based pagination (first/after or last/before), condition factories
+    For cursor-based pagination (first/after or last/before), conditions
     and orders are taken from the spec. For offset pagination, returns OffsetPagination.
     If no parameters are provided, returns a default OffsetPagination.
 
     Args:
         options: Flat pagination arguments (first/after/last/before/limit/offset).
-        spec: Domain-specific pagination specification (orders, condition factories).
+        spec: Domain-specific pagination specification (orders, cursor column).
 
     Raises:
         InvalidGraphQLParameters: If multiple pagination modes are requested
@@ -95,7 +154,7 @@ def build_pagination(
         if options.after is not None:
             cursor_value = decode_cursor(options.after)
             try:
-                cursor_condition = spec.forward_condition_factory(cursor_value)
+                cursor_condition = spec.forward_condition(cursor_value)
             except ValueError as e:
                 raise InvalidCursor(f"Invalid cursor value: {options.after}") from e
         return CursorForwardPagination(
@@ -111,7 +170,7 @@ def build_pagination(
         if options.before is not None:
             cursor_value = decode_cursor(options.before)
             try:
-                cursor_condition = spec.backward_condition_factory(cursor_value)
+                cursor_condition = spec.backward_condition(cursor_value)
             except ValueError as e:
                 raise InvalidCursor(f"Invalid cursor value: {options.before}") from e
         return CursorBackwardPagination(

@@ -8,8 +8,11 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.dto.manager.v2.artifact_registry.response import ArtifactRegistryGQLNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_node_type,
 )
@@ -25,8 +28,14 @@ from .types import StrawberryGQLContext
         description="Represents common metadata for an artifact registry. All artifact registry nodes expose that information regardless of type.",
     ),
 )
-class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
+class ArtifactRegistryMeta(PydanticNodeMixin[ArtifactRegistryGQLNode]):
     id: NodeID[str]
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the artifact registry.",
+        ),
+    )
     name: str
     registry_id: ID
     type: ArtifactRegistryType
@@ -72,6 +81,7 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
             registries.append(
                 cls(
                     id=ID(str(registry_meta.id)),
+                    entity_id=registry_meta.entity_id,
                     name=registry_meta.name,
                     registry_id=ID(str(registry_meta.registry_id)),
                     type=registry_meta.type,

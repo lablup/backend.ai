@@ -85,6 +85,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
+    RoleNode,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleSourceDTO,
@@ -119,6 +120,11 @@ from ai.backend.manager.services.permission_contoller.actions.search_my_role_ass
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity import (
+        EntityConnection,
+        EntityFilterGQL,
+        EntityOrderByGQL,
+    )
     from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.rbac.types.permission import (
         PermissionConnection,
@@ -155,8 +161,14 @@ class RoleOrderField(StrEnum):
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="RBAC role."), name="Role")
-class RoleGQL(PydanticNodeMixin[Any]):
+class RoleGQL(PydanticNodeMixin[RoleNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the role.",
+        ),
+    )
     name: str
     description: str | None
     source: RoleSourceGQL
@@ -203,7 +215,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         | None
     ):
         return await info.context.data_loaders.entity_node_loader.load(
-            RuntimeEntityID(EntityType(self.scope_type), self.scope_id)
+            RuntimeEntityID(EntityType.from_name(self.scope_type), self.scope_id)
         )
 
     @classmethod
@@ -417,6 +429,75 @@ class RoleGQL(PydanticNodeMixin[Any]):
             count=payload.total_count,
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            description="Scopes this role is registered in.",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="`scope`",
+        ),
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`. A role belongs to one "
+            "scope, so this connection holds that one scope and ignores `filter` and `order_by`."
+        ),
+    )  # type: ignore[misc]
+    async def scopes(
+        self,
+        filter: Annotated[
+            EntityFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                EntityOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            EntityConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.rbac.types.entity import (
+            EntityConnection,
+            EntityEdge,
+            EntityRefGQL,
+        )
+
+        page_is_empty = (offset is not None and offset > 0) or any(
+            bound == 0 for bound in (first, last, limit)
+        )
+        edges = (
+            []
+            if page_is_empty
+            else [
+                EntityEdge(
+                    node=EntityRefGQL.from_role(self),
+                    cursor=encode_cursor(self.id),
+                )
+            ]
+        )
+        return EntityConnection(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=1,
+        )
+
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -573,6 +654,23 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     status: RoleStatusFilterGQL | None = None
     assigned_user: RoleUserNestedFilterGQL | None = None
     mapped_scope: RoleMappedScopeNestedFilterGQL | None = None
+    permission: (
+        Annotated[
+            PermissionNestedFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None
+    ) = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter roles by the permissions they carry. For listing roles only —"
+                " a role carrying a bit does not mean the caller holds it. Use"
+                " `myScopePermissions` to decide what the caller may do."
+            ),
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -590,6 +688,17 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
+    mapped_scope: RoleMappedScopeNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter assignments by the scope their role is registered in. For listing"
+                " assignments only — a role registered in a scope does not mean the caller"
+                " holds anything there. Use `myScopePermissions` to decide."
+            ),
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

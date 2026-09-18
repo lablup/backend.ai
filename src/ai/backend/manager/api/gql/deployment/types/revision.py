@@ -112,6 +112,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ResourceConfigInfoDTO,
     RuntimeVariantPresetValueInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -531,6 +532,12 @@ class ModelDefinitionGQL:
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     image_id: ID
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the revision.",
+        ),
+    )
     revision_number: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",

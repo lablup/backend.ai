@@ -202,6 +202,12 @@ class ModelCardMetadataGQL(PydanticOutputMixin[ModelCardMetadataDTO]):
 )
 class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the model card.",
+        ),
+    )
     name: str = gql_field(description="Display name of the registered model.")
     vfolder_id: UUID = gql_field(
         description="The VFolder that stores the actual model files, weights, and configuration."

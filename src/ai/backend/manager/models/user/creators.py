@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.repository import (
@@ -58,7 +60,7 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
 
     @override
     def created_in(self, row: UserRow) -> Collection[EntityIdentifier]:
-        return (self.domain_id,)
+        return (self.domain_id, global_entity_id(GlobalEntityName.GLOBAL))
 
     @override
     def template_value(self, row: UserRow) -> ScopeTemplateValue:

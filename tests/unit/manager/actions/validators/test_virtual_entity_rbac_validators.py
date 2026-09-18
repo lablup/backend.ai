@@ -37,6 +37,7 @@ from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
+    VirtualEntityPartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
@@ -517,6 +518,13 @@ def bulk_validator(
     repository: RbacPermissionCheckRepository,
 ) -> VirtualEntityAtomicBulkActionRBACValidator:
     return VirtualEntityAtomicBulkActionRBACValidator(repository)
+
+
+@pytest.fixture
+def partial_bulk_validator(
+    repository: RbacPermissionCheckRepository,
+) -> VirtualEntityPartialBulkActionRBACValidator:
+    return VirtualEntityPartialBulkActionRBACValidator(repository)
 
 
 @pytest.fixture
@@ -1013,6 +1021,46 @@ class TestVirtualEntityAtomicBulkActionRBACValidator:
             await bulk_validator.validate(
                 _bulk_meta(_BulkVfolderUpdateAction(ids=[]), trigger_meta)
             )
+
+
+class TestVirtualEntityPartialBulkActionRBACValidator:
+    async def test_superadmin_is_denied_nothing_for_an_entity_without_a_node(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        seeded_superadmin_user: UserData,
+    ) -> None:
+        with with_user(seeded_superadmin_user):
+            denied = await partial_bulk_validator.validate(
+                _bulk_meta(bulk_vfolder_action, trigger_meta)
+            )
+
+        assert denied == {}
+
+    async def test_missing_user_raises(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+    ) -> None:
+        with pytest.raises(UnreachableError):
+            await partial_bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
+
+    async def test_denied_target_is_one_failed_item(
+        self,
+        partial_bulk_validator: VirtualEntityPartialBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_partial_bulk_membership: UserData,
+    ) -> None:
+        with with_user(user_with_partial_bulk_membership):
+            denied = await partial_bulk_validator.validate(
+                _bulk_meta(bulk_vfolder_action, trigger_meta)
+            )
+
+        assert set(denied) == {_VfolderID(_BULK_VF_DENIED)}
+        assert isinstance(denied[_VfolderID(_BULK_VF_DENIED)], NotEnoughPermission)
 
 
 class TestHeldPermissions:

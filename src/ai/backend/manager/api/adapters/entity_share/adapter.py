@@ -68,10 +68,7 @@ __all__ = ("EntityShareAdapter",)
 def _entity_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=EntityShareOrders.created_at(ascending=True),
-        backward_order=EntityShareOrders.created_at(ascending=False),
-        forward_condition_factory=EntityShareConditions.by_cursor_forward,
-        backward_condition_factory=EntityShareConditions.by_cursor_backward,
-        tiebreaker_order=EntityShareRow.id.asc(),
+        cursor_column=EntityShareRow.id,
     )
 
 
@@ -305,6 +302,7 @@ class EntityShareAdapter(BaseAdapter):
     def _to_node(self, data: EntityShareData) -> EntityShareNode:
         return EntityShareNode(
             id=data.id,
+            entity_id=data.entity_id(),
             sharer_user_id=data.sharer_user_id,
             recipient_email=data.recipient_email,
             target_entity_type=data.target.entity_type(),

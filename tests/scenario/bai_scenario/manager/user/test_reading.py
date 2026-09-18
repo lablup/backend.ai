@@ -8,13 +8,6 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.components.user import AGrant, UserNodeLook
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -30,11 +23,17 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     Scenario,
-    Skipped,
     Then,
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.components.user import AGrant, UserNodeLook
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import SeedDomain
 
 type Loaded = list[UserNode | Exception | None]
 type Answer = UserNode | Loaded
@@ -245,7 +244,7 @@ class TheNodeThenNothing(Then[AReaderAndATarget, Answer]):
             seen.extend(UserNodeLook(self.started).verdicts(first, laid.target, at="[0]."))
         else:
             seen.append(Same("[0]", type(first).__name__, "UserNode"))
-        seen.append(Skipped("[1]", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"))
+        seen.append(Same("[1]", second, None))
         return seen
 
 

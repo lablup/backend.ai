@@ -46,6 +46,7 @@ from ai.backend.manager.models.app_config_allow_list.purgers import (
 from ai.backend.manager.models.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
 )
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_allow_list.searchers import (
     AppConfigAllowListSearcher,
 )
@@ -80,10 +81,7 @@ from ai.backend.manager.types import OptionalState
 def _get_app_config_allow_list_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigAllowListOrders.created_at(ascending=False),
-        backward_order=AppConfigAllowListOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigAllowListConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigAllowListConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigAllowListOrders.id(ascending=True),
+        cursor_column=AppConfigAllowListRow.id,
     )
 
 
@@ -195,6 +193,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
     def _data_to_node(data: AppConfigAllowListData) -> AppConfigAllowListNode:
         return AppConfigAllowListNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
             rank=data.rank,

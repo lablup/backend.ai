@@ -37,15 +37,14 @@ from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryProjectCreator,
 )
 from ai.backend.manager.models.container_registry.orders import (
-    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
     resolve_order,
 )
 from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
@@ -75,10 +74,7 @@ def _pagination_spec() -> PaginationSpec:
     """How a page of registries is cut, in either mode. The order runs by id."""
     return PaginationSpec(
         forward_order=DEFAULT_FORWARD_ORDER,
-        backward_order=DEFAULT_BACKWARD_ORDER,
-        forward_condition_factory=ContainerRegistryConditions.by_cursor_forward,
-        backward_condition_factory=ContainerRegistryConditions.by_cursor_backward,
-        tiebreaker_order=TIEBREAKER_ORDER,
+        cursor_column=ContainerRegistryRow.id,
     )
 
 
@@ -345,6 +341,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return ContainerRegistryNode(
             id=data.id,
+            entity_id=data.entity_id(),
             url=data.url,
             registry_name=data.registry_name,
             type=data.type,

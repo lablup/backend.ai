@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Collection
 from datetime import datetime
 
@@ -302,36 +301,6 @@ class ReplicaGroupHistoryConditions:
     by_phase_in = staticmethod(make_string_in_factory(ReplicaGroupHistoryRow.phase))
     by_error_code_in = staticmethod(make_string_in_factory(ReplicaGroupHistoryRow.error_code))
     by_message_in = staticmethod(make_string_in_factory(ReplicaGroupHistoryRow.message))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ReplicaGroupHistoryRow.created_at)
-                .where(ReplicaGroupHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ReplicaGroupHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ReplicaGroupHistoryRow.created_at)
-                .where(ReplicaGroupHistoryRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return ReplicaGroupHistoryRow.created_at > subquery
-
-        return inner
 
     # DateTime filter conditions
     @staticmethod

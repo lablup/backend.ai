@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -65,7 +66,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupScope,
     SchedulerTypeDTO,
 )
-from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.exception import DomainNotFound, UnreachableError
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapter_options.deployment.options import (
@@ -204,10 +205,7 @@ def _slot_quantities_to_resource_slot_info(
 def _resource_group_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ResourceGroupOrders.created_at(ascending=False),
-        backward_order=ResourceGroupOrders.created_at(ascending=True),
-        forward_condition_factory=ResourceGroupConditions.by_cursor_forward,
-        backward_condition_factory=ResourceGroupConditions.by_cursor_backward,
-        tiebreaker_order=ResourceGroupRow.name.asc(),
+        cursor_column=ResourceGroupRow.id,
     )
 
 
@@ -947,11 +945,13 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         return AllowedProjectsPayload(items=result.items)
 
-    async def _scoped_resource_group_names(self, item: ResourceGroupScopeItem) -> list[str]:
-        """Read the resource groups one scope reaches, by name."""
+    async def _scoped_resource_group_names(
+        self, items: Sequence[ResourceGroupScopeItem]
+    ) -> list[str]:
+        """Read the resource groups the named scopes reach, by name."""
         result = await self._resource_group.scoped_search_resource_groups.run(
             ScopedSearchResourceGroupsAction(
-                items=[item],
+                items=items,
                 searcher=ResourceGroupSearcher(
                     pagination=NoPagination(),
                     orders=[ResourceGroupOrders.name()],
@@ -966,21 +966,29 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> AllowedResourceGroupsPayload:
         """Get allowed resource groups for a domain."""
         return AllowedResourceGroupsPayload(
-            items=await self._scoped_resource_group_names(
+            items=await self._scoped_resource_group_names([
                 DomainResourceGroupScopeItem(domain_id=await self._resolve_domain_id(domain_name))
-            )
+            ])
         )
 
     async def get_allowed_resource_groups_for_project(
         self,
         project_id: UUID,
     ) -> AllowedResourceGroupsPayload:
-        """Get allowed resource groups for a project."""
-        return AllowedResourceGroupsPayload(
-            items=await self._scoped_resource_group_names(
-                ProjectResourceGroupScopeItem(project_id=ProjectID(project_id))
-            )
-        )
+        """Get allowed resource groups for a project.
+
+        A resource group is associated with domains, projects and keypairs
+        independently, so scheduling in a project reaches all three sides.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        items: list[ResourceGroupScopeItem] = [
+            DomainResourceGroupScopeItem(domain_id=me.domain_id),
+            ProjectResourceGroupScopeItem(project_id=ProjectID(project_id)),
+            UserResourceGroupScopeItem(user_id=UserID(me.user_id)),
+        ]
+        return AllowedResourceGroupsPayload(items=await self._scoped_resource_group_names(items))
 
     async def get_allowed_domains_for_resource_group(
         self,
@@ -1009,6 +1017,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """Convert ResourceGroupData to ResourceGroupDetailNode DTO for GQL layer."""
         return ResourceGroupDetailNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             status=ResourceGroupStatusInfo(
                 is_active=data.status.is_active,

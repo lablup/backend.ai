@@ -44,6 +44,7 @@ def _make_client(mock_session: MagicMock) -> V2AppConfigAllowListClient:
 def _node_payload(entry_id: str, config_name: str) -> dict[str, str | int]:
     return {
         "id": entry_id,
+        "entity_id": entry_id,
         "config_name": config_name,
         "scope_type": "domain",
         "rank": 200,

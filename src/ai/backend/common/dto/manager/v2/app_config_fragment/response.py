@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import Field
 
@@ -11,6 +12,7 @@ from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseMo
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
@@ -28,6 +30,9 @@ class AppConfigFragmentNode(BaseResponseModel):
     """Node model representing one app config fragment."""
 
     id: AppConfigFragmentID = Field(description="App config fragment id.")
+    entity_id: UUID = Field(
+        description=f"UUID of the app config fragment. Added in {NEXT_RELEASE_VERSION}.",
+    )
     config_name: str = Field(description="Config name the fragment belongs to.")
     scope_type: AppConfigScopeType = Field(description="Scope the fragment is written at.")
     scope_id: AppConfigScopeID | None = Field(

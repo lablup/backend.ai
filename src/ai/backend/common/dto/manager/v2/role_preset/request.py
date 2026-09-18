@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
@@ -31,7 +31,7 @@ class CreateRolePresetInput(BaseRequestModel):
     """Input for creating a new role preset."""
 
     name: str = Field(min_length=1, max_length=64, description="Role preset name.")
-    scope_type: EntityType = Field(
+    scope_type: DeclaredEntityType = Field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
     auto_assign: bool = Field(

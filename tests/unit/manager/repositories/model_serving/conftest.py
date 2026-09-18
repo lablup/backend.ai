@@ -16,12 +16,12 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -177,7 +177,7 @@ def sample_vfolder() -> VFolderRow:
     vfolder.last_used = datetime.now(UTC)
     vfolder.unmanaged_path = ""
     vfolder.usage_mode = VFolderUsageMode.MODEL
-    vfolder.permission = VFolderMountPermission.READ_WRITE
+    vfolder.default_mount_permission = VFolderMountPolicy.READ_WRITE
     vfolder.status = VFolderOperationStatus.READY
     return vfolder
 

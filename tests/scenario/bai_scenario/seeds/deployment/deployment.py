@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree
-
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentOptions
@@ -19,6 +17,7 @@ from ai.backend.manager.models.endpoint.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
+from bai_scenario.seeds.seeder import Naming, SeedRowFromThree
 
 
 @dataclass(frozen=True)

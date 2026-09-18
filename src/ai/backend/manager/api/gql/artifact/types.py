@@ -95,6 +95,7 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -637,6 +638,12 @@ class SourceInfo:
 )
 class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     id: NodeID[str]
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the artifact.",
+        ),
+    )
     name: str
     type: ArtifactType
     description: str | None
@@ -685,6 +692,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
         for item in payload.items:
             revision = ArtifactRevision(
                 id=ID(str(item.id)),
+                field_id=item.field_id,
                 status=ArtifactStatus(item.status.value),
                 remote_status=ArtifactRemoteStatus(item.remote_status)
                 if item.remote_status
@@ -722,6 +730,12 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
 )
 class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
+    field_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the artifact revision.",
+        ),
+    )
     status: ArtifactStatus
     remote_status: ArtifactRemoteStatus | None = gql_added_field(
         BackendAIGQLMeta(
@@ -788,6 +802,7 @@ def to_artifact_gql_node(node: ArtifactNode, registry_url: str, source_url: str)
     """Build an ArtifactGQLNode DTO from an ArtifactNode and resolved registry URLs."""
     return ArtifactGQLNode(
         id=node.id,
+        entity_id=node.entity_id,
         name=node.name,
         type=node.type,
         description=node.description,
@@ -805,6 +820,7 @@ def make_artifact_revision_from_node(node: ArtifactRevisionNode) -> ArtifactRevi
     """Create an ArtifactRevision GQL type from an ArtifactRevisionNode DTO (search result)."""
     return ArtifactRevision(
         id=ID(str(node.id)),
+        field_id=node.field_id,
         status=ArtifactStatus(node.status.value),
         remote_status=ArtifactRemoteStatus(node.remote_status) if node.remote_status else None,
         readme=None,

@@ -283,6 +283,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.processors import (
         VFolderFileProcessors,
         VFolderInviteProcessors,
+        VFolderMountPolicyProcessors,
         VFolderProcessors,
         VFolderSharingProcessors,
     )
@@ -294,6 +295,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.vfolder.services.invite import (
         VFolderInviteService,
+    )
+    from ai.backend.manager.services.vfolder.services.mount_policy import (
+        VFolderMountPolicyService,
     )
     from ai.backend.manager.services.vfolder.services.sharing import (
         VFolderSharingService,
@@ -370,6 +374,7 @@ class Services:
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
+    vfolder_mount_policy: VFolderMountPolicyService
     session: SessionService
     manager_admin: ManagerAdminService
     secret: SecretService
@@ -433,6 +438,7 @@ class Processors:
     vfolder_admin: VFolderAdminProcessors
     vfolder_invite: VFolderInviteProcessors
     vfolder_sharing: VFolderSharingProcessors
+    vfolder_mount_policy: VFolderMountPolicyProcessors
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
@@ -483,7 +489,8 @@ class ProcessorsBundle:
     """What processor assembly hands back, without widening the Processors contract:
     the processors themselves, plus the one registry every v2-wired package
     registered through — its wired_specs() is the catalog of every registered
-    action."""
+    action — and the services for internal callers that run without a request user."""
 
     processors: Processors
+    services: Services
     registry: ProcessorRegistry[Any]

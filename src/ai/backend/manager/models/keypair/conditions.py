@@ -256,37 +256,3 @@ class KeypairConditions:
             return KeyPairRow.last_used == dt
 
         return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(KeyPairRow.created_at)
-                .where(KeyPairRow.access_key == cursor_id)
-                .scalar_subquery()
-            )
-            return KeyPairRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(KeyPairRow.created_at)
-                .where(KeyPairRow.access_key == cursor_id)
-                .scalar_subquery()
-            )
-            return KeyPairRow.created_at > subquery
-
-        return inner

@@ -201,7 +201,7 @@ ignore = [
 "strawberry.experimental.pydantic.interface" = {msg = "Use gql_pydantic_interface from decorators.py."}
 
 [tool.ruff.lint.isort]
-known-first-party = ["ai.backend"]
+known-first-party = ["ai.backend", "bai_scenario"]
 known-local-folder = ["src"]
 known-third-party = ["alembic", "redis", "kubernetes"]
 split-on-trailing-comma = true

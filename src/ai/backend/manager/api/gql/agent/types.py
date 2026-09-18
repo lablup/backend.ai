@@ -361,6 +361,12 @@ class AgentNetworkInfoGQL:
 )
 class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the agent.",
+        ),
+    )
     uuid: UUID = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
@@ -368,7 +374,10 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
                 "Agent UUID. The agent's primary key is its name, so rows keyed on the "
                 "agent carry this instead."
             ),
-        )
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="entityId",
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use entityId.",
     )
     resource_info: AgentResourceGQL = gql_field(
         description="Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources."
@@ -656,11 +665,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             slot_name = item.slot_name
             node = AgentResourceSlotGQL(
                 id=_strawberry.ID(item.id),
+                field_id=item.field_id,
                 slot_name=slot_name,
                 capacity=Decimal(item.capacity),
                 used=Decimal(item.used),
             )
-            cursor = encode_cursor(slot_name)
+            cursor = encode_cursor(item.field_id)
             edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
 
         return AgentResourceConnectionGQL(

@@ -297,6 +297,7 @@ class TestContainerRegistryGQLFromPydantic:
         reg_id = uuid4()
         dto = ContainerRegistryNode(
             id=reg_id,
+            entity_id=reg_id,
             url="https://registry.example.com",
             registry_name="test-registry",
             type=ContainerRegistryType.DOCKER,
@@ -323,6 +324,7 @@ class TestContainerRegistryGQLFromPydantic:
     def test_from_pydantic_with_password_extra(self) -> None:
         dto = ContainerRegistryNode(
             id=uuid4(),
+            entity_id=uuid4(),
             url="https://registry.example.com",
             registry_name="test",
             type=ContainerRegistryType.HARBOR2,

@@ -9,7 +9,7 @@ from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
-from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -61,7 +61,7 @@ async def replicas(
         )
     )
     nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
-    edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+    edges = [ModelReplicaEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return ModelReplicaConnection(
         count=payload.total_count,
         edges=edges,

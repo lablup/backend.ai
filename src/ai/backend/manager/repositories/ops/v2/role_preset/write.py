@@ -7,23 +7,33 @@ no recorded preset is never touched.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from typing import ClassVar
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
-from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    GlobalEntityType,
+    RuntimeEntityID,
+)
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
+from ai.backend.manager.errors.role_preset import RolePresetScopeNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -31,10 +41,13 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scope_source import ScopeSource
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.permission.write import PermissionWriteOps
 
 # Derived roles re-synced per round trip; a preset may have one role per scope.
@@ -47,6 +60,7 @@ class RolePresetWriteOps(PermissionWriteOps):
     _scope_rows: ClassVar[Mapping[EntityType, type[ScopeSource]]] = {
         ContainerRegistryEntityType(): ContainerRegistryRow,
         DomainEntityType(): DomainRow,
+        GlobalEntityType(): GlobalEntityRow,
         ProjectEntityType(): ProjectRow,
         ResourceGroupEntityType(): ResourceGroupRow,
         UserEntityType(): UserRow,
@@ -70,6 +84,152 @@ class RolePresetWriteOps(PermissionWriteOps):
             await self._sync_roles(
                 preset, scope_type, granted, dict(roles[start : start + _SYNC_CHUNK_SIZE])
             )
+
+    async def provision_preset_roles(
+        self,
+        creator_preset_ids: Collection[RolePresetID],
+        preset_scopes: Mapping[RolePresetID, EntityIdentifier],
+    ) -> None:
+        """Point each preset of ``preset_scopes`` at its scope, give every scope in the graph
+        the role of each active preset it lacks, grant what each scope assigns on its own,
+        and grant a project's creator still on its roster the project's roles of
+        ``creator_preset_ids``."""
+        await self._set_preset_scopes(preset_scopes)
+        await self._ensure_preset_scopes_exist()
+        values: dict[EntityIdentifier, ScopeTemplateValue] = {}
+        for scope_type, scopes in (await self._graph_scopes()).items():
+            values.update(await self._scope_template_values(scope_type, scopes))
+        held = await self._preset_role_scopes()
+        await self._write_preset_roles([
+            spec
+            for spec in await self._preset_role_specs(values)
+            if (str(spec.role_preset_id), str(spec.entity)) not in held
+        ])
+        public_id = global_entity_id(GlobalEntityName.PUBLIC)
+        for user_id, domain_id in await self._users_by_domain():
+            await self._grant_auto_assign_roles([user_id, domain_id, public_id], user_id)
+        roster = await self._project_roster()
+        for user_id, project_id in roster:
+            await self._grant_auto_assign_roles([project_id], user_id)
+        await self._grant_creator_roles(roster, creator_preset_ids)
+
+    async def _set_preset_scopes(
+        self, preset_scopes: Mapping[RolePresetID, EntityIdentifier]
+    ) -> None:
+        if not preset_scopes:
+            return
+        presets = RolePresetRow.__table__
+        await self._sess.execute(
+            sa.update(presets)
+            .where(
+                presets.c.id == sa.bindparam("b_preset_id"),
+                presets.c.scope_type == sa.bindparam("b_scope_type"),
+            )
+            .values(scope_id=sa.bindparam("b_scope_id")),
+            [
+                {
+                    "b_preset_id": preset_id,
+                    "b_scope_type": str(scope.entity_type()),
+                    "b_scope_id": scope,
+                }
+                for preset_id, scope in preset_scopes.items()
+            ],
+        )
+
+    async def _ensure_preset_scopes_exist(self) -> None:
+        """Refuse an active preset whose scope has no virtual entity."""
+        missing = (
+            await self._sess.execute(
+                sa.select(RolePresetRow.name, RolePresetRow.scope_type, RolePresetRow.scope_id)
+                .outerjoin(
+                    VirtualEntityRow,
+                    sa.and_(
+                        VirtualEntityRow.entity_type == RolePresetRow.scope_type,
+                        VirtualEntityRow.entity_id == RolePresetRow.scope_id,
+                    ),
+                )
+                .where(
+                    RolePresetRow.scope_id.is_not(None),
+                    RolePresetRow.deleted.is_(False),
+                    VirtualEntityRow.id.is_(None),
+                )
+            )
+        ).all()
+        if missing:
+            raise RolePresetScopeNotFound(
+                "No virtual entity exists for the scope of "
+                + ", ".join(
+                    f"{name} ({scope_type} {scope_id})" for name, scope_type, scope_id in missing
+                )
+            )
+
+    async def _graph_scopes(self) -> dict[EntityType, list[EntityIdentifier]]:
+        """The domains, projects, users and global entities that have a virtual entity, by
+        type."""
+        rows = await self._sess.execute(
+            sa.select(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).where(
+                VirtualEntityRow.entity_type.in_([
+                    DomainEntityType(),
+                    ProjectEntityType(),
+                    UserEntityType(),
+                    GlobalEntityType(),
+                ])
+            )
+        )
+        scopes: dict[EntityType, list[EntityIdentifier]] = defaultdict(list)
+        for entity_type, entity_id in rows:
+            scopes[entity_type].append(RuntimeEntityID(entity_type, entity_id))
+        return scopes
+
+    async def _preset_role_scopes(self) -> set[tuple[str, str]]:
+        """The (preset, scope) pairs that already hold a role."""
+        rows = await self._sess.execute(
+            sa.select(RoleRow.role_preset_id, RoleRow.scope_id).where(
+                RoleRow.role_preset_id.is_not(None)
+            )
+        )
+        return {(str(preset_id), str(scope_id)) for preset_id, scope_id in rows}
+
+    async def _users_by_domain(self) -> list[tuple[UserID, DomainID]]:
+        rows = await self._sess.execute(
+            sa.select(UserRow.uuid, DomainRow.id).join(
+                DomainRow, DomainRow.name == UserRow.domain_name
+            )
+        )
+        return [(UserID(user_id), DomainID(domain_id)) for user_id, domain_id in rows]
+
+    async def _project_roster(self) -> list[tuple[UserID, ProjectID]]:
+        """Each user on a project's roster, with the project."""
+        rows = await self._sess.execute(user_scope_membership_query(ProjectEntityType()))
+        return [(UserID(user_id), ProjectID(project_id)) for user_id, project_id in rows]
+
+    async def _grant_creator_roles(
+        self,
+        roster: Collection[tuple[UserID, ProjectID]],
+        preset_ids: Collection[RolePresetID],
+    ) -> None:
+        if not preset_ids:
+            return
+        on_roster = {(str(user_id), str(project_id)) for user_id, project_id in roster}
+        rows = await self._sess.execute(
+            sa.select(ProjectRow.creator_id, ProjectRow.id, RoleRow.id)
+            .join(
+                RoleRow,
+                sa.and_(
+                    RoleRow.scope_type == ProjectEntityType(),
+                    RoleRow.scope_id == ProjectRow.id,
+                ),
+            )
+            .where(
+                ProjectRow.creator_id.is_not(None),
+                RoleRow.role_preset_id.in_(list(preset_ids)),
+            )
+        )
+        await self._bulk_insert_ignore_conflicts([
+            UserRoleRow(user_id=creator_id, role_id=role_id)
+            for creator_id, project_id, role_id in rows
+            if (str(creator_id), str(project_id)) in on_roster
+        ])
 
     async def _sync_roles(
         self,

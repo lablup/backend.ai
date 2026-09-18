@@ -52,6 +52,7 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
@@ -69,10 +70,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _get_idle_checker_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=IdleCheckerOrders.created_at(ascending=False),
-        backward_order=IdleCheckerOrders.created_at(ascending=True),
-        forward_condition_factory=IdleCheckerConditions.by_cursor_forward,
-        backward_condition_factory=IdleCheckerConditions.by_cursor_backward,
-        tiebreaker_order=IdleCheckerOrders.id(ascending=True),
+        cursor_column=IdleCheckerRow.id,
     )
 
 
@@ -190,6 +188,7 @@ class IdleCheckerAdapter(BaseAdapter):
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:
         return IdleCheckerNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             checker_type=IdleCheckerTypeDTO(data.checker_type.value),

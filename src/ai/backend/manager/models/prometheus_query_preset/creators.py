@@ -15,13 +15,15 @@ from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
     PrometheusQueryPresetRow,
 )
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class PrometheusQueryPresetCreator(
-    GlobalEntityCreator[PrometheusQueryPresetRow, PrometheusQueryPresetData]
+    CreatedInGlobal[PrometheusQueryPresetRow],
+    EntityCreator[PrometheusQueryPresetRow, PrometheusQueryPresetData],
 ):
     """Creator for a query preset in the global catalog."""
 

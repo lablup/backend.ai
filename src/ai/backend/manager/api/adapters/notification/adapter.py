@@ -144,20 +144,14 @@ def _spec_input_to_domain(spec: NotificationChannelSpecInputDTO) -> WebhookSpec 
 def _channel_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=NotificationChannelOrders.created_at(ascending=False),
-        backward_order=NotificationChannelOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
-        backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
-        tiebreaker_order=NotificationChannelRow.id.asc(),
+        cursor_column=NotificationChannelRow.id,
     )
 
 
 def _rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=NotificationRuleOrders.created_at(ascending=False),
-        backward_order=NotificationRuleOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
-        backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
-        tiebreaker_order=NotificationRuleRow.id.asc(),
+        cursor_column=NotificationRuleRow.id,
     )
 
 
@@ -439,6 +433,7 @@ class NotificationAdapter(BaseAdapter):
                 raise InvalidNotificationSpec(f"Unsupported channel type: {data.channel_type}")
         return NotificationChannelNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             channel_type=NotificationChannelTypeDTO(data.channel_type.value),
@@ -454,6 +449,7 @@ class NotificationAdapter(BaseAdapter):
         """Convert NotificationRuleData to NotificationRuleNode DTO."""
         return NotificationRuleNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             rule_type=NotificationRuleTypeDTO(data.rule_type.value),

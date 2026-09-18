@@ -12,16 +12,6 @@ from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
-from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.deployment import (
-    APlaceAndACaller,
-    APlaceForDeployments,
-    AProjectGrantedElsewhere,
-    TheNewDeploymentNode,
-)
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -45,6 +35,16 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.deployment import (
+    APlaceAndACaller,
+    APlaceForDeployments,
+    AProjectGrantedElsewhere,
+    TheNewDeploymentNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.steps import run_scenario
 
 MADE = "serving"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"

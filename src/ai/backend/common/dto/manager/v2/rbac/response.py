@@ -5,12 +5,14 @@ Response DTOs for RBAC DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     PermissionBitDTO,
@@ -30,11 +32,14 @@ __all__ = (
     "BulkRemoveRolePermissionsPayload",
     "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
+    "CreateRoleInvitationPayload",
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
     "EntityActionInfo",
     "EntityOperationCombinationInfo",
+    "MyAtomicBulkScopePermissionsPayload",
+    "MyScopePermissionsPayload",
     "OperationInfo",
     "PermissionNode",
     "PurgeRolePayload",
@@ -44,6 +49,7 @@ __all__ = (
     "RoleNode",
     "ScopeEntityCombinationInfo",
     "ScopeEntityOperationCombinationInfo",
+    "ScopeEntityPermission",
     "UpdateRolePayload",
 )
 
@@ -52,6 +58,9 @@ class RoleNode(BaseResponseModel):
     """Node model representing a role entity."""
 
     id: UUID = Field(description="Role ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the role. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Role name")
     description: str | None = Field(default=None, description="Role description")
     source: RoleSourceDTO = Field(description="Role source")
@@ -92,6 +101,12 @@ class PurgeRolePayload(BaseResponseModel):
     """Payload for role purge mutation result."""
 
     id: UUID = Field(description="ID of the purged role")
+
+
+class CreateRoleInvitationPayload(BaseResponseModel):
+    """Payload of the removed role invitation creation. Never produced."""
+
+    items: list[Any] = Field(description="Created role invitations")
 
 
 class DeletePermissionPayload(BaseResponseModel):
@@ -212,6 +227,9 @@ class PermissionNode(BaseResponseModel):
     """Node representing a scoped RBAC permission."""
 
     id: UUID = Field(description="Permission ID")
+    field_id: UUID = Field(
+        description=f"UUID of the permission row. Added in {NEXT_RELEASE_VERSION}.",
+    )
     role_id: UUID = Field(description="Role this permission belongs to")
     entity_type: EntityType = Field(description="Entity element type")
     permission: PermissionBitDTO = Field(description="The permission bit the row holds")
@@ -284,4 +302,29 @@ class ScopeEntityOperationCombinationInfo(BaseResponseModel):
     scope_type: EntityType = Field(description="Scope element type")
     entities: list[EntityActionInfo] = Field(
         description="Entities and their valid operations within this scope"
+    )
+
+
+class ScopeEntityPermission(BaseResponseModel):
+    """The bits the caller holds on one entity type within one scope."""
+
+    scope_type: str = Field(description="Type of the scope, echoed from the target.")
+    scope_id: UUID = Field(description="ID of the scope, echoed from the target.")
+    entity_type: str = Field(description="Entity type, echoed from the target.")
+    permissions: list[PermissionBitDTO] = Field(
+        description="The bits the caller holds, empty when it holds none."
+    )
+
+
+class MyScopePermissionsPayload(BaseResponseModel):
+    """Payload for the caller's permissions on one scope and entity type."""
+
+    item: ScopeEntityPermission = Field(description="The answer for the named target.")
+
+
+class MyAtomicBulkScopePermissionsPayload(BaseResponseModel):
+    """Payload for the caller's permissions on several scopes and entity types."""
+
+    items: list[ScopeEntityPermission] = Field(
+        description="One answer per target, in the order the targets were given."
     )

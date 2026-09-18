@@ -5,10 +5,10 @@ from typing import (
     Any,
 )
 
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationState,
 )
-from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 
 
 @dataclass
@@ -25,7 +25,7 @@ class VFolderInvitationInfo:
     invitee_user_email: str
     inviter_user_email: str
     inviter_username: str | None
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
     created_at: datetime
     modified_at: datetime | None
     status: VFolderInvitationState

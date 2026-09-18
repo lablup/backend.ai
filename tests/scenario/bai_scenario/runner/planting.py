@@ -12,6 +12,11 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from ai.backend.common.data.entity.types import FieldData
+from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.user.types import UserData
+from ai.backend.testutils.scenario_steps import Told
 from bai_scenario.seeds.ops import SeedOps
 from bai_scenario.seeds.seeder import (
     Laid,
@@ -27,12 +32,6 @@ from bai_scenario.seeds.seeder import (
     SeedShareAcceptance,
     lay,
 )
-
-from ai.backend.common.data.entity.types import FieldData
-from ai.backend.manager.data.entity_share.types import EntityShareData
-from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Told
 
 
 class SeedingSession:

@@ -12,7 +12,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupName,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
@@ -232,13 +235,14 @@ class TestAllowedResourceGroupsForProject:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
+        resource_group_name: ResourceGroupName,
     ) -> None:
-        """Initially, a project has no allowed resource groups."""
+        """Initially, a project reaches only what its domain allows."""
         result = await admin_v2_registry.resource_group.get_allowed_resource_groups_for_project(
             group_fixture
         )
         assert isinstance(result, AllowedResourceGroupsPayload)
-        assert result.items == []
+        assert result.items == [resource_group_name]
 
     async def test_add_and_get_allowed(
         self,

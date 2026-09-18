@@ -96,6 +96,12 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Domain uuid. The name lives at basicInfo.name.")
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the domain.",
+        ),
+    )
     basic_info: DomainBasicInfoGQL = gql_field(
         description="Basic domain information including name and description."
     )
@@ -103,15 +109,6 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     lifecycle: DomainLifecycleInfoGQL = gql_field(
         description="Lifecycle information including activation status and timestamps."
     )
-
-    @gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Domain uuid as a plain scalar, without the Relay global-id encoding.",
-        )
-    )  # type: ignore[misc]
-    def entity_id(self) -> uuid.UUID:
-        return uuid.UUID(str(self.id))
 
     @gql_field(
         description="Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used)."

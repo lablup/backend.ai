@@ -281,32 +281,6 @@ class EntityLabelConditions:
 
         return inner
 
-    # --- cursor pagination conditions ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(EntityLabelRow.created_at)
-                .where(EntityLabelRow.id == cursor_id)
-                .scalar_subquery()
-            )
-            return EntityLabelRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(EntityLabelRow.created_at)
-                .where(EntityLabelRow.id == cursor_id)
-                .scalar_subquery()
-            )
-            return EntityLabelRow.created_at > subquery
-
-        return inner
-
 
 class EntityLabelOrders:
     """Query orders for labels."""
