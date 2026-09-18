@@ -122,8 +122,14 @@ class ScratchConfig:
         """Write the record beside `recovery.json`; `commit()` puts it in place in one rename.
         The config directory is the kernel's own and is never made here: absent, this raises
         `FileNotFoundError`, which means the kernel has been destroyed."""
+        serialized = data.model_dump_json()
         final_path = self._json_recovery_file_path()
         staged_path = final_path.with_name(f"{final_path.name}.{uuid.uuid4().hex}.tmp")
-        async with aiofiles.open(staged_path, "w") as file:
-            await file.write(data.model_dump_json())
+        try:
+            async with aiofiles.open(staged_path, "w") as file:
+                await file.write(serialized)
+        except BaseException:
+            # BaseException: a cancelled save must not leave its half-written file either.
+            staged_path.unlink(missing_ok=True)
+            raise
         return StagedRecoveryData(staged_path=staged_path, final_path=final_path)
