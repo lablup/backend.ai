@@ -1,7 +1,7 @@
 ---
 name: resource-policy-adapter-scenarios
 type: reference
-description: what the resource policy adapter guarantees, as scenarios, one chapter per policy — the project and keypair policies so far; the tests in tests/scenario/bai_scenario/manager/resource_policy match these one for one
+description: what the resource policy adapter guarantees, as scenarios, one chapter per policy — the project, keypair and user policies; the tests in tests/scenario/bai_scenario/manager/resource_policy match these one for one
 scope: src/ai/backend/manager/api/adapters/resource_policy
 keywords: [resource policy, keypair resource policy, user resource policy, project resource policy, scenario, adapter, superadmin, lookup, scope]
 generated:
@@ -191,6 +191,74 @@ status: draft
 여부를 따른다. 기본 키페어가 비활성인 상황과 활성 키페어가 없는 상황은 비활성 사용자로
 구성한다.
 
+## 사용자 정책
+
+생성할 때 생략할 수 있는 항목은 `max_concurrent_logins` 값뿐이고, 수정할 때 비울 수 있는 항목도
+그것뿐이다. 자기 정책 조회는 사용자 행이 가리키는 정책을 그대로 읽는다.
+
+### 생성
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 모든 값을 지정해 생성한다 | 정책 없음 | 생성 | 지정한 값이 그대로 담긴 노드 전체 |
+| `max_concurrent_logins` 값을 생략하고 생성한다 | 정책 없음 | `max_concurrent_logins` 없이 생성 | 그 필드가 비어 있는 노드 전체 |
+| 이미 사용 중인 이름으로 생성한다 | 그 이름의 정책이 있음 | 생성 | 이름 중복으로 거부 |
+| 슈퍼관리자가 아닌 사용자가 생성한다 | 권한 없음 | 생성 | 역할 부족으로 거부 |
+| 모니터 역할 사용자가 생성한다 | 모니터 역할 | 생성 | 역할 부족으로 거부 |
+| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화 | 생성 | 역할 부족으로 거부 |
+
+`max_quota_scope_size` 값은 사람이 읽기 쉬운 표기("1g")로 받고, 정확한 바이트 수와 읽기 쉬운
+표기 둘 다로 응답한다.
+
+### 이름으로 조회
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 이름으로 조회한다 | 그 이름의 정책이 있음 | 이름으로 조회 | 그 정책 전체 |
+| 아무 권한도 없는 사용자가 조회한다 | 같은 정책이 있음 | 이름으로 조회 | 정책을 찾을 수 없다는 이유로 거부 |
+| 슈퍼관리자가 없는 이름으로 조회한다 | 다른 정책만 있음 | 이름으로 조회 | 대상을 찾을 수 없어 거부 |
+| 권한 검사를 끄면 권한 없이도 조회할 수 있다 | 권한 검사 비활성화, 권한 없음 | 이름으로 조회 | 그 정책 전체 |
+
+### 검색
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 필터 없이 검색한다 | 정책 여럿이 있음 | 전체 검색 | 미리 만들어 둔 정책만 빠짐없이 반환된다 |
+| 이름 필터로 검색한다 | 이름이 다른 정책 여럿 | 이름 필터 검색 | 그 이름의 정책만 반환된다 |
+| 모니터 역할 사용자가 검색한다 | 모니터 역할, 정책 하나 | 전체 검색 | 슈퍼관리자와 같은 응답 |
+| 슈퍼관리자가 아닌 사용자가 검색한다 | 권한 없음 | 전체 검색 | 역할 부족으로 거부 |
+
+### 수정
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 한도 하나만 수정한다 | 그 정책이 있음 | `max_vfolder_count` 수정 | 그 한도는 새 값, 나머지는 그대로 |
+| 값을 하나도 지정하지 않는다 | 그 정책이 있음 | 빈 수정 | 아무것도 바뀌지 않은 노드 |
+| 비울 수 있는 항목을 비운다 | `max_concurrent_logins` 값이 설정된 정책 | `max_concurrent_logins` 값을 비우는 수정 | 그 항목이 비어 있는 노드 |
+| 비울 수 없는 항목을 비우려 한다 | 그 정책이 있음 | `max_vfolder_count` 값을 비우는 수정 | 아무것도 바뀌지 않은 노드 |
+| 아무 권한도 없는 사용자가 수정한다 | 같은 정책이 있음 | 한도 수정 | 정책을 찾을 수 없다는 이유로 거부 |
+| 슈퍼관리자가 없는 이름을 수정한다 | 다른 정책만 있음 | 한도 수정 | 대상을 찾을 수 없어 거부 |
+
+### 삭제
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 아무도 사용하지 않는 정책을 삭제한다 | 어느 사용자도 사용하지 않는 정책이 있음 | 삭제 | 삭제한 이름을 담은 응답. 이어서 검색하면 없다 |
+| 아직 사용 중인 정책을 삭제한다 | 그 정책을 사용하는 사용자가 있음 | 삭제 | 아직 참조 중이라는 이유로 거부 |
+| 아무 권한도 없는 사용자가 삭제한다 | 같은 정책이 있음 | 삭제 | 정책을 찾을 수 없다는 이유로 거부 |
+| 슈퍼관리자가 없는 이름을 삭제한다 | 다른 정책만 있음 | 삭제 | 대상을 찾을 수 없어 거부 |
+
+### 자기 정책 조회
+
+요청 본문이 없고, 호출자 정보만으로 정책을 찾는다. 사용자 행은 정책 이름을 비워 둘 수 없으므로
+사용자가 있으면 정책도 반드시 있다. 그래서 대상을 찾을 수 없어 거부되는 시나리오가 없다.
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 읽기 권한을 받은 사용자가 자기 정책을 조회한다 | 정책 하나, 그 정책이 할당된 사용자, 그 사용자 자신의 스코프에 사용자 정책 읽기 권한 있음 | 내 사용자 정책 조회 | 그 정책 전체 |
+| 읽기 권한이 없는 사용자가 자기 정책을 조회한다 | 같은 사용자, 권한 없음 | 내 사용자 정책 조회 | 권한 부족으로 거부 |
+| 권한 검사를 끄면 권한 없이도 자기 정책을 조회할 수 있다 | 권한 검사 비활성화, 권한 없음 | 내 사용자 정책 조회 | 그 정책 전체 |
+
 ## 아직 적지 않은 것
 
 프로젝트 정책의 `admin_create_project_resource_policy`, `admin_get_project_resource_policy`,
@@ -198,8 +266,11 @@ status: draft
 `admin_delete_project_resource_policy`와 키페어 정책의 `admin_create_keypair_resource_policy`,
 `admin_get_keypair_resource_policy`, `admin_search_keypair_resource_policies`,
 `admin_update_keypair_resource_policy`, `admin_delete_keypair_resource_policy`,
-`get_my_keypair_resource_policy`는 모두 위에 적혀 있다. 사용자 정책의 호출은 아직 절이 없다.
-실행 결과가 그 목록을 함께 출력한다.
+`get_my_keypair_resource_policy`와 사용자 정책의 `admin_create_user_resource_policy`,
+`admin_get_user_resource_policy`, `admin_search_user_resource_policies`,
+`admin_update_user_resource_policy`, `admin_delete_user_resource_policy`,
+`get_my_user_resource_policy`는 모두 위에 적혀 있다. 세 정책 모두 절이 있고, 절이 없는 호출은
+없다.
 
 실행 결과에 포함되는 `batch_load_fields`는 모든 어댑터가 물려받는 공통 호출이고, 이 어댑터는
 사용하지 않는다.
