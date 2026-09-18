@@ -395,9 +395,7 @@ SCENARIOS: list[ReadingStep] = [
     MyFragmentOverridesTheDomains(),
     TheDomainsFragmentOverridesThePublic(),
     AFlippedRankLetsTheDomainWin(),
-    # TODO(BA-7934): the domain visibility reaches every fragment its users own, so
-    # another user's fragment merges into mine until the condition is scoped.
-    # AnotherUsersFragmentStaysOut(),
+    AnotherUsersFragmentStaysOut(),
     AnotherDomainsFragmentStaysOut(),
     SeveralNamesAnswerInRequestOrder(),
     ANameAskedTwiceAnswersTwice(),
