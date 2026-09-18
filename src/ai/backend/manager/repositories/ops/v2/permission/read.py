@@ -39,7 +39,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 
-_ROLE_HELD_BITS: Mapping[UserRole, Permission] = {
+_PRIVILEGED_USER_ROLE_BITS: Mapping[UserRole, Permission] = {
     UserRole.SUPERADMIN: Permission.full(),
     UserRole.MONITOR: Permission.READ,
 }
@@ -129,17 +129,19 @@ class PermissionReadOps(V2ReadOps):
         """
         if not keys:
             return {}
-        by_role = await self._held_by_role({key.user_id for key in keys})
+        privileged_bits = await self._get_privileged_user_permission_bits({
+            key.user_id for key in keys
+        })
         result: dict[OwnCheckKey, Permission] = {}
-        role_keys = [key for key in keys if key.user_id in by_role]
-        provisioned = await self._provisioned([key.entity for key in role_keys])
-        for key in role_keys:
+        privileged_keys = [key for key in keys if key.user_id in privileged_bits]
+        provisioned = await self._provisioned([key.entity for key in privileged_keys])
+        for key in privileged_keys:
             result[key] = self._get_permission_bits_if_provisioned(
-                key.entity, provisioned, by_role[key.user_id]
+                key.entity, provisioned, privileged_bits[key.user_id]
             )
         groups: defaultdict[_GroupKey, list[OwnCheckKey]] = defaultdict(list)
         for key in keys:
-            if key.user_id in by_role:
+            if key.user_id in privileged_bits:
                 continue
             groups[
                 _GroupKey(
@@ -164,17 +166,19 @@ class PermissionReadOps(V2ReadOps):
         within a scope that has a node."""
         if not keys:
             return {}
-        by_role = await self._held_by_role({key.user_id for key in keys})
+        privileged_bits = await self._get_privileged_user_permission_bits({
+            key.user_id for key in keys
+        })
         result: dict[GovernCheckKey, Permission] = {}
-        role_keys = [key for key in keys if key.user_id in by_role]
-        provisioned = await self._provisioned([key.scope for key in role_keys])
-        for key in role_keys:
+        privileged_keys = [key for key in keys if key.user_id in privileged_bits]
+        provisioned = await self._provisioned([key.scope for key in privileged_keys])
+        for key in privileged_keys:
             result[key] = self._get_permission_bits_if_provisioned(
-                key.scope, provisioned, by_role[key.user_id]
+                key.scope, provisioned, privileged_bits[key.user_id]
             )
         groups: defaultdict[_GroupKey, list[GovernCheckKey]] = defaultdict(list)
         for key in keys:
-            if key.user_id in by_role:
+            if key.user_id in privileged_bits:
                 continue
             groups[
                 _GroupKey(
@@ -190,7 +194,9 @@ class PermissionReadOps(V2ReadOps):
                 result[key] = granted.get(key.scope, Permission.NONE)
         return result
 
-    async def _held_by_role(self, user_ids: Collection[UserID]) -> Mapping[uuid.UUID, Permission]:
+    async def _get_privileged_user_permission_bits(
+        self, user_ids: Collection[UserID]
+    ) -> Mapping[uuid.UUID, Permission]:
         """The bits a user's role alone grants on every provisioned entity: every bit
         for a superadmin, the read bit for a monitor. Every other user is absent."""
         rows = await self._sess.execute(
@@ -199,7 +205,7 @@ class PermissionReadOps(V2ReadOps):
                 UserRow.role.in_([UserRole.SUPERADMIN, UserRole.MONITOR]),
             )
         )
-        return {uuid.UUID(int=row.uuid.int): _ROLE_HELD_BITS[row.role] for row in rows}
+        return {uuid.UUID(int=row.uuid.int): _PRIVILEGED_USER_ROLE_BITS[row.role] for row in rows}
 
     async def _provisioned(
         self, entities: Sequence[EntityIdentifier]
