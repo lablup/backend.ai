@@ -77,15 +77,17 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             recovery_data = KernelRecoveryScratchData.from_kernel_recovery_data(
                 original_recovery_data
             )
-            # The config directory is the kernel's own, made when it was created and removed with
-            # it. Never re-made here: a save that outran a destroy would otherwise leave an empty
-            # scratch directory behind for a kernel that is gone.
             try:
-                await config_mgr.save_json_recovery_data(recovery_data, create_config_dir=False)
+                staged = await config_mgr.stage_json_recovery_data(recovery_data)
+                # A restart re-registers the same id with a new kernel object and keeps the
+                # directory: the snapshot's object must still be the registered one, checked
+                # with no await between the check and the rename.
+                if data.get(kernel_id) is kernel:
+                    staged.commit()
+                else:
+                    staged.discard()
+                    log.debug("Skipped saving kernel {}: replaced while being saved", kernel_id)
             except FileNotFoundError:
-                log.debug(
-                    "Skipped saving kernel {}: its scratch config directory was removed",
-                    kernel_id,
-                )
+                log.debug("Skipped saving kernel {}: its scratch directory is gone", kernel_id)
             # resource spec and environ are not saved here, as they are saved when the kernel is created.
         log.debug("Saved kernel registry to scratch root {}", str(self._scratch_root))
