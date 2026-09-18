@@ -11,10 +11,12 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.testutils.scenario_steps import Given
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.testutils.scenario_steps import Answered, Given, Refused, Same, Then, Verdict
 from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
@@ -222,3 +224,64 @@ class SomeoneWithNoGrant(Given[Any, AFolderMakerAndTheirDomain]):
         )
         caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         return AFolderMakerAndTheirDomain(seeding.made(domain), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class TwoFoldersAndAReaderOfOne:
+    """자기 개인 폴더와 남의 개인 폴더, 그리고 자기 것만 읽을 수 있는 사람."""
+
+    mine: VFolderData
+    theirs: VFolderData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class SomeoneWithTheirOwnFolderBesideAnothers(Given[Any, TwoFoldersAndAReaderOfOne]):
+    """자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자와, 그 사람의 폴더, 그리고 남의 폴더."""
+
+    @override
+    def describe(self) -> str:
+        return "자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명과, 남의 개인 폴더 하나"
+
+    @override
+    async def lay(self, seeding: Any) -> TwoFoldersAndAReaderOfOne:
+        domain = await seeding.creating(
+            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        reader = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        mine = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), reader)
+        own = await seeding.personal_project_of(reader)
+        await seeding.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), reader))
+        other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        theirs = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), other)
+        return TwoFoldersAndAReaderOfOne(
+            seeding.made(mine), seeding.made(theirs), seeding.made(reader)
+        )
+
+
+@dataclass(frozen=True)
+class MineAnswersItsBitsTheirsIsRefused(
+    Then[TwoFoldersAndAReaderOfOne, list[list[PermissionBitDTO] | Exception]]
+):
+    """자기 폴더는 받은 권한 비트로, 남의 폴더는 거부로 답한다."""
+
+    @override
+    def says(self) -> str:
+        return "자기 폴더는 읽기 비트로, 남의 폴더는 권한 부족의 거부로, 요청한 순서대로 답한다"
+
+    @override
+    def look(
+        self,
+        laid: TwoFoldersAndAReaderOfOne,
+        answered: Answered[list[list[PermissionBitDTO] | Exception]],
+    ) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        mine = items[0] if len(items) > 0 else None
+        theirs = items[1] if len(items) > 1 else None
+        return [
+            Same("len(items)", len(items), 2),
+            Same("items[0]", mine, [PermissionBitDTO.READ]),
+            Refused(NotEnoughPermission, theirs if isinstance(theirs, Exception) else None),
+        ]

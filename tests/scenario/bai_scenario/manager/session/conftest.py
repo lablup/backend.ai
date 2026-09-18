@@ -1,8 +1,9 @@
 """The session adapter, assembled for one row.
 
-A session read answers through a service whose constructor demands eleven dependencies.
-Three of them run against the real database and the real Valkey server; the other eight
-are named unwired, so a row that reaches one fails saying which.
+A session call answers through a service whose constructor demands eleven dependencies.
+Three of them run against the real database and the real Valkey server, the event
+producer a terminate broadcasts through only records, and the other seven are named
+unwired, so a row that reaches one fails saying which.
 """
 
 from __future__ import annotations
@@ -18,7 +19,6 @@ from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -65,6 +65,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from bai_scenario.fakes.events import RecordingEventProducer
 from bai_scenario.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
     FakeStorageSessionManager,
@@ -79,9 +80,16 @@ def storage() -> FakeStorageProxyManagerFacingClient:
 
 
 @pytest.fixture
-def fakes(storage: FakeStorageProxyManagerFacingClient) -> Sequence[object]:
+def events() -> RecordingEventProducer:
+    return RecordingEventProducer()
+
+
+@pytest.fixture
+def fakes(
+    storage: FakeStorageProxyManagerFacingClient, events: RecordingEventProducer
+) -> Sequence[object]:
     """What a ``then`` may read off the outside."""
-    return (storage,)
+    return (storage, events)
 
 
 @pytest.fixture
@@ -91,6 +99,7 @@ async def adapter(
     validators: V2ActionValidators,
     monitors: ActionMonitors,
     storage: FakeStorageProxyManagerFacingClient,
+    events: RecordingEventProducer,
     valkey: ScenarioValkey,
 ) -> SessionAdapter:
     provider = V2DBOpsProvider(engine)
@@ -126,7 +135,7 @@ async def adapter(
                     repository=scheduler_repository,
                     config_provider=config,
                     storage_manager=FakeStorageSessionManager({"local": storage}),
-                    event_producer=unwired(EventProducer, "nothing here waits on the event"),
+                    event_producer=events,
                     valkey_schedule=valkey.schedule,
                     network_plugin_ctx=unwired(
                         NetworkPluginContext, "no session asks for a network"

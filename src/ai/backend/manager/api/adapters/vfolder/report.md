@@ -2,7 +2,43 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-Not exercised by any scenario: admin_search, batch_load_by_ids, batch_load_fields, batch_load_permissions, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get_folder_usage, list_files, list_mount_policies, mkdir, move_file, purge, restore, scoped_search, set_mount_policy, unset_mount_policy.
+Not exercised by any scenario: admin_search, batch_load_by_ids, batch_load_fields, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get_folder_usage, list_files, list_mount_policies, mkdir, move_file, purge, restore, scoped_search, set_mount_policy, unset_mount_policy.
+
+### loading
+
+#### [loading-permissions-answers-the-own-folder-and-refuses-the-others-alone](/tests/scenario/bai_scenario/manager/vfolder/test_loading.py) — pass
+
+자기 폴더와 남의 폴더의 권한을 한 번에 읽으면, 자기 폴더는 읽기 비트로, 남의 폴더는 권한 부족의 거부로 답하고 호출 자체는 거부되지 않는다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명과, 남의 개인 폴더 하나
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+  - 개인 폴더 folder-2: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+
+When
+
+- VFolderAdapter.batch_load_permissions — user-1이 folder-1(와)과 folder-2의 권한을 한 번에 읽음
+
+Then
+
+- 자기 폴더는 읽기 비트로, 남의 폴더는 권한 부족의 거부로, 요청한 순서대로 답한다
+  - len(items) = 2
+  - items[0] = [<PermissionBitDTO.READ: 'read'>]
+  - 거부: NotEnoughPermission
 
 ### reaching
 
