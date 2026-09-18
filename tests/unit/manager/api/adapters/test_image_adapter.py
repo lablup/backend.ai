@@ -155,8 +155,12 @@ class _OffsetCase:
             expected=OffsetPagination(limit=3, offset=2),
         ),
         _OffsetCase(
+            input=AdminSearchImagesInput(offset=2),
+            expected=OffsetPagination(limit=50, offset=2),
+        ),
+        _OffsetCase(
             input=AdminSearchImagesInput(),
-            expected=OffsetPagination(limit=10, offset=0),
+            expected=OffsetPagination(limit=50, offset=0),
         ),
     ],
     ids=lambda case: f"limit-{case.expected.limit}-offset-{case.expected.offset}",

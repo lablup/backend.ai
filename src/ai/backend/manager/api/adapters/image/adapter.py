@@ -86,6 +86,8 @@ from ai.backend.manager.services.image.actions.update_image_by_id import UpdateI
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
+DEFAULT_PAGINATION_LIMIT = 50
+
 
 @lru_cache(maxsize=1)
 def _get_image_pagination_spec() -> PaginationSpec:
@@ -149,6 +151,12 @@ class ImageAdapter(BaseAdapter):
         """Search images with admin scope, by cursor or by offset as the request names."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
+        names_cursor = any(
+            value is not None for value in (input.first, input.after, input.last, input.before)
+        )
+        limit = input.limit
+        if limit is None and not names_cursor:
+            limit = DEFAULT_PAGINATION_LIMIT
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
@@ -157,7 +165,7 @@ class ImageAdapter(BaseAdapter):
             after=input.after,
             last=input.last,
             before=input.before,
-            limit=input.limit,
+            limit=limit,
             offset=input.offset,
         )
 

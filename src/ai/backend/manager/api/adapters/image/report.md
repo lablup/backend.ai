@@ -1458,7 +1458,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_images_gql — user-1이 한 레지스트리로 좁혀 한 페이지에 10개씩 검색함
+- ImageAdapter.admin_search_images_gql — user-1이 한 레지스트리로 좁혀 한 페이지에 50개씩 검색함
 
 Then
 
@@ -1625,7 +1625,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 한 페이지에 10개씩 검색함
+- ImageAdapter.admin_search — user-1이 한 페이지에 50개씩 검색함
 
 Then
 
@@ -1684,7 +1684,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 image-0-1 이름으로 한 페이지에 10개씩 검색함
+- ImageAdapter.admin_search — user-1이 image-0-1 이름으로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -1713,7 +1713,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 ALIVE 상태로 한 페이지에 10개씩 검색함
+- ImageAdapter.admin_search — user-1이 ALIVE 상태로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -1749,13 +1749,13 @@ Then
 - 거부된다
   - 거부: InvalidGraphQLParameters
 
-#### [omitting-the-page-size-answers-with-ten-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [omitting-the-page-size-answers-with-fifty-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
-슈퍼관리자가 페이지 크기를 생략하고 검색하면, 10개까지만 반환되고 다음 페이지가 있다고 알린다
+슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다
 
 Given
 
-- 레지스트리 1개와 그 안의 이미지 11개, superadmin 1명
+- 레지스트리 1개와 그 안의 이미지 51개, superadmin 1명
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-0-1: x86_64 이미지
@@ -1769,6 +1769,46 @@ Given
   - 이미지 image-8-1: x86_64 이미지
   - 이미지 image-9-1: x86_64 이미지
   - 이미지 image-10-1: x86_64 이미지
+  - 이미지 image-11-1: x86_64 이미지
+  - 이미지 image-12-1: x86_64 이미지
+  - 이미지 image-13-1: x86_64 이미지
+  - 이미지 image-14-1: x86_64 이미지
+  - 이미지 image-15-1: x86_64 이미지
+  - 이미지 image-16-1: x86_64 이미지
+  - 이미지 image-17-1: x86_64 이미지
+  - 이미지 image-18-1: x86_64 이미지
+  - 이미지 image-19-1: x86_64 이미지
+  - 이미지 image-20-1: x86_64 이미지
+  - 이미지 image-21-1: x86_64 이미지
+  - 이미지 image-22-1: x86_64 이미지
+  - 이미지 image-23-1: x86_64 이미지
+  - 이미지 image-24-1: x86_64 이미지
+  - 이미지 image-25-1: x86_64 이미지
+  - 이미지 image-26-1: x86_64 이미지
+  - 이미지 image-27-1: x86_64 이미지
+  - 이미지 image-28-1: x86_64 이미지
+  - 이미지 image-29-1: x86_64 이미지
+  - 이미지 image-30-1: x86_64 이미지
+  - 이미지 image-31-1: x86_64 이미지
+  - 이미지 image-32-1: x86_64 이미지
+  - 이미지 image-33-1: x86_64 이미지
+  - 이미지 image-34-1: x86_64 이미지
+  - 이미지 image-35-1: x86_64 이미지
+  - 이미지 image-36-1: x86_64 이미지
+  - 이미지 image-37-1: x86_64 이미지
+  - 이미지 image-38-1: x86_64 이미지
+  - 이미지 image-39-1: x86_64 이미지
+  - 이미지 image-40-1: x86_64 이미지
+  - 이미지 image-41-1: x86_64 이미지
+  - 이미지 image-42-1: x86_64 이미지
+  - 이미지 image-43-1: x86_64 이미지
+  - 이미지 image-44-1: x86_64 이미지
+  - 이미지 image-45-1: x86_64 이미지
+  - 이미지 image-46-1: x86_64 이미지
+  - 이미지 image-47-1: x86_64 이미지
+  - 이미지 image-48-1: x86_64 이미지
+  - 이미지 image-49-1: x86_64 이미지
+  - 이미지 image-50-1: x86_64 이미지
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
@@ -1782,8 +1822,8 @@ When
 Then
 
 - 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
-  - length = 10
-  - total_count = 11
+  - length = 50
+  - total_count = 51
   - has_next_page = True
   - has_previous_page = False
 
@@ -1895,7 +1935,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 한 페이지에 10개씩 검색함
+- ImageAdapter.admin_search — user-1이 한 페이지에 50개씩 검색함
 
 Then
 
