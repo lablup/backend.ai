@@ -24,6 +24,10 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -31,9 +35,9 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.login_client_type.searchers import LoginClientTypeSearcher
 from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
@@ -51,6 +55,13 @@ from ai.backend.manager.services.login_client_type.actions.update import (
 )
 from ai.backend.manager.services.login_client_type.processors import LoginClientTypeProcessors
 from ai.backend.manager.types import OptionalState, TriState
+
+
+def _pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=LoginClientTypeOrders.created_at(ascending=False),
+        cursor_column=LoginClientTypeRow.id,
+    )
 
 
 class LoginClientTypeAdapter(BaseAdapter):
@@ -97,8 +108,32 @@ class LoginClientTypeAdapter(BaseAdapter):
         return self._data_to_node(action_result.data)
 
     async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
-        """Search login client types with filter/order/pagination."""
-        searcher = self._build_search_searcher(input)
+        """Search login client types, by cursor or by offset as the request names."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        limit = input.limit
+        if limit is None and not options.has_cursor:
+            limit = DEFAULT_PAGE_LIMIT
+        searcher = self._build_searcher(
+            LoginClientTypeSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=limit,
+            offset=input.offset,
+        )
 
         action_result = await self._login_client_type.public_search.run(
             SearchLoginClientTypesAction(searcher=searcher)
@@ -147,15 +182,6 @@ class LoginClientTypeAdapter(BaseAdapter):
         return DeleteLoginClientTypePayload(id=action_result.data.id)
 
     # --- Private helpers ---
-
-    def _build_search_searcher(self, input: SearchLoginClientTypesInput) -> LoginClientTypeSearcher:
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGE_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-        return LoginClientTypeSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
