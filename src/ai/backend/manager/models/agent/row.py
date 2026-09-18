@@ -115,12 +115,6 @@ class AgentRow(Base):
             available[resource_row.slot_name] = resource_row.capacity
         return available
 
-    def actual_occupied_slots(self) -> ResourceSlot:
-        occupied = ResourceSlot()
-        for resource_row in self._resource_rows_by_rank():
-            occupied[resource_row.slot_name] = resource_row.used
-        return occupied
-
     def to_data(self) -> AgentData:
         return AgentData(
             uuid=self.uuid,
