@@ -22,12 +22,15 @@ from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.processor import (
     BulkActionProcessor,
+    PartialBulkResultJudge,
     PartialEntityResultJudge,
 )
 from ai.backend.manager.actions.v2.bulk.result import (
     BasePartialBulkActionResult,
     BulkActionProcessResult,
     BulkEntityResult,
+    PartialBulkEntityResult,
+    PartialBulkResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
@@ -167,3 +170,28 @@ async def test_denial_is_attributed_to_every_named_entity(action: _Action) -> No
     meta = monitor.done_results[0].meta
     assert [r.entity_id for r in meta.entity_results] == list(action.entity_ids())
     assert all(r.status is OperationStatus.DENIED for r in meta.entity_results)
+
+
+async def test_standard_result_records_what_each_entity_ended_in(action: _Action) -> None:
+    """An atomically gated run still records per entity what the service answered."""
+
+    async def run(_: _Action) -> PartialBulkResult[str]:
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[str].succeeded(_eid("a"), "terminating", "terminating"),
+                PartialBulkEntityResult[str].failed(_eid("b"), RuntimeError("agent gone")),
+                PartialBulkEntityResult[str].nothing(_eid("c"), "skipped"),
+            ]
+        )
+
+    monitor = _RecordingMonitor()
+    await BulkActionProcessor[_Action, PartialBulkResult[str]](
+        func=run, judge=PartialBulkResultJudge(), monitors=[monitor]
+    ).run(action)
+
+    meta = monitor.done_results[0].meta
+    assert [(r.entity_id, r.status, r.description) for r in meta.entity_results] == [
+        (_eid("a"), OperationStatus.SUCCESS, "terminating"),
+        (_eid("b"), OperationStatus.ERROR, "agent gone"),
+        (_eid("c"), OperationStatus.SUCCESS, "skipped"),
+    ]

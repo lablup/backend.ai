@@ -3,7 +3,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import override
+from typing import Any, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
@@ -15,11 +15,13 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
     BulkActionResultMeta,
     BulkEntityResult,
+    PartialBulkEntityResult,
+    PartialBulkResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
 
-__all__ = ("BulkActionProcessor",)
+__all__ = ("BulkActionProcessor", "recorded")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -44,6 +46,20 @@ class PartialEntityResultJudge[TResult: BasePartialBulkActionResult](EntityResul
         return result.entity_results()
 
 
+class PartialBulkResultJudge[TData](EntityResultJudge[PartialBulkResult[TData]]):
+    """The run was gated as one, but what the service did to each entity is its own.
+
+    Reads the standard result, so a run whose gate is atomic still records per entity
+    what it ended in — a session's termination state, say.
+    """
+
+    @override
+    def judge(
+        self, trigger_meta: BulkActionTriggerMeta, result: PartialBulkResult[TData]
+    ) -> Sequence[BulkEntityResult]:
+        return [recorded(item) for item in result.items]
+
+
 class AtomicEntityResultJudge[TResult](EntityResultJudge[TResult]):
     """The run stood or fell as one, so every named entity shares its outcome.
 
@@ -64,6 +80,26 @@ class AtomicEntityResultJudge[TResult](EntityResultJudge[TResult]):
             )
             for entity_id in trigger_meta.entity_ids
         ]
+
+
+def recorded(item: PartialBulkEntityResult[Any]) -> BulkEntityResult:
+    """Turn one answer into the audit row's columns.
+
+    The one place the classification runs: a denial is DENIED because it came
+    from a validator, and every other failure is an ordinary error.
+    """
+    if item.error is None:
+        run_status = ActionRunStatus.success()
+    else:
+        run_status = ActionRunStatus.of_failure(
+            item.error, during_validation=item.during_validation
+        )
+    return BulkEntityResult(
+        entity_id=item.entity_id,
+        status=run_status.status,
+        description=item.description or run_status.description,
+        error_code=run_status.error_code,
+    )
 
 
 class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
