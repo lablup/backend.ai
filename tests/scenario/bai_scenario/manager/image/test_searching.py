@@ -611,20 +611,20 @@ class ACursorAloneReadsFromTheFront(
 
 
 @dataclass(frozen=True)
-class ASizeBesideACursorPagesByOffset(
+class ASizeBesideACursorIsRefused(
     Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-size-beside-a-cursor-pages-by-offset"
+        return "a-size-beside-a-cursor-is-refused"
 
     @override
     def describe(self) -> str:
-        return "크기와 커서를 함께 지정하면 커서는 무시되고 크기대로 오프셋 페이지가 반환된다"
+        return "크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
-        return ManyImagesAndSomeone(count=3)
+        return ManyImagesAndSomeone()
 
     @override
     def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
@@ -632,7 +632,7 @@ class ASizeBesideACursorPagesByOffset(
 
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
-        return OnePageComesBack(size=1)
+        return TheCallIsRefused(InvalidGraphQLParameters)
 
 
 @dataclass(frozen=True)
@@ -847,9 +847,8 @@ SCENARIOS: list[Any] = [
     SearchingByStatusReturnsOnlyAliveImages(),
     OrderingAndOffsetChooseTheMiddlePage(),
     ThePageSizeDefaultsToFifty(),
-    # TODO: ACursorAloneReadsFromTheFront() — admin_search still answers a cursor-only
-    # request with the first page; list it once the adapter reads the cursor.
-    ASizeBesideACursorPagesByOffset(),
+    ACursorAloneReadsFromTheFront(),
+    ASizeBesideACursorIsRefused(),
     APlainUserMayNotSearch(),
     ACursorReadsFromTheFront(),
     TheBaseConditionNarrowsFirst(),

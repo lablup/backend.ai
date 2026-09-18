@@ -198,7 +198,14 @@ class BaseAdapter(BaseFilterAdapter):
             offset: Offset-based page offset.
             base_conditions: Extra conditions prepended before ``conditions``.
         """
-        is_cursor_pagination = first is not None or last is not None
+        options = PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
 
         all_conditions: list[QueryCondition] = []
         if base_conditions:
@@ -206,24 +213,14 @@ class BaseAdapter(BaseFilterAdapter):
         all_conditions.extend(conditions)
 
         all_orders: list[QueryOrder] = list(orders)
-        if not all_orders and not is_cursor_pagination:
+        if not all_orders and not options.has_cursor:
             all_orders.append(pagination_spec.forward_order)
         if last is not None:
             all_orders.append(pagination_spec.backward_tiebreaker_order)
         else:
             all_orders.append(pagination_spec.tiebreaker_order)
 
-        pagination = build_pagination(
-            PaginationOptions(
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
-            ),
-            pagination_spec,
-        )
+        pagination = build_pagination(options, pagination_spec)
         return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
 
     def _build_searcher[TSearcher: Searcher[Any, Any]](
