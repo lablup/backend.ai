@@ -24,7 +24,10 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
-from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -105,14 +108,19 @@ class LoginClientTypeAdapter(BaseAdapter):
         return self._data_to_node(action_result.data)
 
     async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
-        """Search login client types with filter/order/pagination."""
+        """Search login client types, by cursor or by offset as the request names."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        pages_by_cursor = any(
-            value is not None for value in (input.first, input.after, input.last, input.before)
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
         limit = input.limit
-        if limit is None and not pages_by_cursor:
+        if limit is None and not options.has_cursor:
             limit = DEFAULT_PAGE_LIMIT
         searcher = self._build_searcher(
             LoginClientTypeSearcher,
