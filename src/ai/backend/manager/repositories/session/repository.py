@@ -135,7 +135,7 @@ class SessionRepository:
     async def get_container_registry_by_id(
         self, registry_id: ContainerRegistryID
     ) -> ContainerRegistryData:
-        return await self._db_source.get_container_registry_by_id(registry_id)
+        return await self._registry_db_source.fetch_by_id(registry_id)
 
     async def get_image_commit_registry(self, project_id: uuid.UUID) -> ContainerRegistryData:
         return await self._registry_db_source.fetch_image_commit_registry(project_id)
@@ -146,7 +146,9 @@ class SessionRepository:
         registry_hostname: str,
         registry_project: str,
     ) -> ContainerRegistryData:
-        return await self._db_source.get_container_registry(registry_hostname, registry_project)
+        return await self._registry_db_source.fetch_by_name_and_project(
+            registry_hostname, registry_project
+        )
 
     @session_repository_resilience.apply()
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:
