@@ -136,7 +136,7 @@ class PermissionReadOps(V2ReadOps):
         privileged_keys = [key for key in keys if key.user_id in privileged_bits]
         provisioned = await self._provisioned([key.entity for key in privileged_keys])
         for key in privileged_keys:
-            result[key] = self._get_permission_bits_if_provisioned(
+            result[key] = self._bits_if_provisioned(
                 key.entity, provisioned, privileged_bits[key.user_id]
             )
         groups: defaultdict[_GroupKey, list[OwnCheckKey]] = defaultdict(list)
@@ -173,7 +173,7 @@ class PermissionReadOps(V2ReadOps):
         privileged_keys = [key for key in keys if key.user_id in privileged_bits]
         provisioned = await self._provisioned([key.scope for key in privileged_keys])
         for key in privileged_keys:
-            result[key] = self._get_permission_bits_if_provisioned(
+            result[key] = self._bits_if_provisioned(
                 key.scope, provisioned, privileged_bits[key.user_id]
             )
         groups: defaultdict[_GroupKey, list[GovernCheckKey]] = defaultdict(list)
@@ -222,7 +222,7 @@ class PermissionReadOps(V2ReadOps):
         )
         return {(str(row.entity_type), uuid.UUID(int=row.entity_id.int)) for row in rows}
 
-    def _get_permission_bits_if_provisioned(
+    def _bits_if_provisioned(
         self,
         entity: EntityIdentifier,
         provisioned: set[tuple[str, uuid.UUID]],
