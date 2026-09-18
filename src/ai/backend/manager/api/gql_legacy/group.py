@@ -543,20 +543,6 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             ]
 
 
-def _parse_image_commit_registry(value: Any) -> TriState[ImageCommitRegistry]:
-    if value is Undefined:
-        return TriState.nop()
-    if value is None or value == {}:
-        return TriState.nullify()
-    if not isinstance(value, dict) or set(value) != {"registry", "project"}:
-        raise InvalidAPIParameters("Expected registry and project strings")
-    if not isinstance(value["registry"], str) or not isinstance(value["project"], str):
-        raise InvalidAPIParameters("Expected registry and project strings")
-    return TriState.update(
-        ImageCommitRegistry(registry_name=value["registry"], project_name=value["project"])
-    )
-
-
 class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     type = graphene.String(
         required=False,
@@ -597,16 +583,14 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         resource_policy_val = value_or_none(self.resource_policy)
         registry = value_or_none(self.container_registry)
         container_registry_val = None
-        if registry is not None and registry != {}:
-            if not isinstance(registry, dict) or set(registry) != {"registry", "project"}:
-                raise InvalidAPIParameters("Expected registry and project strings")
-            if not isinstance(registry["registry"], str) or not isinstance(
-                registry["project"], str
-            ):
-                raise InvalidAPIParameters("Expected registry and project strings")
-            container_registry_val = ImageCommitRegistry(
-                registry_name=registry["registry"], project_name=registry["project"]
-            )
+        if registry:
+            match registry:
+                case {"registry": str() as registry_name, "project": str() as project_name}:
+                    container_registry_val = ImageCommitRegistry(
+                        registry_name=registry_name, project_name=project_name
+                    )
+                case _:
+                    raise InvalidAPIParameters("Expected registry and project strings")
 
         return CreateProjectAction(
             domain_id=domain_id,
@@ -642,6 +626,19 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     )
 
     def to_action(self, group_id: uuid.UUID) -> UpdateProjectAction:
+        registry = self.container_registry
+        if registry is Undefined:
+            container_registry = TriState[ImageCommitRegistry].nop()
+        elif not registry:
+            container_registry = TriState[ImageCommitRegistry].nullify()
+        else:
+            match registry:
+                case {"registry": str() as registry_name, "project": str() as project_name}:
+                    container_registry = TriState.update(
+                        ImageCommitRegistry(registry_name=registry_name, project_name=project_name)
+                    )
+                case _:
+                    raise InvalidAPIParameters("Expected registry and project strings")
         updater = ProjectUpdater(
             project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
@@ -670,9 +667,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=_parse_image_commit_registry(
-                self.container_registry,
-            ),
+            container_registry=container_registry,
         )
         return UpdateProjectAction(updater=updater)
 
