@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     SearchLoginClientTypesInput,
 )
@@ -85,8 +86,12 @@ class _OffsetCase:
             expected=OffsetPagination(limit=3, offset=2),
         ),
         _OffsetCase(
+            input=SearchLoginClientTypesInput(offset=2),
+            expected=OffsetPagination(limit=DEFAULT_PAGE_LIMIT, offset=2),
+        ),
+        _OffsetCase(
             input=SearchLoginClientTypesInput(),
-            expected=OffsetPagination(limit=10, offset=0),
+            expected=OffsetPagination(limit=DEFAULT_PAGE_LIMIT, offset=0),
         ),
     ],
     ids=lambda case: f"limit-{case.expected.limit}-offset-{case.expected.offset}",

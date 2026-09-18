@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
@@ -107,6 +108,12 @@ class LoginClientTypeAdapter(BaseAdapter):
         """Search login client types with filter/order/pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
+        pages_by_cursor = any(
+            value is not None for value in (input.first, input.after, input.last, input.before)
+        )
+        limit = input.limit
+        if limit is None and not pages_by_cursor:
+            limit = DEFAULT_PAGE_LIMIT
         searcher = self._build_searcher(
             LoginClientTypeSearcher,
             conditions=conditions,
@@ -116,7 +123,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             after=input.after,
             last=input.last,
             before=input.before,
-            limit=input.limit,
+            limit=limit,
             offset=input.offset,
         )
 
