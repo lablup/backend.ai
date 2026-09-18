@@ -25,6 +25,7 @@ def make_domain_node(name: str = "test-domain", domain_id: DomainID | None = Non
     now = datetime.now(tz=UTC)
     return DomainNode(
         id=domain_id if domain_id is not None else DomainID(uuid.uuid4()),
+        entity_id=uuid.uuid4(),
         basic_info=DomainBasicInfo(
             name=name,
             description="Test domain",

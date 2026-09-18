@@ -13,6 +13,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelDefinitionInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class EnvironEntryInfo(BaseResponseModel):
@@ -102,6 +103,9 @@ class PresetDeploymentDefaults(BaseResponseModel):
 
 class DeploymentRevisionPresetNode(BaseResponseModel):
     id: UUID = Field(description="Preset ID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the deployment revision preset. Added in {NEXT_RELEASE_VERSION}.",
+    )
     runtime_variant_id: RuntimeVariantID = Field(description="Runtime variant ID.")
     name: str = Field(description="Preset name.")
     description: str | None = Field(default=None, description="Description.")

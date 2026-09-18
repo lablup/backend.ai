@@ -42,6 +42,12 @@ __all__ = (
 )
 class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
     id: NodeID[str] = gql_field(description="Label UUID (primary key).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the entity label.",
+        ),
+    )
     entity_type: str = gql_field(description="Type of the labeled entity.")
     entity_id: UUID = gql_field(description="ID of the labeled entity.")
     key: str = gql_field(description="Label key.")

@@ -231,6 +231,12 @@ class PermissionOrderField(StrEnum):
 )
 class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the permission row.",
+        ),
+    )
     role_id: UUID
     entity_type: str
     created_at: datetime

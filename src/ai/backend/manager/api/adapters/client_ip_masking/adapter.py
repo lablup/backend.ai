@@ -141,6 +141,7 @@ class ClientIPMaskingAdapter(BaseAdapter):
     def _data_to_node(data: ClientIPMaskingPolicyData) -> ClientIPMaskingPolicyNode:
         return ClientIPMaskingPolicyNode(
             id=data.id,
+            entity_id=data.entity_id(),
             target_type=ClientIPMaskingTargetDTO(data.target_type.value),
             mode=ClientIPMaskingModeDTO(data.mode.value),
             ipv4_prefix=data.ipv4_prefix,

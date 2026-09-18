@@ -392,6 +392,7 @@ class AgentAdapter(BaseAdapter):
         occupied_slots = detail.occupied_slots()
         return AgentNode(
             id=str(data.id),
+            entity_id=data.entity_id(),
             uuid=data.uuid,
             resource_info=AgentResourceInfo(
                 capacity=dict(available_slots.to_json()),

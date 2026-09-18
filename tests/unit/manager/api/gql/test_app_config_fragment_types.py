@@ -35,6 +35,7 @@ class TestAppConfigFragmentGQL:
         scope_id = uuid.uuid4()
         node = AppConfigFragmentNode(
             id=AppConfigFragmentID(uuid.uuid4()),
+            entity_id=uuid.uuid4(),
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
             scope_id=AppConfigScopeID(scope_id),
@@ -55,6 +56,7 @@ class TestAppConfigFragmentGQL:
     def test_from_pydantic_maps_public_scope_id_as_none(self) -> None:
         node = AppConfigFragmentNode(
             id=AppConfigFragmentID(uuid.uuid4()),
+            entity_id=uuid.uuid4(),
             config_name="theme",
             scope_type=AppConfigScopeType.PUBLIC,
             scope_id=None,
@@ -73,6 +75,7 @@ class TestUpsertAppConfigFragmentsPayloadGQL:
     def test_from_pydantic_converts_items_and_failures(self) -> None:
         node = AppConfigFragmentNode(
             id=AppConfigFragmentID(uuid.uuid4()),
+            entity_id=uuid.uuid4(),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
             scope_id=AppConfigScopeID(uuid.uuid4()),

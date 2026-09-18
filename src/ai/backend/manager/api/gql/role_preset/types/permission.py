@@ -45,6 +45,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -82,6 +83,12 @@ _REMOVED_OPERATION_REASON = (
 )
 class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     id: NodeID[str] = gql_field(description="Permission entry UUID.")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the role permission preset.",
+        ),
+    )
     role_preset_id: UUID = gql_field(description="UUID of the parent role preset.")
     entity_type: str = gql_field(description="Entity type the permission applies to.")
     permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")

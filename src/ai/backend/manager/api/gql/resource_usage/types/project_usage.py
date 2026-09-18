@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     ProjectUsageBucketNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -75,6 +76,12 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
     """Project-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the usage bucket.",
+        ),
+    )
     project_id: UUID = gql_field(description="UUID of the project this usage bucket belongs to.")
     domain_name: str = gql_field(description="Name of the domain the project belongs to.")
     resource_group_name: str = gql_field(

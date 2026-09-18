@@ -341,6 +341,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return ContainerRegistryNode(
             id=data.id,
+            entity_id=data.entity_id(),
             url=data.url,
             registry_name=data.registry_name,
             type=data.type,

@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "EntityShareNode",
@@ -23,6 +24,9 @@ __all__ = (
 
 class EntityShareNode(BaseResponseModel):
     id: EntityShareID = Field(description="Share id")
+    entity_id: UUID = Field(
+        description=f"UUID of the entity share. Added in {NEXT_RELEASE_VERSION}.",
+    )
     sharer_user_id: UserID | None = Field(
         default=None, description="Who sent the offer, while that account is still there"
     )

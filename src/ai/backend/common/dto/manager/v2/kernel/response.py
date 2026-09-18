@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchKernelsPayload",
@@ -141,6 +142,9 @@ class KernelNode(BaseResponseModel):
     """Node model representing a kernel (compute container) entity."""
 
     id: UUID = Field(description="Kernel ID.")
+    field_id: UUID = Field(
+        description=f"UUID of the kernel. Added in {NEXT_RELEASE_VERSION}.",
+    )
     image_id: UUID | None = Field(
         default=None,
         description="The UUID of the image used by this kernel. Null if the image has been purged.",

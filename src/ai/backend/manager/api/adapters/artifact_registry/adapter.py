@@ -89,6 +89,7 @@ class ArtifactRegistryAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return ArtifactRegistryGQLNode(
             id=data.id,
+            entity_id=data.entity_id(),
             registry_id=ArtifactRegistryID(data.registry_id),
             name=data.name,
             type=data.type,

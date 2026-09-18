@@ -170,6 +170,9 @@ class UserNode(BaseResponseModel):
     id: UUID = Field(
         description="Unique identifier for the user (UUID).",
     )
+    entity_id: UUID = Field(
+        description=f"UUID of the user. Added in {NEXT_RELEASE_VERSION}.",
+    )
     basic_info: UserBasicInfo = Field(
         description="Basic profile information including username, email, and display name.",
     )

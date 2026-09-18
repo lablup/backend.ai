@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     EmailSpecInfo,
@@ -40,6 +41,9 @@ class NotificationChannelNode(BaseResponseModel):
     """Node model representing a notification channel entity."""
 
     id: UUID = Field(description="Channel ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the notification channel. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Channel name")
     description: str | None = Field(default=None, description="Channel description")
     channel_type: NotificationChannelTypeDTO = Field(description="Channel type")
@@ -54,6 +58,9 @@ class NotificationRuleNode(BaseResponseModel):
     """Node model representing a notification rule entity."""
 
     id: UUID = Field(description="Rule ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the notification rule. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Rule name")
     description: str | None = Field(default=None, description="Rule description")
     rule_type: NotificationRuleTypeDTO = Field(description="Rule type")

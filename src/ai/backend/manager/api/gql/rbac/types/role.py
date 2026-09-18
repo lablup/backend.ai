@@ -85,6 +85,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
+    RoleNode,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleSourceDTO,
@@ -160,8 +161,14 @@ class RoleOrderField(StrEnum):
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="RBAC role."), name="Role")
-class RoleGQL(PydanticNodeMixin[Any]):
+class RoleGQL(PydanticNodeMixin[RoleNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the role.",
+        ),
+    )
     name: str
     description: str | None
     source: RoleSourceGQL

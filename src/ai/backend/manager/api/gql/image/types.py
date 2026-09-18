@@ -156,6 +156,12 @@ class ImageV2TagEntryGQL:
 )
 class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
     id: NodeID[uuid.UUID]
+    field_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the image alias.",
+        ),
+    )
     alias: str = gql_field(description="The alias string for the image.")
 
     @classmethod
@@ -264,6 +270,12 @@ class ImageV2PermissionInfoGQL(PydanticOutputMixin[ImagePermissionInfoDTO]):
 )
 class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     id: NodeID[uuid.UUID]
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the image.",
+        ),
+    )
 
     # Sub-info types
     identity: ImageV2IdentityInfoGQL = gql_field(

@@ -22,6 +22,9 @@ class AuditLogNode(BaseResponseModel):
     """Node model representing an audit log entry."""
 
     id: UUID = Field(description="Audit log entry ID")
+    field_id: UUID = Field(
+        description=f"UUID of the audit log record. Added in {NEXT_RELEASE_VERSION}.",
+    )
     action_id: UUID = Field(description="UUID of the action that generated this log")
     entity_type: str | None = Field(
         default=None,

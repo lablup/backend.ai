@@ -431,6 +431,7 @@ class DomainAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return DomainNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=DomainBasicInfo(
                 name=data.name,
                 description=data.description,

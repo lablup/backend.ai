@@ -217,6 +217,7 @@ class RuntimeVariantAdapter(BaseAdapter):
     def _data_to_node(data: RuntimeVariantData) -> RuntimeVariantNode:
         return RuntimeVariantNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             reads_vfolder_config_files=data.reads_vfolder_config_files,

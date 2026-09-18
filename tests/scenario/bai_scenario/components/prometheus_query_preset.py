@@ -429,6 +429,7 @@ def node_of(seeded: PrometheusQueryPresetData) -> QueryDefinitionNode:
     """The node a read of this seeded preset has to answer, whole."""
     return QueryDefinitionNode(
         id=seeded.id,
+        entity_id=seeded.id,
         name=seeded.name,
         description=seeded.description,
         rank=seeded.rank,

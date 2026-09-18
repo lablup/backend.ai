@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import ClientIPMaskingMode, ClientIPMaskingTarget
 
@@ -22,6 +23,9 @@ class ClientIPMaskingPolicyNode(BaseResponseModel):
     """Node model representing the masking set for one target."""
 
     id: UUID = Field(description="Policy ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the client IP masking policy. Added in {NEXT_RELEASE_VERSION}.",
+    )
     target_type: ClientIPMaskingTarget = Field(description="Which recorded client IP is governed")
     mode: ClientIPMaskingMode = Field(description="Masking applied before the address is stored")
     ipv4_prefix: int | None = Field(

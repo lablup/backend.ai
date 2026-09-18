@@ -366,6 +366,12 @@ class PresetModelDefinitionGQL:
 )
 class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment revision preset.",
+        ),
+    )
     runtime_variant_id: UUID = gql_field(
         description="The runtime variant this preset is designed for (e.g., vLLM, SGLang)."
     )

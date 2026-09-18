@@ -68,6 +68,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -257,6 +258,12 @@ class SubStepResultGQL(PydanticOutputMixin[SubStepResultInfo]):
 )
 class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the session scheduling history record.",
+        ),
+    )
     session_id: ID
     phase: str
     from_status: str | None
@@ -311,6 +318,12 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
 )
 class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the kernel scheduling history record.",
+        ),
+    )
     kernel_id: ID
     session_id: ID
     phase: str
@@ -342,6 +355,12 @@ class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
 class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment history record.",
+        ),
+    )
     deployment_id: ID
     phase: str
     from_status: str | None
@@ -410,6 +429,12 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
     # No resolve_nodes: these rows are reached through the owning deployment.
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the replica group history record.",
+        ),
+    )
     deployment_id: ID
     category: ReplicaGroupHistoryCategoryGQL
     phase: str
@@ -444,6 +469,12 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
 class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the route history record.",
+        ),
+    )
     route_id: ID
     deployment_id: ID
     category: str

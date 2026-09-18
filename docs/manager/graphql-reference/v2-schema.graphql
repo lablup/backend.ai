@@ -18,6 +18,9 @@ type AccessToken implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the access token."""
+  fieldId: UUID!
+
   """The access token."""
   token: String!
 
@@ -395,6 +398,9 @@ type AgentResourceSlot implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the agent resource."""
+  fieldId: UUID!
+
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   slotName: String!
 
@@ -517,10 +523,13 @@ type AgentV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the agent."""
+  entityId: UUID!
+
   """
-  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead.
+  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead. Deprecated since 26.9.0. Use entityId.
   """
-  uuid: UUID!
+  uuid: UUID! @deprecated(reason: "Deprecated since 26.9.0. Use entityId.")
 
   """
   Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
@@ -675,6 +684,9 @@ type AppConfigAllowList implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the app config allow list."""
+  entityId: UUID!
+
   """The config name this entry permits writes for."""
   configName: String!
 
@@ -769,6 +781,9 @@ type AppConfigDefinition implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the app config definition."""
+  entityId: UUID!
+
   """Registered config name."""
   configName: String!
 
@@ -849,6 +864,9 @@ Added in 26.8.0. One config document written at a single scope, merged by rank a
 type AppConfigFragment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the app config fragment."""
+  entityId: UUID!
 
   """Config name the fragment belongs to."""
   configName: String!
@@ -1025,6 +1043,9 @@ Added in 25.14.0. An artifact represents AI models, packages, images, or other r
 type Artifact implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the artifact."""
+  entityId: UUID!
   name: String!
   type: ArtifactType!
   description: String
@@ -1138,6 +1159,9 @@ Added in 25.15.0. Represents common metadata for an artifact registry. All artif
 type ArtifactRegistryMeta implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the artifact registry."""
+  entityId: UUID!
   name: String!
   registryId: ID!
   type: ArtifactRegistryType!
@@ -1182,6 +1206,9 @@ Added in 25.14.0. A specific version/revision of an artifact containing the actu
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the artifact revision."""
+  fieldId: UUID!
   status: ArtifactStatus!
 
   """
@@ -1467,6 +1494,9 @@ type AuditLogV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the audit log record."""
+  fieldId: UUID!
+
   """UUID of the action that generated this log."""
   actionId: UUID!
 
@@ -1557,6 +1587,9 @@ enum AutoScalingMetricSource {
 type AutoScalingRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the auto scaling rule."""
+  fieldId: UUID!
 
   """The source of the scaling metric (e.g. KERNEL, INFERENCE_FRAMEWORK)."""
   metricSource: AutoScalingMetricSource!
@@ -2353,6 +2386,9 @@ type ClientIPMaskingPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the client IP masking policy."""
+  entityId: UUID!
+
   """Which recorded client IP is governed."""
   targetType: ClientIPMaskingTarget!
 
@@ -2606,6 +2642,9 @@ input ContainerRegistryTypeFilter {
 type ContainerRegistryV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the container registry."""
+  entityId: UUID!
 
   """URL of the container registry"""
   url: String!
@@ -4461,6 +4500,9 @@ input DeploymentHandlerOptionsInput {
 type DeploymentHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment history record."""
+  fieldId: UUID!
   deploymentId: ID!
   phase: String!
   fromStatus: String
@@ -4561,6 +4603,9 @@ enum DeploymentOrderField {
 type DeploymentPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment policy."""
+  fieldId: UUID!
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -4572,6 +4617,9 @@ Added in 26.4.2. A reusable deployment configuration template. Users select a pr
 type DeploymentRevisionPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment revision preset."""
+  entityId: UUID!
 
   """The runtime variant this preset is designed for (e.g., vLLM, SGLang)."""
   runtimeVariantId: UUID!
@@ -5008,6 +5056,9 @@ type DomainUsageBucket implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the usage bucket."""
+  fieldId: UUID!
+
   """Name of the domain this usage bucket belongs to."""
   domainName: String!
 
@@ -5149,6 +5200,9 @@ type DomainV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the domain."""
+  entityId: UUID!
+
   """Basic domain information including name and description."""
   basicInfo: DomainBasicInfo!
 
@@ -5157,11 +5211,6 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: DomainLifecycleInfo!
-
-  """
-  Added in 26.9.0. Domain uuid as a plain scalar, without the Relay global-id encoding.
-  """
-  entityId: UUID!
 
   """
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
@@ -5447,6 +5496,9 @@ type EntityLabel implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the entity label."""
+  fieldId: UUID!
+
   """Type of the labeled entity."""
   entityType: String!
 
@@ -5588,6 +5640,9 @@ Added in 26.9.0. One entity handed to one scope: offered, taken, or taken back.
 type EntityShare implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the entity share."""
+  entityId: UUID!
 
   """Who sent the offer, while that account is still there."""
   sharerUserId: UUID
@@ -6077,6 +6132,9 @@ input HandlerOptionsInput {
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the HuggingFace registry."""
+  entityId: UUID!
   url: String!
   name: String!
   token: String
@@ -6111,6 +6169,9 @@ Added in 26.8.0. Represents a reusable idle checker definition independent of it
 type IdleChecker implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the idle checker."""
+  entityId: UUID!
 
   """Idle checker name."""
   name: String!
@@ -6459,6 +6520,9 @@ type ImageV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the image."""
+  entityId: UUID!
+
   """Image identity information (name, architecture)."""
   identity: ImageV2IdentityInfo!
 
@@ -6489,6 +6553,9 @@ Added in 26.2.0. Represents an alias for a container image. Aliases provide alte
 type ImageV2Alias implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the image alias."""
+  fieldId: UUID!
 
   """The alias string for the image."""
   alias: String!
@@ -6906,6 +6973,9 @@ enum KernelResourceAllocationOrderField {
 type KernelSchedulingHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the kernel scheduling history record."""
+  fieldId: UUID!
   kernelId: ID!
   sessionId: ID!
   phase: String!
@@ -6996,6 +7066,9 @@ Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 type KernelV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the kernel."""
+  fieldId: UUID!
 
   """
   The UUID of the image used by this kernel. Null if the image has been purged.
@@ -7251,6 +7324,9 @@ type KeyPairV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the keypair."""
+  fieldId: UUID!
+
   """The access key string."""
   accessKey: String!
 
@@ -7362,6 +7438,9 @@ Added in 26.4.2. Keypair resource policy defining session and storage limits for
 type KeypairResourcePolicyV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the policy."""
+  entityId: UUID!
 
   """Policy name."""
   name: String!
@@ -7533,6 +7612,9 @@ type LoginClientType implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the login client type."""
+  entityId: UUID!
+
   """Unique login client type name (e.g. 'core', 'webui')."""
   name: String!
 
@@ -7645,6 +7727,9 @@ type LoginHistoryV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the login history record."""
+  fieldId: UUID!
+
   """UUID of the user who attempted to log in."""
   userId: UUID!
 
@@ -7743,6 +7828,9 @@ Added in 26.4.2. Represents a login session entry tracking user authentication s
 type LoginSessionV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the login session."""
+  fieldId: UUID!
 
   """UUID of the user who owns the session."""
   userId: UUID!
@@ -7860,6 +7948,9 @@ Added in 26.4.2. Represents a registered AI model with metadata extracted from m
 type ModelCardV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the model card."""
+  entityId: UUID!
 
   """Display name of the registered model."""
   name: String!
@@ -8102,6 +8193,9 @@ Added in 25.19.0. Represents a model deployment in Backend.AI. A deployment is a
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment."""
+  entityId: UUID!
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   currentRevisionId: ID
@@ -8402,6 +8496,9 @@ Added in 25.19.0. A single replica instance of a model deployment. Each replica 
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the replica."""
+  fieldId: UUID!
   sessionId: ID
   revisionId: ID!
 
@@ -8474,6 +8571,9 @@ type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   imageId: ID!
+
+  """Added in 26.9.0. UUID of the revision."""
+  fieldId: UUID!
 
   """
   Added in 26.4.4. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
@@ -9776,6 +9876,9 @@ interface Node {
 type NotificationChannel implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the notification channel."""
+  entityId: UUID!
   name: String!
   description: String
   channelType: NotificationChannelType!
@@ -9867,6 +9970,9 @@ input NotificationChannelTypeFilter {
 type NotificationRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the notification rule."""
+  entityId: UUID!
   name: String!
   description: String
   ruleType: NotificationRuleType!
@@ -9994,6 +10100,9 @@ type NumberOption {
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the object storage."""
+  entityId: UUID!
   name: String!
   host: String!
   accessKey: String!
@@ -10098,6 +10207,9 @@ type PageInfo @shareable {
 type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the permission row."""
+  fieldId: UUID!
   roleId: UUID!
   entityType: String!
   createdAt: DateTime!
@@ -10931,6 +11043,9 @@ type ProjectResourcePolicyV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the policy."""
+  entityId: UUID!
+
   """Policy name."""
   name: String!
 
@@ -11063,6 +11178,9 @@ Added in 26.1.0. Project-level usage bucket representing aggregated resource con
 type ProjectUsageBucket implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the usage bucket."""
+  fieldId: UUID!
 
   """UUID of the project this usage bucket belongs to."""
   projectId: UUID!
@@ -11224,6 +11342,9 @@ Added in 26.2.0. Project entity with structured field groups. Formerly GroupNode
 type ProjectV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the project."""
+  entityId: UUID!
 
   """Basic project information including name, type, and description."""
   basicInfo: ProjectBasicInfo!
@@ -12377,6 +12498,9 @@ type QueryDefinition implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the query preset."""
+  entityId: UUID!
+
   """Human-readable query definition identifier."""
   name: String!
 
@@ -12850,6 +12974,9 @@ input ReplicaFilter {
 type ReplicaGroupHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the replica group history record."""
+  fieldId: UUID!
   deploymentId: ID!
   category: ReplicaGroupHistoryCategory!
   phase: String!
@@ -13032,6 +13159,9 @@ input ReplicaStatusFilter {
 type ReservoirRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the reservoir registry."""
+  entityId: UUID!
   name: String!
   endpoint: String!
   accessKey: String!
@@ -13122,6 +13252,9 @@ Added in 26.1.0. Resource group with structured configuration. Since 26.8.0, the
 type ResourceGroup implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the resource group."""
+  entityId: UUID!
 
   """
   Unique name identifying the resource group. Used as primary key and referenced by agents, sessions, and resource presets.
@@ -13431,6 +13564,9 @@ type ResourcePresetV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the resource preset."""
+  entityId: UUID!
+
   """Resource preset name."""
   name: String!
 
@@ -13507,6 +13643,9 @@ and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
 type ResourceSlotType implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the resource slot type."""
+  entityId: UUID!
 
   """
   Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device').
@@ -13690,6 +13829,9 @@ type RetentionPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the retention policy."""
+  entityId: UUID!
+
   """Retention category."""
   category: RetentionCategory!
 
@@ -13802,6 +13944,9 @@ input RevokeRoleInput {
 type Role implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the role."""
+  entityId: UUID!
   name: String!
   description: String
   source: RoleSource!
@@ -14123,6 +14268,9 @@ type RolePermissionPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the role permission preset."""
+  fieldId: UUID!
+
   """UUID of the parent role preset."""
   rolePresetId: UUID!
 
@@ -14234,6 +14382,9 @@ Added in 26.4.4. Role preset entity implementing the Relay Node pattern.
 type RolePreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the role preset."""
+  entityId: UUID!
 
   """Role preset name."""
   name: String!
@@ -14394,6 +14545,9 @@ input RollingUpdateConfigInput {
 type Route implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the route."""
+  fieldId: UUID!
   deploymentId: ID!
   sessionId: ID
   revisionId: ID
@@ -14476,6 +14630,9 @@ enum RouteHealthStatus {
 type RouteHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the route history record."""
+  fieldId: UUID!
   routeId: ID!
   deploymentId: ID!
   category: String!
@@ -14588,6 +14745,9 @@ Added in 26.4.2. Represents an inference runtime engine definition (e.g., vLLM, 
 type RuntimeVariant implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the runtime variant."""
+  entityId: UUID!
 
   """
   Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi').
@@ -14742,6 +14902,9 @@ Added in 26.4.2. Defines a configurable parameter for a runtime variant. Each pr
 type RuntimeVariantPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the runtime variant preset."""
+  entityId: UUID!
 
   """The runtime variant this preset belongs to."""
   runtimeVariantId: UUID!
@@ -15262,6 +15425,9 @@ type ServiceCatalog implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the service catalog."""
+  entityId: UUID!
+
   """Logical group name (e.g., 'manager', 'agent', 'storage-proxy')."""
   serviceGroup: String!
 
@@ -15520,6 +15686,9 @@ input SessionResourceSlotEntryInput {
 type SessionSchedulingHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the session scheduling history record."""
+  fieldId: UUID!
   sessionId: ID!
   phase: String!
   fromStatus: String
@@ -15619,6 +15788,9 @@ enum SessionTypes {
 type SessionV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the session."""
+  entityId: UUID!
 
   """
   UUIDs of the images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
@@ -15938,6 +16110,9 @@ Implementation varies by storage type:
 type StorageNamespace implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the storage namespace."""
+  entityId: UUID!
   storageId: ID!
   namespace: String!
 }
@@ -17797,6 +17972,9 @@ type UserResourcePolicyV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the policy."""
+  entityId: UUID!
+
   """Policy name."""
   name: String!
 
@@ -17947,6 +18125,9 @@ type UserUsageBucket implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the usage bucket."""
+  fieldId: UUID!
+
   """UUID of the user this usage bucket belongs to."""
   userUuid: UUID!
 
@@ -18092,6 +18273,9 @@ Added in 26.2.0. User entity with structured field groups. Provides comprehensiv
 type UserV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the user."""
+  entityId: UUID!
 
   """Basic profile information including username, email, and display name."""
   basicInfo: UserV2BasicInfo!
@@ -18397,6 +18581,9 @@ input UtilizationIdleCheckerThresholdInput {
 type VFSStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the VFS storage."""
+  entityId: UUID!
   name: String!
   host: String!
   basePath: String!
@@ -18429,6 +18616,9 @@ Added in 26.4.2. Virtual folder entity with structured field groups. Provides co
 type VFolder implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the vfolder."""
+  entityId: UUID!
 
   """
   Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.

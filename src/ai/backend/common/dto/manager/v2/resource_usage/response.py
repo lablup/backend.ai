@@ -9,6 +9,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "UsageBucketMetadataNode",
@@ -40,6 +41,9 @@ class DomainUsageBucketNode(BaseResponseModel):
     """Node model representing a domain usage bucket."""
 
     id: UUID = Field(description="Usage bucket ID")
+    field_id: UUID = Field(
+        description=f"UUID of the usage bucket. Added in {NEXT_RELEASE_VERSION}.",
+    )
     domain_name: str = Field(description="Domain name")
     resource_group_name: str = Field(description="Resource group name")
     metadata: UsageBucketMetadataNode = Field(description="Usage measurement period metadata")
@@ -51,6 +55,9 @@ class ProjectUsageBucketNode(BaseResponseModel):
     """Node model representing a project usage bucket."""
 
     id: UUID = Field(description="Usage bucket ID")
+    field_id: UUID = Field(
+        description=f"UUID of the usage bucket. Added in {NEXT_RELEASE_VERSION}.",
+    )
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
     resource_group_name: str = Field(description="Resource group name")
@@ -63,6 +70,9 @@ class UserUsageBucketNode(BaseResponseModel):
     """Node model representing a user usage bucket."""
 
     id: UUID = Field(description="Usage bucket ID")
+    field_id: UUID = Field(
+        description=f"UUID of the usage bucket. Added in {NEXT_RELEASE_VERSION}.",
+    )
     user_uuid: UUID = Field(description="User UUID")
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")

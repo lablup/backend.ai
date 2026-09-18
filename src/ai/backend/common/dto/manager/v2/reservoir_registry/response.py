@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchReservoirRegistriesPayload",
@@ -21,6 +22,9 @@ class ReservoirRegistryNode(BaseResponseModel):
     """Node model representing a Reservoir registry."""
 
     id: UUID = Field(description="Registry ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the reservoir registry. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Registry name")
     endpoint: str = Field(description="Reservoir endpoint URL")
     access_key: str = Field(description="Access key for authentication")

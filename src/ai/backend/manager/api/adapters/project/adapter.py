@@ -601,6 +601,7 @@ class ProjectAdapter(BaseAdapter):
 
         return ProjectNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=ProjectBasicInfo(
                 name=data.name,
                 description=data.description,

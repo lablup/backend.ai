@@ -350,6 +350,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     def _fragment_to_node(data: AppConfigFragmentData) -> AppConfigFragmentNode:
         return AppConfigFragmentNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             scope_type=AppConfigScopeType.of_owner(data.scope_id),
             scope_id=AppConfigScopeID(data.scope_id) if data.scope_id is not None else None,

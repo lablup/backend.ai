@@ -261,6 +261,7 @@ class AuditLogAdapter(BaseAdapter):
     def _data_to_node(data: AuditLogData) -> AuditLogNode:
         return AuditLogNode(
             id=data.id,
+            field_id=data.id,
             action_id=data.action_id,
             entity_type=data.entity_type,
             operation=data.operation,

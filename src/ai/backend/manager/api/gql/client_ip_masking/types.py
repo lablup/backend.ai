@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
+from uuid import UUID
 
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -25,6 +26,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -91,6 +93,12 @@ class ClientIPMaskingPolicyOrderFieldGQL(StrEnum):
 )
 class ClientIPMaskingPolicyGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the client IP masking policy.",
+        ),
+    )
     target_type: ClientIPMaskingTargetGQL = gql_field(
         description="Which recorded client IP is governed."
     )

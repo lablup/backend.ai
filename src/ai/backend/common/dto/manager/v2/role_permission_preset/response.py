@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -11,6 +12,7 @@ from ai.backend.common.data.entity.role_permission_preset import RolePermissionP
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkAddRolePermissionPresetFailureInfo",
@@ -26,6 +28,9 @@ class RolePermissionPresetNode(BaseResponseModel):
     """Node model for a stored permission entry under a role preset."""
 
     id: RolePermissionPresetID = Field(description="Permission entry UUID.")
+    field_id: UUID = Field(
+        description=f"UUID of the role permission preset. Added in {NEXT_RELEASE_VERSION}.",
+    )
     role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
     entity_type: EntityType = Field(
         description="Entity type the permission applies to.",

@@ -155,6 +155,7 @@ def _runtime_variants() -> list[RuntimeVariantNode]:
     return [
         RuntimeVariantNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name=f"variant-{n}",
             reads_vfolder_config_files=False,
             default_model_definition=RuntimeVariantModelDefinitionInfo(),
@@ -168,6 +169,7 @@ def _runtime_variant_presets() -> list[RuntimeVariantPresetNode]:
     return [
         RuntimeVariantPresetNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             runtime_variant_id=uuid.uuid4(),
             name=f"preset-{n}",
             rank=n,
@@ -187,6 +189,7 @@ def _retention_policies() -> list[RetentionPolicyNode]:
     return [
         RetentionPolicyNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             category=RetentionCategory.LOGS,
             retention_period_days=30,
             enabled=True,
@@ -201,6 +204,7 @@ def _role_presets() -> list[RolePresetNode]:
     return [
         RolePresetNode(
             id=RolePresetID(uuid.uuid4()),
+            entity_id=uuid.uuid4(),
             name=f"role-preset-{n}",
             scope_type=DomainEntityType(),
             auto_assign=False,
@@ -216,6 +220,7 @@ def _role_permission_presets() -> list[RolePermissionPresetNode]:
     return [
         RolePermissionPresetNode(
             id=RolePermissionPresetID(uuid.uuid4()),
+            field_id=uuid.uuid4(),
             role_preset_id=RolePresetID(uuid.uuid4()),
             entity_type=VFolderEntityType(),
             permission=PermissionBitDTO.READ,
@@ -229,6 +234,7 @@ def _revision_presets() -> list[DeploymentRevisionPresetNode]:
     return [
         DeploymentRevisionPresetNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             name=f"revision-preset-{n}",
             description=None,
@@ -255,6 +261,7 @@ def _model_cards() -> list[ModelCardNode]:
     return [
         ModelCardNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name=f"card-{n}",
             vfolder_id=VFolderUUID(uuid.uuid4()),
             domain_name="default",
@@ -272,6 +279,7 @@ def _entity_shares() -> list[EntityShareNode]:
     return [
         EntityShareNode(
             id=EntityShareID(uuid.uuid4()),
+            entity_id=uuid.uuid4(),
             target_entity_type=VFolderEntityType(),
             target_entity_id=uuid.uuid4(),
             permissions=[PermissionBitDTO.READ],
@@ -287,6 +295,7 @@ def _replicas() -> list[ReplicaNode]:
     return [
         ReplicaNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             revision_id=uuid.uuid4(),
             readiness_status=ReadinessStatus.HEALTHY,

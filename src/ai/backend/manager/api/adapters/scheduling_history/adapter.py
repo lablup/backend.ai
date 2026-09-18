@@ -1177,6 +1177,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _session_data_to_dto(data: SessionSchedulingHistoryData) -> SessionHistoryNode:
         return SessionHistoryNode(
             id=data.id,
+            field_id=data.id,
             session_id=data.session_id,
             phase=data.phase,
             from_status=data.from_status.value if data.from_status else None,
@@ -1204,6 +1205,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _kernel_data_to_dto(data: KernelSchedulingHistoryData) -> KernelHistoryNode:
         return KernelHistoryNode(
             id=data.id,
+            field_id=data.id,
             kernel_id=data.kernel_id,
             session_id=data.session_id,
             phase=data.phase,
@@ -1221,6 +1223,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _deployment_data_to_dto(data: DeploymentHistoryData) -> DeploymentHistoryNode:
         return DeploymentHistoryNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             category=data.handler_category.value,
             phase=data.phase,
@@ -1249,6 +1252,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _replica_group_data_to_dto(data: ReplicaGroupHistoryData) -> ReplicaGroupHistoryNode:
         return ReplicaGroupHistoryNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             category=data.category.value,
             phase=data.phase,
@@ -1277,6 +1281,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _route_data_to_dto(data: RouteHistoryData) -> RouteHistoryNode:
         return RouteHistoryNode(
             id=data.id,
+            field_id=data.id,
             route_id=data.route_id,
             deployment_id=data.deployment_id,
             category=data.category,

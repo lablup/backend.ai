@@ -48,6 +48,7 @@ def node_payload(fragment_id: AppConfigFragmentID) -> dict[str, Any]:
     """One fragment as the server sends it, for a ``theme`` fragment at a user scope."""
     return {
         "id": str(fragment_id),
+        "entity_id": str(fragment_id),
         "config_name": "theme",
         "scope_type": "user",
         "scope_id": str(_USER_SCOPE_ID),

@@ -458,7 +458,7 @@ async def cleanup_artifact_revisions(
         cleaned_artifact_revisions.append(make_artifact_revision_from_node(revision_node))
 
     edges = [
-        ArtifactRevisionEdge(node=revision, cursor=encode_cursor(revision.id))
+        ArtifactRevisionEdge(node=revision, cursor=encode_cursor(revision.field_id))
         for revision in cleaned_artifact_revisions
     ]
 
@@ -602,7 +602,7 @@ async def scan_artifact_models(
         edges.extend([
             ArtifactRevisionEdge(
                 node=ArtifactRevision.from_pydantic(revision),
-                cursor=encode_cursor(revision.id),
+                cursor=encode_cursor(revision.field_id),
             )
             for revision in data.revisions
         ])

@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import PresetTarget, PresetValueType, UIOption
 
@@ -19,6 +20,9 @@ class PresetTargetSpec(BaseResponseModel):
 
 class RuntimeVariantPresetNode(BaseResponseModel):
     id: UUID = Field(description="Preset ID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the runtime variant preset. Added in {NEXT_RELEASE_VERSION}.",
+    )
     runtime_variant_id: UUID = Field(description="Runtime variant ID.")
     name: str = Field(description="Preset name.")
     description: str | None = Field(default=None, description="Description.")

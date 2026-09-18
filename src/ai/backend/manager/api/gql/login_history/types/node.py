@@ -58,6 +58,12 @@ class LoginAttemptResultGQL(StrEnum):
 )
 class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the login history entry (UUID).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the login history record.",
+        ),
+    )
 
     user_id: UUID = gql_field(description="UUID of the user who attempted to log in.")
     domain_name: str = gql_field(description="Domain name of the user at the time of the attempt.")

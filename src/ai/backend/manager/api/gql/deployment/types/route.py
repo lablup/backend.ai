@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
@@ -106,6 +107,12 @@ RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = gql_enum(
 )
 class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the route.",
+        ),
+    )
     deployment_id: ID
     session_id: ID | None
     revision_id: ID | None

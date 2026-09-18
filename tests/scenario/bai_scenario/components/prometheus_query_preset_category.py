@@ -268,6 +268,7 @@ def node_of(seeded: PrometheusQueryPresetCategoryData) -> CategoryNode:
     """The node a read of this seeded category has to answer, whole."""
     return CategoryNode(
         id=seeded.id,
+        entity_id=seeded.id,
         name=seeded.name,
         description=seeded.description,
         created_at=seeded.created_at,

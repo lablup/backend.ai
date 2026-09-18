@@ -1444,6 +1444,7 @@ class RBACAdapter(BaseAdapter):
     def _role_data_to_node(data: RoleData) -> RoleNode:
         return RoleNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             source=RoleSourceDTO(data.source.value),
@@ -1460,6 +1461,7 @@ class RBACAdapter(BaseAdapter):
     def _role_detail_to_node(data: RoleDetailData) -> RoleNode:
         return RoleNode(
             id=data.id,
+            entity_id=data.id,
             name=data.name,
             description=data.description,
             source=RoleSourceDTO(data.source.value),
@@ -1476,6 +1478,7 @@ class RBACAdapter(BaseAdapter):
     def _permission_data_to_node(data: PermissionData) -> PermissionNode:
         return PermissionNode(
             id=data.id,
+            field_id=data.id,
             role_id=data.role_id,
             entity_type=EntityType(data.entity_type),
             permission=PermissionBitDTO.of(data.permission),
