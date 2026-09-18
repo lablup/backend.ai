@@ -23,11 +23,16 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+<<<<<<< HEAD
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -42,6 +47,10 @@ from ai.backend.manager.repositories.login_client_type.creators import (
 from ai.backend.manager.repositories.login_client_type.updaters import (
     LoginClientTypeUpdaterSpec,
 )
+=======
+from ai.backend.manager.models.login_client_type.searchers import LoginClientTypeSearcher
+from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
+>>>>>>> bf02018a0 (fix(BA-7927): read the cursor arguments the login client type search advertises (#14769))
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
@@ -60,6 +69,13 @@ from ai.backend.manager.services.login_client_type.actions.update import (
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 50
+
+
+def _pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=LoginClientTypeOrders.created_at(ascending=False),
+        cursor_column=LoginClientTypeRow.id,
+    )
 
 
 class LoginClientTypeAdapter(BaseAdapter):
@@ -100,8 +116,37 @@ class LoginClientTypeAdapter(BaseAdapter):
         return self._data_to_node(action_result.login_client_type)
 
     async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
+<<<<<<< HEAD
         """Search login client types with filter/order/pagination."""
         querier = self._build_search_querier(input)
+=======
+        """Search login client types, by cursor or by offset as the request names."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        limit = input.limit
+        if limit is None and not options.has_cursor:
+            limit = DEFAULT_PAGE_LIMIT
+        searcher = self._build_searcher(
+            LoginClientTypeSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=limit,
+            offset=input.offset,
+        )
+>>>>>>> bf02018a0 (fix(BA-7927): read the cursor arguments the login client type search advertises (#14769))
 
         action_result = await self._processors.login_client_type.search.wait_for_complete(
             SearchLoginClientTypesAction(querier=querier)
@@ -165,6 +210,7 @@ class LoginClientTypeAdapter(BaseAdapter):
 
     # --- Private helpers ---
 
+<<<<<<< HEAD
     def _build_search_querier(self, input: SearchLoginClientTypesInput) -> BatchQuerier:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
@@ -174,6 +220,8 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
+=======
+>>>>>>> bf02018a0 (fix(BA-7927): read the cursor arguments the login client type search advertises (#14769))
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
