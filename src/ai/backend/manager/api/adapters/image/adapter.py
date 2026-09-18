@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -86,8 +87,6 @@ from ai.backend.manager.services.image.actions.update_image_by_id import UpdateI
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
-DEFAULT_PAGINATION_LIMIT = 50
-
 
 @lru_cache(maxsize=1)
 def _get_image_pagination_spec() -> PaginationSpec:
@@ -156,7 +155,7 @@ class ImageAdapter(BaseAdapter):
         )
         limit = input.limit
         if limit is None and not names_cursor:
-            limit = DEFAULT_PAGINATION_LIMIT
+            limit = DEFAULT_PAGE_LIMIT
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
