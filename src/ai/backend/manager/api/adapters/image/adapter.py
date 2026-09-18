@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -52,7 +53,10 @@ from ai.backend.common.dto.manager.v2.image.types import (
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -65,8 +69,6 @@ from ai.backend.manager.models.image.conditions import (
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
@@ -87,8 +89,6 @@ from ai.backend.manager.services.image.actions.search_images import SearchImages
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
-
-DEFAULT_PAGINATION_LIMIT = 50
 
 
 @lru_cache(maxsize=1)
@@ -150,8 +150,31 @@ class ImageAdapter(BaseAdapter):
     # ------------------------------------------------------------------ search
 
     async def admin_search(self, input: AdminSearchImagesInput) -> AdminSearchImagesPayload:
-        """Search images with admin scope using offset pagination."""
-        querier = self._build_offset_querier(input)
+        """Search images with admin scope, by cursor or by offset as the request names."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        limit = input.limit
+        if limit is None and not options.has_cursor:
+            limit = DEFAULT_PAGE_LIMIT
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_image_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=limit,
+            offset=input.offset,
+        )
 
         action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
 
@@ -332,16 +355,6 @@ class ImageAdapter(BaseAdapter):
         return UpdateImagePayload(item=self._data_to_dto(result.image))
 
     # ------------------------------------------------------------------ querier builders
-
-    def _build_offset_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier with offset pagination from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(
         self,
@@ -601,16 +614,3 @@ class ImageAdapter(BaseAdapter):
             field_id=data.id,
             alias=data.alias,
         )
-
-    def build_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO (offset pagination)."""
-        return self._build_offset_querier(input)
-
-    def _build_pagination(self, input: AdminSearchImagesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    def _convert_orders_legacy(self, orders: list[ImageOrderByInputDTO]) -> list[QueryOrder]:
-        return self._convert_orders(orders)

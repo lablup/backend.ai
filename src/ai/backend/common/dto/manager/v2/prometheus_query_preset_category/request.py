@@ -22,8 +22,6 @@ __all__ = (
     "SearchCategoriesInput",
 )
 
-_DEFAULT_PAGE_LIMIT = 50
-
 
 class CreateCategoryInput(BaseRequestModel):
     """Input for creating a prometheus query preset category."""

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
@@ -51,8 +52,6 @@ from ai.backend.manager.services.object_storage.actions.search import SearchObje
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.types import OptionalState, TriState
-
-DEFAULT_PAGINATION_LIMIT = 50
 
 
 class ObjectStorageAdapter(BaseAdapter):
@@ -141,7 +140,7 @@ class ObjectStorageAdapter(BaseAdapter):
     @staticmethod
     def _build_pagination(input: AdminSearchObjectStoragesInput) -> OffsetPagination:
         return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
+            limit=input.limit if input.limit is not None else DEFAULT_PAGE_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
 
