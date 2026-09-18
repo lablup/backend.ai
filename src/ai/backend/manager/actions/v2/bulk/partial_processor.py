@@ -11,7 +11,6 @@ from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
-from ai.backend.manager.actions.v2.bulk.processor import recorded
 from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
     BulkActionResultMeta,
@@ -126,7 +125,7 @@ class PartialBulkActionProcessor[TAction: BasePartialBulkAction, TData]:
                 raise
             else:
                 answer = self._complete(trigger_meta, result, denied)
-                entity_results = [recorded(item) for item in answer.items]
+                entity_results = [self._recorded(item) for item in answer.items]
                 return answer
         finally:
             ended_at = datetime.now(UTC)
@@ -165,6 +164,25 @@ class PartialBulkActionProcessor[TAction: BasePartialBulkAction, TData]:
                 )
             items.append(item)
         return PartialBulkResult(items=items)
+
+    def _recorded(self, item: PartialBulkEntityResult[TData]) -> BulkEntityResult:
+        """Turn one answer into the audit row's columns.
+
+        The one place the classification runs: a denial is DENIED because it came
+        from a validator, and every other failure is an ordinary error.
+        """
+        if item.error is None:
+            run_status = ActionRunStatus.success()
+        else:
+            run_status = ActionRunStatus.of_failure(
+                item.error, during_validation=item.during_validation
+            )
+        return BulkEntityResult(
+            entity_id=item.entity_id,
+            status=run_status.status,
+            description=item.description or run_status.description,
+            error_code=run_status.error_code,
+        )
 
     def _same_result_for_every_entity(
         self, trigger_meta: BulkActionTriggerMeta, run_status: ActionRunStatus

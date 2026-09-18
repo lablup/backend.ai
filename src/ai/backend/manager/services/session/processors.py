@@ -3,7 +3,6 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
-from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     BulkFieldActionProcessor,
     PartialBulkFieldActionProcessor,
@@ -245,8 +244,8 @@ class SessionProcessors:
         ShutdownServiceAction, ShutdownServiceActionResult
     ]
     start_service: SingleEntityActionProcessor[StartServiceAction, StartServiceActionResult]
-    terminate_sessions: BulkActionProcessor[
-        TerminateSessionsAction, PartialBulkResult[SessionTerminationStatus]
+    terminate_sessions: PartialBulkActionProcessor[
+        TerminateSessionsAction, SessionTerminationStatus
     ]
     upload_files: SingleEntityActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
@@ -327,7 +326,7 @@ class SessionProcessors:
         self.global_search = group.global_search_ops(GlobalSearchSessionsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetSessionsAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchSessionsAction)
-        self.terminate_sessions = group.atomic_bulk(
+        self.terminate_sessions = group.partial_bulk(
             TerminateSessionsAction, service.terminate_sessions
         )
 

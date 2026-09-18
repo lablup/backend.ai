@@ -42,7 +42,6 @@ from ai.backend.manager.actions.v2.bulk.partial_processor import (
 )
 from ai.backend.manager.actions.v2.bulk.processor import (
     BulkActionProcessor,
-    PartialBulkResultJudge,
     PartialEntityResultJudge,
 )
 from ai.backend.manager.actions.v2.bulk.result import (
@@ -326,28 +325,6 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.bulk, *monitors),
             partial_validators=(*self._deps.validators.partial_bulk, *validators),
-        )
-
-    def atomic_bulk[TAction: BaseBulkAction, TValue](
-        self,
-        action_cls: type[TAction],
-        func: Callable[[TAction], Awaitable[PartialBulkResult[TValue]]],
-        *,
-        validators: Sequence[AtomicBulkActionValidator] = (),
-        monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, PartialBulkResult[TValue]]:
-        """Several entities written by a service, refused as one and answered for one by one.
-
-        Gated atomically: a caller refused any named entity is refused the run before
-        it starts. The service still answers with the standard result, so what each
-        entity ended in is recorded.
-        """
-        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
-        return BulkActionProcessor(
-            func,
-            PartialBulkResultJudge(),
-            monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
     def legacy_partial_bulk[TAction: BaseBulkAction, TResult: BasePartialBulkActionResult](

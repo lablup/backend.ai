@@ -736,3 +736,40 @@ class TestTerminateActionBuilding:
         await adapter.terminate(dto)
         action = mock_processors.session.terminate_sessions.run.call_args[0][0]
         assert len(action.session_ids) == 3
+
+
+class TestTerminateDenial:
+    """A session the caller may not terminate refuses the call, not just its own item."""
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no terminate on this session")
+
+    @pytest.fixture
+    def processors(self, denial: GenericForbidden) -> MagicMock:
+        processors = MagicMock()
+        processors.terminate_sessions.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                        SessionID(uuid4()), SessionTerminationStatus.TERMINATING
+                    ),
+                    PartialBulkEntityResult[SessionTerminationStatus].denied(
+                        SessionID(uuid4()), denial
+                    ),
+                ]
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_the_denial_is_raised(
+        self, adapter: SessionAdapter, denial: GenericForbidden
+    ) -> None:
+        with pytest.raises(GenericForbidden) as raised:
+            await adapter.terminate(TerminateSessionsInput(session_ids=[uuid4(), uuid4()]))
+
+        assert raised.value is denial
