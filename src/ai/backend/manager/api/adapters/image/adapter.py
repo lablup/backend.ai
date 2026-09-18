@@ -7,16 +7,8 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
-<<<<<<< HEAD
 from ai.backend.common.api_handlers import Sentinel
-=======
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
->>>>>>> 35538843 (fix(BA-7874): read the cursor arguments the REST image search advertises (#14598))
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -67,18 +59,13 @@ from ai.backend.manager.models.image.conditions import (
 )
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-<<<<<<< HEAD
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
-=======
-from ai.backend.manager.models.image.updaters import ImageUpdate
->>>>>>> 35538843 (fix(BA-7874): read the cursor arguments the REST image search advertises (#14598))
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
