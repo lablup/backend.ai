@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,6 +18,7 @@ from ai.backend.agent.docker.intrinsic import (
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
+from ai.backend.common.types import DeviceId, DeviceName, SlotName
 
 
 class BaseDockerIntrinsicTest:
@@ -138,6 +140,104 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await cpu_plugin.gather_container_measures(cpu_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
+
+
+@dataclass(frozen=True)
+class _CpuUtilCapacityCase:
+    allocated_cores: int
+    expected_capacity: Decimal
+
+
+class TestCPUPluginUtilCapacity(BaseDockerIntrinsicTest):
+    """cpu_util capacity follows the cores the kernel registry allocated to the container."""
+
+    @pytest.fixture
+    def cpu_plugin(self) -> CPUPlugin:
+        plugin = CPUPlugin.__new__(CPUPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
+        return plugin
+
+    @pytest.fixture
+    def registry_context(
+        self,
+        docker_stat_context: MagicMock,
+        case: _CpuUtilCapacityCase,
+    ) -> MagicMock:
+        kernel = MagicMock()
+        kernel.container_id = "container_000"
+        kernel.resource_spec.allocations = {
+            DeviceName("cpu"): {
+                SlotName("cpu"): {
+                    DeviceId(str(core)): Decimal(1) for core in range(case.allocated_cores)
+                },
+            },
+        }
+        docker_stat_context.agent.kernel_registry = {"kernel_000": kernel}
+        return docker_stat_context
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _CpuUtilCapacityCase(allocated_cores=1, expected_capacity=Decimal(1000)),
+            _CpuUtilCapacityCase(allocated_cores=2, expected_capacity=Decimal(2000)),
+            _CpuUtilCapacityCase(allocated_cores=4, expected_capacity=Decimal(4000)),
+        ],
+        ids=lambda case: f"{case.allocated_cores}core",
+    )
+    async def test_container_capacity_is_allocated_millicores(
+        self,
+        cpu_plugin: CPUPlugin,
+        registry_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+        case: _CpuUtilCapacityCase,
+    ) -> None:
+        results = await cpu_plugin.gather_container_measures(registry_context, ["container_000"])
+
+        cpu_util = next(r for r in results if r.key == "cpu_util")
+        assert cpu_util.per_container["container_000"].capacity == case.expected_capacity
+
+    @pytest.mark.parametrize(
+        "case",
+        [_CpuUtilCapacityCase(allocated_cores=2, expected_capacity=Decimal(2000))],
+        ids=lambda case: f"{case.allocated_cores}core",
+    )
+    async def test_unregistered_container_has_no_capacity(
+        self,
+        cpu_plugin: CPUPlugin,
+        registry_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+        case: _CpuUtilCapacityCase,
+    ) -> None:
+        results = await cpu_plugin.gather_container_measures(
+            registry_context, ["container_000", "container_001"]
+        )
+
+        cpu_util = next(r for r in results if r.key == "cpu_util")
+        assert cpu_util.per_container["container_000"].capacity == case.expected_capacity
+        assert cpu_util.per_container["container_001"].capacity is None
+
+    @pytest.mark.parametrize(
+        "case",
+        [_CpuUtilCapacityCase(allocated_cores=2, expected_capacity=Decimal(2000))],
+        ids=lambda case: f"{case.allocated_cores}core",
+    )
+    async def test_process_capacity_is_the_container_allocation(
+        self,
+        cpu_plugin: CPUPlugin,
+        registry_context: MagicMock,
+        case: _CpuUtilCapacityCase,
+    ) -> None:
+        cpu_times = MagicMock(user=0.5, system=0.25)
+        with patch("ai.backend.agent.docker.intrinsic.psutil.Process") as mock_process:
+            mock_process.return_value.cpu_times.return_value = cpu_times
+            results = await cpu_plugin.gather_process_measures(
+                registry_context, {1234: "container_000", 5678: "container_001"}
+            )
+
+        cpu_util = next(r for r in results if r.key == "cpu_util")
+        assert cpu_util.per_process[1234].capacity == case.expected_capacity
+        assert cpu_util.per_process[5678].capacity is None
 
 
 class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):

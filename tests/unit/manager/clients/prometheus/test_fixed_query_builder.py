@@ -124,10 +124,10 @@ class TestGetContainerMetricQuery:
                 expected_query=(
                     "label_replace("
                     "sum by (user_id)(rate(backendai_container_utilization"
-                    f'{{container_metric_name="cpu_util",user_id="{_USER_ID}",value_type="current"}}[5m])'
-                    " / ignoring(value_type) (backendai_container_utilization"
-                    f'{{container_metric_name="cpu_util",user_id="{_USER_ID}",value_type="capacity"}} > 0)'
-                    ') * 100, "value_type", "pct", "", "")'
+                    f'{{container_metric_name="cpu_util",user_id="{_USER_ID}",value_type="current"}}[5m]))'
+                    " / (sum by (user_id)(backendai_container_utilization"
+                    f'{{container_metric_name="cpu_util",user_id="{_USER_ID}",value_type="capacity"}}) > 0)'
+                    ' * 100, "value_type", "pct", "", "")'
                 ),
             ),
             _PctQueryCase(
