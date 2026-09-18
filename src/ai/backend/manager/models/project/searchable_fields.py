@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
@@ -95,6 +96,7 @@ class _ProjectOwnFields(RowDataConverter[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
+        registry = self.container_registry.read(row)
         return ProjectData(
             id=self.id.read(row),
             name=self.name.read(row),
@@ -109,7 +111,13 @@ class _ProjectOwnFields(RowDataConverter[ProjectRow, ProjectData]):
             dotfiles=self.dotfiles.read(row),
             resource_policy=self.resource_policy.read(row),
             type=self.type.read(row),
-            container_registry=self.container_registry.read(row),
+            container_registry=(
+                ImageCommitRegistry(
+                    registry_name=registry["registry"], project_name=registry.get("project")
+                )
+                if registry
+                else None
+            ),
         )
 
 

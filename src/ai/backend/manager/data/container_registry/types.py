@@ -58,7 +58,7 @@ class PerProjectContainerRegistryInfo:
 @dataclass(frozen=True)
 class ImageCommitRegistry:
     registry_name: str
-    project_name: str
+    project_name: str | None
 
-    def to_json(self) -> dict[str, str]:
+    def to_json(self) -> dict[str, str | None]:
         return {"registry": self.registry_name, "project": self.project_name}

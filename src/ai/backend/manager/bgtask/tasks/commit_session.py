@@ -66,7 +66,9 @@ class CommitSessionManifest(BaseBackgroundTaskManifest):
         default=None, description="Selected container registry ID"
     )
     registry_hostname: str = Field(description="Registry hostname to push the image")
-    registry_project: str = Field(description="Registry project name")
+    registry_project: str | None = Field(
+        default=None, description="Registry project name, absent for a registry without one"
+    )
     image_name: str = Field(description="Name for the customized image")
     image_visibility: CustomizedImageVisibilityScope = Field(
         description="Visibility scope of the customized image"
@@ -150,7 +152,8 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
             else:
                 new_name = base_image_ref.name
 
-            new_canonical = f"{manifest.registry_hostname}/{manifest.registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            project_prefix = f"{manifest.registry_project}/" if manifest.registry_project else ""
+            new_canonical = f"{manifest.registry_hostname}/{project_prefix}{new_name}:{'-'.join(filtered_tag_set)}"
 
             # Check for existing customized image
             existing_row = await self._session_repository.get_existing_customized_image(
