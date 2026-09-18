@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
@@ -50,8 +51,6 @@ from ai.backend.manager.services.login_client_type.actions.update import (
 )
 from ai.backend.manager.services.login_client_type.processors import LoginClientTypeProcessors
 from ai.backend.manager.types import OptionalState, TriState
-
-DEFAULT_PAGINATION_LIMIT = 50
 
 
 class LoginClientTypeAdapter(BaseAdapter):
@@ -153,7 +152,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
+            limit=input.limit if input.limit is not None else DEFAULT_PAGE_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
         return LoginClientTypeSearcher(pagination=pagination, conditions=conditions, orders=orders)
