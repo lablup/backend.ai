@@ -17,6 +17,7 @@ from ai.backend.common.data.notification.types import (
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -98,7 +99,9 @@ class SearchNotificationChannelsRequest(BaseRequestModel):
     order: list[NotificationChannelOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -159,7 +162,9 @@ class SearchNotificationRulesRequest(BaseRequestModel):
     order: list[NotificationRuleOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 

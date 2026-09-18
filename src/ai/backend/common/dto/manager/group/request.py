@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import GroupOrder
@@ -46,7 +47,9 @@ class SearchGroupsRequest(BaseRequestModel):
 
     filter: GroupFilter | None = Field(default=None, description="Filter conditions")
     order: GroupOrder | None = Field(default=None, description="Order specification")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -97,7 +100,9 @@ class RemoveGroupMembersRequest(BaseRequestModel):
 class ListGroupMembersRequest(BaseRequestModel):
     """Request to list members of a group with pagination."""
 
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
