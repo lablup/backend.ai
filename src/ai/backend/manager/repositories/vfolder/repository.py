@@ -236,13 +236,10 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[VFolderData | None]:
-        """
-        Batch fetch vfolders by IDs without permission validation.
+        """The named vfolders in the given order, ``None`` where an id matches no row.
 
-        Returns a list with the same length and order as the input ids;
-        entries that are not found are ``None``. Intended for GraphQL
-        DataLoader use where the caller has already authorized access to a
-        parent entity that references these vfolder IDs.
+        No permission check: the partial bulk action calling this has already
+        narrowed ``ids`` to what the caller may read.
         """
         if not ids:
             return []

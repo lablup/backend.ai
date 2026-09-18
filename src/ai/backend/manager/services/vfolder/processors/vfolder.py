@@ -30,10 +30,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    GlobalBatchLoadVFoldersAction,
-    GlobalBatchLoadVFoldersActionResult,
-)
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
     BulkLoadVFolderMountLevelsAction,
 )
@@ -170,9 +167,7 @@ class VFolderProcessors:
     get_vfolder_row: SingleEntityActionProcessor[
         GetVFolderLegacyRowAction, GetVFolderLegacyRowActionResult
     ]
-    batch_load_vfolders_by_ids: GlobalActionProcessor[
-        GlobalBatchLoadVFoldersAction, GlobalBatchLoadVFoldersActionResult
-    ]
+    bulk_get: PartialBulkActionProcessor[BulkGetVFoldersAction, VFolderData]
     bulk_load_permissions: PartialBulkActionProcessor[BulkLoadVFolderPermissionsAction, Permission]
     bulk_load_mount_levels: PartialBulkActionProcessor[
         BulkLoadVFolderMountLevelsAction, VFolderMountPolicy
@@ -249,10 +244,8 @@ class VFolderProcessors:
             GetVFolderLegacyRowAction, service.get_vfolder_row
         )
 
-        # Cross-entity loaders (no RBAC validation; caller has parent access)
-        self.batch_load_vfolders_by_ids = group.global_scope(
-            GlobalBatchLoadVFoldersAction, service.batch_load_by_ids
-        )
+        # Bulk reads, answered per folder
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetVFoldersAction)
         self.bulk_load_permissions = group.partial_bulk(
             BulkLoadVFolderPermissionsAction, service.bulk_load_permissions
         )
