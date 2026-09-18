@@ -35,9 +35,6 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.services.container_registry.quota import (
-    AbstractPerProjectContainerRegistryQuotaService,
-)
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
@@ -336,7 +333,6 @@ class GraphQueryContext:
     access_key: str
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService
     valkey_stat: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_image: ValkeyImageClient

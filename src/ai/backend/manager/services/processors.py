@@ -74,9 +74,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
-    from ai.backend.manager.services.container_registry.quota import (
-        AbstractPerProjectContainerRegistryQuotaService,
-    )
     from ai.backend.manager.services.container_registry.service import (
         ContainerRegistryService,
     )
@@ -350,7 +347,6 @@ class ServiceArgs:
     prometheus_client: PrometheusClient
     ssh_key_validator: SSHKeyValidator
     key_provider_pool: KeyProviderPool
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass

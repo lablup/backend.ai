@@ -99,9 +99,6 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.services.container_registry.quota import (
-    AbstractPerProjectContainerRegistryQuotaService,
-)
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -176,9 +173,6 @@ class ProcessingInput:
     # Lifecycle background tasks
     stats_monitor: StatsPluginContext
     pidx: int
-
-    # Registry quota service (optional, defaults to None)
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
@@ -374,7 +368,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             prometheus_client=setup_input.prometheus_client,
             ssh_key_validator=ssh_key_validator,
             key_provider_pool=setup_input.key_provider_pool,
-            registry_quota_service=setup_input.registry_quota_service,
         )
 
         v2_validators = build_action_validators(

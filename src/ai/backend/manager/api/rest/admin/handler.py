@@ -112,7 +112,6 @@ class AdminHandler:
             manager_status=manager_status,
             known_slot_types=known_slot_types,
             background_task_manager=gql_deps.background_task_manager,
-            registry_quota_service=gql_deps.registry_quota_service,
             storage_manager=gql_deps.storage_manager,
             registry=gql_deps.registry,
             idle_checker_host=gql_deps.idle_checker_host,

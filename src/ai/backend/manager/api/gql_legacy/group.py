@@ -48,6 +48,9 @@ from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
+from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
+    ReadRegistryQuotaAction,
+)
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import (
@@ -243,7 +246,10 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         scope_id = ProjectScope(project_id=self.id, domain_name=None)
 
-        return await graph_ctx.registry_quota_service.read_quota(scope_id)
+        result = await graph_ctx.processors.container_registry.read_registry_quota.run(
+            ReadRegistryQuotaAction(scope_id=scope_id)
+        )
+        return result.quota
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
