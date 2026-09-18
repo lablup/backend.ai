@@ -264,7 +264,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
             container_registry=(
                 ImageCommitRegistry(
                     registry_name=self.container_registry["registry"],
-                    project_name=self.container_registry["project"],
+                    project_name=self.container_registry.get("project"),
                 )
                 if self.container_registry
                 else None

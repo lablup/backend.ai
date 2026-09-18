@@ -28,6 +28,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -584,13 +585,10 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         registry = value_or_none(self.container_registry)
         container_registry_val = None
         if registry:
-            match registry:
-                case {"registry": str() as registry_name, "project": str() as project_name}:
-                    container_registry_val = ImageCommitRegistry(
-                        registry_name=registry_name, project_name=project_name
-                    )
-                case _:
-                    raise InvalidAPIParameters("Expected registry and project strings")
+            parsed = ImageCommitRegistryReq.model_validate(registry)
+            container_registry_val = ImageCommitRegistry(
+                registry_name=parsed.registry, project_name=parsed.project
+            )
 
         return CreateProjectAction(
             domain_id=domain_id,
@@ -632,13 +630,10 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         elif not registry:
             container_registry = TriState[ImageCommitRegistry].nullify()
         else:
-            match registry:
-                case {"registry": str() as registry_name, "project": str() as project_name}:
-                    container_registry = TriState.update(
-                        ImageCommitRegistry(registry_name=registry_name, project_name=project_name)
-                    )
-                case _:
-                    raise InvalidAPIParameters("Expected registry and project strings")
+            parsed = ImageCommitRegistryReq.model_validate(registry)
+            container_registry = TriState.update(
+                ImageCommitRegistry(registry_name=parsed.registry, project_name=parsed.project)
+            )
         updater = ProjectUpdater(
             project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(

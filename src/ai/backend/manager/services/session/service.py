@@ -414,7 +414,7 @@ class SessionService:
 
         registry_conf = await self._session_repository.get_image_commit_registry(session.group_id)
         registry_hostname = registry_conf.registry_name
-        registry_project = registry_conf.project or ""
+        registry_project = registry_conf.project
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:

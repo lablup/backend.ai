@@ -8,6 +8,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 
@@ -43,14 +44,19 @@ class PerProjectRegistryQuotaRepository:
     async def fetch_container_registry_row(
         self, scope_id: ProjectScope
     ) -> PerProjectContainerRegistryInfo:
-        registry = await self._db_source.fetch_image_commit_registry(scope_id.project_id)
+        registry_id = await self._db_source.lookup_image_commit_registry_id(scope_id.project_id)
+        registry = await self._db_source.fetch_by_id(registry_id)
+        if not registry.project:
+            raise ContainerRegistryNotFound(
+                f"Container registry {registry.registry_name} carries no project to hold the quota. (project: {scope_id.project_id})"
+            )
 
         return PerProjectContainerRegistryInfo(
             id=registry.id,
             url=registry.url,
             registry_name=registry.registry_name,
             type=registry.type,
-            project=registry.project or "",
+            project=registry.project,
             username=registry.username or "",
             password=registry.password or "",
             ssl_verify=registry.ssl_verify if registry.ssl_verify is not None else True,
