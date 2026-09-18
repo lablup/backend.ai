@@ -162,14 +162,14 @@ async def admin_delete_runtime_variants(
     info: Info[StrawberryGQLContext],
     input: DeleteRuntimeVariantsInputGQL,
 ) -> DeleteRuntimeVariantsPayloadGQL | None:
-    """Delete multiple runtime variants, answering for each one.
+    """Delete multiple runtime variants.
 
     Args:
         info: Strawberry GraphQL context.
         input: Input containing list of runtime variant UUIDs to delete.
 
     Returns:
-        DeleteRuntimeVariantsPayloadGQL with the deleted variants and the failures.
+        DeleteRuntimeVariantsPayloadGQL with count of deleted runtime variants.
     """
     check_admin_only()
     ctx = info.context

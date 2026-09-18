@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     CreateRuntimeVariantPayload,
     DeleteRuntimeVariantPayload,
     DeleteRuntimeVariantsPayload,
-    RuntimeVariantBulkFailureInfo,
     RuntimeVariantModelDefinitionInfo,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
@@ -156,24 +155,20 @@ class RuntimeVariantAdapter(BaseAdapter):
         return DeleteRuntimeVariantPayload(id=result.data.id)
 
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
-        """Delete the named runtime variants, answering for each one."""
+        """Delete multiple runtime variants by ID.
+
+        The action answers per id; the first failure is raised here so the response
+        keeps meaning that every id named was deleted.
+        """
         result = await self._runtime_variant.bulk_purge.run(
             BulkPurgeRuntimeVariantsAction(
                 ids=[RuntimeVariantID(variant_id) for variant_id in input.ids]
             )
         )
-        items = [self._data_to_node(item.value) for item in result.items if item.value is not None]
-        return DeleteRuntimeVariantsPayload(
-            items=items,
-            failed=[
-                RuntimeVariantBulkFailureInfo(
-                    id=RuntimeVariantID(item.entity_id), message=str(item.error)
-                )
-                for item in result.items
-                if item.error is not None
-            ],
-            deleted_count=len(items),
-        )
+        for item in result.items:
+            if item.error is not None:
+                raise item.error
+        return DeleteRuntimeVariantsPayload(deleted_count=len(result.items))
 
     async def resolve_by_name(self, name: str) -> RuntimeVariantID:
         """Resolve a variant name into its ``RuntimeVariantID``.
