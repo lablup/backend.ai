@@ -46,6 +46,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -104,6 +105,12 @@ class AutoScalingRuleOrderBy(PydanticInputMixin[AutoScalingRuleOrderDTO]):
 )
 class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the auto scaling rule.",
+        ),
+    )
 
     metric_source: AutoScalingMetricSource = gql_field(
         description="The source of the scaling metric (e.g. KERNEL, INFERENCE_FRAMEWORK)."

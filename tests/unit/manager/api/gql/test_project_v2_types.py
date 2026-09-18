@@ -37,6 +37,7 @@ def _make_project_node(
 ) -> ProjectNode:
     return ProjectNode(
         id=project_id or uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         basic_info=ProjectBasicInfo(
             name=name,
             description=description,

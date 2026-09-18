@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import Field
 
@@ -18,6 +19,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 
 __all__ = (
@@ -150,7 +152,16 @@ class AgentNode(BaseResponseModel):
     """Node model representing an agent entity with nested information groups."""
 
     id: str = Field(description="Agent ID.")
-    uuid: AgentUUID = Field(description="Agent UUID, which is what rows keyed on the agent carry.")
+    entity_id: UUID = Field(
+        description=f"UUID of the agent. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    uuid: AgentUUID = Field(
+        description=(
+            "Agent UUID, which is what rows keyed on the agent carry. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use entity_id."
+        ),
+        deprecated=True,
+    )
     resource_info: AgentResourceInfo = Field(
         description="Hardware resource capacity, usage, and availability information."
     )

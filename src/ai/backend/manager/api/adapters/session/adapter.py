@@ -1211,6 +1211,7 @@ class SessionAdapter(BaseAdapter):
         )
         return SessionNode(
             id=data.id,
+            entity_id=data.entity_id(),
             image_ids=data.image_ids,
             domain_name=data.domain_name,
             user_id=UserID(data.user_uuid),
@@ -1273,6 +1274,7 @@ class SessionAdapter(BaseAdapter):
         )
         return KernelNode(
             id=info.id,
+            field_id=info.id,
             image_id=info.image.image_id,
             startup_command=info.runtime.startup_command,
             session_info=KernelSessionInfoGQLDTO(

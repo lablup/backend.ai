@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any, Self
+from uuid import UUID
 
 from strawberry import UNSET
 from strawberry.relay import Connection, Edge, NodeID
@@ -32,6 +33,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     UpdateLoginClientTypePayload as UpdateLoginClientTypePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -76,6 +78,12 @@ __all__ = (
 class LoginClientTypeGQL(PydanticNodeMixin[LoginClientTypeNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the login client type."
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the login client type.",
+        ),
     )
     name: str = gql_field(description="Unique login client type name (e.g. 'core', 'webui').")
     description: str | None = gql_field(description="Optional administrator-facing description.")

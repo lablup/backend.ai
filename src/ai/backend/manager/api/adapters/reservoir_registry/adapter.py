@@ -197,6 +197,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
     ) -> ReservoirRegistryNode:
         return ReservoirRegistryNode(
             id=connection.id,
+            entity_id=connection.entity_id(),
             name=meta.name,
             endpoint=connection.endpoint,
             access_key=connection.access_key,
@@ -215,6 +216,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
     def _reservoir_registry_data_to_dto(data: ReservoirRegistryData) -> ReservoirRegistryNode:
         return ReservoirRegistryNode(
             id=data.id,
+            entity_id=data.id,
             name=data.name,
             endpoint=data.endpoint,
             access_key=data.access_key,

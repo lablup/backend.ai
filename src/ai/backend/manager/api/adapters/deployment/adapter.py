@@ -2373,6 +2373,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return DeploymentNode(
             id=data.id,
+            entity_id=data.entity_id(),
             metadata=DeploymentMetadataInfoDTO(
                 project_id=str(data.metadata.project_id),
                 domain_name=data.metadata.domain_name,
@@ -2423,6 +2424,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return RevisionNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             revision_number=data.revision_number,
             image_id=data.image_id,
@@ -2481,6 +2483,7 @@ class DeploymentAdapter(BaseAdapter):
     def _route_info_to_dto(data: RouteInfo) -> RouteNode:
         return RouteNode(
             id=data.route_id,
+            field_id=data.route_id,
             deployment_id=data.deployment_id,
             session_id=str(data.session_id) if data.session_id is not None else None,
             status=RouteStatus(data.status.value),
@@ -2496,6 +2499,7 @@ class DeploymentAdapter(BaseAdapter):
     def _access_token_data_to_dto(data: ModelDeploymentAccessTokenData) -> AccessTokenNode:
         return AccessTokenNode(
             id=data.id,
+            field_id=data.id,
             token=data.token,
             expires_at=data.expires_at,
             created_at=data.created_at,
@@ -2507,6 +2511,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AutoScalingRuleNode:
         return AutoScalingRuleNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.model_deployment_id,
             metric_source=data.metric_source.name,
             metric_name=data.metric_name,
@@ -2538,6 +2543,7 @@ class DeploymentAdapter(BaseAdapter):
             )
         return DeploymentPolicyNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.endpoint,
             strategy_spec=strategy_spec,
             created_at=data.created_at,
@@ -2548,6 +2554,7 @@ class DeploymentAdapter(BaseAdapter):
     def _replica_data_to_dto(data: ModelReplicaData) -> ReplicaNode:
         return ReplicaNode(
             id=data.id,
+            field_id=data.id,
             deployment_id=data.deployment_id,
             revision_id=data.revision_id,
             session_id=data.session_id,

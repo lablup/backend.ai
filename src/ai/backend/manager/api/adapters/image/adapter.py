@@ -554,6 +554,7 @@ class ImageAdapter(BaseAdapter):
         ]
         return ImageNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=str(data.name),
             image=data.image,
             registry=data.registry,
@@ -597,6 +598,7 @@ class ImageAdapter(BaseAdapter):
         """Convert alias data layer type to Pydantic DTO."""
         return ImageAliasNode(
             id=data.id,
+            field_id=data.id,
             alias=data.alias,
         )
 

@@ -42,6 +42,12 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     """Keypair entity accessible via Relay Node interface."""
 
     id: NodeID[str] = gql_field(description="Access key (primary key, used as the Relay Node ID).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the keypair.",
+        ),
+    )
     access_key: str = gql_field(description="The access key string.")
     is_active: bool | None = gql_field(description="Whether the keypair is currently active.")
     is_admin: bool | None = gql_field(description="Whether the keypair has admin privileges.")

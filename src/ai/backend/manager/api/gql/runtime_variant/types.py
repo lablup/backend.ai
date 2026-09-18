@@ -50,6 +50,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -160,6 +161,12 @@ class RuntimeVariantModelDefinitionGQL(PydanticOutputMixin[RuntimeVariantModelDe
 )
 class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the runtime variant.",
+        ),
+    )
     name: str = gql_field(
         description="Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi')."
     )

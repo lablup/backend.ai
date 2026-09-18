@@ -1033,6 +1033,7 @@ class ResourceUsageAdapter(BaseAdapter):
     def _domain_bucket_to_dto(data: DomainUsageBucketData) -> DomainUsageBucketNode:
         return DomainUsageBucketNode(
             id=data.id,
+            field_id=data.id,
             domain_name=data.domain_name,
             resource_group_name=data.resource_group,
             metadata=UsageBucketMetadataNode(
@@ -1050,6 +1051,7 @@ class ResourceUsageAdapter(BaseAdapter):
     def _project_bucket_to_dto(data: ProjectUsageBucketData) -> ProjectUsageBucketNode:
         return ProjectUsageBucketNode(
             id=data.id,
+            field_id=data.id,
             project_id=data.project_id,
             domain_name=data.domain_name,
             resource_group_name=data.resource_group,
@@ -1068,6 +1070,7 @@ class ResourceUsageAdapter(BaseAdapter):
     def _user_bucket_to_dto(data: UserUsageBucketData) -> UserUsageBucketNode:
         return UserUsageBucketNode(
             id=data.id,
+            field_id=data.id,
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,

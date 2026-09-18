@@ -773,6 +773,7 @@ class ArtifactAdapter(BaseAdapter):
     def _data_to_dto(data: ArtifactData) -> ArtifactNode:
         return ArtifactNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
@@ -795,6 +796,7 @@ class ArtifactAdapter(BaseAdapter):
     def _revision_data_to_dto(data: ArtifactRevisionData) -> ArtifactRevisionNode:
         return ArtifactRevisionNode(
             id=data.id,
+            field_id=data.id,
             artifact_id=ArtifactID(data.artifact_id),
             version=data.version,
             size=str(data.size) if data.size is not None else None,
@@ -809,6 +811,7 @@ class ArtifactAdapter(BaseAdapter):
     def _data_with_revisions_to_dto(data: ArtifactDataWithRevisions) -> ArtifactNode:
         return ArtifactNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,

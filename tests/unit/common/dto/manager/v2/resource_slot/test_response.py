@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import NumberFormatInf
 
 def _make_resource_slot_type_node(slot_name: str = "cpu") -> ResourceSlotTypeNode:
     return ResourceSlotTypeNode(
+        entity_id=uuid4(),
         uuid=uuid4(),
         slot_name=slot_name,
         slot_type="count",
@@ -43,6 +44,7 @@ class TestResourceSlotTypeNode:
 
     def test_memory_slot(self) -> None:
         node = ResourceSlotTypeNode(
+            entity_id=uuid4(),
             uuid=uuid4(),
             slot_name="mem",
             slot_type="bytes",
@@ -75,6 +77,7 @@ class TestResourceSlotTypeNode:
 
     def test_cuda_slot(self) -> None:
         node = ResourceSlotTypeNode(
+            entity_id=uuid4(),
             uuid=uuid4(),
             slot_name="cuda.device",
             slot_type="unique",

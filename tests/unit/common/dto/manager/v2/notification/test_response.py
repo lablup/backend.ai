@@ -62,6 +62,7 @@ def _make_channel_node(
     now = datetime.now(tz=UTC)
     return NotificationChannelNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         name="Test Channel",
         channel_type=channel_type,
         spec=spec or _make_webhook_spec_info(),
@@ -81,6 +82,7 @@ class TestNotificationChannelNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=channel_id,
+            entity_id=channel_id,
             name="Webhook Channel",
             description="A webhook channel",
             channel_type=NotificationChannelTypeDTO.WEBHOOK,
@@ -101,6 +103,7 @@ class TestNotificationChannelNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Email Channel",
             channel_type=NotificationChannelTypeDTO.EMAIL,
             spec=_make_email_spec_info(),
@@ -120,6 +123,7 @@ class TestNotificationChannelNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Channel",
             description=None,
             channel_type=NotificationChannelTypeDTO.WEBHOOK,
@@ -205,6 +209,7 @@ class TestNotificationRuleNodeCreation:
         channel_node = _make_channel_node()
         node = NotificationRuleNode(
             id=rule_id,
+            entity_id=rule_id,
             name="Session Alert Rule",
             description="Alert on session events",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
@@ -225,6 +230,7 @@ class TestNotificationRuleNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_TERMINATED,
             channel_id=_make_channel_node().id,
@@ -241,6 +247,7 @@ class TestNotificationRuleNodeCreation:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
             channel_id=channel_node.id,
@@ -256,6 +263,7 @@ class TestNotificationRuleNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Download Alert",
             rule_type=NotificationRuleTypeDTO.ARTIFACT_DOWNLOAD_COMPLETED,
             channel_id=_make_channel_node().id,
@@ -276,6 +284,7 @@ class TestNotificationRuleNodeSerialization:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Alert Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
             channel_id=channel_node.id,
@@ -295,6 +304,7 @@ class TestNotificationRuleNodeSerialization:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_TERMINATED,
             channel_id=channel_node.id,
@@ -335,6 +345,7 @@ class TestUpdateNotificationChannelPayload:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Updated Channel",
             channel_type=NotificationChannelTypeDTO.WEBHOOK,
             spec=_make_webhook_spec_info(),
@@ -388,6 +399,7 @@ class TestCreateNotificationRulePayload:
         now = datetime.now(tz=UTC)
         return NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Alert Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
             channel_id=_make_channel_node().id,
@@ -420,6 +432,7 @@ class TestUpdateNotificationRulePayload:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Updated Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_TERMINATED,
             channel_id=_make_channel_node().id,
@@ -437,6 +450,7 @@ class TestUpdateNotificationRulePayload:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
             channel_id=_make_channel_node().id,

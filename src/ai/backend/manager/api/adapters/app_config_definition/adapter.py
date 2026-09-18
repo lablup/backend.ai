@@ -150,6 +150,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     def _data_to_node(data: AppConfigDefinitionData) -> AppConfigDefinitionNode:
         return AppConfigDefinitionNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             created_at=data.created_at,
             updated_at=data.updated_at,

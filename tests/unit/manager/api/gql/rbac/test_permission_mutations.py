@@ -34,6 +34,7 @@ def _make_permission_node(
 ) -> PermissionNode:
     return PermissionNode(
         id=permission_id or uuid.uuid4(),
+        field_id=uuid.uuid4(),
         role_id=role_id or uuid.uuid4(),
         entity_type=EntityType(entity_type),
         permission=permission,

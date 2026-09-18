@@ -193,6 +193,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
     def _data_to_node(data: AppConfigAllowListData) -> AppConfigAllowListNode:
         return AppConfigAllowListNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
             rank=data.rank,

@@ -35,10 +35,12 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_node_type,
@@ -78,6 +80,12 @@ class AccessTokenOrderBy(PydanticInputMixin[AccessTokenOrderDTO]):
 )
 class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the access token.",
+        ),
+    )
     token: str = gql_field(description="The access token.")
     created_at: datetime = gql_field(description="The creation timestamp of the access token.")
     expires_at: datetime | None = gql_field(

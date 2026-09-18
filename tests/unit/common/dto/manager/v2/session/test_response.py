@@ -96,6 +96,7 @@ def _make_network(use_host_network: bool = False) -> SessionNetworkInfo:
 def _make_session_node() -> SessionNode:
     return SessionNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         domain_name="default",
         user_id=uuid.uuid4(),
         project_id=uuid.uuid4(),
@@ -311,6 +312,7 @@ class TestSessionNode:
         session_id = uuid.uuid4()
         node = SessionNode(
             id=session_id,
+            entity_id=session_id,
             domain_name="default",
             user_id=uuid.uuid4(),
             project_id=uuid.uuid4(),
@@ -369,6 +371,7 @@ class TestSessionNode:
         replica_id = uuid.uuid4()
         node = SessionNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             domain_name="default",
             user_id=uuid.uuid4(),
             project_id=uuid.uuid4(),

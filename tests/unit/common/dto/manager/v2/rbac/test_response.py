@@ -34,6 +34,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             description="Administrator role",
             source=RoleSourceDTO.CUSTOM,
@@ -58,6 +59,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
@@ -75,6 +77,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="TestRole",
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
@@ -90,6 +93,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="TestRole",
             description=None,
             source=RoleSourceDTO.SYSTEM,
@@ -106,6 +110,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="DeletedRole",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.DELETED,
@@ -123,6 +128,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="SystemRole",
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
@@ -138,6 +144,7 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="InactiveRole",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.INACTIVE,
@@ -157,6 +164,7 @@ class TestCreateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
@@ -174,6 +182,7 @@ class TestCreateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             description="Admin role",
             source=RoleSourceDTO.CUSTOM,
@@ -192,6 +201,7 @@ class TestCreateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
@@ -216,6 +226,7 @@ class TestUpdateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="UpdatedAdmin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
@@ -233,6 +244,7 @@ class TestUpdateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="UpdatedAdmin",
             description="Updated description",
             source=RoleSourceDTO.CUSTOM,
@@ -316,6 +328,7 @@ class TestRoleNodeRoundTrip:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             description="Admin role",
             source=RoleSourceDTO.CUSTOM,
@@ -340,6 +353,7 @@ class TestRoleNodeRoundTrip:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="DeletedRole",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.DELETED,
@@ -360,6 +374,7 @@ class TestRoleNodeRoundTrip:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="BasicRole",
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
@@ -393,6 +408,7 @@ class TestRoleNodeScope:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Scoped",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
@@ -414,6 +430,7 @@ class TestPermissionNodeBit:
     def _node(self, permission: PermissionBitDTO) -> PermissionNode:
         return PermissionNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             role_id=uuid.uuid4(),
             entity_type=EntityType("vfolder"),
             permission=permission,

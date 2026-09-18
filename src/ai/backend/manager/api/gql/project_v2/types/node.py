@@ -101,6 +101,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     """Project entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier for the project (UUID).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the project.",
+        ),
+    )
     basic_info: ProjectBasicInfoGQL = gql_field(
         description="Basic project information including name, type, and description."
     )

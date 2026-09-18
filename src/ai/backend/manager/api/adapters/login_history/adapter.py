@@ -179,6 +179,7 @@ class LoginHistoryAdapter(BaseAdapter):
     def _data_to_node(data: LoginHistoryData) -> LoginHistoryNode:
         return LoginHistoryNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             domain_name=data.domain_name,
             result=LoginAttemptResult(data.result.value),

@@ -188,6 +188,7 @@ class IdleCheckerAdapter(BaseAdapter):
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:
         return IdleCheckerNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             checker_type=IdleCheckerTypeDTO(data.checker_type.value),

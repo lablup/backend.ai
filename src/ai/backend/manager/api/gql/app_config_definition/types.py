@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload as PurgeAppConfigDefinitionPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -77,6 +78,12 @@ __all__ = (
 class AppConfigDefinitionGQL(PydanticNodeMixin[AppConfigDefinitionNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config definition."
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the app config definition.",
+        ),
     )
     config_name: str = gql_field(description="Registered config name.")
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")

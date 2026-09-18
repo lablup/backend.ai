@@ -228,6 +228,7 @@ class LoginSessionAdapter(BaseAdapter):
     def _data_to_node(data: LoginSessionData) -> LoginSessionNode:
         return LoginSessionNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             access_key=data.access_key,
             status=LoginSessionStatus(data.status.value),

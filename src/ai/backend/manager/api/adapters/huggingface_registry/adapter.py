@@ -182,6 +182,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
     ) -> HuggingFaceRegistryNode:
         return HuggingFaceRegistryNode(
             id=connection.id,
+            entity_id=connection.entity_id(),
             name=meta.name,
             url=connection.url,
             token=connection.token,
@@ -202,6 +203,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
     ) -> HuggingFaceRegistryNode:
         return HuggingFaceRegistryNode(
             id=data.id,
+            entity_id=data.id,
             name=data.name,
             url=data.url,
             token=data.token,

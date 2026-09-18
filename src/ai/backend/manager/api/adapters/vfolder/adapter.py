@@ -242,6 +242,7 @@ class VFolderAdapter(BaseAdapter):
         """Convert VFolderData to VFolderNode DTO."""
         return VFolderNode(
             id=data.id,
+            entity_id=data.entity_id(),
             status=data.status.to_field(),
             host=data.host,
             metadata=VFolderMetadataInfo(
@@ -580,6 +581,7 @@ class VFolderAdapter(BaseAdapter):
     def _mount_policy_to_node(data: VFolderMountPolicyData) -> VFolderMountPolicyNode:
         return VFolderMountPolicyNode(
             id=data.id,
+            field_id=data.id,
             vfolder_id=data.vfolder_id,
             user_id=data.user_id,
             permission=VFolderPermissionField(data.permission.value),

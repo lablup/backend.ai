@@ -144,6 +144,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return ServiceCatalogNode(
             id=data.id,
+            entity_id=data.entity_id(),
             service_group=data.service_group,
             instance_id=data.instance_id,
             display_name=data.display_name,

@@ -298,6 +298,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """Convert ResourceSlotTypeData to Pydantic DTO node."""
         return ResourceSlotTypeNode(
             id=data.slot_name,
+            entity_id=data.entity_id(),
             uuid=data.uuid,
             slot_name=data.slot_name,
             slot_type=data.slot_type,
@@ -433,6 +434,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """Convert AgentResourceData to Pydantic DTO node."""
         return AgentResourceNode(
             id=f"{data.agent_id}:{data.slot_name}",
+            field_id=data.id,
             agent_id=data.agent_id,
             slot_name=data.slot_name,
             capacity=str(data.capacity),

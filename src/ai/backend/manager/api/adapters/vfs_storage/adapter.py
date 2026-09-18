@@ -143,6 +143,7 @@ class VFSStorageAdapter(BaseAdapter):
     def _vfs_storage_data_to_dto(data: VFSStorageData) -> VFSStorageNode:
         return VFSStorageNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             host=data.host,
             base_path=str(data.base_path),

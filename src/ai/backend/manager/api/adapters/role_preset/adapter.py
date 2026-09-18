@@ -487,6 +487,7 @@ class RolePresetAdapter(BaseAdapter):
     def _data_to_node(data: RolePresetData) -> RolePresetNode:
         return RolePresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             scope_type=data.scope_type,
             auto_assign=data.auto_assign,
@@ -499,6 +500,7 @@ class RolePresetAdapter(BaseAdapter):
     def _permission_data_to_node(data: RolePermissionPresetData) -> RolePermissionPresetNode:
         return RolePermissionPresetNode(
             id=data.id,
+            field_id=data.id,
             role_preset_id=data.role_preset_id,
             entity_type=data.entity_type,
             permission=PermissionBitDTO.of(data.permission),

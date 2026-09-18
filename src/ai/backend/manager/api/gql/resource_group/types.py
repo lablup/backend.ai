@@ -366,6 +366,12 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             " instead of the name."
         )
     )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the resource group.",
+        ),
+    )
     name: str = gql_field(
         description="Unique name identifying the resource group. Used as primary key and referenced by agents, sessions, and resource presets."
     )

@@ -273,6 +273,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     def _data_to_node(data: RuntimeVariantPresetData) -> RuntimeVariantPresetNode:
         return RuntimeVariantPresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             runtime_variant_id=data.runtime_variant_id,
             name=data.name,
             description=data.description,

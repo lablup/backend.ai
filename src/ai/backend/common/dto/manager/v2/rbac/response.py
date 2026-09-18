@@ -12,6 +12,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     PermissionBitDTO,
@@ -57,6 +58,9 @@ class RoleNode(BaseResponseModel):
     """Node model representing a role entity."""
 
     id: UUID = Field(description="Role ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the role. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Role name")
     description: str | None = Field(default=None, description="Role description")
     source: RoleSourceDTO = Field(description="Role source")
@@ -223,6 +227,9 @@ class PermissionNode(BaseResponseModel):
     """Node representing a scoped RBAC permission."""
 
     id: UUID = Field(description="Permission ID")
+    field_id: UUID = Field(
+        description=f"UUID of the permission row. Added in {NEXT_RELEASE_VERSION}.",
+    )
     role_id: UUID = Field(description="Role this permission belongs to")
     entity_type: EntityType = Field(description="Entity element type")
     permission: PermissionBitDTO = Field(description="The permission bit the row holds")

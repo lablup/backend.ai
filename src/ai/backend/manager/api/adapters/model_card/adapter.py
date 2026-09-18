@@ -656,6 +656,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> ModelCardNode:
         return ModelCardNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             vfolder_id=data.vfolder_id,
             domain_name=data.domain,

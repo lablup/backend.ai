@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -90,6 +91,12 @@ __all__ = (
 class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config allow-list entry."
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the app config allow list.",
+        ),
     )
     config_name: str = gql_field(description="The config name this entry permits writes for.")
     scope_type: AppConfigScopeType = gql_field(

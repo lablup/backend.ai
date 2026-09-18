@@ -67,6 +67,12 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     """Virtual folder entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the vfolder.",
+        ),
+    )
     status: VFolderOperationStatusGQL = gql_field(
         description=(
             "Current operation status. "

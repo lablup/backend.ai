@@ -1596,6 +1596,7 @@ class UserAdapter(BaseAdapter):
         """Convert UserData to UserNode DTO."""
         return UserNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=UserBasicInfo(
                 username=data.username,
                 email=data.email,

@@ -338,6 +338,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return QueryDefinitionNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             rank=data.rank,

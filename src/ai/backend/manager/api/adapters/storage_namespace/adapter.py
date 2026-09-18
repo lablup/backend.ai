@@ -133,6 +133,7 @@ class StorageNamespaceAdapter(BaseAdapter):
     def _storage_namespace_data_to_dto(data: StorageNamespaceData) -> StorageNamespaceNode:
         return StorageNamespaceNode(
             id=data.id,
+            entity_id=data.entity_id(),
             storage_id=data.storage_id,
             namespace=data.namespace,
         )

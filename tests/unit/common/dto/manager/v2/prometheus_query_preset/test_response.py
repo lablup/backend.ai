@@ -46,6 +46,7 @@ def _make_query_definition_node(
 ) -> QueryDefinitionNode:
     return QueryDefinitionNode(
         id=node_id,
+        entity_id=node_id,
         name=name,
         metric_name="node_cpu_seconds_total",
         query_template="rate({metric}[{time_window}])",
@@ -73,6 +74,7 @@ class TestQueryDefinitionNode:
     def test_default_time_window_is_none(self) -> None:
         node = QueryDefinitionNode(
             id=_UUID1,
+            entity_id=_UUID1,
             name="test",
             metric_name="metric",
             query_template="query",

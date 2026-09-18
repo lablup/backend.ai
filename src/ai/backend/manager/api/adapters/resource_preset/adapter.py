@@ -239,6 +239,7 @@ class ResourcePresetAdapter(BaseAdapter):
         """Convert ResourcePresetData to ResourcePresetNode DTO."""
         return ResourcePresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             resource_slots=[
                 ResourceSlotEntryInfo(resource_type=k, quantity=v)

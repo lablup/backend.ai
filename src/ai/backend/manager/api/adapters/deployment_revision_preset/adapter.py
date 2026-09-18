@@ -576,6 +576,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         ]
         return DeploymentRevisionPresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             runtime_variant_id=data.runtime_variant_id,
             name=data.name,
             description=data.description,

@@ -433,6 +433,7 @@ class NotificationAdapter(BaseAdapter):
                 raise InvalidNotificationSpec(f"Unsupported channel type: {data.channel_type}")
         return NotificationChannelNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             channel_type=NotificationChannelTypeDTO(data.channel_type.value),
@@ -448,6 +449,7 @@ class NotificationAdapter(BaseAdapter):
         """Convert NotificationRuleData to NotificationRuleNode DTO."""
         return NotificationRuleNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             rule_type=NotificationRuleTypeDTO(data.rule_type.value),

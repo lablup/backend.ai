@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -47,6 +48,12 @@ class LoginSessionStatusGQL(StrEnum):
 )
 class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the login session (UUID).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the login session.",
+        ),
+    )
 
     user_id: UUID = gql_field(description="UUID of the user who owns the session.")
     access_key: str = gql_field(description="Access key associated with the session.")

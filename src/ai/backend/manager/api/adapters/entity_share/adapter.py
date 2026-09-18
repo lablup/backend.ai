@@ -302,6 +302,7 @@ class EntityShareAdapter(BaseAdapter):
     def _to_node(self, data: EntityShareData) -> EntityShareNode:
         return EntityShareNode(
             id=data.id,
+            entity_id=data.entity_id(),
             sharer_user_id=data.sharer_user_id,
             recipient_email=data.recipient_email,
             target_entity_type=data.target.entity_type(),

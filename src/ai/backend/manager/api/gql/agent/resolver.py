@@ -72,7 +72,7 @@ async def agents_v2(
         )
     )
     nodes = [AgentV2GQL.from_pydantic(item) for item in result.items]
-    edges = [AgentV2Edge(node=node, cursor=encode_cursor(node.uuid)) for node in nodes]
+    edges = [AgentV2Edge(node=node, cursor=encode_cursor(node.entity_id)) for node in nodes]
     return AgentV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(

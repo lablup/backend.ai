@@ -170,6 +170,7 @@ class RetentionPolicyAdapter(BaseAdapter):
     def _data_to_node(data: RetentionPolicyData) -> RetentionPolicyNode:
         return RetentionPolicyNode(
             id=data.id,
+            entity_id=data.entity_id(),
             category=data.category,
             retention_period_days=data.retention_period.days,
             enabled=data.enabled,
