@@ -303,10 +303,12 @@ async def group_name_fixture(
 @pytest.fixture()
 async def resource_preset_fixture(
     db_engine: SAEngine,
+    valkey_clients: ValkeyClients,
 ) -> AsyncIterator[dict[str, str]]:
     """Insert a test resource preset and yield its metadata.
 
     Used for list_presets and check_presets tests. Cleaned up after each test.
+    The insert and the teardown drop the preset cache the repository reads first.
     """
     preset_id = uuid.uuid4()
     preset_name = f"test-preset-{preset_id.hex[:8]}"
@@ -321,6 +323,7 @@ async def resource_preset_fixture(
                 scaling_group_name=None,
             )
         )
+    await valkey_clients.stat.invalidate_all_resource_presets()
     yield {"id": str(preset_id), "name": preset_name}
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -328,3 +331,4 @@ async def resource_preset_fixture(
                 ResourcePresetRow.__table__.c.id == preset_id
             )
         )
+    await valkey_clients.stat.invalidate_all_resource_presets()
