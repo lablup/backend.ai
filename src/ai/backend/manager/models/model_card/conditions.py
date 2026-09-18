@@ -251,17 +251,3 @@ class ModelCardConditions:
             lambda c: ModelCardConditions._exists_vfolder(c),
         )
     )
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.id < sa.text(f"'{cursor_id}'::uuid")
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.id > sa.text(f"'{cursor_id}'::uuid")
-
-        return inner

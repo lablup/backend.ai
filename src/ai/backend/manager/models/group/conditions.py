@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
-from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -257,38 +256,6 @@ class GroupConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return GroupRow.modified_at == dt
-
-        return inner
-
-    # ==================== Cursor Pagination ====================
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: UUID) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(GroupRow.created_at).where(GroupRow.id == cursor_id).scalar_subquery()
-            )
-            return GroupRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: UUID) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(GroupRow.created_at).where(GroupRow.id == cursor_id).scalar_subquery()
-            )
-            return GroupRow.created_at > subquery
 
         return inner
 

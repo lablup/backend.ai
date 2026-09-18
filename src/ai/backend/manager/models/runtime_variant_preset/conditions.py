@@ -107,17 +107,3 @@ class RuntimeVariantPresetConditions:
         return inner
 
     by_name_in = staticmethod(make_string_in_factory(RuntimeVariantPresetRow.name))
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RuntimeVariantPresetRow.id < sa.text(f"'{cursor_id}'::uuid")
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RuntimeVariantPresetRow.id > sa.text(f"'{cursor_id}'::uuid")
-
-        return inner

@@ -53,10 +53,10 @@ from ai.backend.manager.services.agent.actions.search_agents import SearchAgents
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEFAULT_FORWARD_ORDER,
-    backward_order=DEFAULT_BACKWARD_ORDER,
+    explicit_backward_order=DEFAULT_BACKWARD_ORDER,
     forward_condition_factory=AgentConditions.by_cursor_forward,
     backward_condition_factory=AgentConditions.by_cursor_backward,
-    tiebreaker_order=TIEBREAKER_ORDER,
+    explicit_tiebreaker_order=TIEBREAKER_ORDER,
 )
 
 

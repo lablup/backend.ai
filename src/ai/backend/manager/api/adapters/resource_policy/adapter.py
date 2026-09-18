@@ -175,26 +175,26 @@ def _to_binary_size_info(value: int) -> BinarySizeInfo:
 
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairResourcePolicyOrders.created_at(ascending=False),
-    backward_order=KeypairResourcePolicyOrders.created_at(ascending=True),
+    explicit_backward_order=KeypairResourcePolicyOrders.created_at(ascending=True),
     forward_condition_factory=KeypairResourcePolicyConditions.by_cursor_forward,
     backward_condition_factory=KeypairResourcePolicyConditions.by_cursor_backward,
-    tiebreaker_order=KeyPairResourcePolicyRow.name.asc(),
+    explicit_tiebreaker_order=KeyPairResourcePolicyRow.name.asc(),
 )
 
 _USER_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserResourcePolicyOrders.created_at(ascending=False),
-    backward_order=UserResourcePolicyOrders.created_at(ascending=True),
+    explicit_backward_order=UserResourcePolicyOrders.created_at(ascending=True),
     forward_condition_factory=UserResourcePolicyConditions.by_cursor_forward,
     backward_condition_factory=UserResourcePolicyConditions.by_cursor_backward,
-    tiebreaker_order=UserResourcePolicyRow.name.asc(),
+    explicit_tiebreaker_order=UserResourcePolicyRow.name.asc(),
 )
 
 _PROJECT_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=ProjectResourcePolicyOrders.created_at(ascending=False),
-    backward_order=ProjectResourcePolicyOrders.created_at(ascending=True),
+    explicit_backward_order=ProjectResourcePolicyOrders.created_at(ascending=True),
     forward_condition_factory=ProjectResourcePolicyConditions.by_cursor_forward,
     backward_condition_factory=ProjectResourcePolicyConditions.by_cursor_backward,
-    tiebreaker_order=ProjectResourcePolicyRow.name.asc(),
+    explicit_tiebreaker_order=ProjectResourcePolicyRow.name.asc(),
 )
 
 

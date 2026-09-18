@@ -83,17 +83,12 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (
-    DEFAULT_BACKWARD_ORDER as VFOLDER_DEFAULT_BACKWARD_ORDER,
-)
-from ai.backend.manager.models.vfolder.orders import (
     DEFAULT_FORWARD_ORDER as VFOLDER_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.vfolder.orders import (
-    TIEBREAKER_ORDER as VFOLDER_TIEBREAKER_ORDER,
 )
 from ai.backend.manager.models.vfolder.orders import (
     resolve_order as resolve_vfolder_order,
 )
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -146,10 +141,7 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
     forward_order=VFOLDER_DEFAULT_FORWARD_ORDER,
-    backward_order=VFOLDER_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=VFolderConditions.by_cursor_forward,
-    backward_condition_factory=VFolderConditions.by_cursor_backward,
-    tiebreaker_order=VFOLDER_TIEBREAKER_ORDER,
+    cursor_column=VFolderRow.id,
 )
 
 

@@ -88,12 +88,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
     forward_order=GroupOrders.created_at(ascending=False),
-    backward_order=GroupOrders.created_at(ascending=True),
-    forward_condition_factory=lambda cursor_id: GroupConditions.by_cursor_forward(UUID(cursor_id)),
-    backward_condition_factory=lambda cursor_id: GroupConditions.by_cursor_backward(
-        UUID(cursor_id)
-    ),
-    tiebreaker_order=GroupRow.id.asc(),
+    cursor_column=GroupRow.id,
 )
 
 

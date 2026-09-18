@@ -118,20 +118,17 @@ from ai.backend.manager.types import OptionalState, TriState
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=DeploymentRevisionPresetOrders.rank(ascending=True),
-        backward_order=DeploymentRevisionPresetOrders.rank(ascending=False),
-        forward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentRevisionPresetRow.id.asc(),
+        cursor_column=DeploymentRevisionPresetRow.id,
     )
 
 
 def _preset_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
+        explicit_backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
+        explicit_tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
         forward_condition_factory=PresetResourceSlotConditions.by_cursor_forward,
         backward_condition_factory=PresetResourceSlotConditions.by_cursor_backward,
-        tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
     )
 
 

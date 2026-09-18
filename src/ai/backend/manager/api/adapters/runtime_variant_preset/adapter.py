@@ -75,10 +75,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RuntimeVariantPresetOrders.rank(ascending=True),
-        backward_order=RuntimeVariantPresetOrders.rank(ascending=False),
-        forward_condition_factory=RuntimeVariantPresetConditions.by_cursor_forward,
-        backward_condition_factory=RuntimeVariantPresetConditions.by_cursor_backward,
-        tiebreaker_order=RuntimeVariantPresetRow.id.asc(),
+        cursor_column=RuntimeVariantPresetRow.id,
     )
 
 

@@ -84,26 +84,17 @@ DEFAULT_PAGINATION_LIMIT = 20
 
 _DOMAIN_USAGE_BUCKET_PAGINATION_SPEC = PaginationSpec(
     forward_order=DomainUsageBucketOrders.by_period_start(ascending=False),
-    backward_order=DomainUsageBucketOrders.by_period_start(ascending=True),
-    forward_condition_factory=DomainUsageBucketConditions.by_cursor_forward,
-    backward_condition_factory=DomainUsageBucketConditions.by_cursor_backward,
-    tiebreaker_order=DomainUsageBucketRow.id.asc(),
+    cursor_column=DomainUsageBucketRow.id,
 )
 
 _PROJECT_USAGE_BUCKET_PAGINATION_SPEC = PaginationSpec(
     forward_order=ProjectUsageBucketOrders.by_period_start(ascending=False),
-    backward_order=ProjectUsageBucketOrders.by_period_start(ascending=True),
-    forward_condition_factory=ProjectUsageBucketConditions.by_cursor_forward,
-    backward_condition_factory=ProjectUsageBucketConditions.by_cursor_backward,
-    tiebreaker_order=ProjectUsageBucketRow.id.asc(),
+    cursor_column=ProjectUsageBucketRow.id,
 )
 
 _USER_USAGE_BUCKET_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserUsageBucketOrders.by_period_start(ascending=False),
-    backward_order=UserUsageBucketOrders.by_period_start(ascending=True),
-    forward_condition_factory=UserUsageBucketConditions.by_cursor_forward,
-    backward_condition_factory=UserUsageBucketConditions.by_cursor_backward,
-    tiebreaker_order=UserUsageBucketRow.id.asc(),
+    cursor_column=UserUsageBucketRow.id,
 )
 
 

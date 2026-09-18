@@ -19,6 +19,7 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -969,6 +970,13 @@ class TestNotificationCursorPagination:
     """
 
     @pytest.fixture
+    def channel_pagination_spec(self) -> PaginationSpec:
+        return PaginationSpec(
+            forward_order=NotificationChannelOrders.created_at(ascending=False),
+            cursor_column=NotificationChannelRow.id,
+        )
+
+    @pytest.fixture
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -1160,6 +1168,7 @@ class TestNotificationCursorPagination:
 
     async def test_forward_pagination_with_cursor_shows_older_items(
         self,
+        channel_pagination_spec: PaginationSpec,
         notification_repository: NotificationRepository,
         channels_for_cursor_pagination: list[uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1178,8 +1187,7 @@ class TestNotificationCursorPagination:
             )
             channel_3_id = db_result.scalar_one()
 
-        # Forward cursor condition: created_at < cursor's created_at
-        cursor_condition = NotificationChannelConditions.by_cursor_forward(str(channel_3_id))
+        cursor_condition = channel_pagination_spec.forward_condition(str(channel_3_id))
 
         querier = BatchQuerier(
             pagination=CursorForwardPagination(
@@ -1227,6 +1235,7 @@ class TestNotificationCursorPagination:
 
     async def test_backward_pagination_with_cursor_shows_newer_items(
         self,
+        channel_pagination_spec: PaginationSpec,
         notification_repository: NotificationRepository,
         channels_for_cursor_pagination: list[uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1245,8 +1254,7 @@ class TestNotificationCursorPagination:
             )
             channel_3_id = db_result.scalar_one()
 
-        # Backward cursor condition: created_at > cursor's created_at
-        cursor_condition = NotificationChannelConditions.by_cursor_backward(str(channel_3_id))
+        cursor_condition = channel_pagination_spec.backward_condition(str(channel_3_id))
 
         querier = BatchQuerier(
             pagination=CursorBackwardPagination(

@@ -238,25 +238,3 @@ class VFolderConditions:
             return VFolderRow.created_at == dt
 
         return inner
-
-    # ── cursor pagination factories ──
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(VFolderRow.created_at).where(VFolderRow.id == cursor_id).scalar_subquery()
-            )
-            return VFolderRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(VFolderRow.created_at).where(VFolderRow.id == cursor_id).scalar_subquery()
-            )
-            return VFolderRow.created_at > subquery
-
-        return inner

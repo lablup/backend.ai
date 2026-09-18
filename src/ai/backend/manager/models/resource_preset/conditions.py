@@ -125,21 +125,3 @@ class ResourcePresetConditions:
     by_resource_group_name_in = staticmethod(
         make_string_in_factory(ResourcePresetRow.scaling_group_name)
     )
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourcePresetRow.id < sa.text(f"'{cursor_id}'::uuid")
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourcePresetRow.id > sa.text(f"'{cursor_id}'::uuid")
-
-        return inner

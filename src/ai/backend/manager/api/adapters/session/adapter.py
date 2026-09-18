@@ -84,26 +84,15 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, Kerne
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.orders import (
-    DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
-)
-from ai.backend.manager.models.kernel.orders import (
     DEFAULT_FORWARD_ORDER as KERNEL_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.kernel.orders import (
-    TIEBREAKER_ORDER as KERNEL_TIEBREAKER_ORDER,
 )
 from ai.backend.manager.models.kernel.orders import (
     resolve_order as resolve_kernel_order,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
-    DEFAULT_BACKWARD_ORDER as SESSION_DEFAULT_BACKWARD_ORDER,
-)
-from ai.backend.manager.models.session.orders import (
     DEFAULT_FORWARD_ORDER as SESSION_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.session.orders import (
-    TIEBREAKER_ORDER as SESSION_TIEBREAKER_ORDER,
 )
 from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
@@ -175,18 +164,12 @@ def _fold_session_status(status: SessionStatus) -> str:
 
 _SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=SESSION_DEFAULT_FORWARD_ORDER,
-    backward_order=SESSION_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=SessionConditions.by_cursor_forward,
-    backward_condition_factory=SessionConditions.by_cursor_backward,
-    tiebreaker_order=SESSION_TIEBREAKER_ORDER,
+    cursor_column=SessionRow.id,
 )
 
 _KERNEL_PAGINATION_SPEC = PaginationSpec(
     forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
-    backward_order=KERNEL_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=KernelConditions.by_cursor_forward,
-    backward_condition_factory=KernelConditions.by_cursor_backward,
-    tiebreaker_order=KERNEL_TIEBREAKER_ORDER,
+    cursor_column=KernelRow.id,
 )
 
 

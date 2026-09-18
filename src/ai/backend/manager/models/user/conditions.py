@@ -649,32 +649,6 @@ class UserConditions:
 
         return inner
 
-    # ==================== Cursor Pagination ====================
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(UserRow.created_at).where(UserRow.uuid == cursor_id).scalar_subquery()
-            )
-            return UserRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(UserRow.created_at).where(UserRow.uuid == cursor_id).scalar_subquery()
-            )
-            return UserRow.created_at > subquery
-
-        return inner
-
     # ==================== Domain Nested Filters ====================
 
     @staticmethod

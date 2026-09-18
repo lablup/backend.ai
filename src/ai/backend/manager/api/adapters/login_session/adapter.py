@@ -50,10 +50,7 @@ from ai.backend.manager.services.auth.actions.unblock_user import AdminUnblockUs
 
 _LOGIN_SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginSessionOrders.created_at(ascending=False),
-    backward_order=LoginSessionOrders.created_at(ascending=True),
-    forward_condition_factory=LoginSessionConditions.by_cursor_forward,
-    backward_condition_factory=LoginSessionConditions.by_cursor_backward,
-    tiebreaker_order=LoginSessionRow.id.asc(),
+    cursor_column=LoginSessionRow.id,
 )
 
 

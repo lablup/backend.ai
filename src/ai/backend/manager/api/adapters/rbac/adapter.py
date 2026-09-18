@@ -327,10 +327,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _permission_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ScopedPermissionOrders.created_at(ascending=False),
-        backward_order=ScopedPermissionOrders.created_at(ascending=True),
-        forward_condition_factory=ScopedPermissionConditions.by_cursor_forward,
-        backward_condition_factory=ScopedPermissionConditions.by_cursor_backward,
-        tiebreaker_order=PermissionRow.id.asc(),
+        cursor_column=PermissionRow.id,
     )
 
 
@@ -338,10 +335,7 @@ def _permission_pagination_spec() -> PaginationSpec:
 def _role_gql_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RoleOrders.created_at(ascending=False),
-        backward_order=RoleOrders.created_at(ascending=True),
-        forward_condition_factory=RoleConditions.by_cursor_forward,
-        backward_condition_factory=RoleConditions.by_cursor_backward,
-        tiebreaker_order=RoleRow.id.asc(),
+        cursor_column=RoleRow.id,
     )
 
 
@@ -349,10 +343,7 @@ def _role_gql_pagination_spec() -> PaginationSpec:
 def _assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AssignedUserOrders.granted_at(ascending=False),
-        backward_order=AssignedUserOrders.granted_at(ascending=True),
-        forward_condition_factory=AssignedUserConditions.by_cursor_forward,
-        backward_condition_factory=AssignedUserConditions.by_cursor_backward,
-        tiebreaker_order=UserRoleRow.id.asc(),
+        cursor_column=UserRoleRow.id,
     )
 
 
@@ -360,10 +351,10 @@ def _assignment_pagination_spec() -> PaginationSpec:
 def _entity_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=EntityScopeOrders.registered_at(ascending=False),
-        backward_order=EntityScopeOrders.registered_at(ascending=True),
+        explicit_backward_order=EntityScopeOrders.registered_at(ascending=True),
         forward_condition_factory=EntityScopeConditions.by_cursor_forward,
         backward_condition_factory=EntityScopeConditions.by_cursor_backward,
-        tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
+        explicit_tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
     )
 
 
@@ -371,10 +362,10 @@ def _entity_pagination_spec() -> PaginationSpec:
 def _invitation_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RoleInvitationOrders.created_at(ascending=False),
-        backward_order=RoleInvitationOrders.created_at(ascending=True),
+        explicit_backward_order=RoleInvitationOrders.created_at(ascending=True),
         forward_condition_factory=RoleInvitationConditions.by_cursor_forward,
         backward_condition_factory=RoleInvitationConditions.by_cursor_backward,
-        tiebreaker_order=RoleInvitationRow.id.asc(),
+        explicit_tiebreaker_order=RoleInvitationRow.id.asc(),
     )
 
 
