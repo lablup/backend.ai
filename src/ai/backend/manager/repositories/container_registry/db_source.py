@@ -1,7 +1,5 @@
 """Container registry reads: one by its id, and the lookups that name one."""
 
-import uuid
-
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -42,9 +40,9 @@ class ContainerRegistryDBSource:
                 )
             return registry_id
 
-    async def lookup_image_commit_registry_id(self, project_id: uuid.UUID) -> ContainerRegistryID:
+    async def lookup_image_commit_registry_id(self, project_id: ProjectID) -> ContainerRegistryID:
         async with self._ops_provider.read_ops() as ops:
-            project = await ops.query_data(ProjectQuerier(project_id=ProjectID(project_id)))
+            project = await ops.query_data(ProjectQuerier(project_id=project_id))
             if project is None or project.container_registry is None:
                 raise ContainerRegistryNotFound(
                     f"Container registry info does not exist or is invalid in the project. (project: {project_id})"

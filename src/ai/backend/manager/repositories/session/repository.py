@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -132,12 +133,14 @@ class SessionRepository:
     ) -> SessionRow:
         return await self._db_source.update_session_name(session_id, new_name)
 
+    @session_repository_resilience.apply()
     async def get_container_registry_by_id(
         self, registry_id: ContainerRegistryID
     ) -> ContainerRegistryData:
         return await self._registry_db_source.fetch_by_id(registry_id)
 
-    async def get_image_commit_registry(self, project_id: uuid.UUID) -> ContainerRegistryData:
+    @session_repository_resilience.apply()
+    async def get_image_commit_registry(self, project_id: ProjectID) -> ContainerRegistryData:
         registry_id = await self._registry_db_source.lookup_image_commit_registry_id(project_id)
         return await self._registry_db_source.fetch_by_id(registry_id)
 
