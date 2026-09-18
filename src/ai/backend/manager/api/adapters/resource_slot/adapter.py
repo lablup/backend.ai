@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainName
@@ -47,6 +48,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInput,
 )
 from ai.backend.common.types import AgentId
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
@@ -62,16 +64,18 @@ from ai.backend.manager.models.resource_slot.conditions import (
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.orders import (
     AGENT_RESOURCE_DEFAULT_FORWARD_ORDER,
-    AGENT_RESOURCE_TIEBREAKER_ORDER,
     RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER,
-    RESOURCE_ALLOCATION_TIEBREAKER_ORDER,
     SLOT_TYPE_DEFAULT_FORWARD_ORDER,
-    SLOT_TYPE_TIEBREAKER_ORDER,
     resolve_agent_resource_order,
     resolve_resource_allocation_order,
     resolve_slot_type_order,
 )
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
+from ai.backend.manager.models.resource_slot.row import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.resource_slot.searchers import (
     AgentResourceSearcher,
     ResourceSlotTypeSearcher,
@@ -121,7 +125,29 @@ from ai.backend.manager.services.resource_slot.actions.update import UpdateResou
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.types import OptionalState
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+@lru_cache(maxsize=1)
+def _get_slot_type_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=SLOT_TYPE_DEFAULT_FORWARD_ORDER,
+        cursor_column=ResourceSlotTypeRow.uuid,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_agent_resource_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AGENT_RESOURCE_DEFAULT_FORWARD_ORDER,
+        cursor_column=AgentResourceRow.id,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_resource_allocation_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER,
+        cursor_column=ResourceAllocationRow.id,
+    )
 
 
 class ResourceSlotAdapter(BaseAdapter):
@@ -175,14 +201,19 @@ class ResourceSlotAdapter(BaseAdapter):
     ) -> ResourceSlotTypeSearcher:
         """Build a Searcher for resource slot type search."""
         conditions = self._convert_slot_type_filter(input.filter) if input.filter else []
-        orders = (
-            self._convert_slot_type_orders(input.order)
-            if input.order
-            else [SLOT_TYPE_DEFAULT_FORWARD_ORDER]
+        orders = self._convert_slot_type_orders(input.order) if input.order else []
+        return self._build_searcher(
+            ResourceSlotTypeSearcher,
+            pagination_spec=_get_slot_type_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        orders.append(SLOT_TYPE_TIEBREAKER_ORDER)
-        pagination = self._build_slot_type_pagination(input)
-        return ResourceSlotTypeSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -205,15 +236,6 @@ class ResourceSlotAdapter(BaseAdapter):
     @staticmethod
     def _convert_slot_type_orders(orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
         return [resolve_slot_type_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_slot_type_pagination(
-        input: AdminSearchResourceSlotTypesInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     # -------------------------------------------------------------------------
     # ResourceSlotType write (superadmin only)
@@ -373,14 +395,18 @@ class ResourceSlotAdapter(BaseAdapter):
     def _build_agent_resource_querier(self, input: AdminSearchAgentResourcesInput) -> BatchQuerier:
         """Build a BatchQuerier for agent resource search."""
         conditions = self._convert_agent_resource_filter(input.filter) if input.filter else []
-        orders = (
-            self._convert_agent_resource_orders(input.order)
-            if input.order
-            else [AGENT_RESOURCE_DEFAULT_FORWARD_ORDER]
+        orders = self._convert_agent_resource_orders(input.order) if input.order else []
+        return self._build_querier(
+            pagination_spec=_get_agent_resource_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        orders.append(AGENT_RESOURCE_TIEBREAKER_ORDER)
-        pagination = self._build_agent_resource_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_agent_resource_filter(self, filter: AgentResourceFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -419,15 +445,6 @@ class ResourceSlotAdapter(BaseAdapter):
     @staticmethod
     def _convert_agent_resource_orders(orders: list[AgentResourceOrder]) -> list[QueryOrder]:
         return [resolve_agent_resource_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_agent_resource_pagination(
-        input: AdminSearchAgentResourcesInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     @staticmethod
     def _agent_resource_data_to_node(data: AgentResourceData) -> AgentResourceNode:
@@ -475,14 +492,18 @@ class ResourceSlotAdapter(BaseAdapter):
     ) -> BatchQuerier:
         """Build a BatchQuerier for resource allocation search."""
         conditions = self._convert_resource_allocation_filter(input.filter) if input.filter else []
-        orders = (
-            self._convert_resource_allocation_orders(input.order)
-            if input.order
-            else [RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER]
+        orders = self._convert_resource_allocation_orders(input.order) if input.order else []
+        return self._build_querier(
+            pagination_spec=_get_resource_allocation_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        orders.append(RESOURCE_ALLOCATION_TIEBREAKER_ORDER)
-        pagination = self._build_resource_allocation_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_resource_allocation_filter(
         self, filter: ResourceAllocationFilter
@@ -522,19 +543,11 @@ class ResourceSlotAdapter(BaseAdapter):
         return [resolve_resource_allocation_order(o.field, o.direction) for o in orders]
 
     @staticmethod
-    def _build_resource_allocation_pagination(
-        input: AdminSearchResourceAllocationsInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    @staticmethod
     def _resource_allocation_data_to_node(data: ResourceAllocationData) -> ResourceAllocationNode:
         """Convert ResourceAllocationData to Pydantic DTO node."""
         return ResourceAllocationNode(
             id=f"{data.kernel_id}:{data.slot_name}",
+            field_id=data.id,
             kernel_id=str(data.kernel_id),
             slot_name=data.slot_name,
             requested=str(data.requested),

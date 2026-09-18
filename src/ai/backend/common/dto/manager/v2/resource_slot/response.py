@@ -132,6 +132,9 @@ class ResourceAllocationNode(BaseResponseModel):
     """Node model representing a per-kernel, per-slot resource allocation entry."""
 
     id: str = Field(description="Node ID (format: '{kernel_id}:{slot_name}').")
+    field_id: UUID = Field(
+        description=f"UUID of the resource allocation. Added in {NEXT_RELEASE_VERSION}.",
+    )
     kernel_id: str = Field(description="Kernel identifier (UUID).")
     slot_name: str = Field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."

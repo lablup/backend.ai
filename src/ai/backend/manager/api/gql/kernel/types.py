@@ -555,11 +555,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             slot_name = item.slot_name
             node = KernelResourceAllocationGQL(
                 id=_strawberry.ID(item.id),
+                field_id=item.field_id,
                 slot_name=slot_name,
                 requested=Decimal(item.requested),
                 used=Decimal(item.used) if item.used is not None else None,
             )
-            cursor = encode_cursor(slot_name)
+            cursor = encode_cursor(item.field_id)
             edges.append(KernelResourceAllocationEdgeGQL(node=node, cursor=cursor))
 
         return ResourceAllocationConnectionGQL(

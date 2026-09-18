@@ -142,6 +142,7 @@ class ResourceSlotDBSource:
             result = await execute_batch_querier(db_sess, query, querier)
             items = [
                 ResourceAllocationData(
+                    id=row.ResourceAllocationRow.id,
                     kernel_id=row.ResourceAllocationRow.kernel_id,
                     slot_name=row.ResourceAllocationRow.slot_name,
                     requested=row.ResourceAllocationRow.requested,

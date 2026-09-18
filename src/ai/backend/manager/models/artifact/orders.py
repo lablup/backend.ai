@@ -21,7 +21,6 @@ ORDER_FIELD_MAP: dict[ArtifactOrderField, _OrderColumn] = {
 }
 
 DEFAULT_FORWARD_ORDER: QueryOrder = ArtifactRow.id.desc()
-TIEBREAKER_ORDER: QueryOrder = ArtifactRow.id.asc()
 
 
 def resolve_order(field: ArtifactOrderField, direction: OrderDirection) -> QueryOrder:
