@@ -11,22 +11,24 @@ import pytest
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     SearchLoginClientTypesInput,
 )
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
-from ai.backend.manager.models.specs.pagination import (
+from ai.backend.manager.repositories.base.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
+)
+from ai.backend.manager.services.login_client_type.actions.search import (
+    SearchLoginClientTypesActionResult,
 )
 
 
 @pytest.fixture
 def processors() -> MagicMock:
     processors = MagicMock()
-    processors.public_search.run = AsyncMock(
-        return_value=BatchOpsResult(
+    processors.login_client_type.search.wait_for_complete = AsyncMock(
+        return_value=SearchLoginClientTypesActionResult(
             items=[], total_count=0, has_next_page=False, has_previous_page=False
         )
     )
@@ -65,7 +67,9 @@ async def test_search_pages_by_the_cursor_it_is_given(
 ) -> None:
     await adapter.search(case.input)
 
-    pagination = processors.public_search.run.call_args.args[0].searcher.pagination
+    pagination = processors.login_client_type.search.wait_for_complete.call_args.args[
+        0
+    ].querier.pagination
     assert isinstance(pagination, (CursorForwardPagination, CursorBackwardPagination))
     assert type(pagination) is case.pagination_type
     assert pagination.cursor_condition is not None
@@ -102,7 +106,9 @@ async def test_search_pages_by_offset(
 ) -> None:
     await adapter.search(case.input)
 
-    pagination = processors.public_search.run.call_args.args[0].searcher.pagination
+    pagination = processors.login_client_type.search.wait_for_complete.call_args.args[
+        0
+    ].querier.pagination
     assert pagination == case.expected
 
 
@@ -113,4 +119,4 @@ async def test_search_refuses_two_pagination_modes(
     with pytest.raises(InvalidGraphQLParameters):
         await adapter.search(SearchLoginClientTypesInput(first=1, limit=1))
 
-    processors.public_search.run.assert_not_awaited()
+    processors.login_client_type.search.wait_for_complete.assert_not_awaited()
