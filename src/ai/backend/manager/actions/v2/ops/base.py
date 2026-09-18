@@ -38,7 +38,6 @@ from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDat
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
-    GlobalEntityUpserter,
 )
 
 __all__ = (

@@ -8,13 +8,15 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.container_registry.quota import (
+    AbstractPerProjectContainerRegistryQuotaService,
+)
 from ai.backend.manager.types import DistributedLockFactory
 
 from .distributed_lock import DistributedLockFactoryDependency, DistributedLockInput
 from .notification import NotificationCenterDependency
+from .registry_quota import RegistryQuotaServiceDependency, RegistryQuotaServiceInput
 from .repositories import RepositoriesDependency, RepositoriesInput
-from .services import ServicesContextDependency, ServicesInput
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -57,7 +59,7 @@ class DomainResources:
     notification_center: NotificationCenter
     distributed_lock_factory: DistributedLockFactory
     repositories: Repositories
-    services_ctx: ServicesContext
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService
 
 
 class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
@@ -67,7 +69,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
     1. Notification center: HTTP client pool for notifications (no deps)
     2. Distributed lock factory: Lock backend based on config
     3. Repositories: All repository instances
-    4. Services context: Service-layer objects for the API layer
+    4. Registry quota service: Per-project container registry quota service
     """
 
     @property
@@ -121,14 +123,16 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
         )
         repositories = await stack.enter_dependency(repositories_dep, repositories_input)
 
-        # 4. Services context (depends on db)
-        services_dep = ServicesContextDependency()
-        services_input = ServicesInput(db=setup_input.db)
-        services_ctx = await stack.enter_dependency(services_dep, services_input)
+        # 4. Registry quota service (depends on db)
+        registry_quota_dep = RegistryQuotaServiceDependency()
+        registry_quota_input = RegistryQuotaServiceInput(db=setup_input.db)
+        registry_quota_service = await stack.enter_dependency(
+            registry_quota_dep, registry_quota_input
+        )
 
         yield DomainResources(
             notification_center=notification_center,
             distributed_lock_factory=distributed_lock_factory,
             repositories=repositories,
-            services_ctx=services_ctx,
+            registry_quota_service=registry_quota_service,
         )
