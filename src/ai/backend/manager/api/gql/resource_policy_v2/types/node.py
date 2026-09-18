@@ -135,10 +135,8 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
                 offset=offset,
             ),
         )
-        edges = [
-            KeyPairEdge(node=KeyPairGQL.from_pydantic(item), cursor=encode_cursor(item.field_id))
-            for item in result.items
-        ]
+        nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
+        edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return KeyPairConnection(
             edges=edges,
             page_info=PageInfo(

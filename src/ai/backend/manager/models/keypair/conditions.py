@@ -252,7 +252,6 @@ class KeypairConditions:
             return KeyPairRow.last_used == dt
 
         return inner
-<<<<<<< HEAD
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -321,5 +320,3 @@ class KeypairOrders:
         if ascending:
             return KeyPairRow.resource_policy.asc()
         return KeyPairRow.resource_policy.desc()
-=======
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))

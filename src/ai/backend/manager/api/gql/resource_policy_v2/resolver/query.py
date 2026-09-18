@@ -83,13 +83,8 @@ async def admin_keypair_resource_policies_v2(
             offset=offset,
         )
     )
-    edges = [
-        strawberry.relay.Edge(
-            node=KeypairResourcePolicyV2GQL.from_pydantic(item),
-            cursor=encode_cursor(item.entity_id),
-        )
-        for item in payload.items
-    ]
+    nodes = [KeypairResourcePolicyV2GQL.from_pydantic(item) for item in payload.items]
+    edges = [strawberry.relay.Edge(node=n, cursor=encode_cursor(str(n.id))) for n in nodes]
     return KeypairResourcePolicyV2Connection(
         edges=edges,
         page_info=PageInfo(
@@ -163,12 +158,8 @@ async def admin_user_resource_policies_v2(
             offset=offset,
         )
     )
-    edges = [
-        strawberry.relay.Edge(
-            node=UserResourcePolicyV2GQL.from_pydantic(item), cursor=encode_cursor(item.entity_id)
-        )
-        for item in payload.items
-    ]
+    nodes = [UserResourcePolicyV2GQL.from_pydantic(item) for item in payload.items]
+    edges = [strawberry.relay.Edge(node=n, cursor=encode_cursor(str(n.id))) for n in nodes]
     return UserResourcePolicyV2Connection(
         edges=edges,
         page_info=PageInfo(
@@ -242,13 +233,8 @@ async def admin_project_resource_policies_v2(
             offset=offset,
         )
     )
-    edges = [
-        strawberry.relay.Edge(
-            node=ProjectResourcePolicyV2GQL.from_pydantic(item),
-            cursor=encode_cursor(item.entity_id),
-        )
-        for item in payload.items
-    ]
+    nodes = [ProjectResourcePolicyV2GQL.from_pydantic(item) for item in payload.items]
+    edges = [strawberry.relay.Edge(node=n, cursor=encode_cursor(str(n.id))) for n in nodes]
     return ProjectResourcePolicyV2Connection(
         edges=edges,
         page_info=PageInfo(

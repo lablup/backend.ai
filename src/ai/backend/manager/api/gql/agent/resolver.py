@@ -16,7 +16,7 @@ from ai.backend.manager.api.gql.agent.types import (
     AgentV2Edge,
     AgentV2GQL,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -68,7 +68,7 @@ async def agents_v2(
         )
     )
     nodes = [AgentV2GQL.from_pydantic(item) for item in result.items]
-    edges = [AgentV2Edge(node=node, cursor=encode_cursor(node.uuid)) for node in nodes]
+    edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
     return AgentV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(

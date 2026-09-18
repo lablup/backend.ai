@@ -498,6 +498,20 @@ class RevisionResourceSlotConditions:
         make_string_in_factory(DeploymentRevisionResourceSlotRow.slot_name)
     )
 
+    @staticmethod
+    def by_cursor_forward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank > int(cursor_rank)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank < int(cursor_rank)
+
+        return inner
+
 
 class PresetResourceSlotConditions:
     """Query condition factories for preset resource slot rows."""
@@ -562,3 +576,17 @@ class PresetResourceSlotConditions:
         return inner
 
     by_slot_name_in = staticmethod(make_string_in_factory(PresetResourceSlotRow.slot_name))
+
+    @staticmethod
+    def by_cursor_forward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank > int(cursor_rank)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank < int(cursor_rank)
+
+        return inner

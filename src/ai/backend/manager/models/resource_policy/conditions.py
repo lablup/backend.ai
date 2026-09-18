@@ -133,6 +133,32 @@ class KeypairResourcePolicyConditions:
 
         return inner
 
+    # ==================== Cursor Conditions ====================
+
+    @staticmethod
+    def by_cursor_forward(cursor_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KeyPairResourcePolicyRow.created_at)
+                .where(KeyPairResourcePolicyRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return KeyPairResourcePolicyRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KeyPairResourcePolicyRow.created_at)
+                .where(KeyPairResourcePolicyRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return KeyPairResourcePolicyRow.created_at > subquery
+
+        return inner
+
 
 class UserResourcePolicyConditions:
     """Query conditions for filtering user resource policies."""
@@ -228,6 +254,32 @@ class UserResourcePolicyConditions:
         UserResourcePolicyRow.max_customized_image_count
     )
 
+    # ==================== Cursor Conditions ====================
+
+    @staticmethod
+    def by_cursor_forward(cursor_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(UserResourcePolicyRow.created_at)
+                .where(UserResourcePolicyRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return UserResourcePolicyRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(UserResourcePolicyRow.created_at)
+                .where(UserResourcePolicyRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return UserResourcePolicyRow.created_at > subquery
+
+        return inner
+
 
 class ProjectResourcePolicyConditions:
     """Query conditions for filtering project resource policies."""
@@ -316,3 +368,29 @@ class ProjectResourcePolicyConditions:
     by_max_vfolder_count = make_int_conditions(ProjectResourcePolicyRow.max_vfolder_count)
     by_max_quota_scope_size = make_int_conditions(ProjectResourcePolicyRow.max_quota_scope_size)
     by_max_network_count = make_int_conditions(ProjectResourcePolicyRow.max_network_count)
+
+    # ==================== Cursor Conditions ====================
+
+    @staticmethod
+    def by_cursor_forward(cursor_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ProjectResourcePolicyRow.created_at)
+                .where(ProjectResourcePolicyRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return ProjectResourcePolicyRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ProjectResourcePolicyRow.created_at)
+                .where(ProjectResourcePolicyRow.name == cursor_name)
+                .scalar_subquery()
+            )
+            return ProjectResourcePolicyRow.created_at > subquery
+
+        return inner
