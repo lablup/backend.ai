@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -147,6 +148,36 @@ class LoginClientTypeConditions:
     def by_created_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
             return LoginClientTypeRow.created_at == dt
+
+        return inner
+
+    # --- cursor pagination (default order: created_at DESC) ---
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.ColumnElement[bool]:
+            subquery = (
+                sa.select(LoginClientTypeRow.created_at)
+                .where(LoginClientTypeRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return LoginClientTypeRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.ColumnElement[bool]:
+            subquery = (
+                sa.select(LoginClientTypeRow.created_at)
+                .where(LoginClientTypeRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return LoginClientTypeRow.created_at > subquery
 
         return inner
 
