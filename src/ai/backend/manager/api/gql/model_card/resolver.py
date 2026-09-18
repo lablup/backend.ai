@@ -22,6 +22,11 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+<<<<<<< HEAD
+=======
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
+>>>>>>> 1289b8811 (fix(BA-7985): encode relay cursors emitted by GQL resolvers (#14747))
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -297,7 +302,7 @@ def _build_connection(result: SearchModelCardsPayload) -> ModelCardV2Connection:
     edges = [
         ModelCardV2Edge(
             node=ModelCardGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]

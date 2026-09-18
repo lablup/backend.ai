@@ -15,7 +15,11 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+<<<<<<< HEAD
 from ai.backend.common.identifier.role_preset import RolePresetID
+=======
+from ai.backend.manager.api.gql.base import encode_cursor
+>>>>>>> 1289b8811 (fix(BA-7985): encode relay cursors emitted by GQL resolvers (#14747))
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -102,7 +106,7 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         edges = [
             RolePermissionPresetEdge(
                 node=RolePermissionPresetGQL.from_pydantic(item),
-                cursor=str(item.id),
+                cursor=encode_cursor(item.id),
             )
             for item in result.items
         ]
