@@ -53,3 +53,12 @@ class PerProjectContainerRegistryInfo:
     ssl_verify: bool
     is_global: bool
     extra: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ImageCommitRegistry:
+    registry_name: str
+    project_name: str
+
+    def to_json(self) -> dict[str, str]:
+        return {"registry": self.registry_name, "project": self.project_name}

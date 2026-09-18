@@ -25,6 +25,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
@@ -410,7 +411,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=dto.integration_name,  # ProjectData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry,
+            container_registry=dto.container_registry.to_json() if dto.container_registry else None,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -542,6 +543,20 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             ]
 
 
+def _parse_image_commit_registry(value: Any) -> TriState[ImageCommitRegistry]:
+    if value is Undefined:
+        return TriState.nop()
+    if value is None or value == {}:
+        return TriState.nullify()
+    if not isinstance(value, dict) or set(value) != {"registry", "project"}:
+        raise InvalidAPIParameters("Expected registry and project strings")
+    if not isinstance(value["registry"], str) or not isinstance(value["project"], str):
+        raise InvalidAPIParameters("Expected registry and project strings")
+    return TriState.update(
+        ImageCommitRegistry(registry_name=value["registry"], project_name=value["project"])
+    )
+
+
 class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     type = graphene.String(
         required=False,
@@ -580,7 +595,18 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        container_registry_val = value_or_none(self.container_registry)
+        registry = value_or_none(self.container_registry)
+        container_registry_val = None
+        if registry is not None and registry != {}:
+            if not isinstance(registry, dict) or set(registry) != {"registry", "project"}:
+                raise InvalidAPIParameters("Expected registry and project strings")
+            if not isinstance(registry["registry"], str) or not isinstance(
+                registry["project"], str
+            ):
+                raise InvalidAPIParameters("Expected registry and project strings")
+            container_registry_val = ImageCommitRegistry(
+                registry_name=registry["registry"], project_name=registry["project"]
+            )
 
         return CreateProjectAction(
             domain_id=domain_id,
@@ -644,7 +670,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=TriState[dict[str, str]].from_graphql(
+            container_registry=_parse_image_commit_registry(
                 self.container_registry,
             ),
         )

@@ -100,7 +100,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -413,22 +412,9 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        project: ProjectRow = session.group
-        if not project.container_registry:
-            raise InvalidAPIParameters(
-                "Project not ready to convert session image (registry configuration not populated)"
-            )
-
-        registry_hostname = project.container_registry["registry"]
-        registry_project = project.container_registry["project"]
-
-        registry_conf = await self._session_repository.get_container_registry(
-            registry_hostname, registry_project
-        )
-        if not registry_conf:
-            raise InvalidAPIParameters(
-                f"Project {registry_project} not found in registry {registry_hostname}."
-            )
+        registry_conf = await self._session_repository.get_image_commit_registry(session.group_id)
+        registry_hostname = registry_conf.registry_name
+        registry_project = registry_conf.project or ""
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:
@@ -439,6 +425,7 @@ class SessionService:
         # Create manifest for background task
         manifest = CommitSessionManifest(
             session_id=session.id,
+            registry_id=registry_conf.id,
             registry_hostname=registry_hostname,
             registry_project=registry_project,
             image_name=image_name,

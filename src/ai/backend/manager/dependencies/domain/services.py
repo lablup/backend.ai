@@ -5,9 +5,11 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.container_registry_quota.repository import (
     PerProjectRegistryQuotaRepository,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
@@ -50,7 +52,9 @@ class ServicesContextDependency(DomainDependency[ServicesInput, ServicesContext]
             Initialized ServicesContext instance.
         """
         per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
-            repository=PerProjectRegistryQuotaRepository(setup_input.db),
+            repository=PerProjectRegistryQuotaRepository(
+                ContainerRegistryDBSource(V2DBOpsProvider(setup_input.db))
+            ),
             client_pool=PerProjectContainerRegistryQuotaClientPool(),
         )
         yield ServicesContext(per_project_container_registries_quota)

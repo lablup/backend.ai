@@ -36,6 +36,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
@@ -260,7 +261,14 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
             dotfiles=self.dotfiles,
             resource_policy=self.resource_policy,
             type=self.type,
-            container_registry=self.container_registry,
+            container_registry=(
+                ImageCommitRegistry(
+                    registry_name=self.container_registry["registry"],
+                    project_name=self.container_registry["project"],
+                )
+                if self.container_registry
+                else None
+            ),
         )
 
     @classmethod
