@@ -1,24 +1,24 @@
-"""
-Tests for the snapshot race both of the agent's periodic reconcilers can hit.
-
-Each reads the container listing first and the kernel registry second. A kernel whose container
-starts in between is absent from the listing while the start event has already marked it RUNNING,
-so the set difference names a live kernel. Acting on that unregisters it, and the lifecycle sync
-then destroys the container of a kernel it no longer knows.
-"""
+"""Regression tests for periodic reconciler snapshot races."""
 
 from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
-from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.agent import (
+    STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS,
+    STARTUP_CONTAINER_ENUMERATION_RETRY_DELAY,
+    AbstractAgent,
+)
+from ai.backend.agent.errors import ContainerEnumerationError
+from ai.backend.agent.observer.kernel_presence import KernelPresenceObserver
 from ai.backend.agent.types import (
     Container,
+    ContainerEnumerationResult,
     ContainerLifecycleEvent,
     KernelLifecycleStatus,
     LifecycleEvent,
@@ -55,20 +55,17 @@ def _running_kernel(session_id: SessionId) -> MagicMock:
 
 def _make_agent(
     *,
-    listings: list[list[tuple[KernelId, Container]]],
+    listings: list[list[tuple[KernelId, Container]] | ContainerEnumerationResult],
     kernel_registry: dict[KernelId, MagicMock],
     active_creates: dict[KernelId, Any] | None = None,
 ) -> Any:
-    """A stub carrying only what the reconcilers touch.
-
-    `listings` is consumed one call at a time so a test can make the second listing differ from
-    the first, which is exactly what the re-check is for.
-    """
+    """Build a stub that returns each container listing in sequence."""
     agent = MagicMock()
     agent.id = AgentId("test-agent")
     agent.registry_lock = asyncio.Lock()
     agent.restarting_kernels = {}
     agent._active_creates = active_creates if active_creates is not None else {}
+    agent._ongoing_destruction_tasks = {}
     agent.kernel_registry = kernel_registry
     agent.container_lifecycle_queue = asyncio.Queue()
     agent.set_container_count = AsyncMock()
@@ -76,10 +73,12 @@ def _make_agent(
 
     remaining = list(listings)
 
-    async def _enumerate(*args: Any, **kwargs: Any) -> list[tuple[KernelId, Container]]:
+    async def _enumerate(*args: Any, **kwargs: Any) -> ContainerEnumerationResult:
         listing = remaining.pop(0) if len(remaining) > 1 else remaining[0]
         agent.on_listing()
-        return listing
+        if isinstance(listing, ContainerEnumerationResult):
+            return listing
+        return ContainerEnumerationResult(containers=listing, complete=True)
 
     agent.on_listing = MagicMock()
     agent.enumerate_containers = AsyncMock(side_effect=_enumerate)
@@ -159,6 +158,32 @@ class TestDanglingSweep:
 
         assert await _run_one_sweep(agent) == {kernel_id}
 
+    async def test_an_incomplete_confirmation_aborts_the_sweep(self) -> None:
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent(
+            listings=[[], []],
+            kernel_registry={kernel_id: _running_kernel(session_id)},
+        )
+        agent.enumerate_containers = AsyncMock(
+            side_effect=[
+                ContainerEnumerationResult(containers=[], complete=True),
+                ContainerEnumerationResult(containers=[], complete=False),
+            ]
+        )
+
+        assert await _run_one_sweep(agent) == set()
+
+    async def test_an_incomplete_initial_listing_aborts_the_sweep(self) -> None:
+        kernel_id = KernelId(uuid4())
+        agent = _make_agent(
+            listings=[ContainerEnumerationResult(containers=[], complete=False)],
+            kernel_registry={kernel_id: _running_kernel(SessionId(uuid4()))},
+        )
+
+        assert await _run_one_sweep(agent) == set()
+        agent.enumerate_containers.assert_awaited_once()
+
     async def test_a_restarting_kernel_is_not_swept(self) -> None:
         kernel_id = KernelId(uuid4())
         session_id = SessionId(uuid4())
@@ -201,6 +226,56 @@ class TestLifecycleSync:
         assert events[0].kernel_id == kernel_id
 
 
+class TestStartupContainerEnumeration:
+    async def test_retries_until_the_listing_is_complete(self) -> None:
+        kernel_id = KernelId(uuid4())
+        container = _running_container(SessionId(uuid4()))
+        agent = _make_agent(
+            listings=[
+                ContainerEnumerationResult(containers=[], complete=False),
+                ContainerEnumerationResult(containers=[(kernel_id, container)], complete=True),
+            ],
+            kernel_registry={},
+        )
+
+        with patch("ai.backend.agent.agent.asyncio.sleep", new=AsyncMock()) as sleep:
+            result = await AbstractAgent.enumerate_containers_with_retry(agent)
+
+        assert result == [(kernel_id, container)]
+        assert agent.enumerate_containers.await_count == 2
+        sleep.assert_awaited_once_with(STARTUP_CONTAINER_ENUMERATION_RETRY_DELAY)
+
+    async def test_fails_after_incomplete_listings_exhaust_retries(self) -> None:
+        agent = _make_agent(
+            listings=[ContainerEnumerationResult(containers=[], complete=False)],
+            kernel_registry={},
+        )
+
+        with (
+            patch("ai.backend.agent.agent.asyncio.sleep", new=AsyncMock()) as sleep,
+            pytest.raises(ContainerEnumerationError),
+        ):
+            await AbstractAgent.enumerate_containers_with_retry(agent)
+
+        assert agent.enumerate_containers.await_count == STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS
+        assert sleep.await_count == STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS - 1
+
+
+class TestKernelPresenceObserver:
+    async def test_incomplete_listing_skips_presence_update(self) -> None:
+        agent = MagicMock()
+        agent.enumerate_containers = AsyncMock(
+            return_value=ContainerEnumerationResult(containers=[], complete=False)
+        )
+        valkey_schedule_client = MagicMock()
+        valkey_schedule_client.update_kernel_presence_batch = AsyncMock()
+        observer = KernelPresenceObserver(agent, valkey_schedule_client)
+
+        await observer.observe()
+
+        valkey_schedule_client.update_kernel_presence_batch.assert_not_awaited()
+
+
 class TestCleanKernelObject:
     async def test_the_entry_is_dropped_when_it_is_the_object_that_was_closed(self) -> None:
         kernel_id = KernelId(uuid4())
@@ -210,7 +285,7 @@ class TestCleanKernelObject:
         kernel_obj.get = MagicMock(return_value=None)
         agent = _make_agent(listings=[[]], kernel_registry={kernel_id: kernel_obj})
 
-        await AbstractAgent._clean_kernel_object(agent, kernel_id)
+        await AbstractAgent._clean_kernel_object(agent, kernel_id, kernel_obj)
 
         assert kernel_id not in agent.kernel_registry
 
@@ -228,17 +303,21 @@ class TestCleanKernelObject:
 
         kernel_obj.close = AsyncMock(side_effect=_close)
 
-        await AbstractAgent._clean_kernel_object(agent, kernel_id)
+        await AbstractAgent._clean_kernel_object(agent, kernel_id, kernel_obj)
 
         assert agent.kernel_registry[kernel_id] is replacement
 
     async def test_an_absent_kernel_is_not_an_error(self) -> None:
         agent = _make_agent(listings=[[]], kernel_registry={})
+        expected = _running_kernel(SessionId(uuid4()))
 
-        await AbstractAgent._clean_kernel_object(agent, KernelId(uuid4()))
+        await AbstractAgent._clean_kernel_object(agent, KernelId(uuid4()), expected)
 
 
-@pytest.mark.parametrize("in_flight", ["_active_creates", "restarting_kernels"])
+@pytest.mark.parametrize(
+    "in_flight",
+    ["_active_creates", "restarting_kernels", "_ongoing_destruction_tasks"],
+)
 async def test_is_reconcilable_refuses_kernels_in_flight(in_flight: str) -> None:
     kernel_id = KernelId(uuid4())
     agent = _make_agent(listings=[[]], kernel_registry={})
@@ -250,11 +329,7 @@ async def test_is_reconcilable_refuses_kernels_in_flight(in_flight: str) -> None
 
 class TestLifecycleSyncConfirmsBeforeCleaning:
     async def test_a_create_that_finishes_during_the_listing_is_not_cleaned(self) -> None:
-        """The review's interleaving: the create leaves `_active_creates` before the comparison.
-
-        The CLEAN this would raise removes the container with `force=True`, so the guard cannot
-        rest on the older listing alone.
-        """
+        """The create leaves `_active_creates` before the registry comparison."""
         kernel_id = KernelId(uuid4())
         session_id = SessionId(uuid4())
         active_creates: dict[KernelId, Any] = {kernel_id: MagicMock()}
@@ -304,6 +379,25 @@ class TestLifecycleSyncConfirmsBeforeCleaning:
         assert events[0].event == LifecycleEvent.CLEAN
         assert events[0].reason == KernelLifecycleEventReason.CONTAINER_NOT_FOUND
 
+    async def test_an_incomplete_confirmation_does_not_enqueue_clean(self) -> None:
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent(
+            listings=[[], []],
+            kernel_registry={kernel_id: _running_kernel(session_id)},
+        )
+        agent.enumerate_containers = AsyncMock(
+            side_effect=[
+                ContainerEnumerationResult(containers=[], complete=True),
+                ContainerEnumerationResult(containers=[], complete=False),
+            ]
+        )
+
+        await AbstractAgent.sync_container_lifecycles(agent)
+
+        assert _drain(agent.container_lifecycle_queue) == []
+        agent.produce_error_event.assert_not_awaited()
+
 
 class TestCleanupStartsOnTheObjectItJudged:
     async def test_an_id_reused_before_the_cleanup_task_runs_is_left_alone(self) -> None:
@@ -339,3 +433,23 @@ class TestCleanupStartsOnTheObjectItJudged:
 
         kernel_obj.close.assert_not_awaited()
         assert kernel_id in agent.kernel_registry
+
+    async def test_a_kernel_that_started_terminating_is_left_to_its_lifecycle_handler(
+        self,
+    ) -> None:
+        kernel_id = KernelId(uuid4())
+        kernel_obj = _running_kernel(SessionId(uuid4()))
+        kernel_obj.runner = None
+        kernel_obj.close = AsyncMock()
+        agent = _make_agent(listings=[[]], kernel_registry={kernel_id: kernel_obj})
+
+        async with agent.registry_lock:
+            cleanup = asyncio.create_task(
+                AbstractAgent._clean_kernel_object(agent, kernel_id, kernel_obj)
+            )
+            await asyncio.sleep(0)
+            kernel_obj.state = KernelLifecycleStatus.TERMINATING
+        await cleanup
+
+        kernel_obj.close.assert_not_awaited()
+        assert agent.kernel_registry[kernel_id] is kernel_obj

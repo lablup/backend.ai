@@ -19,6 +19,7 @@ import pytest
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.types import (
     Container,
+    ContainerEnumerationResult,
     ContainerLifecycleEvent,
     KernelLifecycleStatus,
     LifecycleEvent,
@@ -45,6 +46,17 @@ def _dead_container(session_id: SessionId) -> Container:
     )
 
 
+def _running_container(session_id: SessionId) -> Container:
+    return Container(
+        id=ContainerId(f"container-{uuid4().hex[:12]}"),
+        status=ContainerStatus.RUNNING,
+        image="python:3.8",
+        labels={LabelName.SESSION_ID: str(session_id)},
+        ports=[],
+        backend_obj=None,
+    )
+
+
 def _tracked_kernel(session_id: SessionId, state: KernelLifecycleStatus) -> MagicMock:
     kernel_obj = MagicMock()
     kernel_obj.session_id = session_id
@@ -57,11 +69,14 @@ def _make_agent(
     *,
     containers: list[tuple[KernelId, Container]],
     kernel_registry: dict[KernelId, MagicMock],
+    complete: bool = True,
 ) -> Any:
     """A stub carrying only what ``sync_container_lifecycles()`` touches."""
     agent = MagicMock()
     agent.id = AgentId("test-agent")
-    agent.enumerate_containers = AsyncMock(return_value=containers)
+    agent.enumerate_containers = AsyncMock(
+        return_value=ContainerEnumerationResult(containers=containers, complete=complete)
+    )
     agent.registry_lock = asyncio.Lock()
     agent.restarting_kernels = {}
     agent.kernel_registry = kernel_registry
@@ -111,6 +126,42 @@ class TestSyncContainerLifecycles:
         assert len(events) == 1
         assert events[0].kernel_id == kernel_id
         assert events[0].event == LifecycleEvent.CLEAN
+
+    async def test_incomplete_listing_processes_present_containers(self) -> None:
+        dead_kernel_id = KernelId(uuid4())
+        active_kernel_id = KernelId(uuid4())
+        agent = _make_agent(
+            containers=[
+                (dead_kernel_id, _dead_container(SessionId(uuid4()))),
+                (active_kernel_id, _running_container(SessionId(uuid4()))),
+            ],
+            kernel_registry={},
+            complete=False,
+        )
+
+        await AbstractAgent.sync_container_lifecycles(agent)
+
+        events = {event.kernel_id: event for event in _drain(agent.container_lifecycle_queue)}
+        assert events[dead_kernel_id].event == LifecycleEvent.CLEAN
+        assert events[active_kernel_id].event == LifecycleEvent.DESTROY
+        agent.set_container_count.assert_awaited_once_with(1)
+        agent.produce_error_event.assert_not_awaited()
+
+    async def test_incomplete_listing_skips_missing_container_check(self) -> None:
+        kernel_id = KernelId(uuid4())
+        agent = _make_agent(
+            containers=[],
+            kernel_registry={
+                kernel_id: _tracked_kernel(SessionId(uuid4()), KernelLifecycleStatus.RUNNING)
+            },
+            complete=False,
+        )
+
+        await AbstractAgent.sync_container_lifecycles(agent)
+
+        assert _drain(agent.container_lifecycle_queue) == []
+        agent.set_container_count.assert_awaited_once_with(0)
+        agent.produce_error_event.assert_not_awaited()
 
     @pytest.mark.parametrize(
         "state",

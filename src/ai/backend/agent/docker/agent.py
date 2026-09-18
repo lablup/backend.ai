@@ -99,6 +99,7 @@ from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesy
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
+    ContainerEnumerationResult,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -1783,49 +1784,68 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
-        result = []
-        fetch_tasks = []
+    ) -> ContainerEnumerationResult:
+        result: list[tuple[KernelId, Container]] = []
+        fetch_errors: list[tuple[str, str, Exception]] = []
+        task_group_error: ExceptionGroup | None = None
         async with closing_async(Docker()) as docker:
-            for container in await docker.containers.list():
+            containers = await docker.containers.list()
 
-                async def _fetch_container_info(container: DockerContainer) -> None:
-                    kernel_id_str: str = "(unknown)"
-                    try:
-                        kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None:
-                            return
-                        kernel_id_str = str(kernel_id)
-                        if container["State"]["Status"] in status_filter:
-                            owner_id = AgentId(
-                                container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
-                            )
-                            if self.id == owner_id:
-                                await container.show()
-                                result.append(
-                                    (
-                                        kernel_id,
-                                        container_from_docker_container(container),
-                                    ),
-                                )
-                    except DockerError as e:
-                        if e.status == HTTPStatus.NOT_FOUND:
-                            log.warning(e.message)
-                            return
-                        raise
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception:
-                        log.exception(
-                            "error while fetching container information (cid:{}, k:{})",
-                            container._id,
-                            kernel_id_str,
+            async def _fetch_container_info(container: DockerContainer) -> None:
+                kernel_id_str = "(unknown)"
+                try:
+                    kernel_id = await get_kernel_id_from_container(container)
+                    if kernel_id is None:
+                        return
+                    kernel_id_str = str(kernel_id)
+                    if container["State"]["Status"] in status_filter:
+                        owner_id = AgentId(
+                            container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
                         )
+                        if self.id == owner_id:
+                            await container.show()
+                            result.append((kernel_id, container_from_docker_container(container)))
+                except DockerError as e:
+                    if e.status == HTTPStatus.NOT_FOUND:
+                        log.warning(e.message)
+                        return
+                    fetch_errors.append((container._id, kernel_id_str, e))
+                    raise
+                except Exception as e:
+                    fetch_errors.append((container._id, kernel_id_str, e))
+                    raise
 
-                fetch_tasks.append(_fetch_container_info(container))
-
-            await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        return result
+            try:
+                async with asyncio.TaskGroup() as task_group:
+                    for container in containers:
+                        task_group.create_task(_fetch_container_info(container))
+            except ExceptionGroup as e:
+                task_group_error = e
+            complete = task_group_error is None
+            if not complete:
+                error_details = ", ".join(
+                    f"(cid:{container_id}, k:{kernel_id}, error:{error!r})"
+                    for container_id, kernel_id, error in fetch_errors
+                )
+                if not error_details:
+                    error_details = (
+                        repr(task_group_error)
+                        if task_group_error is not None
+                        else "container inspection failed"
+                    )
+                first_error = (
+                    fetch_errors[0][2]
+                    if fetch_errors
+                    else task_group_error.exceptions[0]
+                    if task_group_error is not None
+                    else None
+                )
+                log.warning(
+                    "incomplete container enumeration: {}",
+                    error_details,
+                    exc_info=first_error,
+                )
+        return ContainerEnumerationResult(containers=result, complete=complete)
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:

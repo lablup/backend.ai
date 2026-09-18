@@ -247,6 +247,7 @@ from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .errors import (
     ContainerCreationError,
     ContainerCreationFailedError,
+    ContainerEnumerationError,
     ContainerStartupCancelledError,
     ContainerStartupFailedError,
     ContainerStartupTimeoutError,
@@ -280,7 +281,9 @@ from .resources import (
 from .stats import StatContext, StatModes
 from .types import (
     Container,
+    ContainerEnumerationResult,
     ContainerLifecycleEvent,
+    KernelIdContainerPair,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -301,9 +304,10 @@ DEAD_STATUS_SET = ContainerStatus.dead_set()
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
+STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS: Final = 5
+STARTUP_CONTAINER_ENUMERATION_RETRY_DELAY: Final = 2.0
 
 P = ParamSpec("P")
-KernelIdContainerPair = tuple[KernelId, Container]
 
 
 def update_additional_gids(environ: MutableMapping[str, str], gids: Collection[int]) -> None:
@@ -1569,22 +1573,20 @@ class AbstractAgent[
         self.port_pool.release_many(host_ports)
 
     def _is_reconcilable(self, kernel_id: KernelId) -> bool:
-        """Whether a periodic reconciler may judge this kernel by a container listing.
-
-        A kernel whose create has not returned may not: the start event marks it RUNNING as soon
-        as its container starts, which is while `create_kernel` is still running.
-        """
-        return kernel_id not in self._active_creates and kernel_id not in self.restarting_kernels
+        """Return whether periodic reconciliation may judge this kernel."""
+        return (
+            kernel_id not in self._active_creates
+            and kernel_id not in self.restarting_kernels
+            and kernel_id not in self._ongoing_destruction_tasks
+        )
 
     async def _confirm_kernels_have_no_container(self, candidates: set[KernelId]) -> set[KernelId]:
-        """Re-check candidates against a container listing taken after the registry was read.
-
-        The first listing predates the registry read, so a kernel that started in between looks
-        dangling on a snapshot older than its own container. A second one cannot make that
-        mistake, and it also keeps a listing that dropped a container it could not inspect --
-        `enumerate_containers` swallows a per-container failure -- from reading as absence.
-        """
-        alive_kernel_ids = {kid for kid, _ in await self.enumerate_containers()}
+        """Confirm absence with a complete listing newer than the registry read."""
+        enumeration = await self.enumerate_containers()
+        if not enumeration.complete:
+            log.debug("skipping container absence check after incomplete enumeration")
+            return set()
+        alive_kernel_ids = {kid for kid, _ in enumeration.containers}
         return {kid for kid in candidates - alive_kernel_ids if self._is_reconcilable(kid)}
 
     async def _clean_kernel_registry_loop(self) -> None:
@@ -1592,14 +1594,18 @@ class AbstractAgent[
         cleanup_tasks: set[asyncio.Task[None]] = set()
         while True:
             try:
-                alive_containers = await self.enumerate_containers()
-                alive_kernel_ids = {kid for kid, _ in alive_containers}
+                enumeration = await self.enumerate_containers()
+                alive_kernel_ids = {kid for kid, _ in enumeration.containers}
                 registered_kernels = {
                     kid: kernel
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING and self._is_reconcilable(kid)
                 }
-                dangling_kernel_ids = set(registered_kernels) - alive_kernel_ids
+                dangling_kernel_ids = (
+                    set(registered_kernels) - alive_kernel_ids if enumeration.complete else set()
+                )
+                if not enumeration.complete:
+                    log.debug("skipping dangling kernel sweep after incomplete enumeration")
                 if dangling_kernel_ids:
                     # Confirmed against a fresh listing before anything is closed: this cleanup
                     # unregisters the kernel, and the lifecycle sync then destroys the container
@@ -1630,12 +1636,7 @@ class AbstractAgent[
                 await asyncio.sleep(60.0)
 
     async def clean_kernel_objects(self, kernels: Mapping[KernelId, AbstractKernel]) -> None:
-        """
-        Clean up the given kernel objects from the registry.
-
-        Keyed by the object each id was judged as, so a cleanup that starts after the id was
-        re-used closes nothing.
-        """
+        """Clean objects that still occupy the registry entries the caller judged."""
         tasks = [
             self._clean_kernel_object(kernel_id, expected)
             for kernel_id, expected in kernels.items()
@@ -1647,15 +1648,8 @@ class AbstractAgent[
                 "clean_kernel_objects() timed out, some kernel objects may not be cleaned up"
             )
 
-    async def _clean_kernel_object(
-        self, kernel_id: KernelId, expected: AbstractKernel | None = None
-    ) -> None:
-        """
-        Clean up the given kernel objects from the registry.
-
-        `expected` is the object the caller judged; the id is re-checked against it under the
-        lock, because a restart can re-use the id between that judgement and this call.
-        """
+    async def _clean_kernel_object(self, kernel_id: KernelId, expected: AbstractKernel) -> None:
+        """Clean the entry only while it remains the expected running object."""
         # TODO: Reduce `kernel_registry` dependencies and roles
         log.info("cleaning kernel object (kernel:{})", kernel_id)
         async with self.registry_lock:
@@ -1666,11 +1660,13 @@ class AbstractAgent[
                     kernel_id,
                 )
                 return
-            if expected is not None and (
-                kernel_obj is not expected or not self._is_reconcilable(kernel_id)
+            if (
+                kernel_obj is not expected
+                or kernel_obj.state != KernelLifecycleStatus.RUNNING
+                or not self._is_reconcilable(kernel_id)
             ):
                 log.warning(
-                    "kernel object was taken over before its cleanup ran (kernel:{}); leaving it",
+                    "kernel object changed before its cleanup ran (kernel:{}); leaving it",
                     kernel_id,
                 )
                 return
@@ -1813,21 +1809,38 @@ class AbstractAgent[
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> ContainerEnumerationResult:
+        """Enumerate visible containers and report whether the snapshot is complete."""
+
+    async def enumerate_containers_with_retry(
+        self,
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[KernelIdContainerPair]:
-        """
-        Enumerate the containers with the given status filter.
-        """
+        """Return a complete startup snapshot or fail after bounded retries."""
+        for attempt in range(1, STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS + 1):
+            enumeration = await self.enumerate_containers(status_filter)
+            if enumeration.complete:
+                return enumeration.containers
+            if attempt < STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS:
+                await asyncio.sleep(STARTUP_CONTAINER_ENUMERATION_RETRY_DELAY)
+        raise ContainerEnumerationError(
+            f"No complete container listing after "
+            f"{STARTUP_CONTAINER_ENUMERATION_MAX_ATTEMPTS} attempts."
+        )
 
     async def reconstruct_resource_usage(self) -> None:
         """
         Reconstruct the resource alloc maps for each compute plugin from
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
-        containers = await self.enumerate_containers()
+        enumeration = await self.enumerate_containers()
+        if not enumeration.complete:
+            log.warning("skipping resource usage reconstruction after incomplete enumeration")
+            return
         async with self.resource_lock:
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()
-            for kernel_id, container in containers:
+            for kernel_id, container in enumeration.containers:
                 for computer_ctx in self.computers.values():
                     try:
                         await computer_ctx.instance.restore_from_container(
@@ -1847,12 +1860,7 @@ class AbstractAgent[
         candidates: Mapping[KernelId, AbstractKernel],
         kernel_session_map: Mapping[KernelId, SessionId],
     ) -> None:
-        """Raise CLEAN for the candidates a second listing also has no container for.
-
-        The listing the candidates came from was taken before the registry lock, so a kernel
-        whose container started in between is missing from it while already RUNNING -- and the
-        CLEAN this raises removes the container with `force=True`, scratch and all.
-        """
+        """Raise CLEAN only for candidates absent from a complete newer listing."""
         if not candidates:
             return
         confirmed = await self._confirm_kernels_have_no_container(set(candidates))
@@ -1916,7 +1924,8 @@ class AbstractAgent[
 
         log.debug("sync_container_lifecycles(): triggered")
         try:
-            _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
+            enumeration = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
+            _containers = enumeration.containers
             async with self.registry_lock:
                 try:
                     # Check if: there are dead containers
@@ -1982,7 +1991,14 @@ class AbstractAgent[
                         session_id = kernel_obj.session_id
                         kernel_session_map[kernel_id] = session_id
                     # Check if: kernel_registry has the container but it's gone.
-                    for kernel_id in known_kernels.keys() - alive_kernels.keys():
+                    missing_kernel_ids = (
+                        known_kernels.keys() - alive_kernels.keys()
+                        if enumeration.complete
+                        else set()
+                    )
+                    if not enumeration.complete:
+                        log.debug("skipping missing container checks after incomplete enumeration")
+                    for kernel_id in missing_kernel_ids:
                         kernel_obj = self.kernel_registry[kernel_id]
                         # `_is_reconcilable`: the listing above was taken before this lock, so a
                         # kernel that started in between is absent from it while already RUNNING.
@@ -2377,9 +2393,10 @@ class AbstractAgent[
                     ),
                 )
         async with self.registry_lock:
-            for kernel_id, container in await self.enumerate_containers(
-                ACTIVE_STATUS_SET | DEAD_STATUS_SET,
-            ):
+            containers = await self.enumerate_containers_with_retry(
+                ACTIVE_STATUS_SET | DEAD_STATUS_SET
+            )
+            for kernel_id, container in containers:
                 session_id = SessionId(UUID(container.labels[LabelName.SESSION_ID]))
                 if container.status in ACTIVE_STATUS_SET:
                     kernelspec = int(container.labels.get(LabelName.KERNEL_SPEC, "1"))
