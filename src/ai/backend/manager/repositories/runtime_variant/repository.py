@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.runtime_variant.purgers import RuntimeVariantPurger
 from ai.backend.manager.models.runtime_variant_preset.purgers import (
     RuntimeVariantPresetsOfVariantPurger,
@@ -71,9 +71,8 @@ class RuntimeVariantRepository:
         )
         data = await w.purge_entity(purger)
         if data is None:
-            raise EntityNotFoundError(
-                entity_type=purger.variant_id.entity_type(),
+            raise RuntimeVariantNotFound(
+                f"runtime variant {purger.variant_id} not found",
                 operation=ActionOperationType.PURGE,
-                extra_msg=f"runtime variant {purger.variant_id} not found",
             )
         return data

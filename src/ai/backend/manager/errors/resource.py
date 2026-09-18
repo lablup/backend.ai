@@ -26,7 +26,11 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.entity import (
+    EntityError,
+    EntityErrorCode,
+    EntityNotFoundError,
+)
 
 from .common import ObjectNotFound
 
@@ -221,14 +225,17 @@ class ResourcePresetNotFound(EntityError, ObjectNotFound):
         )
 
 
-class RuntimeVariantNotFound(EntityError, ObjectNotFound):
-    object_name = "runtime variant"
+class RuntimeVariantNotFound(EntityNotFoundError):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-found"
+    error_title = "The runtime variant does not exist."
 
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            RuntimeVariantEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
-        )
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, entity_type=RuntimeVariantEntityType(), operation=operation)
 
 
 class RuntimeVariantConflict(EntityError, web.HTTPConflict):
