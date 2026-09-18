@@ -48,5 +48,5 @@ shape, operation, gate and backing.
   one failed item, and the run itself succeeds.
 - Each variant is purged with its presets inside its own savepoint, so one failure
   leaves the others purged.
-- The API surface stays as it was: the adapter raises the first failed item, so the
-  response still means that every id named was deleted.
+- The adapter reports the answer as it is: the purged ids and, per id that did not go,
+  its reason.

@@ -523,6 +523,34 @@ Then
 
 ### retiring
 
+#### [a-user-granted-nothing-has-every-variant-refused-in-a-bulk-delete](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면, 둘 다 실패 목록에 반환되고 아무것도 삭제되지 않는다
+
+Given
+
+- 런타임 변형 2개와, 일반 사용자 한 명
+  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RuntimeVariantAdapter.bulk_delete — user-1이 2개를 한 번에 삭제
+
+Then
+
+- 미리 만들어 둔 변형 전부가 실패 목록에 반환되고, 삭제된 목록은 비어 있다
+  - items = []
+  - failed[*].id: 미리 만들어 둔 변형들와 같다
+  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+  - deleted_count = 0
+
 #### [a-user-granted-nothing-may-not-delete-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
 아무 권한도 없는 사용자가 변형을 삭제하면 권한 부족으로 거부된다
@@ -547,34 +575,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-user-granted-nothing-may-not-delete-many-variants](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
+#### [an-unknown-id-in-a-bulk-delete-fails-alone-while-the-known-one-is-deleted](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면 권한 부족으로 거부된다
-
-Given
-
-- 런타임 변형 2개와, 일반 사용자 한 명
-  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RuntimeVariantAdapter.bulk_delete — user-1이 2개를 한 번에 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [an-unknown-id-in-a-bulk-delete-is-not-found-after-the-ones-before-it-are-gone](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
-
-있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면 대상을 찾을 수 없다는 이유로 거부된다. id마다 따로 지우므로 있는 것은 이미 삭제되어 있다
+있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면, 있는 것은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
 
 Given
 
@@ -593,8 +596,12 @@ When
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- 미리 만들어 둔 변형은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
+  - items: 미리 만들어 둔 변형와 같다
+  - len(failed) = 1
+  - failed[0].id: 무시함 — 호출이 만든 없는 id라 미리 알 수 없다
+  - failed[0].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+  - deleted_count = 1
 
 #### [deleting-a-variant-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
@@ -646,7 +653,7 @@ Then
 
 #### [the-superadmin-deletes-many-variants-at-once](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
 
-슈퍼관리자가 변형 둘을 한 번에 삭제하면, 응답에는 요청한 id의 수가 그대로 담긴다
+슈퍼관리자가 변형 둘을 한 번에 삭제하면, 둘 다 삭제된 목록에 반환되고 실패 목록은 비어 있다
 
 Given
 
@@ -666,7 +673,9 @@ When
 
 Then
 
-- 요청한 id의 수가 반환된다
+- 미리 만들어 둔 변형 전부가 삭제된 목록에 반환되고, 실패 목록은 비어 있다
+  - items: 미리 만들어 둔 변형들와 같다
+  - failed = []
   - deleted_count = 2
 
 #### [turning-enforcement-off-lets-a-user-delete-a-variant](/tests/scenario/bai_scenario/manager/runtime_variant/test_retiring.py) — pass
