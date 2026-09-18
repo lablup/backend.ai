@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -44,7 +45,9 @@ class PerProjectRegistryQuotaRepository:
     async def fetch_container_registry_row(
         self, scope_id: ProjectScope
     ) -> PerProjectContainerRegistryInfo:
-        registry_id = await self._db_source.lookup_image_commit_registry_id(scope_id.project_id)
+        registry_id = await self._db_source.lookup_image_commit_registry_id(
+            ProjectID(scope_id.project_id)
+        )
         registry = await self._db_source.fetch_by_id(registry_id)
         if not registry.project:
             raise ContainerRegistryNotFound(
