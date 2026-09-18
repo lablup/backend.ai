@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -337,7 +338,7 @@ def _build_connection(result: SearchModelCardsPayload) -> ModelCardV2Connection:
     edges = [
         ModelCardV2Edge(
             node=ModelCardGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
