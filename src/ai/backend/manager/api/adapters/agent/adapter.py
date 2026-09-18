@@ -29,10 +29,11 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
+    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
+    TIEBREAKER_ORDER,
     resolve_order,
 )
-<<<<<<< HEAD
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -40,16 +41,6 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-=======
-from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
-from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
-    BulkLoadContainerCountsAction,
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 )
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -62,7 +53,10 @@ from ai.backend.manager.services.agent.actions.search_agents import SearchAgents
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEFAULT_FORWARD_ORDER,
-    cursor_column=AgentRow.uuid,
+    explicit_backward_order=DEFAULT_BACKWARD_ORDER,
+    forward_condition_factory=AgentConditions.by_cursor_forward,
+    backward_condition_factory=AgentConditions.by_cursor_backward,
+    explicit_tiebreaker_order=TIEBREAKER_ORDER,
 )
 
 

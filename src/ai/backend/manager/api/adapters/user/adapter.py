@@ -182,9 +182,13 @@ _USER_PAGINATION_SPEC = PaginationSpec(
     cursor_column=UserRow.uuid,
 )
 
+# 26.4's keypairs table has no unique UUID column, so the cursor cannot carry a row UUID.
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairOrders.created_at(ascending=False),
-    cursor_column=KeyPairRow.id,
+    explicit_backward_order=KeypairOrders.created_at(ascending=True),
+    explicit_tiebreaker_order=KeyPairRow.access_key.asc(),
+    forward_condition_factory=KeypairConditions.by_cursor_forward,
+    backward_condition_factory=KeypairConditions.by_cursor_backward,
 )
 
 
@@ -769,7 +773,6 @@ class UserAdapter(BaseAdapter):
         """Convert KeyPairData to KeypairNode DTO."""
         return KeypairNode(
             id=str(data.access_key),
-            field_id=data.id,
             access_key=str(data.access_key),
             is_active=data.is_active,
             is_admin=data.is_admin,

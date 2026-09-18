@@ -175,17 +175,26 @@ def _to_binary_size_info(value: int) -> BinarySizeInfo:
 
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairResourcePolicyOrders.created_at(ascending=False),
-    cursor_column=KeyPairResourcePolicyRow.uuid,
+    explicit_backward_order=KeypairResourcePolicyOrders.created_at(ascending=True),
+    forward_condition_factory=KeypairResourcePolicyConditions.by_cursor_forward,
+    backward_condition_factory=KeypairResourcePolicyConditions.by_cursor_backward,
+    explicit_tiebreaker_order=KeyPairResourcePolicyRow.name.asc(),
 )
 
 _USER_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserResourcePolicyOrders.created_at(ascending=False),
-    cursor_column=UserResourcePolicyRow.uuid,
+    explicit_backward_order=UserResourcePolicyOrders.created_at(ascending=True),
+    forward_condition_factory=UserResourcePolicyConditions.by_cursor_forward,
+    backward_condition_factory=UserResourcePolicyConditions.by_cursor_backward,
+    explicit_tiebreaker_order=UserResourcePolicyRow.name.asc(),
 )
 
 _PROJECT_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=ProjectResourcePolicyOrders.created_at(ascending=False),
-    cursor_column=ProjectResourcePolicyRow.uuid,
+    explicit_backward_order=ProjectResourcePolicyOrders.created_at(ascending=True),
+    forward_condition_factory=ProjectResourcePolicyConditions.by_cursor_forward,
+    backward_condition_factory=ProjectResourcePolicyConditions.by_cursor_backward,
+    explicit_tiebreaker_order=ProjectResourcePolicyRow.name.asc(),
 )
 
 
@@ -611,7 +620,6 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> KeypairResourcePolicyNode:
         return KeypairResourcePolicyNode(
             id=data.name,
-            entity_id=data.uuid,
             name=data.name,
             created_at=data.created_at,
             default_for_unspecified=data.default_for_unspecified,
@@ -636,7 +644,6 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> UserResourcePolicyNode:
         return UserResourcePolicyNode(
             id=data.name,
-            entity_id=data.uuid,
             name=data.name,
             created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
@@ -652,7 +659,6 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> ProjectResourcePolicyNode:
         return ProjectResourcePolicyNode(
             id=data.name,
-            entity_id=data.uuid,
             name=data.name,
             created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,

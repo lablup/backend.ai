@@ -88,20 +88,3 @@ class RolePresetConditions:
             return RolePresetRow.deleted == deleted
 
         return inner
-<<<<<<< HEAD
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePresetRow.id < sa.text(f"'{cursor_id}'::uuid")
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RolePresetRow.id > sa.text(f"'{cursor_id}'::uuid")
-
-        return inner
-=======
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))

@@ -89,16 +89,8 @@ def _resource_slot_entries_to_slot(
 
 def _resource_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-<<<<<<< HEAD
         forward_order=ResourcePresetOrders.id(ascending=False),
-        backward_order=ResourcePresetOrders.id(ascending=True),
-        forward_condition_factory=ResourcePresetConditions.by_cursor_forward,
-        backward_condition_factory=ResourcePresetConditions.by_cursor_backward,
-        tiebreaker_order=ResourcePresetRow.name.asc(),
-=======
-        forward_order=ResourcePresetOrders.name(ascending=True),
         cursor_column=ResourcePresetRow.id,
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
     )
 
 

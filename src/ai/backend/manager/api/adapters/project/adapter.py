@@ -87,18 +87,8 @@ from ai.backend.manager.services.group.actions.unassign_users import (
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
-<<<<<<< HEAD
     forward_order=GroupOrders.created_at(ascending=False),
-    backward_order=GroupOrders.created_at(ascending=True),
-    forward_condition_factory=lambda cursor_id: GroupConditions.by_cursor_forward(UUID(cursor_id)),
-    backward_condition_factory=lambda cursor_id: GroupConditions.by_cursor_backward(
-        UUID(cursor_id)
-    ),
-    tiebreaker_order=GroupRow.id.asc(),
-=======
-    forward_order=ProjectOrders.created_at(ascending=False),
-    cursor_column=ProjectRow.id,
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
+    cursor_column=GroupRow.id,
 )
 
 

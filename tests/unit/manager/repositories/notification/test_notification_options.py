@@ -19,14 +19,7 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.types import BinarySize, ResourceSlot
-<<<<<<< HEAD
-=======
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
-from ai.backend.manager.data.notification.types import (
-    NotificationChannelData,
-    NotificationRuleData,
-)
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -977,6 +970,13 @@ class TestNotificationCursorPagination:
     """
 
     @pytest.fixture
+    def channel_pagination_spec(self) -> PaginationSpec:
+        return PaginationSpec(
+            forward_order=NotificationChannelOrders.created_at(ascending=False),
+            cursor_column=NotificationChannelRow.id,
+        )
+
+    @pytest.fixture
     async def db_with_cleanup(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -1105,13 +1105,6 @@ class TestNotificationCursorPagination:
         return NotificationRepository(db=db_with_cleanup)
 
     @pytest.fixture
-    def channel_pagination_spec(self) -> PaginationSpec:
-        return PaginationSpec(
-            forward_order=NotificationChannelOrders.created_at(ascending=False),
-            cursor_column=NotificationChannelRow.id,
-        )
-
-    @pytest.fixture
     async def channels_for_cursor_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1175,12 +1168,8 @@ class TestNotificationCursorPagination:
 
     async def test_forward_pagination_with_cursor_shows_older_items(
         self,
-<<<<<<< HEAD
-        notification_repository: NotificationRepository,
-=======
         channel_pagination_spec: PaginationSpec,
-        channel_ops: OpsRepository[NotificationChannelData],
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
+        notification_repository: NotificationRepository,
         channels_for_cursor_pagination: list[uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -1246,12 +1235,8 @@ class TestNotificationCursorPagination:
 
     async def test_backward_pagination_with_cursor_shows_newer_items(
         self,
-<<<<<<< HEAD
-        notification_repository: NotificationRepository,
-=======
         channel_pagination_spec: PaginationSpec,
-        channel_ops: OpsRepository[NotificationChannelData],
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
+        notification_repository: NotificationRepository,
         channels_for_cursor_pagination: list[uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:

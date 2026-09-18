@@ -10,7 +10,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
 class _Base(DeclarativeBase):

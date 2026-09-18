@@ -9,11 +9,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-<<<<<<< HEAD
 import sqlalchemy as sa
-=======
-from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -216,7 +212,9 @@ from ai.backend.manager.models.endpoint.orders import (
 )
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
+    ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
+    ALLOCATED_SLOT_REVISION_TIEBREAKER,
     resolve_allocated_slot_revision_order,
 )
 from ai.backend.manager.models.routing import RoutingRow
@@ -400,7 +398,10 @@ def _get_replica_pagination_spec() -> PaginationSpec:
 def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        cursor_column=DeploymentRevisionResourceSlotRow.id,
+        explicit_backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
+        explicit_tiebreaker_order=ALLOCATED_SLOT_REVISION_TIEBREAKER,
+        forward_condition_factory=RevisionResourceSlotConditions.by_cursor_forward,
+        backward_condition_factory=RevisionResourceSlotConditions.by_cursor_backward,
     )
 
 

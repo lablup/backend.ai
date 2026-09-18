@@ -38,7 +38,6 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
 )
-<<<<<<< HEAD
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -47,13 +46,6 @@ from ai.backend.manager.repositories.container_registry.creators import (
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
-=======
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.container_registry.actions.bulk_get import (
-    BulkGetContainerRegistriesAction,
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 )
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,

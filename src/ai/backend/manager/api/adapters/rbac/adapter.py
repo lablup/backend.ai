@@ -351,10 +351,10 @@ def _assignment_pagination_spec() -> PaginationSpec:
 def _entity_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=EntityScopeOrders.registered_at(ascending=False),
-        backward_order=EntityScopeOrders.registered_at(ascending=True),
+        explicit_backward_order=EntityScopeOrders.registered_at(ascending=True),
         forward_condition_factory=EntityScopeConditions.by_cursor_forward,
         backward_condition_factory=EntityScopeConditions.by_cursor_backward,
-        tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
+        explicit_tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
     )
 
 
@@ -362,10 +362,10 @@ def _entity_pagination_spec() -> PaginationSpec:
 def _invitation_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=RoleInvitationOrders.created_at(ascending=False),
-        backward_order=RoleInvitationOrders.created_at(ascending=True),
+        explicit_backward_order=RoleInvitationOrders.created_at(ascending=True),
         forward_condition_factory=RoleInvitationConditions.by_cursor_forward,
         backward_condition_factory=RoleInvitationConditions.by_cursor_backward,
-        tiebreaker_order=RoleInvitationRow.id.asc(),
+        explicit_tiebreaker_order=RoleInvitationRow.id.asc(),
     )
 
 

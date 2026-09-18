@@ -75,10 +75,11 @@ from ai.backend.manager.models.deployment_revision_preset.orders import (
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
+    ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
+    ALLOCATED_SLOT_PRESET_TIEBREAKER,
     resolve_allocated_slot_preset_order,
 )
-from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
@@ -116,23 +117,18 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-<<<<<<< HEAD
         forward_order=DeploymentRevisionPresetOrders.rank(ascending=True),
-        backward_order=DeploymentRevisionPresetOrders.rank(ascending=False),
-        forward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentRevisionPresetRow.id.asc(),
-=======
-        forward_order=DeploymentRevisionPresetOrders.created_at(ascending=False),
         cursor_column=DeploymentRevisionPresetRow.id,
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
     )
 
 
 def _preset_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        cursor_column=PresetResourceSlotRow.id,
+        explicit_backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
+        explicit_tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
+        forward_condition_factory=PresetResourceSlotConditions.by_cursor_forward,
+        backward_condition_factory=PresetResourceSlotConditions.by_cursor_backward,
     )
 
 

@@ -88,7 +88,7 @@ from ai.backend.manager.models.vfolder.orders import (
 from ai.backend.manager.models.vfolder.orders import (
     resolve_order as resolve_vfolder_order,
 )
-<<<<<<< HEAD
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -99,10 +99,6 @@ from ai.backend.manager.repositories.vfolder.types import (
     ProjectVFolderSearchScope,
     UserVFolderSearchScope,
 )
-=======
-from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,

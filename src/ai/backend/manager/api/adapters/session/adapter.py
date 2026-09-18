@@ -89,11 +89,7 @@ from ai.backend.manager.models.kernel.orders import (
 from ai.backend.manager.models.kernel.orders import (
     resolve_order as resolve_kernel_order,
 )
-<<<<<<< HEAD
-=======
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchers import KernelSearcher
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
     DEFAULT_FORWARD_ORDER as SESSION_DEFAULT_FORWARD_ORDER,
@@ -102,10 +98,6 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.models.session.row import SessionRow
-<<<<<<< HEAD
-=======
-from ai.backend.manager.models.session.searchers import SessionSearcher
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

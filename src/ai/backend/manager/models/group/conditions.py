@@ -259,41 +259,6 @@ class GroupConditions:
 
         return inner
 
-<<<<<<< HEAD:src/ai/backend/manager/models/group/conditions.py
-    # ==================== Cursor Pagination ====================
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: UUID) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(GroupRow.created_at).where(GroupRow.id == cursor_id).scalar_subquery()
-            )
-            return GroupRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: UUID) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(GroupRow.created_at).where(GroupRow.id == cursor_id).scalar_subquery()
-            )
-            return GroupRow.created_at > subquery
-
-        return inner
-
-=======
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734)):src/ai/backend/manager/models/project/conditions.py
     # ==================== Domain Nested Filters ====================
 
     @staticmethod

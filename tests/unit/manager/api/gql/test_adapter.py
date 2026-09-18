@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+from http import HTTPStatus
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -9,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.adapter_options.pagination.pagination import DEFAULT_PAGINATION_LIMIT
 from ai.backend.manager.api.gql.adapter import (
     BaseGQLAdapter,
@@ -16,7 +19,7 @@ from ai.backend.manager.api.gql.adapter import (
     PaginationSpec,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.errors.api import InvalidGraphQLParameters
+from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -387,9 +390,6 @@ class TestBaseGQLAdapterBuildPagination:
         # (it uses cursor_order internally in pagination object)
         # But tiebreaker is always appended
         assert len(querier.orders) == 1
-<<<<<<< HEAD
-        assert querier.orders[0] is mock_tiebreaker_order
-=======
         assert querier.orders[0].compare(_ItemRow.id.asc())
 
     def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
@@ -412,4 +412,3 @@ class TestBaseGQLAdapterBuildPagination:
         for raised in (forward.value, backward.value):
             assert isinstance(raised, BackendAIError)
             assert raised.status_code == HTTPStatus.BAD_REQUEST
->>>>>>> e643d3184 (fix(BA-7979): include the tiebreaker in cursor pagination conditions (#14734))
