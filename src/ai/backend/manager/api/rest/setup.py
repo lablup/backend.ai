@@ -50,7 +50,6 @@ def setup_api(
         valkey_schedule=r.infrastructure.valkey.schedule,
         network_plugin_ctx=r.plugins.network_plugin_ctx,
         background_task_manager=r.system.background_task_manager,
-        registry_quota_service=r.domain.registry_quota_service,
         storage_manager=r.components.storage_manager,
         registry=r.agents.registry,
         idle_checker_host=r.orchestration.idle_checker_host,

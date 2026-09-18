@@ -8,14 +8,10 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.services.container_registry.quota import (
-    AbstractPerProjectContainerRegistryQuotaService,
-)
 from ai.backend.manager.types import DistributedLockFactory
 
 from .distributed_lock import DistributedLockFactoryDependency, DistributedLockInput
 from .notification import NotificationCenterDependency
-from .registry_quota import RegistryQuotaServiceDependency, RegistryQuotaServiceInput
 from .repositories import RepositoriesDependency, RepositoriesInput
 
 if TYPE_CHECKING:
@@ -59,7 +55,6 @@ class DomainResources:
     notification_center: NotificationCenter
     distributed_lock_factory: DistributedLockFactory
     repositories: Repositories
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService
 
 
 class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
@@ -69,7 +64,6 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
     1. Notification center: HTTP client pool for notifications (no deps)
     2. Distributed lock factory: Lock backend based on config
     3. Repositories: All repository instances
-    4. Registry quota service: Per-project container registry quota service
     """
 
     @property
@@ -123,16 +117,8 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
         )
         repositories = await stack.enter_dependency(repositories_dep, repositories_input)
 
-        # 4. Registry quota service (depends on db)
-        registry_quota_dep = RegistryQuotaServiceDependency()
-        registry_quota_input = RegistryQuotaServiceInput(db=setup_input.db)
-        registry_quota_service = await stack.enter_dependency(
-            registry_quota_dep, registry_quota_input
-        )
-
         yield DomainResources(
             notification_center=notification_center,
             distributed_lock_factory=distributed_lock_factory,
             repositories=repositories,
-            registry_quota_service=registry_quota_service,
         )
