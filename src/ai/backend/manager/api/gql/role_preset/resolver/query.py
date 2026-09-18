@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     SearchRolePresetsInput,
 )
 from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -79,7 +80,7 @@ async def admin_role_presets(
     edges = [
         RolePresetEdge(
             node=RolePresetGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
