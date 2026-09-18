@@ -33,6 +33,22 @@ class PaginationOptions:
     limit: int | None = None
     offset: int | None = None
 
+    @property
+    def has_forward_cursor(self) -> bool:
+        return self.first is not None or self.after is not None
+
+    @property
+    def has_backward_cursor(self) -> bool:
+        return self.last is not None or self.before is not None
+
+    @property
+    def has_cursor(self) -> bool:
+        return self.has_forward_cursor or self.has_backward_cursor
+
+    @property
+    def has_offset(self) -> bool:
+        return self.limit is not None or self.offset is not None
+
 
 @dataclass(frozen=True)
 class PaginationSpec:
@@ -79,11 +95,7 @@ def build_pagination(
         InvalidGraphQLParameters: If multiple pagination modes are requested
             or if first/last values are not positive.
     """
-    has_forward_cursor = options.first is not None or options.after is not None
-    has_backward_cursor = options.last is not None or options.before is not None
-    has_offset = options.limit is not None or options.offset is not None
-
-    if sum([has_forward_cursor, has_backward_cursor, has_offset]) > 1:
+    if sum([options.has_forward_cursor, options.has_backward_cursor, options.has_offset]) > 1:
         raise InvalidGraphQLParameters(
             "Only one pagination mode allowed: (first/after) OR (last/before) OR (limit/offset)"
         )
