@@ -1,7 +1,8 @@
-"""The image adapter: the DataLoader path answers per image, the REST search keeps its cursor."""
+"""The image adapter: the DataLoader path answers per image, the REST search reads both paging modes."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -19,8 +20,13 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ImageType,
 )
+from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.specs.pagination import CursorForwardPagination
+from ai.backend.manager.models.specs.pagination import (
+    CursorBackwardPagination,
+    CursorForwardPagination,
+    OffsetPagination,
+)
 from ai.backend.manager.services.image.actions.search_images import SearchImagesActionResult
 
 READABLE = ImageID(uuid4())
@@ -102,12 +108,75 @@ async def test_no_ids_read_nothing(adapter: ImageAdapter, processors: MagicMock)
     processors.bulk_get.run.assert_not_awaited()
 
 
-async def test_admin_search_pages_with_the_cursor_it_is_given(
+@dataclass(frozen=True)
+class _CursorCase:
+    input: AdminSearchImagesInput
+    pagination_type: type[CursorForwardPagination | CursorBackwardPagination]
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        _CursorCase(
+            input=AdminSearchImagesInput(first=5, after=encode_cursor(uuid4())),
+            pagination_type=CursorForwardPagination,
+        ),
+        _CursorCase(
+            input=AdminSearchImagesInput(last=5, before=encode_cursor(uuid4())),
+            pagination_type=CursorBackwardPagination,
+        ),
+    ],
+    ids=lambda case: case.pagination_type.__name__,
+)
+async def test_admin_search_pages_by_the_cursor_it_is_given(
+    case: _CursorCase,
     adapter: ImageAdapter,
     processors: MagicMock,
 ) -> None:
-    await adapter.admin_search(AdminSearchImagesInput(first=5, after=encode_cursor(uuid4())))
+    await adapter.admin_search(case.input)
 
-    action = processors.search_images.run.call_args.args[0]
-    assert isinstance(action.querier.pagination, CursorForwardPagination)
-    assert action.querier.pagination.cursor_condition is not None
+    pagination = processors.search_images.run.call_args.args[0].querier.pagination
+    assert isinstance(pagination, (CursorForwardPagination, CursorBackwardPagination))
+    assert type(pagination) is case.pagination_type
+    assert pagination.cursor_condition is not None
+
+
+@dataclass(frozen=True)
+class _OffsetCase:
+    input: AdminSearchImagesInput
+    expected: OffsetPagination
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        _OffsetCase(
+            input=AdminSearchImagesInput(limit=3, offset=2),
+            expected=OffsetPagination(limit=3, offset=2),
+        ),
+        _OffsetCase(
+            input=AdminSearchImagesInput(),
+            expected=OffsetPagination(limit=10, offset=0),
+        ),
+    ],
+    ids=lambda case: f"limit-{case.expected.limit}-offset-{case.expected.offset}",
+)
+async def test_admin_search_pages_by_offset(
+    case: _OffsetCase,
+    adapter: ImageAdapter,
+    processors: MagicMock,
+) -> None:
+    await adapter.admin_search(case.input)
+
+    pagination = processors.search_images.run.call_args.args[0].querier.pagination
+    assert pagination == case.expected
+
+
+async def test_admin_search_refuses_two_pagination_modes(
+    adapter: ImageAdapter,
+    processors: MagicMock,
+) -> None:
+    with pytest.raises(InvalidGraphQLParameters):
+        await adapter.admin_search(AdminSearchImagesInput(first=1, limit=1))
+
+    processors.search_images.run.assert_not_awaited()
