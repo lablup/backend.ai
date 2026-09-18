@@ -15,7 +15,7 @@ from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKern
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.scratch.types import KernelRecoveryScratchData
 from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
-from ai.backend.agent.types import KernelOwnershipData
+from ai.backend.agent.types import KernelLifecycleStatus, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
 
@@ -51,6 +51,7 @@ def mock_kernel() -> MagicMock:
         is_local=False,
     )
     kernel.session_type = SessionTypes.INTERACTIVE
+    kernel.state = KernelLifecycleStatus.RUNNING
     kernel.ownership_data = KernelOwnershipData(
         kernel_id=kernel_id,
         session_id=session_id,
@@ -143,15 +144,17 @@ class TestSaveKernelRegistry:
             # Should not raise, just skip the kernel
             await writer.save_kernel_registry(kernel_registry_data, metadata)
 
-    async def test_a_kernel_not_yet_fully_built_is_skipped_without_a_traceback(
+    async def test_a_kernel_not_yet_started_is_skipped_without_a_traceback(
         self,
         writer: ContainerBasedKernelRegistryWriter,
         kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
         metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Registered before its REPL ports exist: ordinary under concurrent creates, and its
         own start writes it a moment later. One warning line, not an exception traceback."""
+        mock_kernel.state = KernelLifecycleStatus.PREPARING
         with (
             patch.object(
                 writer,
@@ -163,10 +166,35 @@ class TestSaveKernelRegistry:
             caplog.at_level(logging.WARNING, logger="ai.backend.agent.kernel_registry"),
         ):
             await writer.save_kernel_registry(kernel_registry_data, metadata)
-        records = [r for r in caplog.records if "not complete yet" in r.getMessage()]
+        records = [r for r in caplog.records if "not started yet" in r.getMessage()]
         assert len(records) == 1
         assert records[0].levelno == logging.WARNING
         assert records[0].exc_info is None
+
+    async def test_a_running_kernel_it_cannot_parse_is_reported_as_a_fault(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A RUNNING kernel has its ports by contract; missing ones are a broken invariant, not
+        the start-up race, and keep the traceback that says so."""
+        with (
+            patch.object(
+                writer,
+                "_parse_recovery_data_from_kernel",
+                side_effect=KernelRecoveryDataParseError(),
+            ),
+            patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
+            patch("ai.backend.agent.kernel_registry.writer.container.ScratchConfig"),
+            caplog.at_level(logging.WARNING, logger="ai.backend.agent.kernel_registry"),
+        ):
+            await writer.save_kernel_registry(kernel_registry_data, metadata)
+        records = [r for r in caplog.records if "Failed to parse" in r.getMessage()]
+        assert len(records) == 1
+        assert records[0].levelno == logging.ERROR
+        assert records[0].exc_info is not None
 
     async def test_a_kernel_created_while_saving_does_not_break_the_save(
         self,

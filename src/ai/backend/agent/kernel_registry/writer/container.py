@@ -9,6 +9,7 @@ from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseEr
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.scratch.types import KernelRecoveryScratchData
 from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
+from ai.backend.agent.types import KernelLifecycleStatus
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
@@ -56,14 +57,20 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             try:
                 original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
             except KernelRecoveryDataParseError as e:
-                # A kernel that is registered but not yet fully built -- its REPL ports arrive a
-                # step later -- has nothing to record yet, and its own start writes it. Ordinary
-                # under concurrent creates; a traceback here reported a race as a fault.
-                log.warning(
-                    "Skipped saving kernel {}: its recovery data is not complete yet ({})",
-                    kernel.kernel_id,
-                    e.__cause__ or e,
-                )
+                if kernel.state is KernelLifecycleStatus.PREPARING:
+                    # Registered a step before its REPL ports exist; its own start writes it.
+                    log.warning(
+                        "Skipped saving kernel {}: not started yet ({})",
+                        kernel.kernel_id,
+                        e.__cause__ or e,
+                    )
+                else:
+                    log.exception(
+                        "Failed to parse recovery data from kernel {} in state {}: {}",
+                        kernel.kernel_id,
+                        kernel.state,
+                        e.__cause__ or e,
+                    )
                 continue
             if original_recovery_data is None:
                 continue
