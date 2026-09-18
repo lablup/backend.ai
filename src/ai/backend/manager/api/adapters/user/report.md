@@ -2869,6 +2869,53 @@ Then
   - timestamps.created_at: 이 실행이 쓴 시각
   - timestamps.modified_at: 이 실행이 쓴 시각
 
+#### [the-monitor-granted-nothing-reads-another-users-whole-node](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+
+아무 역할도 받지 않은 모니터가 다른 사용자를 읽으면, 권한 검사가 읽기에 한해 모니터를 통과시켜 기본 키까지 채운 노드 전체가 반환된다
+
+Given
+
+- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 모니터 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.get — user-2이 user-1을 읽음
+
+Then
+
+- 읽힌 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
 #### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
 
 슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다
@@ -3910,6 +3957,39 @@ Then
 
 - 거부된다
   - 거부: EntityNotFoundError
+
+#### [the-monitor-granted-nothing-searching-a-domain-by-name-finds-only-its-users](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+
+아무 역할도 받지 않은 모니터가 도메인 이름으로 훑으면, 권한 검사가 읽기에 한해 모니터를 통과시켜 다른 도메인 사용자는 빠진다
+
+Given
+
+- 도메인 하나와 부르는 사람, 같은 도메인 사용자 하나와 다른 도메인 사용자 하나
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 모니터 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인 other-1
+
+When
+
+- UserAdapter.domain_search — user-3이 home-1으로 조회
+
+Then
+
+- 닿는 사용자가 모두 오고 페이지 정보가 실린다
+  - items(이름순) = ['user-1', 'user-3']
+  - pagination.total = 2
+  - pagination.offset = 0
+  - pagination.limit = 50
 
 #### [the-superadmin-searching-by-role-finds-only-its-holders](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
 

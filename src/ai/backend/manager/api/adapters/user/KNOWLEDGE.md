@@ -95,9 +95,9 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 문 | 배선 종류 | 거부 예외 | 슈퍼관리자 | 집행을 끄면 | 근거 |
 |---|---|---|---|---|---|
 | 전역 역할 | `global_scope`, `global_search_ops` | `InsufficientPrivilege` | 통과. 모니터는 GET/SEARCH/LOOKUP만 통과 | 그대로 막는다 | `actions/v2/global_scope/processor.py:51`, `superadmin.py:22-34`, `actions/types.py:106` |
-| 엔티티 권한 | `single_entity`, field `single_field` | `NotEnoughPermission` | 통과 | 통과 | `actions/v2/single_entity/validator/rbac.py:33-54` |
+| 엔티티 권한 | `single_entity`, field `single_field` | `NotEnoughPermission` | 통과. 모니터는 READ만 통과 | 통과 | `actions/v2/single_entity/validator/rbac.py:33-54` |
 | 엔티티 권한, 소유자 조회 단계 | `key_field_lookup_ops`, `key_owner_lookup_ops` | `GenericBadRequest`. 없는 키와 권한 없음이 같은 예외다 | 통과. 없는 키는 `FieldNotFoundError` | 권한은 통과, 없는 키는 여전히 `GenericBadRequest` | `actions/v2/lookup/processor.py:99-110,132-146` |
-| 스코프 권한 | `scope`, `scope_search_ops`, field `search_ops` | `NotEnoughPermission`. 여러 스코프 중 하나라도 막히면 전부 거부 | 통과 | 통과 | `actions/v2/scope/validator/rbac.py:38-66` |
+| 스코프 권한 | `scope`, `scope_search_ops`, field `search_ops` | `NotEnoughPermission`. 여러 스코프 중 하나라도 막히면 전부 거부 | 통과. 모니터는 READ만 통과 | 통과 | `actions/v2/scope/validator/rbac.py:38-66` |
 | 입력 검증 | 없음. 서비스와 리포지토리가 실행 중에 낸다 | 경우마다 다르다 | 해당 없음 | 해당 없음 | 아래 표 |
 
 - 집행 스위치는 `manager.rbac.enforcement_enabled`, 기본 True(`config/unified.py:630-650`).
@@ -295,6 +295,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|---|
 | 권한 받은 사용자가 사용자를 읽으면 그 사용자 노드 전체가 온다 | 대상 사용자 스코프에서 사용자 READ를 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 답으로 온다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 사용자 스코프에 READ를 준 역할을 행위자에게 | 노드 전체, 8절 기본대로 |
 | 권한 없는 사용자는 다른 사용자를 읽을 수 없다 | 아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
+| 권한 없는 모니터가 다른 사용자를 읽으면 그 사용자 노드 전체가 온다 | 아무 역할도 받지 않은 모니터가 다른 사용자를 읽으면, 권한 검사가 읽기에 한해 모니터를 통과시켜 기본 키까지 채운 노드 전체가 반환된다 | 모니터 | 도메인 하나, 대상 사용자 하나, 모니터 하나 | 노드 전체, 8절 기본대로 |
 | 일괄 읽기는 원소마다 노드와 거부를 입력 순서대로 답한다 | 한 사용자에게만 READ를 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다 | 권한 받은 사용자 | 도메인 하나, 사용자 둘, 행위자 하나, 첫 사용자 스코프에 READ를 준 역할을 행위자에게 | 원소 표 참고 |
 | 슈퍼관리자의 일괄 읽기에서 없는 id는 비어 온다 | 슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다 | 슈퍼관리자 | 도메인 하나, 사용자 하나 | 있는 id는 노드, 없는 id는 None |
 | 빈 목록으로 일괄 읽기를 하면 빈 목록이 온다 | 권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | 빈 목록 |
@@ -319,6 +320,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 슈퍼관리자가 아니면 역할로 걸러 훑을 수 없다 | 그 역할의 스코프 권한을 받은 사용자라도 역할 검색을 하려 하면, 전역 역할 문이 막는다 | 권한 받은 사용자 | 도메인 하나, 행위자 하나, 역할 하나, 도메인 스코프에 READ를 준 역할을 행위자에게 | `InsufficientPrivilege` |
 | 도메인 스코프 권한을 받은 사용자가 도메인 이름으로 훑으면 그 도메인 사용자만 온다 | 도메인 스코프에서 사용자 READ를 받은 사용자가 도메인 이름으로 훑으면, 다른 도메인 사용자는 빠진다 | 권한 받은 사용자 | 도메인 둘, 도메인마다 사용자 하나, 행위자는 첫 도메인 소속, 첫 도메인 스코프에 READ를 준 역할을 행위자에게 | 목록 전체 비교(첫 도메인 사용자와 행위자) |
 | 권한 없는 사용자는 도메인 이름으로 사용자를 훑을 수 없다 | 역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | `NotEnoughPermission` |
+| 권한 없는 모니터가 도메인 이름으로 훑으면 그 도메인 사용자만 온다 | 아무 역할도 받지 않은 모니터가 도메인 이름으로 훑으면, 권한 검사가 읽기에 한해 모니터를 통과시켜 다른 도메인 사용자는 빠진다 | 모니터 | 도메인 둘, 도메인마다 사용자 하나, 모니터는 첫 도메인 소속 | 목록 전체 비교(첫 도메인 사용자와 모니터) |
 | 없는 도메인 이름으로는 사용자를 훑을 수 없다 | 권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다 | 권한 받은 사용자 | 도메인 하나, 행위자 하나, 도메인 스코프에 READ를 준 역할 | `EntityNotFoundError` |
 | 도메인 스코프 권한을 받은 사용자가 GQL로 도메인 사용자를 훑는다 | 같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다 | 권한 받은 사용자 | 도메인 스코프 행과 같음 | 목록 전체 비교, 페이지 여부 |
 | 권한 없는 사용자는 GQL로 도메인 사용자를 훑을 수 없다 | 역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | `NotEnoughPermission` |

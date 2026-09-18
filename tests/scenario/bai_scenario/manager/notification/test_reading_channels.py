@@ -181,18 +181,20 @@ class AUserGrantedNothingMayNotRead(
 
 
 @dataclass(frozen=True)
-class TheMonitorMayNotRead(
+class TheMonitorReadsAChannel(
     Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
-        return "the-monitor-may-not-read-a-channel-by-id"
+        return "the-monitor-reads-a-channel-by-id"
 
     @override
     def describe(self) -> str:
         return (
-            "모니터가 id로 조회하면 권한 부족으로 거부된다. "
-            "검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없다"
+            "모니터가 id로 조회하면 그 채널 전체가 반환된다. "
+            "검색의 슈퍼관리자 검사와 같이 권한 검사도 읽기에 한해 모니터를 통과시킨다"
         )
 
     @override
@@ -205,7 +207,7 @@ class TheMonitorMayNotRead(
 
     @override
     def then(self) -> Then[AChannelAndACaller, NotificationChannelNode]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheChannelNode(started=self.started)
 
 
 @dataclass(frozen=True)
@@ -347,7 +349,7 @@ class ABatchLoadOfNothingAnswersNothing(
 SCENARIOS: list[ReadingStep] = [
     TheSuperadminReadsAChannel(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
-    TheMonitorMayNotRead(),
+    TheMonitorReadsAChannel(started=datetime.now(UTC)),
     TheSuperadminReadingAnUnknownIdIsNotFound(),
     AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(),
     TheSuperadminLoadsLaidAndMissing(started=datetime.now(UTC)),

@@ -317,6 +317,36 @@ class AUserGrantedNothingMayNotReadAnother(
 
 
 @dataclass(frozen=True)
+class TheMonitorReadsAnotherWithoutAGrant(
+    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-monitor-granted-nothing-reads-another-users-whole-node"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "아무 역할도 받지 않은 모니터가 다른 사용자를 읽으면, "
+            "권한 검사가 읽기에 한해 모니터를 통과시켜 기본 키까지 채운 노드 전체가 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+        return SomeoneAndAnother(granted=False, role=UserRole.MONITOR)
+
+    @override
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
+        return ReadingTheTarget()
+
+    @override
+    def then(self) -> Then[AReaderAndATarget, Answer]:
+        return TheTargetNode(started=self.started)
+
+
+@dataclass(frozen=True)
 class ABatchLoadAnswersEachElementInOrder(
     Scenario[SeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
 ):
@@ -404,6 +434,7 @@ class ABatchLoadOfNothingAnswersNothing(
 SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserReadsAnother(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotReadAnother(),
+    TheMonitorReadsAnotherWithoutAGrant(started=datetime.now(UTC)),
     ABatchLoadAnswersEachElementInOrder(started=datetime.now(UTC)),
     TheSuperadminBatchLoadLeavesAMissingIdEmpty(started=datetime.now(UTC)),
     ABatchLoadOfNothingAnswersNothing(),

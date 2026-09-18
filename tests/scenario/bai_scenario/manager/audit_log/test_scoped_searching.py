@@ -325,18 +325,18 @@ class AUserGrantedNothingMayNotScopeSearch(
 
 
 @dataclass(frozen=True)
-class TheMonitorRoleGetsNoScopeForFree(
+class TheMonitorRoleScopeSearchesWithoutAGrant(
     Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "the-monitor-role-without-a-grant-may-not-scope-search"
+        return "the-monitor-role-without-a-grant-scope-searches-a-named-entity"
 
     @override
     def describe(self) -> str:
         return (
-            "모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. "
-            "모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다"
+            "모니터 역할 사용자가 권한 없이 엔티티를 지정해 검색하면, 그 엔티티의 기록이 반환된다. "
+            "권한 검사도 읽기에 한해 모니터를 통과시킨다"
         )
 
     @override
@@ -349,7 +349,7 @@ class TheMonitorRoleGetsNoScopeForFree(
 
     @override
     def then(self) -> Then[ScopedEntities, Searched]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheRecordsAnswered()
 
 
 @dataclass(frozen=True)
@@ -552,7 +552,7 @@ ENTITY_SCENARIOS: list[EntityStep] = [
     OmittingThePageSizeCapsThePage(),
     AnUnreadableEntityRefusesTheWhole(),
     AUserGrantedNothingMayNotScopeSearch(),
-    TheMonitorRoleGetsNoScopeForFree(),
+    TheMonitorRoleScopeSearchesWithoutAGrant(),
     NamingAnUnknownEntityIsRefused(),
     TheSuperadminNamingAnUnknownEntityIsRefused(),
     EnforcementOffReadsWithoutAGrant(),

@@ -914,9 +914,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [the-monitor-may-not-read-a-channel-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+#### [the-monitor-reads-a-channel-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
 
-모니터가 id로 조회하면 권한 부족으로 거부된다. 검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없다
+모니터가 id로 조회하면 그 채널 전체가 반환된다. 검색의 슈퍼관리자 검사와 같이 권한 검사도 읽기에 한해 모니터를 통과시킨다
 
 Given
 
@@ -935,8 +935,17 @@ When
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- 미리 만들어 둔 채널 전체가 반환된다
+  - id: 무시함 — 데이터베이스가 만든다
+  - name = 'channel-1'
+  - description = None
+  - channel_type = 'webhook'
+  - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - spec.url = 'https://hooks.example.test/notify'
+  - enabled = True
+  - created_by: 만든 사람와 같다
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
 
 #### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
 

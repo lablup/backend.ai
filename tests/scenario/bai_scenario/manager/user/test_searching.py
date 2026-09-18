@@ -889,6 +889,32 @@ class AUserGrantedNothingMayNotSearchADomain(Scenario[SeedingSession, Any, UserA
 
 
 @dataclass(frozen=True)
+class TheMonitorSearchesADomainWithoutAGrant(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+    @override
+    def summary(self) -> str:
+        return "the-monitor-granted-nothing-searching-a-domain-by-name-finds-only-its-users"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "아무 역할도 받지 않은 모니터가 도메인 이름으로 훑으면, "
+            "권한 검사가 읽기에 한해 모니터를 통과시켜 다른 도메인 사용자는 빠진다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, Any]:
+        return SomeoneInADomain(role=UserRole.MONITOR, with_neighbours=True)
+
+    @override
+    def when(self) -> When[Any, UserAdapter, Answer]:
+        return SearchingTheDomain()
+
+    @override
+    def then(self) -> Then[Any, Answer]:
+        return TheOffsetPage()
+
+
+@dataclass(frozen=True)
 class ADomainNameNothingAnswersToIsNotFound(Scenario[SeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
@@ -1192,6 +1218,7 @@ SCENARIOS: list[SearchStep] = [
     OnlyTheSuperadminSearchesByRole(),
     AGrantedUserSearchesTheirDomain(),
     AUserGrantedNothingMayNotSearchADomain(),
+    TheMonitorSearchesADomainWithoutAGrant(),
     ADomainNameNothingAnswersToIsNotFound(),
     AGrantedUserSearchesTheirDomainByGql(),
     AUserGrantedNothingMayNotGqlSearchADomain(),

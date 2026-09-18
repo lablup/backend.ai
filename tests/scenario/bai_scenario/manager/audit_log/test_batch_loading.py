@@ -189,16 +189,19 @@ class AnEmptyListReadsNothing(Scenario[SeedingSession, RecordsToLoad, AuditLogAd
 
 
 @dataclass(frozen=True)
-class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
+class TheMonitorRoleWithoutAGrantReadsEverySlot(
     Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-monitor-role-without-a-grant-is-refused-in-every-slot"
+        return "the-monitor-role-without-a-grant-reads-every-slot"
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다"
+        return (
+            "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, "
+            "요청한 순서대로 기록 전체가 반환된다. 권한 검사도 읽기에 한해 모니터를 통과시킨다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, RecordsToLoad]:
@@ -210,7 +213,7 @@ class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
 
     @override
     def then(self) -> Then[RecordsToLoad, Loaded]:
-        return TheSlotsInOrder(("refused", "refused"))
+        return TheSlotsInOrder(("first", "second"))
 
 
 @dataclass(frozen=True)
@@ -242,7 +245,7 @@ SCENARIOS: list[LoadingStep] = [
     AGrantedReaderIsAnsweredPerSlot(),
     TheNodesComeBackWithAGap(),
     AnEmptyListReadsNothing(),
-    TheMonitorRoleWithoutAGrantIsRefusedPerSlot(),
+    TheMonitorRoleWithoutAGrantReadsEverySlot(),
     AUserGrantedNothingIsRefusedPerSlot(),
 ]
 

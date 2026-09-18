@@ -103,9 +103,9 @@ Then
 - 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 0
 
-#### [the-monitor-role-without-a-grant-is-refused-in-every-slot](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [the-monitor-role-without-a-grant-reads-every-slot](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
-아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다
+아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 요청한 순서대로 기록 전체가 반환된다. 권한 검사도 읽기에 한해 모니터를 통과시킨다
 
 Given
 
@@ -127,8 +127,32 @@ Then
 
 - 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 2
-  - 거부: NotEnoughPermission
-  - 거부: NotEnoughPermission
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].operation = 'edited'
+  - [0].entity_type = 'user'
+  - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [0].description = 'edited was recorded'
+  - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - [0].request_id = None
+  - [0].acted_as = None
+  - [0].duration = None
+  - [0].client_ip = None
+  - [0].triggered_by = None
+  - [1].id: 무시함 — 데이터베이스가 만든다
+  - [1].action_id: 무시함 — 실행마다 새로 생성된다
+  - [1].operation = 'created'
+  - [1].entity_type = 'user'
+  - [1].entity_id: 기록의 대상 엔티티와 같다
+  - [1].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [1].description = 'created was recorded'
+  - [1].created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - [1].request_id = None
+  - [1].acted_as = None
+  - [1].duration = None
+  - [1].client_ip = None
+  - [1].triggered_by = None
 
 #### [the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
 
@@ -620,9 +644,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [the-monitor-role-without-a-grant-may-not-scope-search](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [the-monitor-role-without-a-grant-scope-searches-a-named-entity](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다
+모니터 역할 사용자가 권한 없이 엔티티를 지정해 검색하면, 그 엔티티의 기록이 반환된다. 권한 검사도 읽기에 한해 모니터를 통과시킨다
 
 Given
 
@@ -644,8 +668,24 @@ When
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
+  - item_count = 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생성된다
+  - operation = 'edited'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 #### [the-superadmin-naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
