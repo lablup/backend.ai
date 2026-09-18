@@ -749,13 +749,15 @@ class DataLoaders:
     ) -> DataLoader[SessionID, ResourceAllocationGQL]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionID]) -> list[ResourceAllocationGQL]:
+        async def load_fn(
+            session_ids: list[SessionID],
+        ) -> list[ResourceAllocationGQL | Exception]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 ResourceAllocationGQL as RA,
             )
 
             dtos = await adapter.batch_resource_allocation_by_session(session_ids)
-            return [RA.from_pydantic(dto) for dto in dtos]
+            return [dto if isinstance(dto, Exception) else RA.from_pydantic(dto) for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

@@ -54,6 +54,11 @@ Both carry the entity type `app_config`.
 - The user-scope read's three query conditions (public, that user's domain, that user)
   are bound together as one `VisibleAppConfigFragmentOperationScope`. Left for the call
   site to assemble, a merge could be read with one of the three missing.
+- Each of the three matches the row's own `(scope_type, scope_id)` and does not ask the
+  ownership graph what the scope reaches. The merge picks the fragment written at each
+  scope; access is answered before it runs, by the RBAC gate on the caller's own scope.
+  Answered from the graph, a domain reaches every fragment its users hold, so another
+  user's fragment merges into the caller's config (BA-7934).
 - The adapter fills the user and the domain from the session, so a caller cannot name
   someone else's.
 

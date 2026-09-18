@@ -42,7 +42,7 @@ status: draft
 | 자기 `fragment`가 도메인 `fragment`를 덮어쓴다 | 도메인·사용자 `allow_list` 항목의 `rank` 값이 기본값, 겹치는 키를 가진 도메인 `fragment`와 자기 `fragment`, 읽기 권한 있음 | 조회 | 겹치는 키는 자기 값, 겹치지 않는 키는 양쪽 모두 남는다 |
 | 도메인 `fragment`가 공개 `fragment`를 덮어쓴다 | 공개·도메인 `allow_list` 항목의 `rank` 값이 기본값, 겹치는 키를 가진 공개 `fragment`와 도메인 `fragment`, 읽기 권한 있음 | 조회 | 겹치는 키는 도메인 값 |
 | 관리자가 `rank` 값을 뒤집으면 도메인 `fragment`가 자기 `fragment`를 덮어쓴다 | 도메인 `allow_list` 항목의 `rank` 값이 사용자 항목보다 큼, 겹치는 키를 가진 도메인 `fragment`와 자기 `fragment`, 읽기 권한 있음 | 조회 | 겹치는 키는 도메인 값 |
-| 다른 사용자의 `fragment`는 섞이지 않는다 | 도메인 하나, 사용자 둘, 사용자 `allow_list` 항목 하나, 두 사용자 각자의 `fragment`, 읽기 권한 있음 | 조회 | 자기 `fragment`의 값만 (실행에서 뺌, 아래 참고) |
+| 다른 사용자의 `fragment`는 섞이지 않는다 | 도메인 하나, 사용자 둘, 사용자 `allow_list` 항목 하나, 두 사용자 각자의 `fragment`, 읽기 권한 있음 | 조회 | 자기 `fragment`의 값만 |
 | 다른 도메인의 `fragment`는 섞이지 않는다 | 도메인 둘, 각 도메인의 `fragment`, 도메인 `allow_list` 항목 하나, 읽기 권한 있음 | 조회 | 자기 도메인 `fragment`의 값만 |
 | 여러 이름을 한 번에 조회하면 요청한 순서대로 반환된다 | `definition` 셋, 각각의 `allow_list` 항목과 `fragment`, 읽기 권한 있음 | 이름 셋으로 조회 | 셋, 요청 순서대로, 각각 자기 병합 결과 |
 | 같은 이름을 두 번 지정하면 두 번 반환된다 | `definition` 하나, `fragment` 하나, 읽기 권한 있음 | 같은 이름 둘로 조회 | 둘, 같은 값 |
@@ -58,12 +58,6 @@ status: draft
 
 `definition`조차 없는 이름의 시나리오는 `fragment`가 없는 이름과 같은 응답을 받는다. 이 조회는
 `definition`을 확인하지 않고 `fragment`만 읽는다.
-
-다른 사용자의 `fragment`가 섞이지 않는 시나리오는 현재 코드에서 실패하므로 실행에서 뺐다 (BA-7934).
-도메인 스코프의 `fragment`를 고르는 조건이 도메인에 속한 모든 `fragment`를 포함하는데, 사용자는 자기
-도메인에 속하므로 같은 도메인 사용자들의 `fragment`까지 그 조건에 포함된다. 도메인 조건은 도메인
-스코프에 만든 `fragment`만, 사용자 조건은 그 사용자 스코프에 만든 `fragment`만 골라야 하고,
-시나리오의 기대 결과는 그 기준으로 적었다. 고쳐지면 실행에 되돌린다.
 
 `allow_list` 항목이 없는 스코프의 `fragment`가 병합에 섞이는 시나리오는 두지 않는다. 그런 `fragment`는
 쓸 수 없고, `allow_list` 항목이 삭제되면 `fragment`도 함께 삭제되므로 그 상황이 생기지 않는다.

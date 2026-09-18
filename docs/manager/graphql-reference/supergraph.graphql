@@ -6202,10 +6202,20 @@ input DeleteRuntimeVariantsInput
   ids: [UUID!]!
 }
 
-"""Added in 26.4.2. Payload for bulk runtime variant deletion."""
+"""
+Added in 26.4.2. Partial-success payload for a bulk runtime variant deletion.
+"""
 type DeleteRuntimeVariantsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.9.0. Ids of successfully deleted runtime variants."""
+  items: [UUID!]!
+
+  """
+  Added in 26.9.0. Per-item failures, each naming the runtime variant it targeted.
+  """
+  failed: [RuntimeVariantBulkFailureInfo!]!
+
   """Number of runtime variants successfully deleted."""
   deletedCount: Int!
 }
@@ -9977,6 +9987,9 @@ type KernelResourceAllocation implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the resource allocation."""
+  fieldId: UUID!
 
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   slotName: String!
@@ -20458,6 +20471,19 @@ type RuntimeVariant implements Node
 
   """Timestamp of the last modification to this runtime variant."""
   updatedAt: DateTime
+}
+
+"""
+Added in 26.9.0. One failed item of a partial-success bulk runtime variant operation.
+"""
+type RuntimeVariantBulkFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Id of the runtime variant the failed item targeted."""
+  id: UUID!
+
+  """Reason the item failed."""
+  message: String!
 }
 
 """Added in 26.4.2. Paginated list of runtime variants."""

@@ -545,10 +545,11 @@ class SessionAdapter(BaseAdapter):
 
     async def batch_resource_allocation_by_session(
         self, session_ids: Sequence[SessionID]
-    ) -> list[ResourceAllocationGQLDTO]:
+    ) -> list[ResourceAllocationGQLDTO | Exception]:
         """Batch-aggregate resource_allocations per session for DataLoader use.
 
-        Returns one DTO per input session id, in the same order.
+        Returns one DTO per input session id, in the same order. A session the caller
+        may not read answers with its denial.
         """
         if not session_ids:
             return []
@@ -557,7 +558,14 @@ class SessionAdapter(BaseAdapter):
                 session_ids=[SessionId(sid) for sid in session_ids]
             )
         )
-        return [self._aggregate_to_allocation_dto(item.value) for item in action_result.items]
+        answers: list[ResourceAllocationGQLDTO | Exception] = []
+        for item in action_result.items:
+            error = self.batch_load_failure(item.error)
+            if error is not None:
+                answers.append(error)
+                continue
+            answers.append(self._aggregate_to_allocation_dto(item.value))
+        return answers
 
     async def batch_resource_allocation_by_kernel(
         self, kernel_ids: Sequence[KernelID]
@@ -581,10 +589,12 @@ class SessionAdapter(BaseAdapter):
         allocations = await self.batch_resource_allocation_by_session([
             SessionID(item.id) for item in data
         ])
-        return [
-            self._session_data_to_node(item, allocation)
-            for item, allocation in zip(data, allocations, strict=True)
-        ]
+        nodes: list[SessionNode] = []
+        for item, allocation in zip(data, allocations, strict=True):
+            if isinstance(allocation, Exception):
+                raise allocation
+            nodes.append(self._session_data_to_node(item, allocation))
+        return nodes
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
         """Convert kernel infos to nodes, batch-loading their slot allocations."""
@@ -1019,12 +1029,19 @@ class SessionAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
-        """Terminate one or more sessions."""
+        """Terminate one or more sessions.
+
+        The action answers per session; a denial is raised here because the payload
+        has no place for a session that was not acted on.
+        """
         action = TerminateSessionsAction(
             session_ids=[SessionId(sid) for sid in input.session_ids],
             forced=input.forced,
         )
         result = await self._session.terminate_sessions.run(action)
+        denied = next((item.error for item in result.items if item.is_denied), None)
+        if denied is not None:
+            raise denied
         by_state: dict[SessionTerminationStatus, list[SessionId]] = defaultdict(list)
         for item in result.items:
             if item.value is not None:

@@ -22,6 +22,9 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.services.runtime_variant.actions.bulk_get import (
     PublicBulkGetRuntimeVariantsAction,
 )
+from ai.backend.manager.services.runtime_variant.actions.bulk_purge import (
+    BulkPurgeRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.create import (
     CreateRuntimeVariantAction,
 )
@@ -42,7 +45,7 @@ from ai.backend.manager.services.runtime_variant.service import RuntimeVariantSe
 
 
 class RuntimeVariantProcessors:
-    """Every operation but the purge runs straight against ops; the purge clears presets."""
+    """Every operation but the purges runs straight against ops; the purges clear presets."""
 
     public_get: PublicSingleEntityActionProcessor[
         GetRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
@@ -59,6 +62,7 @@ class RuntimeVariantProcessors:
     purge: SingleEntityActionProcessor[
         PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
+    bulk_purge: PartialBulkActionProcessor[BulkPurgeRuntimeVariantsAction, RuntimeVariantData]
     public_search: PublicActionProcessor[
         SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]
     ]
@@ -74,5 +78,6 @@ class RuntimeVariantProcessors:
         self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
         self.update = group.single_update_ops(UpdateRuntimeVariantAction)
         self.purge = group.single_entity(PurgeRuntimeVariantAction, service.purge)
+        self.bulk_purge = group.partial_bulk(BulkPurgeRuntimeVariantsAction, service.bulk_purge)
         self.public_search = group.public_search_ops(SearchRuntimeVariantsAction)
         self.public_lookup = group.public_lookup_ops(LookupRuntimeVariantAction)

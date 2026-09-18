@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
@@ -94,9 +95,27 @@ class DeleteRuntimeVariantPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted runtime variant.")
 
 
-class DeleteRuntimeVariantsPayload(BaseResponseModel):
-    """Payload for bulk runtime variant deletion."""
+class RuntimeVariantBulkFailureInfo(BaseResponseModel):
+    """One failed item of a partial-success bulk operation."""
 
+    id: RuntimeVariantID = Field(description="Id of the runtime variant the failed item targeted.")
+    message: str = Field(description="Reason the item failed.")
+
+
+class DeleteRuntimeVariantsPayload(BaseResponseModel):
+    """Partial-success payload for a bulk runtime variant deletion."""
+
+    items: list[RuntimeVariantID] = Field(
+        default_factory=list,
+        description=f"Ids of successfully deleted runtime variants. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    failed: list[RuntimeVariantBulkFailureInfo] = Field(
+        default_factory=list,
+        description=(
+            "Per-item failures, each naming the runtime variant it targeted. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
     deleted_count: int = Field(description="Number of runtime variants successfully deleted.")
 
 

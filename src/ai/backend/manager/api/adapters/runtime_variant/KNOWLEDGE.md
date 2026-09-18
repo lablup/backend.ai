@@ -1,12 +1,15 @@
 ---
 name: runtime-variant-adapter-scenarios
 type: reference
-description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the reads open to every authenticated user, the bulk delete that is a loop and not a transaction
+description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the reads open to every authenticated user, the bulk delete that answers per id
 scope: src/ai/backend/manager/api/adapters/runtime_variant
-keywords: [runtime variant, scenario, adapter, superadmin, public read, lookup, bulk delete]
+keywords: [runtime variant, scenario, adapter, superadmin, public read, lookup, bulk delete, partial bulk purge]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-09-18
 status: draft
 ---
 # runtime_variant 어댑터 — 시나리오
@@ -100,16 +103,14 @@ status: draft
 | 존재하지 않는 id를 삭제한다 | 다른 `runtime_variant` 행만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 삭제한다 | 같은 `runtime_variant`, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 id를 담은 응답 |
-| 여럿을 한 번에 삭제한다 | `runtime_variant` 둘, 슈퍼관리자 | 두 id를 한 번에 | 요청한 id의 수를 담은 응답 |
-| 없는 id가 섞인 목록을 삭제한다 | `runtime_variant` 하나, 슈퍼관리자 | 있는 id 뒤에 없는 id를 붙여 한 번에 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 여럿을 삭제한다 | `runtime_variant` 둘, 아무 권한도 없음 | 두 id를 한 번에 | 권한 부족으로 거부 |
+| 여럿을 한 번에 삭제한다 | `runtime_variant` 둘, 슈퍼관리자 | 두 id를 한 번에 | 둘 다 삭제된 목록에 담기고 실패 목록은 비어 있다 |
+| 없는 id가 섞인 목록을 삭제한다 | `runtime_variant` 하나, 슈퍼관리자 | 있는 id 뒤에 없는 id를 붙여 한 번에 | 있는 것은 삭제된 목록에, 없는 id는 실패 목록에 담긴다 |
+| 아무 권한도 없는 사용자가 여럿을 삭제한다 | `runtime_variant` 둘, 아무 권한도 없음 | 두 id를 한 번에 | 둘 다 실패 목록에 담기고 아무것도 삭제되지 않는다 |
 
-일괄 삭제는 단건 삭제를 id마다 반복하는 것이다. 한 트랜잭션이 아니어서 중간에 거부되면 앞의
-것은 삭제된 채 남는다. "없는 id가 섞인 목록을 삭제한다" 시나리오의 거부가 그 경우이고, 거부되기
-전에 삭제된 id는 응답에 담기지 않으므로 시나리오는 거부만 확인한다. 응답의 수는 삭제한 수가
-아니라 요청한 id의 수인데, 끝까지 성공했을 때만 응답이 반환되므로 둘이 같다. id마다 결과를
-반환하는 partial bulk purge로 바꾸는 것은 BA-7937이고, 그때 "여럿을 한 번에 삭제한다", "없는 id가
-섞인 목록을 삭제한다", "아무 권한도 없는 사용자가 여럿을 삭제한다" 시나리오의 결과가 바뀐다.
+일괄 삭제는 id마다 따로 답하는 partial bulk purge다. 권한 검사도 id마다이고, 거부된 id와 없는
+id는 실패 목록에 들어가며 호출 자체는 거부되지 않는다. 삭제된 id는 요청한 순서대로 삭제된
+목록에 담기고, 삭제 수는 그 목록의 길이다. `runtime_variant` 행마다 자기 savepoint 안에서
+preset과 함께 지워지므로, 하나가 실패해도 나머지는 삭제된 채 남는다.
 
 삭제는 `runtime_variant` 하위의 preset을 먼저 지우고 `runtime_variant` 행을 지운다. preset을 가진
 `runtime_variant` 행을 삭제하는 시나리오는 `test_retiring.py`에 주석 처리해 두었다. preset seed가

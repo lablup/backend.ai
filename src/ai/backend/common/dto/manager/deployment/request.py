@@ -22,6 +22,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter
 from ai.backend.common.types import ClusterMode, MountPermission, RuntimeVariant
 
@@ -88,7 +89,9 @@ class SearchDeploymentsRequest(BaseRequestModel):
 
     filter: DeploymentFilter | None = Field(default=None, description="Filter conditions")
     order: DeploymentOrder | None = Field(default=None, description="Order specification")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -97,7 +100,9 @@ class SearchRevisionsRequest(BaseRequestModel):
 
     filter: RevisionFilter | None = Field(default=None, description="Filter conditions")
     order: RevisionOrder | None = Field(default=None, description="Order specification")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -136,7 +141,9 @@ class SearchRoutesRequest(BaseRequestModel):
 
     filter: RouteFilter | None = Field(default=None, description="Filter conditions")
     order: RouteOrder | None = Field(default=None, description="Order specification")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
     # Cursor-based pagination (optional, for forward/backward navigation)
     cursor: str | None = Field(default=None, description="Cursor for pagination")
@@ -346,7 +353,9 @@ class UpsertDeploymentPolicyRequest(BaseRequestModel):
 class SearchDeploymentPoliciesRequest(BaseRequestModel):
     """Request body for searching deployment policies with pagination."""
 
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 

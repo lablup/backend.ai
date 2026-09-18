@@ -39,8 +39,6 @@ __all__ = (
     "QueryTimeRangeInputDTO",
 )
 
-_DEFAULT_PAGE_LIMIT = 50
-
 
 class QueryTimeRangeInputDTO(BaseRequestModel):
     """Input for a Prometheus query time range."""
