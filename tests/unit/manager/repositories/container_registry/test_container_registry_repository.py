@@ -133,11 +133,11 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 DomainRow,
                 ResourceGroupRow,
@@ -178,7 +178,7 @@ class TestContainerRegistryRepository:
                 EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
@@ -1379,11 +1379,11 @@ class TestSearchContainerRegistries:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 DomainRow,
                 ResourceGroupRow,
@@ -1413,7 +1413,7 @@ class TestSearchContainerRegistries:
                 AssociationContainerRegistriesGroupsRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:

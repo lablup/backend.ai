@@ -101,10 +101,10 @@ class TestAuthRepository:
 
     @pytest.fixture
     async def db_with_cleanup(
-        self, database_connection: ExtendedAsyncSAEngine
+        self, global_entity_ids: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 # FK dependency order: parents before children
                 DomainRow,
@@ -144,7 +144,7 @@ class TestAuthRepository:
                 EntityMembershipFieldRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     async def auth_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthRepository:

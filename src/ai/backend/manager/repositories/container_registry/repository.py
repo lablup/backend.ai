@@ -65,7 +65,7 @@ class ContainerRegistryRepository:
     ) -> ContainerRegistryData:
         """Create a container registry with its own virtual entity."""
         async with self._ops_provider.write_ops() as w:
-            return await w.create_global_entity(creator)
+            return await w.create_entity(creator)
 
     async def modify_registry(
         self,

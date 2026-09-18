@@ -56,7 +56,7 @@ class PrometheusQueryPresetService:
     ) -> CreatedEntityOpsResult[PrometheusQueryPresetData]:
         self._template_renderer.validate(action.creator.query_template)
         return CreatedEntityOpsResult(
-            data=await self._ops_repository.create_global_entity(action.to_creator())
+            data=await self._ops_repository.create_entity(action.to_creator())
         )
 
     async def update_preset(self, action: UpdatePresetAction) -> UpdatePresetActionResult:

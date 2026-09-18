@@ -106,7 +106,7 @@ class TestPrometheusQueryPresetService:
         mock_ops_repository: MagicMock,
         preset_data: PrometheusQueryPresetData,
     ) -> None:
-        mock_ops_repository.create_global_entity = AsyncMock(return_value=preset_data)
+        mock_ops_repository.create_entity = AsyncMock(return_value=preset_data)
         creator = PrometheusQueryPresetCreator(
             name="cpu_usage",
             metric_name="backendai_container_cpu_util",
@@ -119,14 +119,14 @@ class TestPrometheusQueryPresetService:
         result = await service.create_preset(CreatePresetAction(creator=creator))
 
         assert result.data == preset_data
-        mock_ops_repository.create_global_entity.assert_awaited_once_with(creator)
+        mock_ops_repository.create_entity.assert_awaited_once_with(creator)
 
     async def test_create_preset_rejects_an_unfillable_template(
         self,
         service: PrometheusQueryPresetService,
         mock_ops_repository: MagicMock,
     ) -> None:
-        mock_ops_repository.create_global_entity = AsyncMock()
+        mock_ops_repository.create_entity = AsyncMock()
         action = CreatePresetAction(
             creator=PrometheusQueryPresetCreator(
                 name="test",
@@ -140,7 +140,7 @@ class TestPrometheusQueryPresetService:
 
         with pytest.raises(InvalidMetricPresetTemplate):
             await service.create_preset(action)
-        mock_ops_repository.create_global_entity.assert_not_awaited()
+        mock_ops_repository.create_entity.assert_not_awaited()
 
     async def test_modify_preset(
         self,

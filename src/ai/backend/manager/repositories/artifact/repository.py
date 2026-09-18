@@ -107,7 +107,7 @@ class ArtifactRepository:
                 existing = await self._artifact_by_name(w, artifact.name, artifact.registry_id)
                 if existing is None:
                     results.append(
-                        await w.create_global_entity(
+                        await w.create_entity(
                             ArtifactCreator(
                                 name=artifact.name,
                                 type=artifact.type,
@@ -209,7 +209,7 @@ class ArtifactRepository:
             for model in model_list:
                 artifact = await self._artifact_by_name(w, model.id, registry_id)
                 if artifact is None:
-                    artifact = await w.create_global_entity(
+                    artifact = await w.create_entity(
                         ArtifactCreator(
                             name=model.id,
                             type=ArtifactType.MODEL,

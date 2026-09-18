@@ -12,38 +12,56 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyEntityType,
     ProjectResourcePolicyEntityType,
     UserResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    ResourceSlotEntryInput,
+    VFolderHostPermissionEntryInput,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
+    AdminSearchKeypairResourcePoliciesInput,
     AdminSearchProjectResourcePoliciesInput,
     AdminSearchUserResourcePoliciesInput,
+    CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
     CreateUserResourcePolicyInput,
+    DeleteKeypairResourcePolicyInput,
     DeleteProjectResourcePolicyInput,
     DeleteUserResourcePolicyInput,
+    KeypairResourcePolicyFilter,
+    KeypairResourcePolicyKeypairNestedFilter,
     ProjectResourcePolicyFilter,
+    UpdateKeypairResourcePolicyInput,
     UpdateProjectResourcePolicyInput,
     UpdateUserResourcePolicyInput,
     UserResourcePolicyFilter,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
+    KeypairResourcePolicyNode,
     ProjectResourcePolicyNode,
+    SearchKeypairResourcePoliciesPayload,
     SearchProjectResourcePoliciesPayload,
     SearchUserResourcePoliciesPayload,
     UserResourcePolicyNode,
 )
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import (
+    BinarySize,
+    DefaultForUnspecified,
+    VFolderHostPermission,
+)
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
@@ -66,6 +84,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.keypair.keypair import SeedKeypair
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedNamedProjectPolicy, SeedProjectPolicy
@@ -73,7 +92,13 @@ from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
 from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
 from bai_scenario.seeds.user.user import SeedUserOf
 
-type Searched = SearchProjectResourcePoliciesPayload | SearchUserResourcePoliciesPayload
+type Searched = (
+    SearchProjectResourcePoliciesPayload
+    | SearchKeypairResourcePoliciesPayload
+    | SearchUserResourcePoliciesPayload
+)
+
+VFOLDER_HOST = "local:volume1"
 
 
 @dataclass(frozen=True)
@@ -376,6 +401,292 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
         return payload.name
 
 
+class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicyNode]):
+    @property
+    @override
+    def label(self) -> str:
+        return "keypair-policy"
+
+    @property
+    @override
+    def kind(self) -> str:
+        return "키페어 정책"
+
+    @property
+    @override
+    def entity_type(self) -> EntityType:
+        return KeyPairResourcePolicyEntityType()
+
+    @property
+    @override
+    def calls(self) -> Calls:
+        return Calls(
+            create="admin_create_keypair_resource_policy",
+            read="admin_get_keypair_resource_policy",
+            search="admin_search_keypair_resource_policies",
+            update="admin_update_keypair_resource_policy",
+            delete="admin_delete_keypair_resource_policy",
+        )
+
+    @property
+    @override
+    def mine(self) -> str:
+        return "get_my_keypair_resource_policy"
+
+    @property
+    @override
+    def fields(self) -> tuple[str, ...]:
+        return (
+            "default_for_unspecified",
+            "total_resource_slots",
+            "max_session_lifetime",
+            "max_concurrent_sessions",
+            "max_pending_session_count",
+            "max_priority",
+            "max_pending_session_resource_slots",
+            "max_concurrent_sftp_sessions",
+            "max_containers_per_session",
+            "idle_timeout",
+            "allowed_vfolder_hosts",
+        )
+
+    @override
+    def seed(
+        self, name_hint: str = "keypair-policy", *, holding_optional: bool = False
+    ) -> SeedRow[KeyPairResourcePolicyData]:
+        return SeedKeypairPolicy(
+            name_hint=name_hint, max_pending_session_count=2 if holding_optional else None
+        )
+
+    @override
+    def own_of(self, holder: LaidHolder) -> Laid[KeyPairResourcePolicyData]:
+        return holder.keypair_policy
+
+    @override
+    def view(self, node: KeypairResourcePolicyNode) -> dict[str, Any]:
+        return {
+            "name": node.name,
+            "default_for_unspecified": node.default_for_unspecified,
+            "total_resource_slots": [
+                (one.resource_type, one.quantity, one.unlimited)
+                for one in node.total_resource_slots
+            ],
+            "max_session_lifetime": node.max_session_lifetime,
+            "max_concurrent_sessions": node.max_concurrent_sessions,
+            "max_pending_session_count": node.max_pending_session_count,
+            "max_priority": node.max_priority,
+            "max_pending_session_resource_slots": (
+                [
+                    (one.resource_type, one.quantity, one.unlimited)
+                    for one in node.max_pending_session_resource_slots
+                ]
+                if node.max_pending_session_resource_slots is not None
+                else None
+            ),
+            "max_concurrent_sftp_sessions": node.max_concurrent_sftp_sessions,
+            "max_containers_per_session": node.max_containers_per_session,
+            "idle_timeout": node.idle_timeout,
+            "allowed_vfolder_hosts": sorted(
+                (one.host, sorted(one.permissions)) for one in node.allowed_vfolder_hosts
+            ),
+        }
+
+    @override
+    def seeded_view(self, seeded: KeyPairResourcePolicyData) -> dict[str, Any]:
+        return {
+            "name": seeded.name,
+            "default_for_unspecified": seeded.default_for_unspecified,
+            "total_resource_slots": [
+                (key, value if value.is_finite() else None, not value.is_finite())
+                for key, value in seeded.total_resource_slots.items()
+            ],
+            "max_session_lifetime": seeded.max_session_lifetime,
+            "max_concurrent_sessions": seeded.max_concurrent_sessions,
+            "max_pending_session_count": seeded.max_pending_session_count,
+            "max_priority": seeded.max_priority,
+            "max_pending_session_resource_slots": (
+                [
+                    (key, value if value.is_finite() else None, not value.is_finite())
+                    for key, value in seeded.max_pending_session_resource_slots.items()
+                ]
+                if seeded.max_pending_session_resource_slots is not None
+                else None
+            ),
+            "max_concurrent_sftp_sessions": seeded.max_concurrent_sftp_sessions,
+            "max_containers_per_session": seeded.max_containers_per_session,
+            "idle_timeout": seeded.idle_timeout,
+            "allowed_vfolder_hosts": sorted(
+                (host, sorted(one.value for one in perms))
+                for host, perms in seeded.allowed_vfolder_hosts.items()
+            ),
+        }
+
+    def _ask(
+        self,
+        name: str,
+        says: str,
+        *,
+        cpu: str = "4",
+        pending_count: int | None = 2,
+        priority: int | None = 10,
+        pending_cpu: str | None = "2",
+    ) -> Ask:
+        """요청과, 그 요청이 응답에 남겨야 하는 값을 같은 값에서 만든다."""
+        asked = CreateKeypairResourcePolicyInput(
+            name=name,
+            default_for_unspecified=DefaultForUnspecified.LIMITED,
+            total_resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity=cpu)],
+            max_session_lifetime=3600,
+            max_concurrent_sessions=5,
+            max_pending_session_count=pending_count,
+            max_priority=priority,
+            max_pending_session_resource_slots=(
+                [ResourceSlotEntryInput(resource_type="cpu", quantity=pending_cpu)]
+                if pending_cpu is not None
+                else None
+            ),
+            max_concurrent_sftp_sessions=1,
+            max_containers_per_session=1,
+            idle_timeout=600,
+            allowed_vfolder_hosts=[
+                VFolderHostPermissionEntryInput(
+                    host=VFOLDER_HOST, permissions=[VFolderHostPermission.MOUNT_IN_SESSION.value]
+                )
+            ],
+        )
+        unlimited = cpu == "Infinity"
+        expects = {
+            "name": name,
+            "default_for_unspecified": DefaultForUnspecified.LIMITED,
+            "total_resource_slots": [("cpu", None if unlimited else Decimal(cpu), unlimited)],
+            "max_session_lifetime": 3600,
+            "max_concurrent_sessions": 5,
+            "max_pending_session_count": pending_count,
+            "max_priority": priority,
+            "max_pending_session_resource_slots": (
+                [("cpu", Decimal(pending_cpu), False)] if pending_cpu is not None else None
+            ),
+            "max_concurrent_sftp_sessions": 1,
+            "max_containers_per_session": 1,
+            "idle_timeout": 600,
+            "allowed_vfolder_hosts": [
+                (VFOLDER_HOST, [VFolderHostPermission.MOUNT_IN_SESSION.value])
+            ],
+        }
+        return Ask(asked, says, expects)
+
+    @override
+    def everything(self, name: str) -> Ask:
+        return self._ask(name, "모든 값을 지정해")
+
+    @override
+    def only_required(self, name: str) -> Ask:
+        return self._ask(
+            name,
+            "대기 세션 수·우선순위 상한·대기 자원 슬롯을 생략하고",
+            pending_count=None,
+            priority=None,
+            pending_cpu=None,
+        )
+
+    def unlimited_slot(self, name: str) -> Ask:
+        return self._ask(name, "cpu 슬롯을 무제한으로 지정해", cpu="Infinity")
+
+    def priority_out_of_range(self, name: str) -> Ask:
+        return self._ask(
+            name,
+            "우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해",
+            priority=SESSION_PRIORITY_MAX + 1,
+        )
+
+    @override
+    def one_limit(self) -> Edit:
+        return Edit(
+            UpdateKeypairResourcePolicyInput(max_concurrent_sessions=7),
+            "동시 세션 수 7로 변경",
+            {"max_concurrent_sessions": 7},
+        )
+
+    @override
+    def nothing(self) -> Edit:
+        return Edit(UpdateKeypairResourcePolicyInput(), "빈 요청")
+
+    @override
+    def clearing_a_nullable(self) -> Edit:
+        return Edit(
+            UpdateKeypairResourcePolicyInput(max_pending_session_count=None),
+            "대기 세션 수 비우기",
+            {"max_pending_session_count": None},
+        )
+
+    @override
+    def clearing_a_non_nullable(self) -> Edit:
+        return Edit(
+            UpdateKeypairResourcePolicyInput(max_concurrent_sessions=None),
+            "동시 세션 수 비우기",
+        )
+
+    def priority_moved_out_of_range(self) -> Edit:
+        return Edit(
+            UpdateKeypairResourcePolicyInput(max_priority=SESSION_PRIORITY_MAX + 1),
+            "우선순위 상한을 세션 우선순위 범위 밖으로 변경",
+        )
+
+    @override
+    async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> KeypairResourcePolicyNode:
+        payload = await adapter.admin_create_keypair_resource_policy(asked)
+        return payload.keypair_resource_policy
+
+    @override
+    async def read(self, adapter: ResourcePolicyAdapter, name: str) -> KeypairResourcePolicyNode:
+        return await adapter.admin_get_keypair_resource_policy(name)
+
+    @override
+    async def search(
+        self, adapter: ResourcePolicyAdapter, named: str | None = None
+    ) -> SearchKeypairResourcePoliciesPayload:
+        chosen = (
+            KeypairResourcePolicyFilter(name=StringFilter(equals=named))
+            if named is not None
+            else None
+        )
+        return await adapter.admin_search_keypair_resource_policies(
+            AdminSearchKeypairResourcePoliciesInput(filter=chosen)
+        )
+
+    async def search_held_by(
+        self, adapter: ResourcePolicyAdapter, user_id: UUID
+    ) -> SearchKeypairResourcePoliciesPayload:
+        """그 사용자의 키페어에 할당된 정책만 검색한다."""
+        return await adapter.admin_search_keypair_resource_policies(
+            AdminSearchKeypairResourcePoliciesInput(
+                filter=KeypairResourcePolicyFilter(
+                    keypair=KeypairResourcePolicyKeypairNestedFilter(
+                        user_id=UUIDFilter(equals=user_id)
+                    )
+                )
+            )
+        )
+
+    @override
+    async def update(
+        self, adapter: ResourcePolicyAdapter, name: str, asked: Any
+    ) -> KeypairResourcePolicyNode:
+        payload = await adapter.admin_update_keypair_resource_policy(name, asked)
+        return payload.keypair_resource_policy
+
+    @override
+    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        payload = await adapter.admin_delete_keypair_resource_policy(
+            DeleteKeypairResourcePolicyInput(name=name)
+        )
+        return payload.name
+
+    @override
+    async def read_mine(self, adapter: ResourcePolicyAdapter) -> KeypairResourcePolicyNode:
+        return await adapter.get_my_keypair_resource_policy()
+
+
 class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
     @property
     @override
@@ -551,10 +862,11 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
 
 
 PROJECT = ProjectPolicies()
+KEYPAIR = KeypairPolicies()
 USER = UserPolicies()
 
-FAMILIES: tuple[Family[Any, Any], ...] = (PROJECT, USER)
-OWN_FAMILIES: tuple[OwnFamily[Any, Any], ...] = (USER,)
+FAMILIES: tuple[Family[Any, Any], ...] = (PROJECT, KEYPAIR, USER)
+OWN_FAMILIES: tuple[OwnFamily[Any, Any], ...] = (KEYPAIR, USER)
 
 
 @dataclass(frozen=True)
@@ -589,6 +901,7 @@ class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
 
     domain: Laid[DomainData]
     role: UserRole = UserRole.USER
+    active: bool = True
 
     @override
     def kind(self) -> str:
@@ -599,8 +912,10 @@ class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
         project_policy = seed.once(SeedProjectPolicy())
         user_policy = seed.creating(SeedUserPolicy())
         keypair_policy = seed.creating(SeedKeypairPolicy())
+        # TODO(BA-7935): the report line for this user does not say it is inactive;
+        # SeedUserOf.detail() reports only an explicit status.
         user = seed.provisioning(
-            SeedUserOf(role=self.role),
+            SeedUserOf(role=self.role, is_active=self.active),
             self.domain,
             user_policy,
             keypair_policy,
@@ -636,10 +951,12 @@ class ReadingOwnPolicies(SeedNest[Laid[None]]):
         )
 
 
-async def lay_a_holder(seeding: Any, *, role: UserRole) -> LaidHolder:
+async def lay_a_holder(seeding: Any, *, role: UserRole, active: bool = True) -> LaidHolder:
     """도메인 하나와, 그 도메인에 속하며 정책이 할당된 사용자 한 명."""
     domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    holder: LaidHolder = await seeding.within(SomeoneHeldToPolicies(domain, role=role))
+    holder: LaidHolder = await seeding.within(
+        SomeoneHeldToPolicies(domain, role=role, active=active)
+    )
     return holder
 
 
@@ -730,6 +1047,47 @@ class SomeoneHeldToTheirPolicy(Given[Any, APolicyAndACaller[Any]]):
         return APolicyAndACaller(
             seeding.made(self.family.own_of(holder)), seeding.made(holder.user)
         )
+
+
+@dataclass(frozen=True)
+class SomeoneWithAnotherKey(Given[Any, APolicyAndACaller[Any]]):
+    """키페어를 하나 더 가진 사용자. 두 키페어에는 서로 다른 키페어 정책이 할당돼 있다.
+
+    사용자와 함께 만들어진 키페어가 기본 키페어다. 사용자가 활성이면 기본 키페어의 정책이
+    반환되고, 비활성이면 기본 키페어도 비활성이므로 추가한 키페어의 정책이 반환된다.
+    """
+
+    active: bool = True
+
+    @override
+    def describe(self) -> str:
+        if self.active:
+            return "기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자, 읽기 권한 있음"
+        return "기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자, 읽기 권한 있음"
+
+    @override
+    async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
+        holder = await lay_a_holder(seeding, role=UserRole.USER, active=self.active)
+        other = await seeding.creating(SeedKeypairPolicy(name_hint="other"))
+        await seeding.adding(SeedKeypair(resource_policy=seeding.made(other).name), holder.user)
+        await seeding.within(ReadingOwnPolicies(holder.user, KEYPAIR.entity_type))
+        expected = holder.keypair_policy if self.active else other
+        return APolicyAndACaller(seeding.made(expected), seeding.made(holder.user))
+
+
+@dataclass(frozen=True)
+class SomeoneWithNoActiveKey(Given[Any, APolicyAndACaller[Any]]):
+    """비활성 사용자라 활성 키페어가 하나도 없는 사용자. 정책은 할당돼 있지만 키페어를 거쳐 도달할 수 없다."""
+
+    @override
+    def describe(self) -> str:
+        return "활성 키페어가 없는 사용자, 자기 스코프에서 키페어 정책 읽기 권한 있음"
+
+    @override
+    async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
+        holder = await lay_a_holder(seeding, role=UserRole.USER, active=False)
+        await seeding.within(ReadingOwnPolicies(holder.user, KEYPAIR.entity_type))
+        return APolicyAndACaller(seeding.made(holder.keypair_policy), seeding.made(holder.user))
 
 
 @dataclass(frozen=True)

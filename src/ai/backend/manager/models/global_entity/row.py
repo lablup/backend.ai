@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
@@ -24,3 +25,11 @@ class GlobalEntityRow(CreatedAtMixin, Base):
     name: Mapped[GlobalEntityName] = mapped_column(
         "name", StrEnumType(GlobalEntityName, length=32), nullable=False, unique=True
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[GlobalEntityID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name

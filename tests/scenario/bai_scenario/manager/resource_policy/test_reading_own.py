@@ -1,6 +1,7 @@
 """자기 정책 조회 — 호출자 자신의 스코프에 부여된 권한으로 보호된다.
 
-요청 본문이 없고 호출자 자신이 곧 입력이다. 사용자 정책은 사용자 행이 직접 가리킨다.
+키페어 정책과 사용자 정책에만 있다. 요청 본문이 없고 호출자 자신이 곧 입력이다. 사용자
+정책은 사용자 행이 직접 가리키고, 키페어 정책은 그 사용자의 키페어를 거쳐 찾는다.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
+from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -24,10 +26,13 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
+    KEYPAIR,
     OWN_FAMILIES,
     APolicyAndACaller,
     OwnFamily,
     SomeoneHeldToTheirPolicy,
+    SomeoneWithAnotherKey,
+    SomeoneWithNoActiveKey,
     ThePolicyNode,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -88,6 +93,94 @@ class TheGrantedUserReadsTheirOwn(
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
         return ThePolicyNode(self.family, self.started)
+
+
+@dataclass(frozen=True)
+class TheDefaultKeyDecidesAmongMany(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "among-several-keys-the-default-one-names-the-keypair-policy"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 "
+            "키페어 정책을 조회하면, 기본 키페어에 할당된 정책이 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return SomeoneWithAnotherKey()
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingMine(KEYPAIR)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return ThePolicyNode(KEYPAIR, self.started)
+
+
+@dataclass(frozen=True)
+class AnInactiveDefaultKeyYieldsToAnActiveOne(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-inactive-default-key-yields-to-the-active-one"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 "
+            "자기 키페어 정책을 조회하면, 그 활성 키페어에 할당된 정책이 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return SomeoneWithAnotherKey(active=False)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingMine(KEYPAIR)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return ThePolicyNode(KEYPAIR, self.started)
+
+
+@dataclass(frozen=True)
+class NoActiveKeyFindsNoPolicy(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-with-no-active-key-finds-no-keypair-policy-of-their-own"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "활성 키페어가 없는 사용자가 자기 키페어 정책을 조회하면, 권한이 있어도 정책에 "
+            "도달할 키페어가 없어 대상을 찾을 수 없다는 이유로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return SomeoneWithNoActiveKey()
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingMine(KEYPAIR)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheCallIsRefused(KeypairResourcePolicyNotFound)
 
 
 @dataclass(frozen=True)
@@ -156,6 +249,9 @@ class EnforcementOffOpensTheirOwn(
 
 SCENARIOS: list[OwnStep] = [
     *(TheGrantedUserReadsTheirOwn(family, started=datetime.now(UTC)) for family in OWN_FAMILIES),
+    TheDefaultKeyDecidesAmongMany(started=datetime.now(UTC)),
+    AnInactiveDefaultKeyYieldsToAnActiveOne(started=datetime.now(UTC)),
+    NoActiveKeyFindsNoPolicy(),
     *(AUserGrantedNothingMayNotReadTheirOwn(family) for family in OWN_FAMILIES),
     *(EnforcementOffOpensTheirOwn(family, started=datetime.now(UTC)) for family in OWN_FAMILIES),
 ]

@@ -10,8 +10,10 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
@@ -19,6 +21,7 @@ from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -91,10 +94,10 @@ _KEYPAIR_POLICY_DEFAULTS = {
 
 @pytest.fixture
 async def db(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(database_connection, _TABLES):
-        yield database_connection
+    async with with_tables(global_entity_ids, _TABLES):
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -410,6 +413,19 @@ class TestUserGraphProvisioning:
         assert await _owns(db, domain_node, user_node)
         assert await _governs(db, domain_node, user_node)
 
+    async def test_the_global_scope_owns_and_governs_the_user(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+
+        global_node = (GlobalEntityType(), global_entity_id(GlobalEntityName.GLOBAL))
+        user_node = (UserEntityType(), user_id)
+        assert await _owns(db, global_node, user_node)
+        assert await _governs(db, global_node, user_node)
+
     async def test_the_user_holds_the_roles_its_scope_presets_call_for(
         self,
         db: ExtendedAsyncSAEngine,
@@ -463,6 +479,45 @@ class TestUserGraphProvisioning:
                 )
             ).all()
         assert list(held) == [declared_user_owner_preset]
+
+    async def test_the_user_holds_the_public_role(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+        public_role: RoleID,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+
+        async with db.begin_readonly_session() as session:
+            held = (
+                await session.scalars(
+                    sa.select(UserRoleRow.role_id).where(
+                        UserRoleRow.user_id == user_id,
+                        UserRoleRow.role_id == public_role,
+                    )
+                )
+            ).all()
+        assert list(held) == [public_role]
+
+
+@pytest.fixture
+async def public_role(db: ExtendedAsyncSAEngine) -> RoleID:
+    """An auto_assign role in the public global entity."""
+    role_id = RoleID(uuid.uuid4())
+    async with db.begin_session() as session:
+        session.add(
+            RoleRow(
+                id=role_id,
+                name="public_member",
+                status=RoleStatus.ACTIVE,
+                auto_assign=True,
+                scope_type=GlobalEntityType(),
+                scope_id=global_entity_id(GlobalEntityName.PUBLIC),
+            )
+        )
+        await session.commit()
+    return role_id
 
 
 @pytest.fixture

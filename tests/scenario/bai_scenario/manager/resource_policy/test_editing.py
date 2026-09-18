@@ -16,11 +16,13 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.repository import CheckConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     FAMILIES,
+    KEYPAIR,
     OWN_FAMILIES,
     APolicyAndACaller,
     APolicyAndSomeone,
@@ -187,6 +189,34 @@ class ANonNullableValueStaysWhenCleared(
 
 
 @dataclass(frozen=True)
+class APriorityCapMovedOutOfRangeIsRefused(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    @override
+    def summary(self) -> str:
+        return "moving-the-priority-cap-outside-the-session-range-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 "
+            "하면, 제약 위반으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return Editing(KEYPAIR, KEYPAIR.priority_moved_out_of_range())
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheCallIsRefused(CheckConstraintViolationError)
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
@@ -254,6 +284,7 @@ SCENARIOS: list[EditingStep] = [
         for family in OWN_FAMILIES
     ),
     *(ANonNullableValueStaysWhenCleared(family, started=datetime.now(UTC)) for family in FAMILIES),
+    APriorityCapMovedOutOfRangeIsRefused(),
     *(AUserGrantedNothingMayNotEdit(family) for family in FAMILIES),
     *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
 ]

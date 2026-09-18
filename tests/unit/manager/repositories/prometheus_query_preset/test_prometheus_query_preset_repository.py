@@ -74,10 +74,10 @@ class TestPrometheusQueryPresetRepository:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -95,15 +95,15 @@ class TestPrometheusQueryPresetRepository:
                 EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def preset_ops(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> OpsRepository[PrometheusQueryPresetData]:
         """Writes and searches run through the generic ops repository."""
-        return OpsRepository(V2DBOpsProvider(database_connection))
+        return OpsRepository(V2DBOpsProvider(global_entity_ids))
 
     @pytest.fixture
     def preset_repository(
@@ -188,7 +188,7 @@ class TestPrometheusQueryPresetRepository:
             group_labels=group_labels,
         )
 
-        result = await preset_ops.create_global_entity(creator)
+        result = await preset_ops.create_entity(creator)
 
         assert isinstance(result, PrometheusQueryPresetData)
         assert result.name == name

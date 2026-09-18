@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Collection
 
 import sqlalchemy as sa
@@ -186,43 +185,5 @@ class ResourceGroupConditions:
                     ResourceGroupForProjectRow.group == project_id
                 )
             )
-
-        return inner
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        The cursor value is the resource group UUID; a subquery fetches the
-        cursor row's created_at to compare against.
-        """
-        rg_id = ResourceGroupID(uuid.UUID(cursor_id))
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ResourceGroupRow.created_at)
-                .where(ResourceGroupRow.id == rg_id)
-                .scalar_subquery()
-            )
-            return ResourceGroupRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        The cursor value is the resource group UUID; a subquery fetches the
-        cursor row's created_at to compare against.
-        """
-        rg_id = ResourceGroupID(uuid.UUID(cursor_id))
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(ResourceGroupRow.created_at)
-                .where(ResourceGroupRow.id == rg_id)
-                .scalar_subquery()
-            )
-            return ResourceGroupRow.created_at > subquery
 
         return inner

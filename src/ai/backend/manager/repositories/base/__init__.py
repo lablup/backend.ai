@@ -45,13 +45,9 @@ from .querier import (
     execute_batch_querier,
     execute_querier,
 )
-from .types import (
-    CursorConditionFactory,
-)
 
 __all__ = [
     # Types
-    "CursorConditionFactory",
     "IntegrityErrorCheck",
     # Integrity
     "parse_integrity_error",

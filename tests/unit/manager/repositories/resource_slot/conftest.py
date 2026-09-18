@@ -20,11 +20,11 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def database_with_resource_slot_tables(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     """Set up tables required for resource slot repository tests."""
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -32,7 +32,7 @@ async def database_with_resource_slot_tables(
             ResourceSlotTypeRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture

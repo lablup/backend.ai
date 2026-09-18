@@ -16,7 +16,7 @@ from ai.backend.manager.models.artifact_registries.creators import ArtifactRegis
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_registries.updaters import ArtifactRegistryMetaUpdater
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
@@ -27,14 +27,15 @@ class ArtifactRegistryWriteOps(V2WriteOps):
 
     async def create_registry[TRow: Base, TData](
         self,
-        creator: GlobalEntityCreator[TRow, TData],
+        creator: EntityCreator[TRow, TData],
         meta_creator: ArtifactRegistryMetaCreator,
     ) -> TData:
-        """Insert a registry, provision the node it becomes, and name it."""
+        """Insert a registry, provision the node it becomes in its scopes, and name it."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         registry_id = ArtifactRegistryID(creator.entity_id(row))
         await self._provision([registry_id])
+        await self._created_in(creator.created_in(row), registry_id)
         await self._insert_row(meta_creator.build_row(registry_id), ())
         await self._sess.refresh(row, ["meta"])
         return creator.to_data(row)

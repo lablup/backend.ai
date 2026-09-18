@@ -9,13 +9,16 @@ from ai.backend.common.data.entity.storage_namespace import (
     StorageNamespaceID,
 )
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
 @dataclass
-class StorageNamespaceCreator(GlobalEntityCreator[StorageNamespaceRow, StorageNamespaceData]):
+class StorageNamespaceCreator(
+    CreatedInGlobal[StorageNamespaceRow], EntityCreator[StorageNamespaceRow, StorageNamespaceData]
+):
     """Creator for one namespace registered under an object storage."""
 
     storage_id: uuid.UUID

@@ -29,15 +29,14 @@ from ai.backend.manager.data.app_config.types import (
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
-    Refused,
     Same,
     SameAs,
     Then,
+    Told,
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
@@ -327,6 +326,20 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
 
 
 @dataclass(frozen=True)
+class NotRefused(Verdict):
+    """응답이 반환되어야 한다. 거부되면 그 예외 이름을 문제로 적는다."""
+
+    raised: BaseException | None
+
+    @override
+    def told(self) -> Told:
+        says = "응답이 반환된다"
+        if self.raised is None:
+            return Told(says)
+        return Told(says, problems=(f"{says} 이어야 하는데 {type(self.raised).__name__}",))
+
+
+@dataclass(frozen=True)
 class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
     """요청한 이름마다 하나씩, 요청 순서대로, 병합된 설정이 통째로 반환된다."""
 
@@ -342,7 +355,7 @@ class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [NotRefused(answered.raised)]
         seen: list[Verdict] = [Same("app_configs", len(payload.app_configs), len(self.wanted))]
         for i, (got, wanted) in enumerate(zip(payload.app_configs, self.wanted, strict=False)):
             seen.append(

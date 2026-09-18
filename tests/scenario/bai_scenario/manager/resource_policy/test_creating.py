@@ -1,7 +1,7 @@
-"""정책 생성 — 누가 생성할 수 있고, 무엇이 이름을 막는가.
+"""정책 생성 — 누가 생성할 수 있고, 무엇이 값을 막는가.
 
-생성은 전역 superadmin 역할만 검사한다. 이름 중복은 생성 spec이 아니라 데이터베이스 제약이
-막으므로, 그 거부는 저장소의 제약 위반 오류로 거부된다.
+생성은 전역 superadmin 역할만 검사한다. 이름 중복과 범위 밖 우선순위 상한은 생성 spec이
+아니라 데이터베이스 제약이 막으므로, 그 거부는 저장소의 제약 위반 오류로 온다.
 """
 
 from __future__ import annotations
@@ -16,7 +16,10 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.repository import (
+    CheckConstraintViolationError,
+    UniqueConstraintViolationError,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
@@ -28,6 +31,7 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
     FAMILIES,
+    KEYPAIR,
     OWN_FAMILIES,
     APolicyAndACaller,
     APolicyAndSomeone,
@@ -132,6 +136,36 @@ class LeavingOptionalsOutLeavesThemEmpty(
 
 
 @dataclass(frozen=True)
+class AnUnlimitedSlotIsMarkedUnlimited(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-unlimited-slot-of-a-keypair-policy-comes-back-marked-unlimited"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 한 자원의 전체 슬롯을 무제한으로 지정해 키페어 정책을 생성하면, "
+            "그 자원은 무제한으로 표시되고 수량은 비어 있다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return Creating(KEYPAIR, KEYPAIR.unlimited_slot(FRESH))
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheNewPolicyNode(KEYPAIR, self.started, KEYPAIR.unlimited_slot(FRESH))
+
+
+@dataclass(frozen=True)
 class ANameAnotherPolicyHoldsIsRefused(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
@@ -159,6 +193,34 @@ class ANameAnotherPolicyHoldsIsRefused(
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(UniqueConstraintViolationError)
+
+
+@dataclass(frozen=True)
+class APriorityCapOutOfRangeIsRefused(
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    @override
+    def summary(self) -> str:
+        return "a-priority-cap-outside-the-session-range-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 "
+            "생성하려 하면, 제약 위반으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return Creating(KEYPAIR, KEYPAIR.priority_out_of_range(FRESH))
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheCallIsRefused(CheckConstraintViolationError)
 
 
 @dataclass(frozen=True)
@@ -260,7 +322,9 @@ SCENARIOS: list[CreatingStep] = [
         )
         for family in OWN_FAMILIES
     ),
+    AnUnlimitedSlotIsMarkedUnlimited(started=datetime.now(UTC)),
     *(ANameAnotherPolicyHoldsIsRefused(family) for family in FAMILIES),
+    APriorityCapOutOfRangeIsRefused(),
     *(APlainUserMayNotCreate(family) for family in FAMILIES),
     *(AMonitorMayNotCreate(family) for family in FAMILIES),
     *(EnforcementOffChangesNothing(family) for family in FAMILIES),
