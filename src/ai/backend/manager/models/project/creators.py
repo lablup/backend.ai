@@ -13,8 +13,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.repository import (
