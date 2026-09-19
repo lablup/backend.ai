@@ -389,7 +389,7 @@ class TestAuthRepository:
                 dotfiles=group.dotfiles,
                 resource_policy=group.resource_policy,
                 type=group.type,
-                container_registry=group.container_registry,
+                container_registry=group.to_data().container_registry,
             )
         yield group_data
 
