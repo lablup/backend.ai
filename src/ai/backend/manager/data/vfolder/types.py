@@ -181,10 +181,6 @@ class VFolderData(EntityData):
     quota_scope_id: QuotaScopeID | None
     usage_mode: VFolderUsageMode
     default_mount_permission: VFolderMountPolicy
-    max_files: int
-    max_size: int | None
-    num_files: int
-    cur_size: int
     created_at: datetime
     last_used: datetime | None
     updated_at: datetime

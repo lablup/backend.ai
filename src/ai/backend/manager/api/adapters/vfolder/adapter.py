@@ -168,6 +168,9 @@ from ai.backend.manager.services.vfolder.processors import (
 )
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
+# The ``vfolders.max_files`` column default; no path ever wrote another value.
+_LEGACY_MAX_FILES = 1000
+
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
     forward_order=VFolderSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=VFolderRow.id,
@@ -259,12 +262,7 @@ class VFolderAdapter(BaseAdapter):
                 creator_id=data.creator_id,
                 creator_email=data.creator,
             ),
-            quota=VFolderQuotaInfo(
-                max_size=BinarySize.to_size_info(data.max_size)
-                if data.max_size is not None
-                else None,
-                max_files=data.max_files,
-            ),
+            quota=VFolderQuotaInfo(max_size=None, max_files=_LEGACY_MAX_FILES),
             unmanaged_path=data.unmanaged_path,
         )
 

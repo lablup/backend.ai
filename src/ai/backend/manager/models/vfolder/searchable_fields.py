@@ -22,7 +22,6 @@ from ai.backend.manager.models.entity_label.searchable_fields import (
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
-from ai.backend.manager.models.specs.conditions.integer import IntConditions
 from ai.backend.manager.models.specs.conditions.membership import MembershipConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
@@ -60,18 +59,6 @@ class _VFolderOwnFields(RowDataConverter[VFolderRow, VFolderData]):
         VFolderRow.default_mount_permission,
         EnumConditions(VFolderRow.default_mount_permission, VFolderMountPolicy),
         ColumnOrder(VFolderRow.usage_mode),
-    )
-    max_files = SearchableField(
-        VFolderRow.max_files, IntConditions(VFolderRow.max_files), ColumnOrder(VFolderRow.max_files)
-    )
-    max_size = SearchableField(
-        VFolderRow.max_size, IntConditions(VFolderRow.max_size), ColumnOrder(VFolderRow.max_size)
-    )
-    num_files = SearchableField(
-        VFolderRow.num_files, IntConditions(VFolderRow.num_files), ColumnOrder(VFolderRow.num_files)
-    )
-    cur_size = SearchableField(
-        VFolderRow.cur_size, IntConditions(VFolderRow.cur_size), ColumnOrder(VFolderRow.cur_size)
     )
     created_at = SearchableField(
         VFolderRow.created_at,
@@ -133,10 +120,6 @@ class _VFolderOwnFields(RowDataConverter[VFolderRow, VFolderData]):
             quota_scope_id=self.quota_scope_id.read(row),
             usage_mode=self.usage_mode.read(row),
             default_mount_permission=self.default_mount_permission.read(row),
-            max_files=self.max_files.read(row) or 0,
-            max_size=self.max_size.read(row),
-            num_files=self.num_files.read(row) or 0,
-            cur_size=self.cur_size.read(row) or 0,
             created_at=self.created_at.read(row),
             last_used=self.last_used.read(row),
             updated_at=self.updated_at.read(row),
