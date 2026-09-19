@@ -8,6 +8,7 @@ from typing import Any, TypedDict, override
 import aiohttp
 import yarl
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
@@ -185,3 +186,14 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
                 if resp.status != 200:
                     log.error("Failed to delete quota! response: {}", resp)
                     raise InternalServerError(f"Failed to delete quota! response: {resp}")
+
+
+class PerProjectContainerRegistryQuotaClientPool:
+    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
+        match type_:
+            case ContainerRegistryType.HARBOR2:
+                return PerProjectHarborQuotaClient()
+            case _:
+                raise GenericBadRequest(
+                    f"{type_} does not support registry quota per project management."
+                )

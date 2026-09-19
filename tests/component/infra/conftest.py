@@ -32,6 +32,9 @@ from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHand
 from ai.backend.manager.api.rest.resource_group.registry import register_resource_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -41,6 +44,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
+)
+from ai.backend.manager.repositories.container_registry_quota.repository import (
+    PerProjectRegistryQuotaRepository,
 )
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
@@ -83,7 +89,12 @@ def container_registry_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
-    service = ContainerRegistryService(database_engine, repo)
+    service = ContainerRegistryService(
+        database_engine,
+        repo,
+        PerProjectRegistryQuotaRepository(database_engine),
+        PerProjectContainerRegistryQuotaClientPool(),
+    )
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )
@@ -292,10 +303,12 @@ async def group_name_fixture(
 @pytest.fixture()
 async def resource_preset_fixture(
     db_engine: SAEngine,
+    valkey_clients: ValkeyClients,
 ) -> AsyncIterator[dict[str, str]]:
     """Insert a test resource preset and yield its metadata.
 
     Used for list_presets and check_presets tests. Cleaned up after each test.
+    The insert and the teardown drop the preset cache the repository reads first.
     """
     preset_id = uuid.uuid4()
     preset_name = f"test-preset-{preset_id.hex[:8]}"
@@ -310,6 +323,7 @@ async def resource_preset_fixture(
                 scaling_group_name=None,
             )
         )
+    await valkey_clients.stat.invalidate_all_resource_presets()
     yield {"id": str(preset_id), "name": preset_name}
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -317,3 +331,4 @@ async def resource_preset_fixture(
                 ResourcePresetRow.__table__.c.id == preset_id
             )
         )
+    await valkey_clients.stat.invalidate_all_resource_presets()

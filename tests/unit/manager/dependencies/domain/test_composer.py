@@ -12,13 +12,6 @@ from ai.backend.manager.dependencies.domain.composer import (
 class TestDomainComposer:
     """Test DomainComposer integration."""
 
-    @patch(
-        "ai.backend.manager.dependencies.domain.services.PerProjectContainerRegistryQuotaClientPool"
-    )
-    @patch(
-        "ai.backend.manager.dependencies.domain.services.PerProjectContainerRegistryQuotaService"
-    )
-    @patch("ai.backend.manager.dependencies.domain.services.PerProjectRegistryQuotaRepository")
     @patch("ai.backend.manager.dependencies.domain.repositories.Repositories")
     @patch("ai.backend.manager.dependencies.domain.distributed_lock.create_lock_factory")
     @patch("ai.backend.manager.dependencies.domain.notification.NotificationCenter")
@@ -27,11 +20,8 @@ class TestDomainComposer:
         mock_nc_class: MagicMock,
         mock_create_lock: MagicMock,
         mock_repos_class: MagicMock,
-        mock_quota_repo_class: MagicMock,
-        mock_quota_service_class: MagicMock,
-        mock_quota_pool_class: MagicMock,
     ) -> None:
-        """DomainComposer should initialize all four domain dependencies."""
+        """DomainComposer should initialize all three domain dependencies."""
         # Setup mocks
         mock_nc = MagicMock()
         mock_nc.close = AsyncMock()
@@ -42,8 +32,6 @@ class TestDomainComposer:
 
         mock_repos = MagicMock()
         mock_repos_class.create.return_value = mock_repos
-
-        mock_quota_service_class.return_value = MagicMock()
 
         domain_input = DomainInput(
             config_provider=MagicMock(),
@@ -65,7 +53,6 @@ class TestDomainComposer:
             assert resources.notification_center is mock_nc
             assert resources.distributed_lock_factory is mock_factory
             assert resources.repositories is mock_repos
-            assert resources.services_ctx is not None
 
         # Cleanup should have been called
         mock_nc.close.assert_called_once()

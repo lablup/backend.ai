@@ -13,11 +13,17 @@ from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
+)
+from ai.backend.manager.repositories.container_registry_quota.repository import (
+    PerProjectRegistryQuotaRepository,
 )
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -33,7 +39,12 @@ def container_registry_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
-    service = ContainerRegistryService(database_engine, repo)
+    service = ContainerRegistryService(
+        database_engine,
+        repo,
+        PerProjectRegistryQuotaRepository(database_engine),
+        PerProjectContainerRegistryQuotaClientPool(),
+    )
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )

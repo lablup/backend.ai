@@ -42,9 +42,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
-    from ai.backend.manager.service.container_registry.harbor import (
-        AbstractPerProjectContainerRegistryQuotaService,
-    )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
     from ai.backend.manager.services.app_config.processors import (
@@ -353,7 +350,6 @@ class ServiceArgs:
     prometheus_client: PrometheusClient
     ssh_key_validator: SSHKeyValidator
     key_provider_pool: KeyProviderPool
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass

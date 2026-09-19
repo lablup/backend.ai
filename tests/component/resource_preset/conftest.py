@@ -26,6 +26,9 @@ from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -35,6 +38,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
+)
+from ai.backend.manager.repositories.container_registry_quota.repository import (
+    PerProjectRegistryQuotaRepository,
 )
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -74,7 +80,12 @@ def container_registry_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
-    service = ContainerRegistryService(database_engine, repo)
+    service = ContainerRegistryService(
+        database_engine,
+        repo,
+        PerProjectRegistryQuotaRepository(database_engine),
+        PerProjectContainerRegistryQuotaClientPool(),
+    )
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )
@@ -220,10 +231,12 @@ async def group_name_fixture(
 @pytest.fixture()
 async def preset_factory(
     db_engine: SAEngine,
+    valkey_clients: ValkeyClients,
 ) -> AsyncIterator[PresetFactory]:
     """Factory that inserts resource preset rows directly into DB.
 
     Yields a factory callable and cleans up all created presets on teardown.
+    Each insert and the teardown drop the preset cache the repository reads first.
     """
     created_ids: list[uuid.UUID] = []
 
@@ -239,6 +252,7 @@ async def preset_factory(
         defaults.update(overrides)
         async with db_engine.begin() as conn:
             await conn.execute(sa.insert(ResourcePresetRow.__table__).values(**defaults))
+        await valkey_clients.stat.invalidate_all_resource_presets()
         created_ids.append(defaults["id"])
         return defaults
 
@@ -249,6 +263,7 @@ async def preset_factory(
             await conn.execute(
                 ResourcePresetRow.__table__.delete().where(ResourcePresetRow.__table__.c.id == pid)
             )
+    await valkey_clients.stat.invalidate_all_resource_presets()
 
 
 @pytest.fixture()
