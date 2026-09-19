@@ -12,8 +12,11 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 Domains migrated to the v2 specs add them next to `row.py` — `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
 reads, `scopes.py` for the `OperationScope` subclasses that filter the row.
-검색이 필터하고 정렬할 수 있는 것은 `searchable_fields.py`에 선언한다. 규칙은 `models/specs/search/AGENTS.md`를 본다.
-권한을 검사할 scope를 함께 선언하는 scope는 `ScopeTarget`(`models/scopes.py`)을 상속하고 `{scope 엔티티}{대상 엔티티}Target`으로 이름 짓는다(`DomainVFolderTarget`). `OperationScope`를 직접 상속하는 기존 클래스는 해당 엔티티를 옮길 때 바꾼다.
+What a search can filter and order by is declared in `searchable_fields.py`; see
+`models/specs/search/AGENTS.md`. A scope that also names the scope the operation is authorized
+against inherits `ScopeTarget` (`models/scopes.py`) and is named
+`{scope entity}{target entity}Target` (`DomainVFolderTarget`). Classes still inheriting
+`OperationScope` directly move over when their entity does.
 An `OperationScope` on the domain, project or user axis answers from the ownership graph:
 `scope_membership_exists` (`models/virtual_entity/queries.py`) asks whether the scope's
 virtual entity holds the row, correlating on the column the creator's `entity_id(row)`
