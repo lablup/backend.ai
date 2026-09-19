@@ -2,7 +2,9 @@ import asyncio
 import os
 import shutil
 import subprocess
+import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
@@ -63,6 +65,20 @@ class ScratchUtils:
         return scratch_root / str(kernel_id) / "config"
 
 
+@dataclass(frozen=True)
+class StagedRecoveryData:
+    staged_path: Path
+    final_path: Path
+
+    def commit(self) -> None:
+        """Atomic, and synchronous on purpose: a caller decides on the live registry right
+        before this, and nothing may run in between."""
+        self.staged_path.replace(self.final_path)
+
+    def discard(self) -> None:
+        self.staged_path.unlink(missing_ok=True)
+
+
 class ScratchConfig:
     def __init__(self, config_path: Path) -> None:
         self._config_path = config_path
@@ -102,9 +118,18 @@ class ScratchConfig:
         raw_data = filepath.read_text()
         return KernelResourceSpec.read_from_string(raw_data)
 
-    async def save_json_recovery_data(self, data: KernelRecoveryScratchData) -> None:
-        filepath = self._json_recovery_file_path()
-        filepath.parent.mkdir(parents=True, exist_ok=True)
+    async def stage_json_recovery_data(self, data: KernelRecoveryScratchData) -> StagedRecoveryData:
+        """Write the record beside `recovery.json`; `commit()` puts it in place in one rename.
+        The config directory is the kernel's own and is never made here: absent, this raises
+        `FileNotFoundError`, which means the kernel has been destroyed."""
         serialized = data.model_dump_json()
-        async with aiofiles.open(filepath, "w") as file:
-            await file.write(serialized)
+        final_path = self._json_recovery_file_path()
+        staged_path = final_path.with_name(f"{final_path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            async with aiofiles.open(staged_path, "w") as file:
+                await file.write(serialized)
+        except BaseException:
+            # BaseException: a cancelled save must not leave its half-written file either.
+            staged_path.unlink(missing_ok=True)
+            raise
+        return StagedRecoveryData(staged_path=staged_path, final_path=final_path)
