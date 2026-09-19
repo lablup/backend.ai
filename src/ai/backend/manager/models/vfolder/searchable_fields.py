@@ -9,16 +9,20 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.types import VFolderMountPolicy, VFolderUsageMode
+from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPolicyData,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.entity_label.searchable_fields import (
     EntityLabelCorrelation,
     EntityLabelSearchableFields,
 )
+from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
@@ -29,6 +33,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
+from ai.backend.manager.models.specs.search.usage import UsageConditions
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 
 
@@ -207,6 +212,26 @@ class _VFolderLinkedEntities:
     """How a vfolder connects to other entities; the other entity's permission governs."""
 
     membership = MembershipConditions(VFolderEntityType(), VFolderRow.id)
+    deployments = UsageConditions(
+        ToManyCorrelation(
+            sa.join(
+                ReplicaGroupRow,
+                DeploymentRevisionRow,
+                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
+            ),
+            VFolderRow,
+            sa.and_(
+                ReplicaGroupRow.lifecycle.not_in(ReplicaGroupLifecycle.terminal_statuses()),
+                DeploymentRevisionRow.model == VFolderRow.id,
+            ),
+        ),
+        ReplicaGroupRow.deployment_id,
+    )
+    """Vfolders a live replica group's current revision names as its model."""
+    model_cards = UsageConditions(
+        ToManyCorrelation(ModelCardRow, VFolderRow, ModelCardRow.vfolder == VFolderRow.id),
+        ModelCardRow.id,
+    )
 
 
 class VFolderSearchableFields:

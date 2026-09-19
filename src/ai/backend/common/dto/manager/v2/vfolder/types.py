@@ -116,6 +116,22 @@ class VFolderUsageInfo(BaseResponseModel):
     used_bytes: BinarySizeInfo
 
 
+class VFolderUsedBy(BaseRequestModel):
+    """Entities whose use narrows the vfolders read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Vfolders the caller cannot read
+    are left out even when a listed entity uses them.
+    """
+
+    deployment: list[UUID] | None = Field(
+        default=None,
+        description="Deployments whose live replica groups use the vfolder as the model of their current revision",
+    )
+    model_card: list[UUID] | None = Field(
+        default=None, description="Model cards built on the vfolder"
+    )
+
+
 class VFolderScope(BaseRequestModel):
     """Scope for the scoped vfolder query.
 

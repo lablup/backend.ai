@@ -73,6 +73,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderPermissionField,
     VFolderQuotaInfo,
     VFolderScope,
+    VFolderUsedBy,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -321,10 +322,9 @@ class VFolderAdapter(BaseAdapter):
         input: SearchVFoldersInput,
     ) -> SearchVFoldersPayload:
         """Admin search for VFolders with system scope."""
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(
-            conditions=conditions,
+            conditions=self._convert_vfolder_search_conditions(input),
             orders=orders,
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
@@ -412,7 +412,7 @@ class VFolderAdapter(BaseAdapter):
         action_result = await self._vfolder.scoped_search.run(
             ScopedSearchVFoldersAction(
                 items=self._scope_items(input.scope),
-                searcher=self._build_scoped_vfolder_searcher(input),
+                searcher=self._build_vfolder_searcher(input),
             )
         )
         return SearchVFoldersPayload(
@@ -422,24 +422,10 @@ class VFolderAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_scoped_vfolder_searcher(self, input: ScopedSearchVFoldersInput) -> VFolderSearcher:
-        return self._build_searcher(
-            VFolderSearcher,
-            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
-            orders=self._convert_vfolder_orders(input.order) if input.order else [],
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-
     def _build_vfolder_searcher(self, input: SearchVFoldersInput) -> VFolderSearcher:
         return self._build_searcher(
             VFolderSearcher,
-            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
+            conditions=self._convert_vfolder_search_conditions(input),
             orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
@@ -896,6 +882,21 @@ class VFolderAdapter(BaseAdapter):
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
+
+    def _convert_vfolder_search_conditions(
+        self, input: SearchVFoldersInput
+    ) -> list[QueryCondition]:
+        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        if input.used_by is not None:
+            conditions.extend(self._convert_vfolder_used_by(input.used_by))
+        return conditions
+
+    def _convert_vfolder_used_by(self, used_by: VFolderUsedBy) -> list[QueryCondition]:
+        linked = VFolderSearchableFields.linked
+        return [
+            *(linked.deployments.used_by(entity_id) for entity_id in used_by.deployment or []),
+            *(linked.model_cards.used_by(entity_id) for entity_id in used_by.model_card or []),
+        ]
 
     def _convert_vfolder_orders(self, orders: list[VFolderOrder]) -> list[QueryOrder]:
         return [self._convert_vfolder_order(order) for order in orders]
