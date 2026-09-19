@@ -52,7 +52,12 @@ from ai.backend.manager.models.specs.querier import (
     FieldQuerier,
     OwnedFieldQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
+from ai.backend.manager.models.specs.searcher import (
+    GlobalSearcher,
+    ScopedSearcher,
+    Searcher,
+    SearcherResult,
+)
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
@@ -251,6 +256,21 @@ class OpsRepository[TData]:
         """
         async with self._ops.read_ops() as r:
             return await r.search_with_scopes(scopes, searcher)
+
+    async def scoped_search(self, scoped: ScopedSearcher[Any, TData]) -> SearcherResult[TData]:
+        """Read a page restricted to the searcher's scopes and narrowed by its uses.
+
+        The scopes must not be empty, as in :meth:`search_in_scopes`.
+        """
+        async with self._ops.read_ops() as r:
+            return await r.scoped_search(scoped)
+
+    async def global_search(
+        self, global_searcher: GlobalSearcher[Any, TData]
+    ) -> SearcherResult[TData]:
+        """Read a page across the entire table, narrowed by the searcher's uses."""
+        async with self._ops.read_ops() as r:
+            return await r.global_search(global_searcher)
 
     async def search_in_global(self, searcher: Searcher[Any, TData]) -> SearcherResult[TData]:
         """Read a page across the entire table, with no scope filter.

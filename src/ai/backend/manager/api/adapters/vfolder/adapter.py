@@ -8,7 +8,9 @@ from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -108,12 +110,20 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.scopes import ScopeTarget
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
     VFolderBaseCreator,
 )
 from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.scopes import (
+    DomainVFolderTarget,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
+)
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
@@ -148,13 +158,7 @@ from ai.backend.manager.services.vfolder.actions.mount_policy import (
     SetVFolderMountPolicyAction,
     UnsetVFolderMountPolicyAction,
 )
-from ai.backend.manager.services.vfolder.actions.scoped_search import (
-    DomainVFolderScopeItem,
-    ProjectVFolderScopeItem,
-    ScopedSearchVFoldersAction,
-    UserVFolderScopeItem,
-    VFolderScopeItem,
-)
+from ai.backend.manager.services.vfolder.actions.scoped_search import ScopedSearchVFoldersAction
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
 )
@@ -322,23 +326,16 @@ class VFolderAdapter(BaseAdapter):
         input: SearchVFoldersInput,
     ) -> SearchVFoldersPayload:
         """Admin search for VFolders with system scope."""
-        orders = self._convert_vfolder_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=self._convert_vfolder_search_conditions(input),
-            orders=orders,
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
         action_result = await self._vfolder_admin.admin_search_vfolders.run(
-            GlobalSearchVFoldersAction(querier=querier)
+            GlobalSearchVFoldersAction(
+                searcher=GlobalSearcher(
+                    used_by=self._used_by(input.used_by),
+                    searcher=self._build_vfolder_searcher(input),
+                )
+            )
         )
         return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -356,10 +353,7 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         action_result = await self._vfolder.scoped_search.run(
-            ScopedSearchVFoldersAction(
-                items=[UserVFolderScopeItem(user_id=UserID(me.user_id))],
-                searcher=self._build_vfolder_searcher(input),
-            )
+            self._scoped_search_action([UserVFolderTarget(user_id=UserID(me.user_id))], input)
         )
         return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.items],
@@ -378,9 +372,8 @@ class VFolderAdapter(BaseAdapter):
         Used for the project admin page.
         """
         action_result = await self._vfolder.scoped_search.run(
-            ScopedSearchVFoldersAction(
-                items=[ProjectVFolderScopeItem(project_id=ProjectID(project_id))],
-                searcher=self._build_vfolder_searcher(input),
+            self._scoped_search_action(
+                [ProjectVFolderTarget(project_id=ProjectID(project_id))], input
             )
         )
         return SearchVFoldersPayload(
@@ -390,19 +383,43 @@ class VFolderAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: VFolderScope) -> list[VFolderScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[VFolderScopeItem] = [
-            DomainVFolderScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: VFolderScope) -> list[ScopeTarget]:
+        """The scopes the request named, in the order the input lists them."""
+        scopes: list[ScopeTarget] = [
+            DomainVFolderTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectVFolderScopeItem(project_id=ProjectID(entry.value))
-            for entry in scope.project or ()
+        scopes.extend(
+            ProjectVFolderTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
-        items.extend(
-            UserVFolderScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        scopes.extend(UserVFolderTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return scopes
+
+    def _used_by(self, used_by: VFolderUsedBy | None) -> list[UsedBy]:
+        """The uses the request named, deployments before model cards."""
+        if used_by is None:
+            return []
+        linked = VFolderSearchableFields.linked
+        return [
+            *(
+                linked.deployments.used_by(DeploymentID(entity_id))
+                for entity_id in used_by.deployment or ()
+            ),
+            *(
+                linked.model_cards.used_by(ModelCardID(entity_id))
+                for entity_id in used_by.model_card or ()
+            ),
+        ]
+
+    def _scoped_search_action(
+        self, scopes: Sequence[ScopeTarget], input: SearchVFoldersInput
+    ) -> ScopedSearchVFoldersAction:
+        return ScopedSearchVFoldersAction(
+            searcher=ScopedSearcher(
+                scopes=scopes,
+                used_by=self._used_by(input.used_by),
+                searcher=self._build_vfolder_searcher(input),
+            )
         )
-        return items
 
     async def scoped_search(
         self,
@@ -410,10 +427,7 @@ class VFolderAdapter(BaseAdapter):
     ) -> SearchVFoldersPayload:
         """Search the vfolders the named scopes reach, combined with OR."""
         action_result = await self._vfolder.scoped_search.run(
-            ScopedSearchVFoldersAction(
-                items=self._scope_items(input.scope),
-                searcher=self._build_vfolder_searcher(input),
-            )
+            self._scoped_search_action(self._scope_targets(input.scope), input)
         )
         return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.items],
@@ -425,7 +439,7 @@ class VFolderAdapter(BaseAdapter):
     def _build_vfolder_searcher(self, input: SearchVFoldersInput) -> VFolderSearcher:
         return self._build_searcher(
             VFolderSearcher,
-            conditions=self._convert_vfolder_search_conditions(input),
+            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
             orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
@@ -882,21 +896,6 @@ class VFolderAdapter(BaseAdapter):
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
-
-    def _convert_vfolder_search_conditions(
-        self, input: SearchVFoldersInput
-    ) -> list[QueryCondition]:
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
-        if input.used_by is not None:
-            conditions.extend(self._convert_vfolder_used_by(input.used_by))
-        return conditions
-
-    def _convert_vfolder_used_by(self, used_by: VFolderUsedBy) -> list[QueryCondition]:
-        linked = VFolderSearchableFields.linked
-        return [
-            *(linked.deployments.used_by(entity_id) for entity_id in used_by.deployment or []),
-            *(linked.model_cards.used_by(entity_id) for entity_id in used_by.model_card or []),
-        ]
 
     def _convert_vfolder_orders(self, orders: list[VFolderOrder]) -> list[QueryOrder]:
         return [self._convert_vfolder_order(order) for order in orders]

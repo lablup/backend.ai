@@ -33,13 +33,13 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult: BaseScopeActionRes
 
     _func: Callable[[TAction], Awaitable[TResult]]
     _monitors: Sequence[ScopeActionMonitor]
-    _validators: Sequence[ScopeActionValidator]
+    _validators: Sequence[ScopeActionValidator[TAction]]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         monitors: Sequence[ScopeActionMonitor] | None = None,
-        validators: Sequence[ScopeActionValidator] | None = None,
+        validators: Sequence[ScopeActionValidator[TAction]] | None = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []

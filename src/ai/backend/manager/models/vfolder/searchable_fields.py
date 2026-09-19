@@ -6,6 +6,8 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.types import VFolderMountPolicy, VFolderUsageMode
@@ -212,7 +214,7 @@ class _VFolderLinkedEntities:
     """How a vfolder connects to other entities; the other entity's permission governs."""
 
     membership = MembershipConditions(VFolderEntityType(), VFolderRow.id)
-    deployments = UsageConditions(
+    deployments = UsageConditions[DeploymentID](
         ToManyCorrelation(
             sa.join(
                 ReplicaGroupRow,
@@ -228,7 +230,7 @@ class _VFolderLinkedEntities:
         ReplicaGroupRow.deployment_id,
     )
     """Vfolders a live replica group's current revision names as its model."""
-    model_cards = UsageConditions(
+    model_cards = UsageConditions[ModelCardID](
         ToManyCorrelation(ModelCardRow, VFolderRow, ModelCardRow.vfolder == VFolderRow.id),
         ModelCardRow.id,
     )

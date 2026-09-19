@@ -45,11 +45,9 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -58,7 +56,6 @@ from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteP
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
-from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -74,12 +71,9 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 @pytest.fixture()
 def vfolder_admin_processors(
-    database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderAdminProcessors:
-    repo = VFolderAdminRepository(database_engine)
-    service = VFolderAdminService(vfolder_admin_repository=repo)
-    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
+    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFolderEntityType())))
 
 
 @pytest.fixture()

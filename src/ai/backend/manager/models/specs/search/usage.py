@@ -2,18 +2,29 @@
 
 from __future__ import annotations
 
-import uuid
+from dataclasses import dataclass
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.conditions.types import FilterColumn
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 
 
-class UsageConditions:
+@dataclass(frozen=True)
+class UsedBy:
+    """An entity whose use narrows a scoped operation, and the rows it uses.
+
+    The caller must be able to read ``target``; the use grants nothing.
+    """
+
+    target: EntityIdentifier
+    condition: QueryCondition
+
+
+class UsageConditions[TID: EntityIdentifier]:
     """Rows another entity uses, found through ``correlation``.
 
-    ``using_id`` is the using entity's id among the correlated rows. A usage narrows a
-    search and grants nothing; the caller's read of the using entity is checked elsewhere.
+    ``using_id`` is the using entity's id among the correlated rows.
     """
 
     _correlation: ToManyCorrelation
@@ -23,6 +34,9 @@ class UsageConditions:
         self._correlation = correlation
         self._using_id = using_id
 
-    def used_by(self, entity_id: uuid.UUID) -> QueryCondition:
-        """Rows the entity uses."""
-        return self._correlation.some([lambda: self._using_id == entity_id])
+    def used_by(self, entity_id: TID) -> UsedBy:
+        """The rows the entity uses."""
+        return UsedBy(
+            target=entity_id,
+            condition=self._correlation.some([lambda: self._using_id == entity_id]),
+        )

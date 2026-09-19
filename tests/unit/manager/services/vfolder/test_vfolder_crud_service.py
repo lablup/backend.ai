@@ -45,8 +45,8 @@ from ai.backend.manager.models.vfolder.creators import (
     ProjectVFolderCreator,
 )
 from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -1069,8 +1069,8 @@ class TestGetAccessibleVFolderAction:
         assert result.row["name"] == "my-folder"
         mock_vfolder_repository.resolve_vfolder_id_by_name.assert_awaited_once_with(
             [
-                UserVFolderOperationScope(user_id=UserID(user_uuid)),
-                ProjectVFolderOperationScope(project_id=ProjectID(group_uuid)),
+                UserVFolderTarget(user_id=UserID(user_uuid)),
+                ProjectVFolderTarget(project_id=ProjectID(group_uuid)),
             ],
             "my-folder",
         )

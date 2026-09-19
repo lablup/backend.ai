@@ -62,12 +62,14 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityUpsertOpsAction,
     GlobalEntityWithFieldsCreateOpsAction,
     GlobalRoleManagedEntityCreateOpsAction,
+    GlobalSearcherOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
+    ScopedSearchOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
 )
@@ -411,6 +413,47 @@ class SearchService[TData: EntityData]:
             action.operation_scopes(), action.to_searcher()
         )
         return ScopedBatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
+class ScopedSearchService[TData: EntityData]:
+    """Runs the action's searcher over the scopes it names, narrowed by the uses it names."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: ScopedSearchOpsAction[Any, TData]
+    ) -> ScopedBatchOpsResult[TData]:
+        result = await self._repository.scoped_search(action.searcher)
+        return ScopedBatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
+class GlobalSearcherService[TData]:
+    """Runs the action's searcher across the entire table, narrowed by the uses it names.
+
+    Wired from ``BaseGlobalAction``, whose SUPERADMIN gate answers for the unscoped read.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: GlobalSearcherOpsAction[Any, TData]) -> BatchOpsResult[TData]:
+        result = await self._repository.global_search(action.searcher)
+        return BatchOpsResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

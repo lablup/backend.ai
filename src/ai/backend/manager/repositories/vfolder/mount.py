@@ -51,8 +51,8 @@ from ai.backend.manager.models.vfolder.row import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
@@ -103,8 +103,8 @@ async def query_reachable_vfolders(
     """
     user_id = UserID(user_scope.user_uuid)
     project_ids = (await conn.scalars(joined_project_ids_query(user_id))).all()
-    scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
-    scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
+    scopes: list[OperationScope] = [UserVFolderTarget(user_id=user_id)]
+    scopes.extend(ProjectVFolderTarget(project_id=pid) for pid in project_ids)
     membership = VFolderSearchableFields.linked.membership
     project_id = ProjectID(user_scope.group_id)
     rows = (

@@ -130,7 +130,7 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderQuerier,
     VFolderUserMountPolicyQuerier,
 )
-from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
 from ai.backend.manager.models.vfolder.updaters import (
@@ -1661,7 +1661,7 @@ class VfolderRepository:
         """The ``.logs`` vfolder the user reaches, or ``None`` when there is none."""
         async with self._v2_ops.read_ops() as r:
             vfolder_id = await r.lookup_entity_id(
-                VFolderNameLookup(scopes=[UserVFolderOperationScope(user_id=user_id)], name=".logs")
+                VFolderNameLookup(scopes=[UserVFolderTarget(user_id=user_id)], name=".logs")
             )
         if vfolder_id is None:
             return None

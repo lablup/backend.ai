@@ -115,7 +115,7 @@ class TestVFolderAdapterMySearch:
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.items] == [user_data.user_id]
+        assert [item.scope_id() for item in action.searcher.scopes] == [user_data.user_id]
 
     async def test_my_search_returns_payload(
         self,
@@ -204,7 +204,7 @@ class TestVFolderAdapterProjectSearch:
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.items] == [ProjectID(project_id)]
+        assert [item.scope_id() for item in action.searcher.scopes] == [ProjectID(project_id)]
 
     async def test_project_search_returns_payload(
         self,

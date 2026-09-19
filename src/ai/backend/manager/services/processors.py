@@ -305,9 +305,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,
     )
-    from ai.backend.manager.services.vfolder.services.vfolder_admin import (
-        VFolderAdminService,
-    )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,
     )
@@ -370,7 +367,6 @@ class Services:
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
-    vfolder_admin: VFolderAdminService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService

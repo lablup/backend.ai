@@ -251,16 +251,6 @@ class VFolderCreation:
 
 
 @dataclass
-class VFolderSearchResult:
-    """Search result with total count and pagination info for vfolders."""
-
-    items: list[VFolderData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
 class VFolderDeleteParams:
     vfolder_id: VFolderID
     host: str

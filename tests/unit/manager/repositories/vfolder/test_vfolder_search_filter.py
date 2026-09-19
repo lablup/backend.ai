@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy import Row
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
@@ -29,6 +30,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -43,7 +45,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
-from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
@@ -96,6 +98,7 @@ class TestVfolderSearchFilter:
                 ImageRow,
                 VFolderRow,
                 VFolderUserMountPolicyRow,
+                ModelCardRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
@@ -405,6 +408,7 @@ class TestVfolderSearchFilter:
             )
 
         yield {
+            "project_id": project_id,
             "user_a_id": user_a_id,
             "user_b_id": user_b_id,
             "vf_clone_1": vf_clone_1,
@@ -421,7 +425,7 @@ class TestVfolderSearchFilter:
         filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable={eq: true} returns only cloneable=true vfolders (owned + shared)."""
-        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=filter_adapter.apply_bool_filter(
@@ -447,7 +451,7 @@ class TestVfolderSearchFilter:
         filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable={eq: false} returns only cloneable=false vfolders."""
-        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=filter_adapter.apply_bool_filter(
@@ -468,7 +472,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """No cloneable filter returns all visible vfolders (owned + shared)."""
-        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -493,7 +497,7 @@ class TestVfolderSearchFilter:
         filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable filter works with pagination (correct total_count and has_next_page)."""
-        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=filter_adapter.apply_bool_filter(
@@ -515,7 +519,7 @@ class TestVfolderSearchFilter:
         filter_adapter: BaseFilterAdapter,
     ) -> None:
         """cloneable filter combines correctly with other conditions (usage_mode)."""
-        scope = UserVFolderOperationScope(user_id=UserID(cloneable_data["user_a_id"]))
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -539,3 +543,74 @@ class TestVfolderSearchFilter:
             cloneable_data["vf_shared_clone"],
         }
         assert result.total_count == 2
+
+    @pytest.fixture
+    async def model_cards(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+    ) -> dict[str, uuid.UUID]:
+        """A card on user_a's ``vf_clone_1`` and one on user_b's unshared ``vf_noclone_b``."""
+        card_a = uuid.uuid4()
+        card_b = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            for card_id, name, vfolder_id, creator in (
+                (card_a, "card-a", cloneable_data["vf_clone_1"], cloneable_data["user_a_id"]),
+                (card_b, "card-b", cloneable_data["vf_noclone_b"], cloneable_data["user_b_id"]),
+            ):
+                db_sess.add(
+                    ModelCardRow(
+                        id=card_id,
+                        name=name,
+                        vfolder=vfolder_id,
+                        domain="test-domain",
+                        project=cloneable_data["project_id"],
+                        creator=creator,
+                    )
+                )
+        return {"card_a": card_a, "card_b": card_b}
+
+    async def test_used_by_returns_the_vfolder_the_card_uses(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+        model_cards: dict[str, uuid.UUID],
+    ) -> None:
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                VFolderSearchableFields.linked.model_cards.used_by(
+                    ModelCardID(model_cards["card_a"])
+                ).condition
+            ],
+            orders=[],
+        )
+
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
+
+        assert [row.VFolderRow.id for row in result.rows] == [cloneable_data["vf_clone_1"]]
+        assert result.total_count == 1
+
+    async def test_used_by_leaves_out_a_vfolder_outside_the_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        cloneable_data: dict[str, uuid.UUID],
+        model_cards: dict[str, uuid.UUID],
+    ) -> None:
+        # card_b uses user_b's vfolder, which user_a's scope does not reach.
+        scope = UserVFolderTarget(user_id=UserID(cloneable_data["user_a_id"]))
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                VFolderSearchableFields.linked.model_cards.used_by(
+                    ModelCardID(model_cards["card_b"])
+                ).condition
+            ],
+            orders=[],
+        )
+
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
+
+        assert result.rows == []
+        assert result.total_count == 0
