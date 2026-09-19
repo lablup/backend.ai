@@ -192,7 +192,7 @@ class VFolderProcessors:
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
-        self.scoped_search = group.scope_search_ops(ScopedSearchVFoldersAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchVFoldersAction)
 
         # Single entity actions with RBAC validation
         self.get_vfolder = group.single_entity(GetVFolderAction, service.get)

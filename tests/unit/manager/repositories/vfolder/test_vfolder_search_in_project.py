@@ -37,7 +37,7 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.vfolder.scopes import ProjectVFolderOperationScope
+from ai.backend.manager.models.vfolder.scopes import ProjectVFolderTarget
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -261,7 +261,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only vfolders belonging to the specified project."""
-        scope = ProjectVFolderOperationScope(project_id=test_data["project_a_id"])
+        scope = ProjectVFolderTarget(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -281,7 +281,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its vfolder, not project_a's."""
-        scope = ProjectVFolderOperationScope(project_id=test_data["project_b_id"])
+        scope = ProjectVFolderTarget(project_id=test_data["project_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -300,7 +300,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
-        scope = ProjectVFolderOperationScope(project_id=test_data["project_a_id"])
+        scope = ProjectVFolderTarget(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -10,7 +11,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.pagination import QueryPagination
+from ai.backend.manager.models.specs.search.usage import UsedBy
 
 
 @dataclass
@@ -69,3 +72,26 @@ class SearcherResult[TData]:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class ScopedSearcher[TRow: Base, TData]:
+    """A searcher together with the scopes it reads within and the uses narrowing it.
+
+    ``scopes`` are OR-ed and must not be empty; ``used_by`` conditions are AND-ed.
+    """
+
+    scopes: Sequence[ScopeTarget]
+    used_by: Sequence[UsedBy]
+    searcher: Searcher[TRow, TData]
+
+
+@dataclass(frozen=True)
+class GlobalSearcher[TRow: Base, TData]:
+    """A searcher across the whole table together with the uses narrowing it.
+
+    ``used_by`` conditions are AND-ed.
+    """
+
+    used_by: Sequence[UsedBy]
+    searcher: Searcher[TRow, TData]

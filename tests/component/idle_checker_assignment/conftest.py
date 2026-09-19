@@ -49,6 +49,9 @@ from ai.backend.manager.actions.v2.relation.validator.rbac import (
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualEntityScopeActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.scope.validator.used_by import (
+    VirtualEntityUsedByRBACValidator,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
@@ -164,6 +167,7 @@ def action_registry(
     )
     validators = VirtualEntityRBACValidators(
         scope=VirtualEntityScopeActionRBACValidator(permission_repo, config_provider),
+        used_by=VirtualEntityUsedByRBACValidator(permission_repo, config_provider),
         single_entity=VirtualEntitySingleEntityActionRBACValidator(
             permission_repo, config_provider
         ),

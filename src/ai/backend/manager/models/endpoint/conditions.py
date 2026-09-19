@@ -23,18 +23,14 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.entity_label.conditions import (
-    make_entity_label_nested_conditions,
-)
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelCorrelation
 from ai.backend.manager.models.routing import RoutingRow
 
 
 class DeploymentConditions:
     """Query conditions for deployments."""
 
-    labels = make_entity_label_nested_conditions(
-        EndpointRow, EndpointRow.id, DeploymentEntityType()
-    )
+    labels = EntityLabelCorrelation(EndpointRow, DeploymentEntityType(), EndpointRow.id)
     """The `labels` nested filter: some / every / none over the labels on a endpoint."""
 
     by_replica_exists = staticmethod(

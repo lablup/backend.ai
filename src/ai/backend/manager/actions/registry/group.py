@@ -104,6 +104,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     DeleteSingleEntityOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
+    GlobalSearcherOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkGetEntityOpsAction,
@@ -112,6 +113,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     PurgeEntityOpsAction,
     RestorePartialBulkOpsAction,
     RestoreSingleEntityOpsAction,
+    ScopedSearchOpsAction,
     SearchGlobalOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
@@ -169,6 +171,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalCreateWithFieldsService,
     GlobalPartialBulkPurgeService,
     GlobalRoleManagedEntityCreateService,
+    GlobalSearcherService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
@@ -179,6 +182,7 @@ from ai.backend.manager.services.ops.service import (
     RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
+    ScopedSearchService,
     SearchService,
     UpdateService,
 )
@@ -681,6 +685,38 @@ class ProcessorGroup[TData: EntityData]:
             SearchService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def scoped_search_ops[TAction: ScopedSearchOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator[ScopedSearchOpsAction[Any, Any]]] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, ScopedBatchOpsResult[TData]]:
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            ScopedSearchService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(
+                *self._deps.validators.scope,
+                *self._deps.validators.scoped_search,
+                *validators,
+            ),
+        )
+
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, BatchOpsResult[TData]]:
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return GlobalActionProcessor(
+            GlobalSearcherService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
         )
 
     def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](

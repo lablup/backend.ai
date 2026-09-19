@@ -10,6 +10,9 @@ from ai.backend.manager.actions.v2.relation.validator.rbac import (
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualEntityScopeActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.scope.validator.used_by import (
+    VirtualEntityUsedByRBACValidator,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
@@ -21,6 +24,7 @@ class VirtualEntityRBACValidators:
     """RBAC validators for the v2 action bases (actions/v2/{single_entity,bulk,scope,relation})."""
 
     scope: VirtualEntityScopeActionRBACValidator
+    used_by: VirtualEntityUsedByRBACValidator
     single_entity: VirtualEntitySingleEntityActionRBACValidator
     partial_bulk: VirtualEntityPartialBulkActionRBACValidator
     atomic_bulk: VirtualEntityAtomicBulkActionRBACValidator
@@ -36,5 +40,6 @@ class VirtualEntityRBACValidators:
             partial_bulk=[self.partial_bulk],
             atomic_bulk=[self.atomic_bulk],
             scope=[self.scope],
+            scoped_search=[self.used_by],
             relation=[self.relation],
         )

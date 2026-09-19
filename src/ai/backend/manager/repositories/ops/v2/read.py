@@ -20,6 +20,7 @@ from ai.backend.manager.errors.repository import (
     EmptyOperationScopeError,
 )
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.lookup import (
     BulkDataLookup,
@@ -36,7 +37,12 @@ from ai.backend.manager.models.specs.querier import (
     FieldQuerier,
     OwnedFieldQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
+from ai.backend.manager.models.specs.searcher import (
+    GlobalSearcher,
+    ScopedSearcher,
+    Searcher,
+    SearcherResult,
+)
 from ai.backend.manager.repositories.ops.v2.graph_read import V2GraphReadOpsBase
 
 
@@ -245,7 +251,35 @@ class V2ReadOps(V2GraphReadOpsBase):
                 "search_with_scopes requires at least one scope; "
                 "use search_in_global for an explicit unscoped global search."
             )
-        return await self._search(scopes, searcher)
+        return await self._search(scopes, searcher, ())
+
+    async def scoped_search[TRow: Base, TData](
+        self,
+        scoped: ScopedSearcher[TRow, TData],
+    ) -> SearcherResult[TData]:
+        """Run a searcher restricted to its scopes and narrowed by its uses."""
+        if not scoped.scopes:
+            raise EmptyOperationScopeError(
+                "scoped_search requires at least one scope; "
+                "use search_in_global for an explicit unscoped global search."
+            )
+        return await self._search(
+            scoped.scopes, scoped.searcher, [used.condition for used in scoped.used_by]
+        )
+
+    async def global_search[TRow: Base, TData](
+        self,
+        global_searcher: GlobalSearcher[TRow, TData],
+    ) -> SearcherResult[TData]:
+        """Run a searcher across the entire table, narrowed by its uses.
+
+        Permitted only for callers that already hold full authority.
+        """
+        return await self._search(
+            (),
+            global_searcher.searcher,
+            [used.condition for used in global_searcher.used_by],
+        )
 
     async def search_in_global[TRow: Base, TData](
         self,
@@ -256,12 +290,13 @@ class V2ReadOps(V2GraphReadOpsBase):
         Permitted only for callers that already hold full authority — superadmin
         endpoints or internal system operations.
         """
-        return await self._search((), searcher)
+        return await self._search((), searcher, ())
 
     async def _search[TRow: Base, TData](
         self,
         scopes: Sequence[OperationScope],
         searcher: Searcher[TRow, TData],
+        used_by: Sequence[QueryCondition],
     ) -> SearcherResult[TData]:
         """Run the searcher's SELECT with its conditions, orders, and pagination.
 
@@ -275,7 +310,7 @@ class V2ReadOps(V2GraphReadOpsBase):
             scope_clause = self._scopes_condition(scopes)
             query = query.where(scope_clause)
             count_query = count_query.where(scope_clause)
-        for condition in searcher.conditions:
+        for condition in (*used_by, *searcher.conditions):
             query = query.where(condition())
             count_query = count_query.where(condition())
         # Pagination applies its own default order (cursor pagination includes the

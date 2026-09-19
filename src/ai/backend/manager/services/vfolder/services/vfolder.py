@@ -75,8 +75,8 @@ from ai.backend.manager.models.vfolder.creators import (
     VFolderBaseCreator,
 )
 from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
@@ -499,7 +499,7 @@ class VFolderService:
 
         # Check for duplicate vfolder names
         duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
-            UserVFolderOperationScope(user_id=UserID(action.requester_user_uuid)),
+            UserVFolderTarget(user_id=UserID(action.requester_user_uuid)),
             action.target_name,
         )
 
@@ -1151,8 +1151,8 @@ class VFolderService:
         else:
             user_id = UserID(action.user_uuid)
             project_ids = await self._vfolder_repository.get_joined_project_ids(user_id)
-            scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
-            scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
+            scopes: list[OperationScope] = [UserVFolderTarget(user_id=user_id)]
+            scopes.extend(ProjectVFolderTarget(project_id=pid) for pid in project_ids)
             vfolder_id = await self._vfolder_repository.resolve_vfolder_id_by_name(
                 scopes, action.folder_id_or_name
             )
@@ -1165,9 +1165,9 @@ class VFolderService:
         """The scope a vfolder's name is unique within."""
         match vfolder.ownership_type:
             case VFolderOwnershipType.GROUP if vfolder.group is not None:
-                return ProjectVFolderOperationScope(project_id=vfolder.group)
+                return ProjectVFolderTarget(project_id=vfolder.group)
             case VFolderOwnershipType.USER if vfolder.user is not None:
-                return UserVFolderOperationScope(user_id=UserID(vfolder.user))
+                return UserVFolderTarget(user_id=UserID(vfolder.user))
         raise UnreachableError(f"VFolder {vfolder.id} names no owner")
 
     async def _check_ownership_allowed(self, ownership_type: str) -> Sequence[str]:
@@ -1360,7 +1360,7 @@ class VFolderService:
 
         # Check for duplicate vfolder names
         duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
-            UserVFolderOperationScope(user_id=UserID(action.user_id)),
+            UserVFolderTarget(user_id=UserID(action.user_id)),
             action.target_name,
         )
 

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -124,7 +124,10 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
 )
 from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.models.scopes import ScopeTarget
+from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.user import (
     UserRole,
 )
@@ -133,7 +136,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     vfolder_status_map,
 )
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -141,7 +143,11 @@ from ai.backend.manager.models.vfolder.creators import (
     UnmanagedProjectVFolderCreator,
     VFolderBaseCreator,
 )
-from ai.backend.manager.models.vfolder.orders import VFolderOrders
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderTarget,
+    UserVFolderTarget,
+)
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
@@ -185,12 +191,7 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
 )
-from ai.backend.manager.services.vfolder.actions.scoped_search import (
-    ProjectVFolderScopeItem,
-    ScopedSearchVFoldersAction,
-    UserVFolderScopeItem,
-    VFolderScopeItem,
-)
+from ai.backend.manager.services.vfolder.actions.scoped_search import ScopedSearchVFoldersAction
 from ai.backend.manager.services.vfolder.actions.sharing import (
     GlobalListSharedVFoldersAction,
     ListSharedVFoldersAction,
@@ -383,27 +384,31 @@ class VFolderHandler:
     ) -> APIResponse:
         params = query.parsed
         owner_user_uuid = await self._list_owner(params.owner_user_email)
-        scope_items: list[VFolderScopeItem] = [
-            UserVFolderScopeItem(user_id=UserID(owner_user_uuid))
-        ]
+        scopes: list[ScopeTarget] = [UserVFolderTarget(user_id=UserID(owner_user_uuid))]
+        membership = VFolderSearchableFields.linked.membership
         orders: list[QueryOrder] = []
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
-            scope_items.insert(0, ProjectVFolderScopeItem(project_id=project_id))
-            orders.append(VFolderOrders.project_first(project_id))
-        orders.append(VFolderOrders.shared_last(UserID(owner_user_uuid)))
+            scopes.insert(0, ProjectVFolderTarget(project_id=project_id))
+            orders.append(
+                ConditionOrder(membership.reached_by(ProjectEntityType(), project_id)).first()
+            )
+        orders.append(ConditionOrder(membership.shared_to(UserID(owner_user_uuid))).last())
         result = await self._vfolder.scoped_search.run(
             ScopedSearchVFoldersAction(
-                items=scope_items,
-                searcher=VFolderSearcher(
-                    pagination=NoPagination(),
-                    orders=orders,
-                    conditions=[
-                        VFolderConditions.by_status_not_in(
-                            vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
-                        )
-                    ],
-                ),
+                searcher=ScopedSearcher(
+                    scopes=scopes,
+                    used_by=[],
+                    searcher=VFolderSearcher(
+                        pagination=NoPagination(),
+                        orders=orders,
+                        conditions=[
+                            VFolderSearchableFields.own.status.filter.not_in(
+                                vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
+                            )
+                        ],
+                    ),
+                )
             )
         )
         vfolder_ids = [vfolder.id for vfolder in result.items]

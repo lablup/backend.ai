@@ -66,10 +66,6 @@ class TestVFolderAdapterMySearch:
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
             default_mount_permission=VFolderMountPolicy.READ_WRITE,
-            max_files=0,
-            max_size=None,
-            num_files=0,
-            cur_size=0,
             creator="test@example.com",
             creator_id=uuid4(),
             unmanaged_path=None,
@@ -119,7 +115,7 @@ class TestVFolderAdapterMySearch:
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.items] == [user_data.user_id]
+        assert [item.scope_id() for item in action.searcher.scopes] == [user_data.user_id]
 
     async def test_my_search_returns_payload(
         self,
@@ -159,10 +155,6 @@ class TestVFolderAdapterProjectSearch:
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
             default_mount_permission=VFolderMountPolicy.READ_WRITE,
-            max_files=0,
-            max_size=None,
-            num_files=0,
-            cur_size=0,
             creator="test@example.com",
             creator_id=uuid4(),
             unmanaged_path=None,
@@ -212,7 +204,7 @@ class TestVFolderAdapterProjectSearch:
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.items] == [ProjectID(project_id)]
+        assert [item.scope_id() for item in action.searcher.scopes] == [ProjectID(project_id)]
 
     async def test_project_search_returns_payload(
         self,

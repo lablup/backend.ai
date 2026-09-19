@@ -19,6 +19,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.clauses import QueryCondition
 
@@ -65,4 +66,16 @@ class OperationScope(ABC):
         Every check of every scope is validated in one query before the main query
         runs. Empty where authorization already answered for them.
         """
+        raise NotImplementedError
+
+
+class ScopeTarget(OperationScope):
+    """An operation scope that also names the scope the operation is authorized against.
+
+    Replaces :class:`OperationScope` as each scoped operation moves to it.
+    """
+
+    @abstractmethod
+    def scope_id(self) -> EntityIdentifier:
+        """The scope the caller must hold the operation's permission in."""
         raise NotImplementedError

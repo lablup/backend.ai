@@ -12480,18 +12480,61 @@ type Query {
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2
 
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
-  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  adminVfoldersV2(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usedBy: VFolderUsedBy = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 
   """Added in 26.4.2. Get a single virtual folder by ID."""
   vfolderV2(vfolderId: UUID!): VFolder
 
   """Added in 26.4.2. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  projectVfolders(
+    projectId: UUID!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usedBy: VFolderUsedBy = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 
   """
   Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedVFoldersV2(scope: VFolderScope!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  scopedVFoldersV2(
+    scope: VFolderScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usedBy: VFolderUsedBy = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 
   """
   Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
@@ -12501,7 +12544,20 @@ type Query {
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
   """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  myVfolders(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usedBy: VFolderUsedBy = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 }
 
 """
@@ -19013,6 +19069,19 @@ input VFolderUsageModeFilter {
 
   """Exclude usage modes not in this list."""
   notIn: [VFolderUsageMode!] = null
+}
+
+"""
+Added in 26.9.0. Entities whose use narrows a vfolder query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only vfolders the caller can read are returned, even when a listed entity uses others.
+"""
+input VFolderUsedBy {
+  """
+  Deployments whose live replica groups use the vfolder as the model of their current revision.
+  """
+  deployment: [UUID!] = null
+
+  """Model cards built on the vfolder."""
+  modelCard: [UUID!] = null
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""

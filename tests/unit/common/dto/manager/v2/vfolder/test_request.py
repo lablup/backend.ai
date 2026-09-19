@@ -24,6 +24,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderOptions,
     RenameFileInput,
     RestoreVFolderInput,
+    ScopedSearchVFoldersInput,
+    SearchVFoldersInput,
     ShareVFolderInput,
     UnshareVFolderInput,
     UpdateVFolderInput,
@@ -251,3 +253,39 @@ class TestSharingInputs:
         inv_id = uuid.uuid4()
         req = DeleteInvitationInput(invitation_id=inv_id)
         assert req.invitation_id == inv_id
+
+
+class TestSearchVFoldersInputUsedBy:
+    """``used_by`` is optional, so a body written before it existed still parses."""
+
+    def test_body_without_used_by_parses(self) -> None:
+        req = SearchVFoldersInput.model_validate({
+            "filter": {"name": {"contains": "a"}},
+            "limit": 5,
+        })
+        assert req.used_by is None
+        assert req.limit == 5
+
+    def test_scoped_body_without_used_by_parses(self) -> None:
+        project_id = uuid.uuid4()
+        req = ScopedSearchVFoldersInput.model_validate({
+            "scope": {"project": [{"value": str(project_id)}]},
+            "limit": 5,
+        })
+        assert req.used_by is None
+        assert req.scope.project is not None
+        assert req.scope.project[0].value == project_id
+
+    def test_used_by_parses_id_lists(self) -> None:
+        deployment_id = uuid.uuid4()
+        model_card_id = uuid.uuid4()
+        req = SearchVFoldersInput.model_validate({
+            "used_by": {"deployment": [str(deployment_id)], "model_card": [str(model_card_id)]},
+        })
+        assert req.used_by is not None
+        assert req.used_by.deployment == [deployment_id]
+        assert req.used_by.model_card == [model_card_id]
+
+    def test_used_by_rejects_non_uuid(self) -> None:
+        with pytest.raises((ValidationError, BackendAISchemaValidationFailed)):
+            SearchVFoldersInput.model_validate({"used_by": {"deployment": ["not-a-uuid"]}})

@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
+from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import VFolderUsageMode
@@ -66,22 +67,12 @@ class VFolderInvitationState(StrEnum):
     REJECTED = "rejected"
 
 
-class VFolderStatusFilter(BaseRequestModel):
+class VFolderStatusFilter(EnumFilter[VFolderOperationStatusField]):
     """Filter for vfolder operation status values."""
 
-    equals: VFolderOperationStatusField | None = None
-    in_: list[VFolderOperationStatusField] | None = None
-    not_equals: VFolderOperationStatusField | None = None
-    not_in: list[VFolderOperationStatusField] | None = None
 
-
-class VFolderUsageModeFilter(BaseRequestModel):
+class VFolderUsageModeFilter(EnumFilter[VFolderUsageMode]):
     """Filter for vfolder usage mode values."""
-
-    equals: VFolderUsageMode | None = None
-    in_: list[VFolderUsageMode] | None = None
-    not_equals: VFolderUsageMode | None = None
-    not_in: list[VFolderUsageMode] | None = None
 
 
 class VFolderMetadataInfo(BaseResponseModel):
@@ -123,6 +114,22 @@ class VFolderUsageInfo(BaseResponseModel):
 
     num_files: int
     used_bytes: BinarySizeInfo
+
+
+class VFolderUsedBy(BaseRequestModel):
+    """Entities whose use narrows the vfolders read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Vfolders the caller cannot read
+    are left out even when a listed entity uses them.
+    """
+
+    deployment: list[UUID] | None = Field(
+        default=None,
+        description="Deployments whose live replica groups use the vfolder as the model of their current revision",
+    )
+    model_card: list[UUID] | None = Field(
+        default=None, description="Model cards built on the vfolder"
+    )
 
 
 class VFolderScope(BaseRequestModel):

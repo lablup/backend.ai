@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsedBy
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName
 
@@ -413,23 +413,16 @@ class VFolderOrder(BaseRequestModel):
     direction: OrderDirection
 
 
-class ScopedSearchVFoldersInput(BaseRequestModel):
-    """Input for searching the vfolders the named scopes reach."""
-
-    scope: VFolderScope = Field(description="Scope (OR across all items).")
-    filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
-    order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
-    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
-    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
-    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
-    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
-    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
-    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
-
-
 class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
+    used_by: VFolderUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; vfolders the caller cannot read are left out."
+        ),
+    )
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
@@ -438,6 +431,12 @@ class SearchVFoldersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchVFoldersInput(SearchVFoldersInput):
+    """Input for searching the vfolders the named scopes reach."""
+
+    scope: VFolderScope = Field(description="Scope (OR across all items).")
 
 
 # ============================================================

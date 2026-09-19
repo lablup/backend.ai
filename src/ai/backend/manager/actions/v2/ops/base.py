@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import Any, override
+from dataclasses import dataclass
+from typing import Any, final, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
@@ -33,12 +34,11 @@ from ai.backend.manager.models.specs.querier import (
     FieldQuerier,
     OwnedFieldQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, Searcher
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
-    GlobalEntityUpserter,
 )
 
 __all__ = (
@@ -48,6 +48,8 @@ __all__ = (
     "LookupOpsAction",
     "BulkLookupOpsAction",
     "ScopeItem",
+    "ScopedSearchOpsAction",
+    "GlobalSearcherOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
@@ -666,6 +668,42 @@ class OperationScopeOpsAction[TRow: Base, TData](
     BaseScopeAction, SearchOpsAction[TRow, TData], ABC
 ):
     """A page read from within the scopes the action names."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass(frozen=True)
+class ScopedSearchOpsAction[TRow: Base, TData](BaseScopeAction, OpsBackendAction, ABC):
+    """A page read from within the scopes the searcher names, narrowed by the uses it names.
+
+    Every scope is authorized and every using entity must be readable; both are read off
+    the searcher, so what is checked is what is queried.
+    """
+
+    searcher: ScopedSearcher[TRow, TData]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @final
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [scope.scope_id() for scope in self.searcher.scopes]
+
+
+@dataclass(frozen=True)
+class GlobalSearcherOpsAction[TRow: Base, TData](BaseGlobalAction, OpsBackendAction, ABC):
+    """A page read across the whole table, narrowed by the uses the searcher names.
+
+    The SUPERADMIN gate answers for the unscoped read, so the uses are not checked.
+    """
+
+    searcher: GlobalSearcher[TRow, TData]
 
     @override
     @classmethod

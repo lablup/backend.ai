@@ -270,7 +270,7 @@
               }
             ],
             "default": null,
-            "description": "At least one of the entity's labels matches"
+            "description": "At least one related row matches."
           },
           "every": {
             "anyOf": [
@@ -282,7 +282,7 @@
               }
             ],
             "default": null,
-            "description": "All of the entity's labels match; true for an unlabeled entity"
+            "description": "Every related row matches; true when there is none."
           },
           "none": {
             "anyOf": [
@@ -294,7 +294,7 @@
               }
             ],
             "default": null,
-            "description": "None of the entity's labels matches"
+            "description": "No related row matches."
           }
         },
         "title": "EntityLabelNestedFilter",
@@ -32708,9 +32708,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -32723,6 +32724,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -32734,7 +32736,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -32749,6 +32752,7 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -32777,9 +32781,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -32792,6 +32797,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -32803,7 +32809,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -32818,15 +32825,69 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
         "title": "VFolderUsageModeFilter",
         "type": "object"
       },
+      "VFolderUsedBy": {
+        "description": "Entities whose use narrows the vfolders read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Vfolders the caller cannot read\nare left out even when a listed entity uses them.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose live replica groups use the vfolder as the model of their current revision",
+            "title": "Deployment"
+          },
+          "model_card": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Model cards built on the vfolder",
+            "title": "Model Card"
+          }
+        },
+        "title": "VFolderUsedBy",
+        "type": "object"
+      },
       "SearchVFoldersInput": {
         "description": "Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches).",
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -32995,9 +33056,17 @@
       "ScopedSearchVFoldersInput": {
         "description": "Input for searching the vfolders the named scopes reach.",
         "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/VFolderScope",
-            "description": "Scope (OR across all items)."
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -33104,6 +33173,10 @@
             "default": null,
             "description": "Offset pagination: number to skip.",
             "title": "Offset"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/VFolderScope",
+            "description": "Scope (OR across all items)."
           }
         },
         "required": [

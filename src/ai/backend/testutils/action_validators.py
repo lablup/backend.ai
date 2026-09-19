@@ -12,6 +12,9 @@ from ai.backend.manager.actions.v2.relation.validator.rbac import (
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualEntityScopeActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.scope.validator.used_by import (
+    VirtualEntityUsedByRBACValidator,
+)
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
@@ -26,6 +29,7 @@ def mock_virtual_entity_rbac_validators() -> VirtualEntityRBACValidators:
     """
     return VirtualEntityRBACValidators(
         scope=MagicMock(spec=VirtualEntityScopeActionRBACValidator),
+        used_by=MagicMock(spec=VirtualEntityUsedByRBACValidator),
         single_entity=MagicMock(spec=VirtualEntitySingleEntityActionRBACValidator),
         partial_bulk=MagicMock(spec=VirtualEntityPartialBulkActionRBACValidator),
         atomic_bulk=MagicMock(spec=VirtualEntityAtomicBulkActionRBACValidator),

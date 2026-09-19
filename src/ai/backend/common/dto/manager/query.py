@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
+from enum import Enum
 from typing import TypeVar, override
 
 from pydantic import Field
@@ -126,6 +127,27 @@ class ArrayFilter[T](BaseRequestModel):
         if self.contains_all is not None:
             return contains_all_factory(self.contains_all)
         return None
+
+
+class EnumFilter[E: Enum](BaseRequestModel):
+    """Filter for enum fields supporting equality and membership operations."""
+
+    equals: E | None = Field(default=None, description="Exact match.")
+    in_: list[E] | None = Field(
+        default=None, alias="in", description="Match any of the provided values."
+    )
+    not_equals: E | None = Field(default=None, description="Exclude an exact match.")
+    not_in: list[E] | None = Field(default=None, description="Exclude any of the provided values.")
+
+
+class ToManyFilter[F](BaseRequestModel):
+    """Filter over the rows a to-many relation reaches; each quantifier takes one row filter."""
+
+    some: F | None = Field(default=None, description="At least one related row matches.")
+    every: F | None = Field(
+        default=None, description="Every related row matches; true when there is none."
+    )
+    none: F | None = Field(default=None, description="No related row matches.")
 
 
 class DateTimeFilter(BaseRequestModel):

@@ -610,7 +610,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())))
     VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderInviteProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
