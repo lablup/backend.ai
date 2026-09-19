@@ -209,6 +209,36 @@
         "round_length": 0
       },
       "rank": 1400
+    },
+    {
+      "uuid": "ef63fa11-609e-4b96-8f90-a08f97a5f04b",
+      "slot_name": "tt-n300.device",
+      "slot_type": "count",
+      "required": false,
+      "display_name": "Tenstorrent n300 Device",
+      "description": "Tenstorrent n300",
+      "display_unit": "n300",
+      "display_icon": "npu_generic",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "rank": 1500
+    },
+    {
+      "uuid": "7b968b58-f7cc-472d-b191-d4b19f417efd",
+      "slot_name": "neuron.core",
+      "slot_type": "count",
+      "required": false,
+      "display_name": "AWS Neuron Core",
+      "description": "AWS Neuron NeuronCore",
+      "display_unit": "Core",
+      "display_icon": "aws",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "rank": 1600
     }
   ]
 }
