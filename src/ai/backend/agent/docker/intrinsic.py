@@ -73,6 +73,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # "sockfs", "debugfs", etc.
 _CONTAINER_STAT_TIMEOUT: float = 2.0
 _INVALID_PID: int = 0
+_MILLICORES_PER_CORE: Decimal = Decimal(1000)
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
     "vfat",
@@ -81,6 +82,20 @@ pruned_disk_types = frozenset([
     "tmpfs",
     "iso9660",  # cdrom
 ])
+
+
+def _allocated_cpu_millicores(
+    ctx: StatContext,
+    container_ids: Iterable[str],
+) -> dict[str, Decimal]:
+    wanted = set(container_ids)
+    result: dict[str, Decimal] = {}
+    for kernel in ctx.agent.kernel_registry.values():
+        if kernel.container_id is None or kernel.container_id not in wanted:
+            continue
+        cores = kernel.resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")]
+        result[kernel.container_id] = sum(cores.values(), Decimal(0)) * _MILLICORES_PER_CORE
+    return result
 
 
 @dataclasses.dataclass(frozen=True)
@@ -339,6 +354,7 @@ class CPUPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
+        allocated_millicores = _allocated_cpu_millicores(ctx, container_ids)
 
         q = Decimal("0.000")
         per_container_cpu_used = {}
@@ -349,13 +365,13 @@ class CPUPlugin(AbstractComputePlugin):
             per_container_cpu_used[cid] = Measurement(Decimal(cpu_used).quantize(q))
             per_container_cpu_util[cid] = Measurement(
                 Decimal(cpu_used).quantize(q),
-                capacity=Decimal(1000),
+                capacity=allocated_millicores.get(cid),
             )
         return [
             ContainerMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
-                unit_hint="percent",
+                unit_hint="millicores",
                 current_hook=lambda metric: metric.stats.rate,
                 stats_filter=frozenset({"avg", "max"}),
                 per_container=per_container_cpu_util,
@@ -410,18 +426,19 @@ class CPUPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
+        allocated_millicores = _allocated_cpu_millicores(ctx, pid_map.values())
         for (pid, cid), cpu_used in zip(pid_map_list, results, strict=True):
             if cpu_used is None:
                 continue
             per_process_cpu_util[pid] = Measurement(
-                Decimal(cpu_used).quantize(q), capacity=Decimal(1000)
+                Decimal(cpu_used).quantize(q), capacity=allocated_millicores.get(cid)
             )
             per_process_cpu_used[pid] = Measurement(Decimal(cpu_used).quantize(q))
         return [
             ProcessMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
-                unit_hint="percent",
+                unit_hint="millicores",
                 current_hook=lambda metric: metric.stats.rate,
                 stats_filter=frozenset({"avg", "max"}),
                 per_process=per_process_cpu_util,

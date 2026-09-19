@@ -3,6 +3,7 @@ Tests for the container-metric and live-stat query builders:
 query building, metric type classification, and live stat query construction.
 """
 
+from dataclasses import dataclass
 from uuid import UUID
 
 import pytest
@@ -23,6 +24,14 @@ from ai.backend.manager.clients.prometheus.preset import (
     regex_union,
 )
 from ai.backend.manager.clients.prometheus.types import ValueType
+
+_USER_ID = UUID("32345678-1234-5678-1234-567812345678")
+
+
+@dataclass(frozen=True)
+class _PctQueryCase:
+    metric_name: str
+    expected_query: str
 
 
 @pytest.fixture
@@ -106,6 +115,57 @@ class TestGetContainerMetricQuery:
 
         assert result.labels["kernel_id"] == LabelMatcher.exact(str(kid))
         assert "kernel_id" in result.group_by
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _PctQueryCase(
+                metric_name="cpu_util",
+                expected_query=(
+                    "label_replace("
+                    "sum by (user_id)(rate(backendai_container_utilization"
+                    f'{{container_metric_name="cpu_util",user_id="{_USER_ID}",value_type="current"}}[5m]))'
+                    " / (sum by (user_id)(backendai_container_utilization"
+                    f'{{container_metric_name="cpu_util",user_id="{_USER_ID}",value_type="capacity"}}) > 0)'
+                    ' * 100, "value_type", "pct", "", "")'
+                ),
+            ),
+            _PctQueryCase(
+                metric_name="net_rx",
+                expected_query=(
+                    "label_replace("
+                    "sum by (user_id)(backendai_container_utilization"
+                    f'{{container_metric_name="net_rx",user_id="{_USER_ID}",value_type="current"}})'
+                    " / (sum by (user_id)(backendai_container_utilization"
+                    f'{{container_metric_name="net_rx",user_id="{_USER_ID}",value_type="capacity"}}) > 0)'
+                    ' * 100, "value_type", "pct", "", "")'
+                ),
+            ),
+            _PctQueryCase(
+                metric_name="cuda_util",
+                expected_query=(
+                    "label_replace("
+                    "sum by (user_id)(backendai_container_utilization"
+                    f'{{container_metric_name="cuda_util",user_id="{_USER_ID}",value_type="current"}})'
+                    " / (sum by (user_id)(backendai_container_utilization"
+                    f'{{container_metric_name="cuda_util",user_id="{_USER_ID}",value_type="capacity"}}) > 0)'
+                    ' * 100, "value_type", "pct", "", "")'
+                ),
+            ),
+        ],
+        ids=lambda case: case.metric_name,
+    )
+    def test_pct_query_divides_current_by_capacity(
+        self,
+        builder: ContainerMetricQueryBuilder,
+        renderer: PromQLTemplateRenderer,
+        case: _PctQueryCase,
+    ) -> None:
+        label = ContainerMetricOptionalLabel(value_type=ValueType.PCT, user_id=_USER_ID)
+
+        rendered = renderer.render(builder.get_container_metric_query(case.metric_name, label))
+
+        assert rendered == case.expected_query
 
 
 class TestGetContainerLiveStatQueries:

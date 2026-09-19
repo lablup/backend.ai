@@ -7,25 +7,13 @@ from ai.backend.common.types import KernelId, MetricValue
 from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     KernelLiveStatValues,
+    resolve_container_metric_unit_hint,
 )
 
 # Metric-name classification used only while adapting Prometheus samples back
 # into the legacy live_stat dict that Graphene/WebUI still expects.
 _RATE_STAT_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
 _DIFF_STAT_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
-
-# Per-metric unit hint emitted by the agent (source of truth:
-# src/ai/backend/agent/docker/intrinsic.py).
-_METRIC_UNIT_HINTS: Final[dict[str, str]] = {
-    "cpu_used": "msec",
-    "cpu_util": "percent",
-    "mem": "bytes",
-    "net_rx": "bps",
-    "net_tx": "bps",
-    "io_read": "bytes",
-    "io_write": "bytes",
-    "io_scratch_size": "bytes",
-}
 
 
 def _make_default_metric_value(unit_hint: str) -> MetricValue:
@@ -42,20 +30,6 @@ def _make_default_metric_value(unit_hint: str) -> MetricValue:
         "stats.rate": "0",
         "stats.version": None,
     })
-
-
-def _resolve_unit_hint(metric_name: str) -> str:
-    if metric_name in _METRIC_UNIT_HINTS:
-        return _METRIC_UNIT_HINTS[metric_name]
-    if metric_name.endswith("_util"):
-        return "percent"
-    if metric_name == "mem" or metric_name.endswith("_mem"):
-        return "bytes"
-    if metric_name.startswith("io_"):
-        return "bytes"
-    if metric_name.startswith("net_"):
-        return "bps"
-    return metric_name
 
 
 class LegacyLiveStatConverter:
@@ -98,7 +72,7 @@ class LegacyLiveStatConverter:
 
     @staticmethod
     def _convert_one(values: KernelLiveStatValues, name: str) -> MetricValue:
-        out = _make_default_metric_value(_resolve_unit_hint(name))
+        out = _make_default_metric_value(resolve_container_metric_unit_hint(name))
 
         # `rate_X or X` works because the rate queries only emit rows for
         # cumulative counter metrics (cpu_util/net_rx/net_tx) where the rate-based
