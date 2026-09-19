@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     SearchRuntimeVariantsInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant.types import (
     CreateRuntimeVariantInputGQL,
@@ -74,7 +75,7 @@ async def runtime_variants(
     edges = [
         RuntimeVariantEdge(
             node=RuntimeVariantGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
