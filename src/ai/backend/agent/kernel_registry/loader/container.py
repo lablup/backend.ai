@@ -60,7 +60,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
     @override
     async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:
         result: dict[KernelId, AbstractKernel] = {}
-        containers = await self._agent.enumerate_containers()
+        containers = await self._agent.enumerate_containers_with_retry()
         for kernel_id, _ in containers:
             config_path = ScratchUtils.get_scratch_kernel_config_dir(
                 self._scratch_root,

@@ -39,13 +39,16 @@ class KernelPresenceObserver(AbstractObserver):
 
     @override
     async def observe(self) -> None:
-        containers = await self._agent.enumerate_containers(ContainerStatus.active_set())
+        enumeration = await self._agent.enumerate_containers(ContainerStatus.active_set())
+        if not enumeration.complete:
+            log.debug("skipping kernel presence update after incomplete container enumeration")
+            return
 
         # Only report RUNNING containers as healthy
         # Non-RUNNING containers will naturally become STALE (no updates)
         kernel_presences: dict[KernelId, bool] = {
             kernel_id: True
-            for kernel_id, container in containers
+            for kernel_id, container in enumeration.containers
             if container.status == ContainerStatus.RUNNING
         }
 

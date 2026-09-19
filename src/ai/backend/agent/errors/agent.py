@@ -107,6 +107,21 @@ class ContainerStartupFailedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ContainerEnumerationError(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when a complete container listing cannot be obtained."""
+
+    error_type = "https://api.backend.ai/probs/agent/container-enumeration-failed"
+    error_title = "Container enumeration failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class ReservedPortError(BackendAIError, web.HTTPBadRequest):
     """Raised when attempting to use reserved ports."""
 

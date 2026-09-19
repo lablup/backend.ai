@@ -36,9 +36,12 @@ class HostPortObserver(AbstractObserver):
 
     @override
     async def observe(self) -> None:
-        containers = await self._agent.enumerate_containers(ContainerStatus.active_set())
+        enumeration = await self._agent.enumerate_containers(ContainerStatus.active_set())
+        if not enumeration.complete:
+            log.debug("skipping host port reconciliation after incomplete container enumeration")
+            return
         occupied_host_ports: set[int] = set()
-        for _, container in containers:
+        for _, container in enumeration.containers:
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
 
