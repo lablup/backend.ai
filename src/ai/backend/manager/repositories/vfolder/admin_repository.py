@@ -11,6 +11,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.vfolder.types import VFolderSearchResult
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 
 if TYPE_CHECKING:
@@ -63,7 +64,7 @@ class VFolderAdminRepository:
                 querier,
             )
 
-            items = [row.VFolderRow.to_data() for row in result.rows]
+            items = [VFolderSearchableFields.own.to_data(row.VFolderRow) for row in result.rows]
 
             return VFolderSearchResult(
                 items=items,

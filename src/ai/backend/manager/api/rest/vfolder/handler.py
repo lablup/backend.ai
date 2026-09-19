@@ -386,7 +386,7 @@ class VFolderHandler:
         scope_items: list[VFolderScopeItem] = [
             UserVFolderScopeItem(user_id=UserID(owner_user_uuid))
         ]
-        membership = VFolderSearchableFields.membership.filter
+        membership = VFolderSearchableFields.linked.membership
         orders: list[QueryOrder] = []
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
@@ -402,7 +402,7 @@ class VFolderHandler:
                     pagination=NoPagination(),
                     orders=orders,
                     conditions=[
-                        VFolderSearchableFields.status.filter.not_in(
+                        VFolderSearchableFields.own.status.filter.not_in(
                             vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
                         )
                     ],

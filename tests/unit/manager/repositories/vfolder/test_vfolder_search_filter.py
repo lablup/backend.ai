@@ -425,7 +425,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=filter_adapter.apply_bool_filter(
-                True, VFolderSearchableFields.cloneable.filter
+                True, VFolderSearchableFields.own.cloneable.filter
             ),
             orders=[],
         )
@@ -451,7 +451,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=filter_adapter.apply_bool_filter(
-                False, VFolderSearchableFields.cloneable.filter
+                False, VFolderSearchableFields.own.cloneable.filter
             ),
             orders=[],
         )
@@ -497,7 +497,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=filter_adapter.apply_bool_filter(
-                True, VFolderSearchableFields.cloneable.filter
+                True, VFolderSearchableFields.own.cloneable.filter
             ),
             orders=[],
         )
@@ -519,10 +519,12 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                *filter_adapter.apply_bool_filter(True, VFolderSearchableFields.cloneable.filter),
+                *filter_adapter.apply_bool_filter(
+                    True, VFolderSearchableFields.own.cloneable.filter
+                ),
                 *filter_adapter.apply_enum_filter(
                     VFolderUsageModeFilter(in_=[VFolderUsageMode.GENERAL]),
-                    VFolderSearchableFields.usage_mode.filter,
+                    VFolderSearchableFields.own.usage_mode.filter,
                 ),
             ],
             orders=[],

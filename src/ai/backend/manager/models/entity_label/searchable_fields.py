@@ -9,6 +9,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
@@ -16,14 +17,36 @@ from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
 
 
-class EntityLabelSearchableFields:
-    key = SearchableField(StringConditions(EntityLabelRow.key), ColumnOrder(EntityLabelRow.key))
-    value = SearchableField(
-        StringConditions(EntityLabelRow.value), ColumnOrder(EntityLabelRow.value)
+class _EntityLabelOwnFields:
+    """The label's own columns."""
+
+    key = SearchableField(
+        EntityLabelRow.key, StringConditions(EntityLabelRow.key), ColumnOrder(EntityLabelRow.key)
     )
-    entity_type = SearchableField(StringConditions(EntityLabelRow.entity_type), None)
-    entity_id = SearchableField(UUIDConditions(EntityLabelRow.entity_id), None)
-    created_at = SearchableField(None, ColumnOrder(EntityLabelRow.created_at))
+    value = SearchableField(
+        EntityLabelRow.value,
+        StringConditions(EntityLabelRow.value),
+        ColumnOrder(EntityLabelRow.value),
+    )
+    entity_type = SearchableField(
+        EntityLabelRow.entity_type,
+        StringConditions(EntityLabelRow.entity_type),
+        ColumnOrder(EntityLabelRow.entity_type),
+    )
+    entity_id = SearchableField(
+        EntityLabelRow.entity_id,
+        UUIDConditions(EntityLabelRow.entity_id),
+        ColumnOrder(EntityLabelRow.entity_id),
+    )
+    created_at = SearchableField(
+        EntityLabelRow.created_at,
+        DateTimeConditions(EntityLabelRow.created_at),
+        ColumnOrder(EntityLabelRow.created_at),
+    )
+
+
+class EntityLabelSearchableFields:
+    own = _EntityLabelOwnFields
 
 
 class EntityLabelCorrelation(ToManyCorrelation):

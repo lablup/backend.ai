@@ -47,7 +47,7 @@ class BaseAdapter(BaseFilterAdapter):
         One instance narrows one row, so a `key` and a `value` given together constrain
         the same label rather than two different ones.
         """
-        fields = EntityLabelSearchableFields
+        fields = EntityLabelSearchableFields.own
         conditions = [
             *self.apply_string_filter(f.key, fields.key.filter),
             *self.apply_string_filter(f.value, fields.value.filter),

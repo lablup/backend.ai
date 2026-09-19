@@ -53,7 +53,7 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=VFolderSearchableFields.status.filter.not_in(
+                condition=VFolderSearchableFields.own.status.filter.not_in(
                     VFolderOperationStatus.purge_in_progress()
                 ),
                 error=VFolderFilterStatusFailed(f"VFolder is being purged: {self.vfolder_id}"),
@@ -75,7 +75,7 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -108,7 +108,7 @@ class VFolderSoftDeleteUpdater(DataUpdater[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -145,7 +145,7 @@ class VFolderReadyUpdater(DataUpdater[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -189,7 +189,7 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
 
         return (
             GuardCheck(
-                condition=VFolderSearchableFields.status.filter.not_in(
+                condition=VFolderSearchableFields.own.status.filter.not_in(
                     VFolderOperationStatus.purge_in_progress()
                 ),
                 error=VFolderFilterStatusFailed(f"VFolder is being purged: {self.vfolder_id}"),
@@ -214,4 +214,4 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)

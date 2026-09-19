@@ -36,7 +36,7 @@ from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntity
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 
 _LABEL_PAGINATION_SPEC = PaginationSpec(
-    forward_order=EntityLabelSearchableFields.created_at.order.apply(ascending=False),
+    forward_order=EntityLabelSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=EntityLabelRow.id,
 )
 
@@ -119,7 +119,7 @@ class EntityLabelAdapter(BaseAdapter):
         return [self._convert_order(order) for order in orders]
 
     def _convert_order(self, order: EntityLabelOrder) -> QueryOrder:
-        fields = EntityLabelSearchableFields
+        fields = EntityLabelSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case EntityLabelOrderField.KEY:

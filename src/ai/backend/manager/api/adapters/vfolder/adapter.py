@@ -169,7 +169,7 @@ from ai.backend.manager.services.vfolder.processors import (
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=VFolderSearchableFields.created_at.order.apply(ascending=False),
+    forward_order=VFolderSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=VFolderRow.id,
 )
 
@@ -868,7 +868,7 @@ class VFolderAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
-        fields = VFolderSearchableFields
+        fields = VFolderSearchableFields.own
         conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_string_filter(f.host, fields.host.filter),
@@ -877,7 +877,9 @@ class VFolderAdapter(BaseAdapter):
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
             *self.apply_bool_filter(f.cloneable, fields.cloneable.filter),
             *self.apply_to_many_filter(
-                f.labels, fields.labels.correlation, self._convert_entity_label_filter
+                f.labels,
+                VFolderSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
             ),
         ]
         if f.AND:
@@ -901,7 +903,7 @@ class VFolderAdapter(BaseAdapter):
         return [self._convert_vfolder_order(order) for order in orders]
 
     def _convert_vfolder_order(self, order: VFolderOrder) -> QueryOrder:
-        fields = VFolderSearchableFields
+        fields = VFolderSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case VFolderOrderField.NAME:

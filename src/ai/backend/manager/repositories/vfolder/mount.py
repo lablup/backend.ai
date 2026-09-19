@@ -105,7 +105,7 @@ async def query_reachable_vfolders(
     project_ids = (await conn.scalars(joined_project_ids_query(user_id))).all()
     scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
     scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
-    membership = VFolderSearchableFields.membership.filter
+    membership = VFolderSearchableFields.linked.membership
     project_id = ProjectID(user_scope.group_id)
     rows = (
         await conn.execute(

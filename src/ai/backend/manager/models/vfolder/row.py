@@ -49,9 +49,7 @@ from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
 from ai.backend.manager.data.vfolder.types import (
-    VFolderData,
     VFolderInvitationState,
-    VFolderMountPolicyData,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -440,32 +438,6 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
 
-    def to_data(self) -> VFolderData:
-        return VFolderData(
-            id=self.id,
-            name=self.name,
-            domain_name=self.domain_name,
-            quota_scope_id=self.quota_scope_id,
-            usage_mode=self.usage_mode,
-            default_mount_permission=self.default_mount_permission,
-            host=self.host,
-            max_files=self.max_files or 0,
-            max_size=self.max_size,
-            num_files=self.num_files or 0,
-            cur_size=self.cur_size or 0,
-            created_at=self.created_at,
-            last_used=self.last_used,
-            updated_at=self.updated_at,
-            creator=self.creator,
-            creator_id=self.creator_id,
-            unmanaged_path=self.unmanaged_path,
-            ownership_type=self.ownership_type,
-            user=self.user,
-            group=self.group,
-            cloneable=self.cloneable,
-            status=self.status,
-        )
-
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use VFolderRow class directly for new code.
@@ -522,16 +494,6 @@ class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
     permission: Mapped[VFolderMountPolicy] = mapped_column(
         "permission", StrEnumType(VFolderMountPolicy), nullable=False
     )
-
-    def to_data(self) -> VFolderMountPolicyData:
-        return VFolderMountPolicyData(
-            id=VFolderMountPolicyID(self.id),
-            vfolder_id=VFolderUUID(self.vfolder_id),
-            user_id=self.user_id,
-            permission=self.permission,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
 
 
 def is_unmanaged(unmanaged_path: str | None) -> bool:

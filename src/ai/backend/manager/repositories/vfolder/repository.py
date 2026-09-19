@@ -248,7 +248,7 @@ class VfolderRepository:
         if not ids:
             return []
         async with self._db.begin_readonly_session() as session:
-            id_in = VFolderSearchableFields.id.filter.in_(
+            id_in = VFolderSearchableFields.own.id.filter.in_(
                 UUIDInMatchSpec(values=list(ids), negated=False)
             )
             query = sa.select(VFolderRow).where(id_in())
