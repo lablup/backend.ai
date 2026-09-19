@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.storage_volume import StorageVolumeID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
@@ -324,6 +325,19 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
     )
     # host will be '' if vFolder is unmanaged
     host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
+    # `use_alter` keeps the FK out of the CREATE TABLE so table subsets that omit
+    # ``storage_volumes`` still build.
+    storage_volume_id: Mapped[StorageVolumeID | None] = mapped_column(
+        "storage_volume_id",
+        GUID(StorageVolumeID),
+        sa.ForeignKey(
+            "storage_volumes.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_vfolders_storage_volume_id_storage_volumes",
+        ),
+        nullable=True,
+    )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
     )

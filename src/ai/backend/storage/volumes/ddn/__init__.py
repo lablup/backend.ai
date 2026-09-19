@@ -3,11 +3,12 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, override
+from typing import Any, ClassVar, Final, override
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendCapability, StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
@@ -19,7 +20,7 @@ from ai.backend.storage.errors import (
 )
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import QuotaConfig, QuotaUsage
-from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.abc import AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 
 FIRST_PROJECT_ID: Final = 100
@@ -239,12 +240,12 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 
 
 class EXAScalerFSVolume(BaseVolume):
-    name = "exascaler"
+    name: ClassVar[StorageBackendType] = StorageBackendType("exascaler")
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA])

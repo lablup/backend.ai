@@ -3,7 +3,7 @@ name: storage-proxy-trust-split
 type: design-rationale
 description: The storage proxy as a stateless data plane, the trust split between client JWTs and the manager shared secret, absence of a relational database, the quota-scope model with per-backend capabilities, the privileged watcher subprocess, TUS upload leases in Valkey, the composed startup dependency stages
 scope: src/ai/backend/storage
-keywords: [storage-proxy, JWT, quota-scope, AbstractVolume, CAP_QUOTA, TUS, watcher, stateless, StorageDependencyComposer, StoragePluginContext, VolumePool]
+keywords: [storage-proxy, JWT, quota-scope, AbstractVolume, StorageBackendCapability, TUS, watcher, stateless, StorageDependencyComposer, StoragePluginContext, VolumePool]
 sources:
   - src/ai/backend/storage/api
   - src/ai/backend/storage/volumes/abc.py
@@ -41,7 +41,7 @@ interface.
 ## The quota unit is a quota scope, not a folder
 
 - The quota unit is a quota scope (`(type, uuid)` — user or project), and vfolder paths are derived under that scope.
-- Quota support is a **per-backend capability** (`CAP_QUOTA`), not a guarantee — code must branch and tolerate its absence.
+- Quota support is a **per-backend capability** (`StorageBackendCapability.QUOTA`), not a guarantee — code must branch and tolerate its absence.
 
 ## Vendor specifics stay behind the volume interface
 
