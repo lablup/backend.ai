@@ -1,10 +1,11 @@
-"""Tests for UserConditions and UserOrders nested filter/order helpers."""
+"""Tests for the user search declarations and the deprecated cross-entity ones."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
@@ -25,12 +26,14 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -45,8 +48,11 @@ from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.user.conditions import UserConditions
-from ai.backend.manager.models.user.orders import UserOrders
+from ai.backend.manager.models.user.deprecated_search import (
+    DeprecatedUserConditions,
+    DeprecatedUserOrders,
+)
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -87,145 +93,84 @@ _WITH_TABLES: list[TableOrORM] = [
 ]
 
 
-class TestUserConditionsIntegrationNameFilters:
-    """Tests for integration_name filter conditions in UserConditions."""
+class TestUserOwnFieldFilters:
+    """The declared filters compile against the column, not the API field name."""
 
-    def test_by_integration_name_contains(self) -> None:
+    def test_integration_name_filters_the_integration_id_column(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
-        condition = UserConditions.by_integration_name_contains(spec)
+        condition = UserSearchableFields.own.integration_name.filter.contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        # SQL references the DB column (integration_id), not the API field name (integration_name)
         assert "integration_id" in sql
         assert "LIKE" in sql.upper()
         assert "%ext-abc%" in sql
 
-    def test_by_integration_name_contains_case_insensitive(self) -> None:
+    def test_integration_name_case_insensitive_lowers_both_sides(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=True, negated=False)
-        condition = UserConditions.by_integration_name_contains(spec)
+        condition = UserSearchableFields.own.integration_name.filter.contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "lower" in sql.lower()
 
-    def test_by_integration_name_contains_negated(self) -> None:
+    def test_integration_name_negated_inverts_the_match(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
-        condition = UserConditions.by_integration_name_contains(spec)
+        condition = UserSearchableFields.own.integration_name.filter.contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "NOT LIKE" in sql.upper()
 
-    def test_by_integration_name_equals(self) -> None:
-        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
-        condition = UserConditions.by_integration_name_equals(spec)
+    def test_modified_at_filters_the_updated_at_column(self) -> None:
+        condition = UserSearchableFields.own.modified_at.filter.after(
+            datetime(2026, 1, 1, tzinfo=UTC)
+        )
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        # SQL references the DB column (integration_id), not the API field name (integration_name)
-        assert "integration_id" in sql
-        assert "ext-abc" in sql
+        assert "updated_at" in sql
 
-    def test_by_integration_name_equals_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="Ext-ABC", case_insensitive=True, negated=False)
-        condition = UserConditions.by_integration_name_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "lower" in sql.lower()
-
-    def test_by_integration_name_equals_negated(self) -> None:
-        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
-        condition = UserConditions.by_integration_name_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "!=" in sql or "NOT" in sql.upper()
-
-    def test_by_integration_name_starts_with(self) -> None:
-        spec = StringMatchSpec(value="ext-", case_insensitive=False, negated=False)
-        condition = UserConditions.by_integration_name_starts_with(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        # SQL references the DB column (integration_id), not the API field name (integration_name)
-        assert "integration_id" in sql
-        assert "LIKE" in sql.upper()
-
-    def test_by_integration_name_ends_with(self) -> None:
-        spec = StringMatchSpec(value="-abc", case_insensitive=False, negated=False)
-        condition = UserConditions.by_integration_name_ends_with(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        # SQL references the DB column (integration_id), not the API field name (integration_name)
-        assert "integration_id" in sql
-        assert "LIKE" in sql.upper()
-
-    def test_closure_independence(self) -> None:
+    def test_two_conditions_off_one_field_stay_independent(self) -> None:
+        conditions = UserSearchableFields.own.integration_name.filter
         spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
         spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
-        cond_a = UserConditions.by_integration_name_contains(spec_a)
-        cond_b = UserConditions.by_integration_name_contains(spec_b)
-        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
-        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
-        assert sql_a != sql_b
+        sql_a = str(conditions.contains(spec_a)().compile(compile_kwargs={"literal_binds": True}))
+        sql_b = str(conditions.contains(spec_b)().compile(compile_kwargs={"literal_binds": True}))
         assert "alpha" in sql_a
         assert "beta" in sql_b
 
 
-class TestUserConditionsDomainNestedFilters:
-    """Tests for Domain nested filter conditions in UserConditions."""
+class TestUserContainerGidsFilters:
+    """``container_gids`` is an array: containment only, and no order."""
 
-    def test_by_domain_description_contains_generates_exists(self) -> None:
-        spec = StringMatchSpec(value="research", case_insensitive=False, negated=False)
-        condition = UserConditions.by_domain_description_contains(spec)
+    def test_contains_uses_the_containment_operator(self) -> None:
+        condition = UserSearchableFields.own.container_gids.filter.contains(1000)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "domains" in sql
+        assert "container_gids" in sql
+        assert "@>" in sql
 
-    def test_by_domain_description_contains_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="research", case_insensitive=True, negated=False)
-        condition = UserConditions.by_domain_description_contains(spec)
+    def test_contains_all_compares_against_every_value(self) -> None:
+        condition = UserSearchableFields.own.container_gids.filter.contains_all([1000, 1001])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        # Default dialect compiles ilike as lower(...) LIKE lower(...)
-        assert "lower" in sql
+        assert "@>" in sql
+        assert "1000" in sql
+        assert "1001" in sql
 
-    def test_by_domain_description_contains_negated(self) -> None:
-        spec = StringMatchSpec(value="research", case_insensitive=False, negated=True)
-        condition = UserConditions.by_domain_description_contains(spec)
+    def test_contains_any_uses_the_overlap_operator(self) -> None:
+        condition = UserSearchableFields.own.container_gids.filter.contains_any([1000, 1001])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "NOT LIKE" in sql.upper()
+        assert "&&" in sql
 
-    def test_by_domain_description_equals_generates_exists(self) -> None:
-        spec = StringMatchSpec(value="exact", case_insensitive=False, negated=False)
-        condition = UserConditions.by_domain_description_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "domains" in sql
+    def test_no_order_is_declared(self) -> None:
+        assert UserSearchableFields.own.container_gids.order is None
 
-    def test_by_domain_description_equals_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="Exact", case_insensitive=True, negated=False)
-        condition = UserConditions.by_domain_description_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "lower" in sql
 
-    def test_by_domain_description_equals_negated(self) -> None:
-        spec = StringMatchSpec(value="exact", case_insensitive=False, negated=True)
-        condition = UserConditions.by_domain_description_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        # sa.not_(col == val) compiles as col != val
-        assert "!=" in sql or "NOT" in sql.upper()
+class TestUserSensitiveFields:
+    """An access control setting is neither filtered nor ordered by."""
 
-    def test_by_domain_is_active(self) -> None:
-        condition = UserConditions.by_domain_is_active(True)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "is_active" in sql
+    def test_allowed_client_ip_declares_neither_slot(self) -> None:
+        field = UserSearchableFields.own.allowed_client_ip
+        assert field.filter is None
+        assert field.order is None
 
-    def test_closure_independence(self) -> None:
-        spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
-        spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
-        cond_a = UserConditions.by_domain_description_contains(spec_a)
-        cond_b = UserConditions.by_domain_description_contains(spec_b)
-        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
-        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
-        assert sql_a != sql_b
-        assert "alpha" in sql_a
-        assert "beta" in sql_b
+
+class TestDeprecatedUserConditions:
+    """The cross-entity filters kept working until they are removed."""
 
     def test_exists_domain_combined_single_exists(self) -> None:
-        """Combined helper wraps raw column conditions into single EXISTS."""
-
         def cond_is_active() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.is_active == True  # noqa: E712
 
@@ -233,62 +178,12 @@ class TestUserConditionsDomainNestedFilters:
             return DomainRow.description.like("%test%")
 
         conditions: list[QueryCondition] = [cond_is_active, cond_desc_like]
-        combined = UserConditions.exists_domain_combined(conditions)
+        combined = DeprecatedUserConditions.exists_domain_combined(conditions)
         sql = str(combined().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
         assert sql.count("EXISTS") == 1
+        assert "domains" in sql
 
-
-class TestUserConditionsProjectNestedFilters:
-    """Tests for Project (M:N) nested filter conditions in UserConditions."""
-
-    def test_by_project_name_contains_generates_exists_with_join(self) -> None:
-        spec = StringMatchSpec(value="ml-team", case_insensitive=False, negated=False)
-        condition = UserConditions.by_project_name_contains(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "association_groups_users" in sql
-        assert "groups" in sql
-
-    def test_by_project_name_contains_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="ml-team", case_insensitive=True, negated=False)
-        condition = UserConditions.by_project_name_contains(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        # Default dialect compiles ilike as lower(...) LIKE lower(...)
-        assert "lower" in sql
-
-    def test_by_project_name_contains_negated(self) -> None:
-        spec = StringMatchSpec(value="ml-team", case_insensitive=False, negated=True)
-        condition = UserConditions.by_project_name_contains(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "NOT LIKE" in sql.upper()
-
-    def test_by_project_name_equals_generates_exists(self) -> None:
-        spec = StringMatchSpec(value="project-a", case_insensitive=False, negated=False)
-        condition = UserConditions.by_project_name_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "association_groups_users" in sql
-
-    def test_by_project_name_equals_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="Project-A", case_insensitive=True, negated=False)
-        condition = UserConditions.by_project_name_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "lower" in sql
-
-    def test_by_project_is_active(self) -> None:
-        condition = UserConditions.by_project_is_active(True)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "is_active" in sql
-        assert "association_groups_users" in sql
-
-    def test_exists_project_combined_single_exists(self) -> None:
-        """Combined helper wraps raw column conditions into single EXISTS."""
-
+    def test_exists_project_combined_single_exists_over_the_join(self) -> None:
         def cond_is_active() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectRow.is_active == True  # noqa: E712
 
@@ -296,88 +191,33 @@ class TestUserConditionsProjectNestedFilters:
             return ProjectRow.name.like("%test%")
 
         conditions: list[QueryCondition] = [cond_is_active, cond_name_like]
-        combined = UserConditions.exists_project_combined(conditions)
+        combined = DeprecatedUserConditions.exists_project_combined(conditions)
         sql = str(combined().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
         assert sql.count("EXISTS") == 1
         assert "association_groups_users" in sql
 
-    def test_exists_project_combined_returns_column_element(self) -> None:
-        conditions: list[QueryCondition] = []
-        combined = UserConditions.exists_project_combined(conditions)
-        result = combined()
-        assert isinstance(result, sa.sql.expression.ColumnElement)
-
-    def test_project_closure_independence(self) -> None:
-        spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
-        spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
-        cond_a = UserConditions.by_project_name_contains(spec_a)
-        cond_b = UserConditions.by_project_name_contains(spec_b)
-        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
-        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
-        assert sql_a != sql_b
-        assert "alpha" in sql_a
-        assert "beta" in sql_b
+    def test_exists_project_combined_with_no_condition_still_compiles(self) -> None:
+        combined = DeprecatedUserConditions.exists_project_combined([])
+        assert isinstance(combined(), sa.sql.expression.ColumnElement)
 
 
-class TestUserOrdersDomainNested:
-    """Tests for Domain nested orders in UserOrders."""
-
-    def test_by_domain_name_ascending(self) -> None:
-        order = UserOrders.by_domain_name(ascending=True)
-        order_str = str(order)
-        assert "ASC" in order_str or "asc" in order_str.lower()
-
-    def test_by_domain_name_descending(self) -> None:
-        order = UserOrders.by_domain_name(ascending=False)
-        order_str = str(order)
-        assert "DESC" in order_str or "desc" in order_str.lower()
-
-    def test_by_domain_name_contains_scalar_subquery(self) -> None:
-        order = UserOrders.by_domain_name(ascending=True)
-        order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
-        assert "domains" in order_str
-        assert "SELECT" in order_str.upper()
-
-    def test_by_domain_created_at_ascending(self) -> None:
-        order = UserOrders.by_domain_created_at(ascending=True)
-        order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
-        assert "domains" in order_str
-        assert "created_at" in order_str
-
-    def test_by_domain_created_at_descending(self) -> None:
-        order = UserOrders.by_domain_created_at(ascending=False)
-        order_str = str(order)
-        assert "DESC" in order_str or "desc" in order_str.lower()
-
-    def test_scalar_subquery_returns_clause_element(self) -> None:
-        order = UserOrders.by_domain_name(ascending=True)
-        assert isinstance(order, sa.sql.ClauseElement)
-
-
-class TestUserOrdersProjectNested:
-    """Tests for Project nested orders in UserOrders."""
+class TestDeprecatedUserOrders:
+    """The project order folds the user's projects with MIN."""
 
     def test_by_project_name_ascending(self) -> None:
-        order = UserOrders.by_project_name(ascending=True)
-        order_str = str(order)
-        assert "ASC" in order_str or "asc" in order_str.lower()
+        order = DeprecatedUserOrders.by_project_name(ascending=True)
+        assert "ASC" in str(order).upper()
 
     def test_by_project_name_descending(self) -> None:
-        order = UserOrders.by_project_name(ascending=False)
-        order_str = str(order)
-        assert "DESC" in order_str or "desc" in order_str.lower()
+        order = DeprecatedUserOrders.by_project_name(ascending=False)
+        assert "DESC" in str(order).upper()
 
-    def test_by_project_name_contains_min_aggregation(self) -> None:
-        order = UserOrders.by_project_name(ascending=True)
-        order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
-        assert "min" in order_str.lower()
-        assert "association_groups_users" in order_str
-        assert "groups" in order_str
-
-    def test_scalar_project_returns_clause_element(self) -> None:
-        order = UserOrders.by_project_name(ascending=True)
-        assert isinstance(order, sa.sql.ClauseElement)
+    def test_by_project_name_aggregates_over_the_join(self) -> None:
+        order = DeprecatedUserOrders.by_project_name(ascending=True)
+        sql = str(order.compile(compile_kwargs={"literal_binds": True}))
+        assert "min" in sql.lower()
+        assert "association_groups_users" in sql
+        assert "groups" in sql
 
 
 # ==================== DB Integration Tests ====================
@@ -560,10 +400,14 @@ class TestUserNestedSearchIntegration:
         user_db_source: UserDBSource,
         search_fixture: UserSearchFixture,
     ) -> None:
-        """search_users with by_domain_is_active(True) returns only users in active domains."""
+        """The domain filter returns only the users in an active domain."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[UserConditions.by_domain_is_active(True)],
+            conditions=[
+                DeprecatedUserConditions.exists_domain_combined([
+                    DomainConditions.by_is_active(True)
+                ])
+            ],
             orders=[],
         )
         result = await user_db_source.search_users(querier)
@@ -580,7 +424,11 @@ class TestUserNestedSearchIntegration:
         spec = StringMatchSpec(value="Research", case_insensitive=True, negated=False)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[UserConditions.by_domain_description_contains(spec)],
+            conditions=[
+                DeprecatedUserConditions.exists_domain_combined([
+                    DomainConditions.by_description_contains(spec)
+                ])
+            ],
             orders=[],
         )
         result = await user_db_source.search_users(querier)
@@ -599,7 +447,11 @@ class TestUserNestedSearchIntegration:
         spec = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[UserConditions.by_project_name_contains(spec)],
+            conditions=[
+                DeprecatedUserConditions.exists_project_combined([
+                    ProjectConditions.by_name_contains(spec)
+                ])
+            ],
             orders=[],
         )
         result = await user_db_source.search_users(querier)
@@ -616,7 +468,11 @@ class TestUserNestedSearchIntegration:
         spec = StringMatchSpec(value="alpha", case_insensitive=False, negated=True)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[UserConditions.by_project_name_contains(spec)],
+            conditions=[
+                DeprecatedUserConditions.exists_project_combined([
+                    ProjectConditions.by_name_contains(spec)
+                ])
+            ],
             orders=[],
         )
         result = await user_db_source.search_users(querier)
@@ -631,11 +487,11 @@ class TestUserNestedSearchIntegration:
         user_db_source: UserDBSource,
         search_fixture: UserSearchFixture,
     ) -> None:
-        """search_users with by_domain_name order sorts users by correlated domain name."""
+        """The declared order sorts by the user's own domain_name column."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
-            orders=[UserOrders.by_domain_name(ascending=True)],
+            orders=[UserSearchableFields.own.domain_name.order.apply(True)],
         )
         result = await user_db_source.search_users(querier)
 
@@ -655,7 +511,7 @@ class TestUserNestedSearchIntegration:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
-            orders=[UserOrders.by_project_name(ascending=True)],
+            orders=[DeprecatedUserOrders.by_project_name(ascending=True)],
         )
         result = await user_db_source.search_users(querier)
 
@@ -674,8 +530,12 @@ class TestUserNestedSearchIntegration:
         """Combining domain filter + project order in single search call."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[UserConditions.by_domain_is_active(True)],
-            orders=[UserOrders.by_project_name(ascending=True)],
+            conditions=[
+                DeprecatedUserConditions.exists_domain_combined([
+                    DomainConditions.by_is_active(True)
+                ])
+            ],
+            orders=[DeprecatedUserOrders.by_project_name(ascending=True)],
         )
         result = await user_db_source.search_users(querier)
 

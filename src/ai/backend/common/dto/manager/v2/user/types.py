@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import EnumFilter, StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
@@ -62,41 +62,23 @@ class UserOrderField(StrEnum):
     PROJECT_NAME = "project_name"
 
 
-class UserStatusFilter(BaseRequestModel):
+class UserStatusFilter(EnumFilter[UserStatus]):
     """Filter for user status enum fields."""
 
-    equals: UserStatus | None = Field(default=None, description="Exact match for user status.")
-    in_: list[UserStatus] | None = Field(
-        default=None, alias="in", description="Match any of the provided statuses."
-    )
-    not_equals: UserStatus | None = Field(default=None, description="Exclude exact status match.")
-    not_in: list[UserStatus] | None = Field(
-        default=None, description="Exclude any of the provided statuses."
-    )
 
-
-class UserRoleFilter(BaseRequestModel):
+class UserRoleFilter(EnumFilter[UserRole]):
     """Filter for user role enum fields."""
-
-    equals: UserRole | None = Field(default=None, description="Exact match for user role.")
-    in_: list[UserRole] | None = Field(
-        default=None, alias="in", description="Match any of the provided roles."
-    )
-    not_equals: UserRole | None = Field(default=None, description="Exclude exact role match.")
-    not_in: list[UserRole] | None = Field(
-        default=None, description="Exclude any of the provided roles."
-    )
 
 
 class UserDomainFilter(BaseRequestModel):
-    """Nested filter for the domain a user belongs to."""
+    """Deprecated. Nested filter for the domain a user belongs to."""
 
     name: StringFilter | None = Field(default=None, description="Filter by domain name.")
     is_active: bool | None = Field(default=None, description="Filter by domain active status.")
 
 
 class UserProjectFilter(BaseRequestModel):
-    """Nested filter for projects a user belongs to."""
+    """Deprecated. Nested filter for projects a user belongs to."""
 
     name: StringFilter | None = Field(default=None, description="Filter by project name.")
     is_active: bool | None = Field(default=None, description="Filter by project active status.")

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
@@ -13,8 +13,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair import (
     AdminSearchKeypairsInput,
@@ -86,9 +84,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserDomainFilter,
     UserOrderField,
     UserProjectFilter,
-    UserRoleFilter,
     UserScope,
-    UserStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.user.types import (
     UserRole as UserRoleDTO,
@@ -102,7 +98,6 @@ from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
-from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
@@ -113,9 +108,11 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.creators import UserCreator
-from ai.backend.manager.models.user.orders import UserOrders
+from ai.backend.manager.models.user.deprecated_search import (
+    DeprecatedUserConditions,
+    DeprecatedUserOrders,
+)
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.scopes import (
@@ -124,6 +121,7 @@ from ai.backend.manager.models.user.scopes import (
     RoleUserTarget,
     UserTarget,
 )
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -182,7 +180,7 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
 _USER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=UserOrders.created_at(ascending=False),
+    forward_order=UserSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=UserRow.uuid,
 )
 
@@ -240,8 +238,8 @@ class UserAdapter(BaseAdapter):
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users with no scope restriction (admin only), cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         searcher = self._build_searcher(
             UserSearcher,
             conditions=conditions,
@@ -270,8 +268,8 @@ class UserAdapter(BaseAdapter):
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a domain, cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         searcher = self._build_searcher(
             UserSearcher,
             conditions=conditions,
@@ -303,8 +301,8 @@ class UserAdapter(BaseAdapter):
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a project, cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         searcher = self._build_searcher(
             UserSearcher,
             conditions=conditions,
@@ -366,8 +364,8 @@ class UserAdapter(BaseAdapter):
         input: ScopedSearchUsersInput,
     ) -> SearchUsersPayload:
         """Search the users the named scopes reach, combined with OR."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
                 targets=self._scope_targets(input.scope),
@@ -393,8 +391,8 @@ class UserAdapter(BaseAdapter):
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search the users the named scopes reach, cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         searcher = self._build_searcher(
             UserSearcher,
             conditions=conditions,
@@ -468,7 +466,8 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
-        searcher.conditions = [*searcher.conditions, UserConditions.by_role_id(role_id)]
+        role_target = RoleUserTarget(role_id=RoleID(role_id))
+        searcher.conditions = [*searcher.conditions, role_target.to_condition()]
         result = await self._user.global_search.run(
             GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
@@ -1108,245 +1107,55 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ GQL filter/order helpers
 
-    def _convert_gql_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter_req.uuid is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.uuid,
-                equals_factory=UserConditions.by_uuid_equals,
-                in_factory=UserConditions.by_uuid_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.username is not None:
-            condition = self.convert_string_filter(
-                filter_req.username,
-                contains_factory=UserConditions.by_username_contains,
-                equals_factory=UserConditions.by_username_equals,
-                starts_with_factory=UserConditions.by_username_starts_with,
-                ends_with_factory=UserConditions.by_username_ends_with,
-                in_factory=UserConditions.by_username_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.email is not None:
-            condition = self.convert_string_filter(
-                filter_req.email,
-                contains_factory=UserConditions.by_email_contains,
-                equals_factory=UserConditions.by_email_equals,
-                starts_with_factory=UserConditions.by_email_starts_with,
-                ends_with_factory=UserConditions.by_email_ends_with,
-                in_factory=UserConditions.by_email_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status is not None:
-            conditions.extend(self._convert_status_filter(filter_req.status))
-
-        if filter_req.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.domain_name,
-                contains_factory=UserConditions.by_domain_name_contains,
-                equals_factory=UserConditions.by_domain_name_equals,
-                starts_with_factory=UserConditions.by_domain_name_starts_with,
-                ends_with_factory=UserConditions.by_domain_name_ends_with,
-                in_factory=UserConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.integration_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.integration_name,
-                contains_factory=UserConditions.by_integration_name_contains,
-                equals_factory=UserConditions.by_integration_name_equals,
-                starts_with_factory=UserConditions.by_integration_name_starts_with,
-                ends_with_factory=UserConditions.by_integration_name_ends_with,
-                in_factory=UserConditions.by_integration_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.full_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.full_name,
-                contains_factory=UserConditions.by_full_name_contains,
-                equals_factory=UserConditions.by_full_name_equals,
-                starts_with_factory=UserConditions.by_full_name_starts_with,
-                ends_with_factory=UserConditions.by_full_name_ends_with,
-                in_factory=UserConditions.by_full_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.description is not None:
-            condition = self.convert_string_filter(
-                filter_req.description,
-                contains_factory=UserConditions.by_description_contains,
-                equals_factory=UserConditions.by_description_equals,
-                starts_with_factory=UserConditions.by_description_starts_with,
-                ends_with_factory=UserConditions.by_description_ends_with,
-                in_factory=UserConditions.by_description_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status_info is not None:
-            condition = self.convert_string_filter(
-                filter_req.status_info,
-                contains_factory=UserConditions.by_status_info_contains,
-                equals_factory=UserConditions.by_status_info_equals,
-                starts_with_factory=UserConditions.by_status_info_starts_with,
-                ends_with_factory=UserConditions.by_status_info_ends_with,
-                in_factory=UserConditions.by_status_info_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.resource_policy is not None:
-            condition = self.convert_string_filter(
-                filter_req.resource_policy,
-                contains_factory=UserConditions.by_resource_policy_contains,
-                equals_factory=UserConditions.by_resource_policy_equals,
-                starts_with_factory=UserConditions.by_resource_policy_starts_with,
-                ends_with_factory=UserConditions.by_resource_policy_ends_with,
-                in_factory=UserConditions.by_resource_policy_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.role is not None:
-            conditions.extend(self._convert_role_filter(filter_req.role))
-
-        if filter_req.need_password_change is not None:
-            conditions.append(
-                UserConditions.by_need_password_change(filter_req.need_password_change)
-            )
-
-        if filter_req.totp_activated is not None:
-            conditions.append(UserConditions.by_totp_activated(filter_req.totp_activated))
-
-        if filter_req.sudo_session_enabled is not None:
-            conditions.append(
-                UserConditions.by_sudo_session_enabled(filter_req.sudo_session_enabled)
-            )
-
-        if filter_req.container_uid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_uid,
-                UserConditions.by_container_uid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_main_gid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_main_gid,
-                UserConditions.by_container_main_gid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_gids is not None:
-            condition = self.convert_array_filter(
-                filter_req.container_gids,
-                contains_factory=UserConditions.by_container_gids_contains,
-                contains_any_factory=UserConditions.by_container_gids_any,
-                contains_all_factory=UserConditions.by_container_gids_all,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.created_at is not None:
-            condition = filter_req.created_at.build_query_condition(
-                before_factory=UserConditions.by_created_at_before,
-                after_factory=UserConditions.by_created_at_after,
-                equals_factory=UserConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain is not None:
-            conditions.extend(self._convert_domain_nested_filter(filter_req.domain))
-
-        if filter_req.project is not None:
-            conditions.extend(self._convert_project_nested_filter(filter_req.project))
-
-        if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_gql_filter(sub_filter))
-
-        if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
+    def _convert_user_filter(self, f: UserFilter) -> list[QueryCondition]:
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
+            *self.apply_string_filter(f.username, fields.username.filter),
+            *self.apply_string_filter(f.email, fields.email.filter),
+            *self.apply_string_filter(f.full_name, fields.full_name.filter),
+            *self.apply_string_filter(f.description, fields.description.filter),
+            *self.apply_enum_filter(f.status, fields.status.filter),
+            *self.apply_string_filter(f.status_info, fields.status_info.filter),
+            *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
+            *self.apply_string_filter(f.integration_name, fields.integration_name.filter),
+            *self.apply_string_filter(f.resource_policy, fields.resource_policy.filter),
+            *self.apply_enum_filter(f.role, fields.role.filter),
+            *self.apply_bool_filter(f.need_password_change, fields.need_password_change.filter),
+            *self.apply_bool_filter(f.totp_activated, fields.totp_activated.filter),
+            *self.apply_bool_filter(f.sudo_session_enabled, fields.sudo_session_enabled.filter),
+            *self.apply_int_filter(f.container_uid, fields.container_uid.filter),
+            *self.apply_int_filter(f.container_main_gid, fields.container_main_gid.filter),
+            *self.apply_array_filter(f.container_gids, fields.container_gids.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self._convert_domain_filter(f.domain),
+            *self._convert_project_filter(f.project),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_user_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_user_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_user_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_status_filter(sf: UserStatusFilter) -> list[QueryCondition]:
+    def _convert_domain_filter(self, f: UserDomainFilter | None) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over the user's domain."""
+        if f is None:
+            return []
         conditions: list[QueryCondition] = []
-        if sf.equals is not None:
-            conditions.append(UserConditions.by_status_equals(DataUserStatus(sf.equals.value)))
-        if sf.in_ is not None:
-            conditions.append(
-                UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.in_])
-            )
-        if sf.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_status_equals(DataUserStatus(sf.not_equals.value))
-                ])
-            )
-        if sf.not_in is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.not_in])
-                ])
-            )
-        return conditions
-
-    @staticmethod
-    def _convert_role_filter(rf: UserRoleFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if rf.equals is not None:
-            conditions.append(UserConditions.by_role_equals(DataUserRole(rf.equals.value)))
-        if rf.in_ is not None:
-            conditions.append(UserConditions.by_role_in([DataUserRole(r.value) for r in rf.in_]))
-        if rf.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_role_equals(DataUserRole(rf.not_equals.value))
-                ])
-            )
-        if rf.not_in is not None and len(rf.not_in) > 0:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_role_in([DataUserRole(r.value) for r in rf.not_in])
-                ])
-            )
-        return conditions
-
-    def _convert_domain_nested_filter(
-        self, domain_filter: UserDomainFilter
-    ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if domain_filter.name is not None:
+        if f.name is not None:
             condition = self.convert_string_filter(
-                domain_filter.name,
+                f.name,
                 contains_factory=DomainConditions.by_name_contains,
                 equals_factory=DomainConditions.by_name_equals,
                 starts_with_factory=DomainConditions.by_name_starts_with,
@@ -1354,20 +1163,21 @@ class UserAdapter(BaseAdapter):
                 in_factory=DomainConditions.by_name_in,
             )
             if condition is not None:
-                raw_conditions.append(condition)
-        if domain_filter.is_active is not None:
-            raw_conditions.append(DomainConditions.by_is_active(domain_filter.is_active))
-        if not raw_conditions:
+                conditions.append(condition)
+        if f.is_active is not None:
+            conditions.append(DomainConditions.by_is_active(f.is_active))
+        if not conditions:
             return []
-        return [UserConditions.exists_domain_combined(raw_conditions)]
+        return [DeprecatedUserConditions.exists_domain_combined(conditions)]
 
-    def _convert_project_nested_filter(
-        self, project_filter: UserProjectFilter
-    ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if project_filter.name is not None:
+    def _convert_project_filter(self, f: UserProjectFilter | None) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one of the user's projects."""
+        if f is None:
+            return []
+        conditions: list[QueryCondition] = []
+        if f.name is not None:
             condition = self.convert_string_filter(
-                project_filter.name,
+                f.name,
                 contains_factory=ProjectConditions.by_name_contains,
                 equals_factory=ProjectConditions.by_name_equals,
                 starts_with_factory=ProjectConditions.by_name_starts_with,
@@ -1375,231 +1185,45 @@ class UserAdapter(BaseAdapter):
                 in_factory=ProjectConditions.by_name_in,
             )
             if condition is not None:
-                raw_conditions.append(condition)
-        if project_filter.is_active is not None:
-            raw_conditions.append(ProjectConditions.by_is_active(project_filter.is_active))
-        if not raw_conditions:
+                conditions.append(condition)
+        if f.is_active is not None:
+            conditions.append(ProjectConditions.by_is_active(f.is_active))
+        if not conditions:
             return []
-        return [UserConditions.exists_project_combined(raw_conditions)]
+        return [DeprecatedUserConditions.exists_project_combined(conditions)]
 
-    def _convert_gql_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:
-        return [self._convert_gql_order(o) for o in orders]
+    def _convert_user_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:
+        return [self._convert_user_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_gql_order(order: UserOrder) -> QueryOrder:
+    def _convert_user_order(self, order: UserOrder) -> QueryOrder:
+        fields = UserSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserOrderField.CREATED_AT:
-                return UserOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case UserOrderField.MODIFIED_AT:
-                return UserOrders.modified_at(ascending=ascending)
+                return fields.modified_at.order.apply(ascending)
             case UserOrderField.USERNAME:
-                return UserOrders.username(ascending=ascending)
+                return fields.username.order.apply(ascending)
             case UserOrderField.EMAIL:
-                return UserOrders.email(ascending=ascending)
+                return fields.email.order.apply(ascending)
             case UserOrderField.STATUS:
-                return UserOrders.status(ascending=ascending)
+                return fields.status.order.apply(ascending)
             case UserOrderField.ROLE:
-                return UserOrders.role(ascending=ascending)
+                return fields.role.order.apply(ascending)
             case UserOrderField.DOMAIN_NAME:
-                return UserOrders.domain_name(ascending=ascending)
+                return fields.domain_name.order.apply(ascending)
             case UserOrderField.PROJECT_NAME:
-                return UserOrders.by_project_name(ascending=ascending)
-
-    # ------------------------------------------------------------------ helpers
+                return DeprecatedUserOrders.by_project_name(ascending=ascending)
+            case _:
+                assert_never(order.field)
 
     def _build_search_searcher(self, input: SearchUsersRequest) -> UserSearcher:
         """Build a user searcher from the search request DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         pagination = OffsetPagination(limit=input.limit, offset=input.offset)
         return UserSearcher(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _convert_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter_req.uuid is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.uuid,
-                equals_factory=UserConditions.by_uuid_equals,
-                in_factory=UserConditions.by_uuid_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.email is not None:
-            condition = self.convert_string_filter(
-                filter_req.email,
-                contains_factory=UserConditions.by_email_contains,
-                equals_factory=UserConditions.by_email_equals,
-                starts_with_factory=UserConditions.by_email_starts_with,
-                ends_with_factory=UserConditions.by_email_ends_with,
-                in_factory=UserConditions.by_email_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.username is not None:
-            condition = self.convert_string_filter(
-                filter_req.username,
-                contains_factory=UserConditions.by_username_contains,
-                equals_factory=UserConditions.by_username_equals,
-                starts_with_factory=UserConditions.by_username_starts_with,
-                ends_with_factory=UserConditions.by_username_ends_with,
-                in_factory=UserConditions.by_username_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.domain_name,
-                contains_factory=UserConditions.by_domain_name_contains,
-                equals_factory=UserConditions.by_domain_name_equals,
-                starts_with_factory=UserConditions.by_domain_name_starts_with,
-                ends_with_factory=UserConditions.by_domain_name_ends_with,
-                in_factory=UserConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.integration_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.integration_name,
-                contains_factory=UserConditions.by_integration_name_contains,
-                equals_factory=UserConditions.by_integration_name_equals,
-                starts_with_factory=UserConditions.by_integration_name_starts_with,
-                ends_with_factory=UserConditions.by_integration_name_ends_with,
-                in_factory=UserConditions.by_integration_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status is not None:
-            status_f = filter_req.status
-            if status_f.equals is not None:
-                conditions.append(
-                    UserConditions.by_status_equals(UserStatus(status_f.equals.value))
-                )
-            if status_f.in_ is not None and len(status_f.in_) > 0:
-                conditions.append(
-                    UserConditions.by_status_in([UserStatus(s.value) for s in status_f.in_])
-                )
-            if status_f.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_status_equals(UserStatus(status_f.not_equals.value))
-                    ])
-                )
-            if status_f.not_in is not None and len(status_f.not_in) > 0:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_status_in([UserStatus(s.value) for s in status_f.not_in])
-                    ])
-                )
-
-        if filter_req.role is not None:
-            role_f = filter_req.role
-            if role_f.equals is not None:
-                conditions.append(UserConditions.by_role_equals(UserRole(role_f.equals.value)))
-            if role_f.in_ is not None and len(role_f.in_) > 0:
-                conditions.append(
-                    UserConditions.by_role_in([UserRole(r.value) for r in role_f.in_])
-                )
-            if role_f.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_role_equals(UserRole(role_f.not_equals.value))
-                    ])
-                )
-            if role_f.not_in is not None and len(role_f.not_in) > 0:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])
-                    ])
-                )
-
-        if filter_req.container_uid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_uid,
-                UserConditions.by_container_uid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_main_gid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_main_gid,
-                UserConditions.by_container_main_gid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_gids is not None:
-            condition = self.convert_array_filter(
-                filter_req.container_gids,
-                contains_factory=UserConditions.by_container_gids_contains,
-                contains_any_factory=UserConditions.by_container_gids_any,
-                contains_all_factory=UserConditions.by_container_gids_all,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.created_at is not None:
-            condition = filter_req.created_at.build_query_condition(
-                before_factory=UserConditions.by_created_at_before,
-                after_factory=UserConditions.by_created_at_after,
-                equals_factory=UserConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain is not None:
-            conditions.extend(self._convert_domain_nested_filter(filter_req.domain))
-
-        if filter_req.project is not None:
-            conditions.extend(self._convert_project_nested_filter(filter_req.project))
-
-        if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_filter(sub_filter))
-        if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-        if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
-    def _convert_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:
-        return [self._convert_order(o) for o in orders]
-
-    @staticmethod
-    def _convert_order(order: UserOrder) -> QueryOrder:
-        ascending = order.direction == OrderDirection.ASC
-        match order.field:
-            case UserOrderField.CREATED_AT:
-                return UserOrders.created_at(ascending=ascending)
-            case UserOrderField.MODIFIED_AT:
-                return UserOrders.modified_at(ascending=ascending)
-            case UserOrderField.USERNAME:
-                return UserOrders.username(ascending=ascending)
-            case UserOrderField.EMAIL:
-                return UserOrders.email(ascending=ascending)
-            case UserOrderField.STATUS:
-                return UserOrders.status(ascending=ascending)
-            case UserOrderField.ROLE:
-                return UserOrders.role(ascending=ascending)
-            case UserOrderField.DOMAIN_NAME:
-                return UserOrders.domain_name(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
 
     async def _default_access_keys(self, users: Sequence[UserData]) -> Mapping[UserID, AccessKey]:
         """The key each user authorizes with, read for every one of them in one go."""

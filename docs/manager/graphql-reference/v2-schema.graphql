@@ -18648,7 +18648,15 @@ input UserV2Filter {
   """Added in 26.4.4. Filter by container supplementary GIDs."""
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
+
+  """
+  Filter by the user's domain. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use the `domainName` filter, or look the domain up first.
+  """
   domain: UserDomainNestedFilter = null
+
+  """
+  Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
+  """
   project: UserProjectNestedFilter = null
   AND: [UserV2Filter!] = null
   OR: [UserV2Filter!] = null
