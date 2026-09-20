@@ -12952,7 +12952,7 @@
         "type": "object"
       },
       "ImageScope": {
-        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``global_`` is answered for at the\npublic scope, which every account reaches: a registry marked global shows its images\nto everyone. Raises an error if every field is empty.",
+        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``public`` reads the images of the\nregistries registered in public. Raises an error if every field is empty.",
         "properties": {
           "domain": {
             "anyOf": [
@@ -13018,10 +13018,10 @@
             "description": "Container registries whose images are being read",
             "title": "Container Registry"
           },
-          "global": {
+          "public": {
             "default": false,
-            "description": "Include the images of every registry marked global",
-            "title": "Global",
+            "description": "Include the images of every registry registered in public",
+            "title": "Public",
             "type": "boolean"
           }
         },

@@ -127,9 +127,8 @@ class ImageUsedBy(BaseRequestModel):
 class ImageScope(BaseRequestModel):
     """Scope for the scoped image query.
 
-    Each list is OR'd internally and across lists. ``global_`` is answered for at the
-    public scope, which every account reaches: a registry marked global shows its images
-    to everyone. Raises an error if every field is empty.
+    Each list is OR'd internally and across lists. ``public`` reads the images of the
+    registries registered in public. Raises an error if every field is empty.
     """
 
     domain: list[UUIDScope] | None = Field(
@@ -144,10 +143,9 @@ class ImageScope(BaseRequestModel):
     container_registry: list[UUIDScope] | None = Field(
         default=None, description="Container registries whose images are being read"
     )
-    global_: bool = Field(
+    public: bool = Field(
         default=False,
-        alias="global",
-        description="Include the images of every registry marked global",
+        description="Include the images of every registry registered in public",
     )
 
     @model_validator(mode="after")
@@ -157,7 +155,7 @@ class ImageScope(BaseRequestModel):
             and not self.project
             and not self.user
             and not self.container_registry
-            and not self.global_
+            and not self.public
         ):
             raise ValueError(
                 "ImageScope requires a non-empty value for 'domain', 'project', 'user', "

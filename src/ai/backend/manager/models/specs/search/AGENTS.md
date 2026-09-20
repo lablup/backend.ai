@@ -146,3 +146,19 @@ Depth follows the permission axis, not the foreign keys.
 - Declare it in `linked` as `UsageConditions[{using entity}ID]`, named after the using entity in the plural (`deployments`, `model_cards`). `used_by(id)` returns a `UsedBy`.
 - A scoped search passes `UsedBy` through `ScopedSearcher`. The caller must be able to read each using entity, or the whole search is refused. Results stay within the rows the scopes allow; a usage grants nothing.
 - A global search passes `UsedBy` through `GlobalSearcher`. The SUPERADMIN gate answers for the unscoped read, so using entities are not checked.
+
+## Scopes a search accepts
+
+The per-entity tables are under `Scopes a search accepts` in `KNOWLEDGE.md`. Adding or removing a Target updates them in the same change.
+
+| Searched | Scopes accepted |
+|---|---|
+| Entity | Every scope entity that can own it, and the scope of every relation that grants READ |
+| Field | The entity that owns the field |
+
+- Read the owning scopes off `created_in` on the creator and the upserter. Read the READ-granting relations off the `RelationCreator` declarations and the share writes.
+- public is a scope like any other. A public read is a scope action, and one Target declares both what is authorized against (the public singleton) and the row condition (rows registered in public). Precedent: `PublicImageTarget` (`models/image/scopes.py`).
+- The `is_global` column keeps its name. It means "registered in public". Names in code say public.
+- A global entity belongs to global and may additionally be shared to public through a relation. Today only the container registry is.
+- A global read keeps the action shape. It checks the entity type and operation at the global singleton and adds no scope condition to the query. Permission is per type.
+- The superadmin and monitor bypass stays as it is.

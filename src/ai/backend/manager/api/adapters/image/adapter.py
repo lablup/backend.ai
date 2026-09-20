@@ -72,9 +72,9 @@ from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import (
     ContainerRegistryImageTarget,
     DomainImageTarget,
-    GlobalImageTarget,
     ImageTarget,
     ProjectImageTarget,
+    PublicImageTarget,
     UserImageTarget,
 )
 from ai.backend.manager.models.image.searchable_fields import (
@@ -202,8 +202,8 @@ class ImageAdapter(BaseAdapter):
             ContainerRegistryImageTarget(registry_id=ContainerRegistryID(entry.value))
             for entry in scope.container_registry or ()
         )
-        if scope.global_:
-            targets.append(GlobalImageTarget())
+        if scope.public:
+            targets.append(PublicImageTarget())
         return targets
 
     def _used_by(self, used_by: ImageUsedBy | None) -> list[UsedBy]:
