@@ -3,7 +3,7 @@ name: app-config-service-shapes
 type: decision-table
 description: app config as a value computed from the definition/allow-list/fragment tables with no row of its own, how the allow-list decides which scopes may fill a config_name and which of domain or user overrides the other, why an anonymous read yields public values, why both reads are scope operations
 scope: src/ai/backend/manager/services/app_config
-keywords: [SearchAppConfigsAction, AnonymousSearchAppConfigsAction, VisibleAppConfigFragmentOperationScope, PublicAppConfigFragmentOperationScope, app_config_definitions, app_config_allow_list, app_config_fragments]
+keywords: [SearchAppConfigsAction, AnonymousSearchAppConfigsAction, VisibleAppConfigFragmentTarget, PublicAppConfigFragmentTarget, app_config_definitions, app_config_allow_list, app_config_fragments]
 sources:
   - src/ai/backend/manager/services/app_config
   - src/ai/backend/manager/repositories/app_config_fragment
@@ -52,7 +52,7 @@ Both carry the entity type `app_config`.
 
 - Several names arrive at once, which is what makes it `SEARCH` rather than `GET`.
 - The user-scope read's three query conditions (public, that user's domain, that user)
-  are bound together as one `VisibleAppConfigFragmentOperationScope`. Left for the call
+  are bound together as one `VisibleAppConfigFragmentTarget`. Left for the call
   site to assemble, a merge could be read with one of the three missing.
 - Each of the three matches the row's own `(scope_type, scope_id)` and does not ask the
   ownership graph what the scope reaches. The merge picks the fragment written at each
@@ -65,7 +65,7 @@ Both carry the entity type `app_config`.
 ## An anonymous read yields the public values
 
 - An anonymous scope names no principal, so there is no scope to answer for access with.
-  Its query axis is `PublicAppConfigFragmentOperationScope` alone, so only public
+  Its query axis is `PublicAppConfigFragmentTarget` alone, so only public
   fragments merge.
 - `public` has no owner and therefore no `scope_id`. It is expressible on the query axis,
   which needs a condition and nothing else, but there is nothing to name where access is

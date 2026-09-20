@@ -15,11 +15,11 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 
-__all__ = ("UserKeypairOperationScope",)
+__all__ = ("UserKeypairTarget",)
 
 
 @dataclass(frozen=True)
-class UserKeypairOperationScope(OperationScope):
+class UserKeypairTarget(OperationScope):
     """Required scope for searching keypairs owned by a specific user.
 
     Used for my_keypairs query (current authenticated user).

@@ -25,14 +25,14 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
-    "DomainSessionOperationScope",
-    "ProjectSessionOperationScope",
-    "UserSessionOperationScope",
+    "DomainSessionTarget",
+    "ProjectSessionTarget",
+    "UserSessionTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainSessionOperationScope(OperationScope):
+class DomainSessionTarget(OperationScope):
     """The sessions of one domain."""
 
     domain_id: DomainID
@@ -61,7 +61,7 @@ class DomainSessionOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserSessionOperationScope(OperationScope):
+class UserSessionTarget(OperationScope):
     """The sessions one user holds."""
 
     user_id: UserID
@@ -88,7 +88,7 @@ class UserSessionOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectSessionOperationScope(OperationScope):
+class ProjectSessionTarget(OperationScope):
     """Required scope for searching sessions within a project.
 
     Used for project-scoped session search (project admin).

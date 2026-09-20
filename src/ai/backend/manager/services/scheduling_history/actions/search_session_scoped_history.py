@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
 from ai.backend.manager.models.scheduling_history.scopes import (
-    SessionSchedulingHistoryOperationScope,
+    SessionSchedulingHistoryTarget,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
 
@@ -23,7 +23,7 @@ class SearchSessionScopedHistoryAction(SessionSchedulingHistoryAction):
     Scope is required and specifies which session to query history for.
     """
 
-    scope: SessionSchedulingHistoryOperationScope
+    scope: SessionSchedulingHistoryTarget
     querier: BatchQuerier
 
     @override

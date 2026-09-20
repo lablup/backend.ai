@@ -16,9 +16,9 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, Scop
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.scopes import (
-    DomainResourceGroupOperationScope,
-    ProjectResourceGroupOperationScope,
-    UserResourceGroupOperationScope,
+    DomainResourceGroupTarget,
+    ProjectResourceGroupTarget,
+    UserResourceGroupTarget,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -44,7 +44,7 @@ class DomainResourceGroupScopeItem(ResourceGroupScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return DomainResourceGroupOperationScope(domain_id=self.domain_id)
+        return DomainResourceGroupTarget(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class ProjectResourceGroupScopeItem(ResourceGroupScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ProjectResourceGroupOperationScope(project_id=self.project_id)
+        return ProjectResourceGroupTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ class UserResourceGroupScopeItem(ResourceGroupScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserResourceGroupOperationScope(user_id=self.user_id)
+        return UserResourceGroupTarget(user_id=self.user_id)
 
 
 @dataclass(frozen=True)

@@ -12,7 +12,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.scopes import (
-    RolePresetPermissionOperationScope,
+    RolePresetPermissionTarget,
 )
 from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePermissionPresetSearcher,
@@ -44,7 +44,7 @@ class SearchRolePermissionPresetsAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (RolePresetPermissionOperationScope(preset_id=self.preset_id),)
+        return (RolePresetPermissionTarget(preset_id=self.preset_id),)
 
     @override
     @classmethod

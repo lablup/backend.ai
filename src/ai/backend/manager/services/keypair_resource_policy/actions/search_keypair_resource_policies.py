@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyOperationScope
+from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyTarget
 from ai.backend.manager.models.resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
 )
@@ -31,7 +31,7 @@ class KeypairResourcePolicyScopeItem(ScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserKeypairResourcePolicyOperationScope(user_id=self.user_id)
+        return UserKeypairResourcePolicyTarget(user_id=self.user_id)
 
 
 @dataclass

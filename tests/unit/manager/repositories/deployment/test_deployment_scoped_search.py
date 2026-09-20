@@ -35,8 +35,8 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.scopes import (
-    ProjectDeploymentOperationScope,
-    UserDeploymentOperationScope,
+    ProjectDeploymentTarget,
+    UserDeploymentTarget,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -329,7 +329,7 @@ class TestDeploymentScopedSearch:
         test_data: TestData,
     ) -> None:
         result = await repository.search_endpoints_in_scopes(
-            querier, [ProjectDeploymentOperationScope(project_id=test_data.project_a_id)]
+            querier, [ProjectDeploymentTarget(project_id=test_data.project_a_id)]
         )
 
         assert result.total_count == 2
@@ -344,7 +344,7 @@ class TestDeploymentScopedSearch:
         test_data: TestData,
     ) -> None:
         result = await repository.search_endpoints_in_scopes(
-            querier, [ProjectDeploymentOperationScope(project_id=test_data.project_b_id)]
+            querier, [ProjectDeploymentTarget(project_id=test_data.project_b_id)]
         )
 
         (item,) = result.items
@@ -362,7 +362,7 @@ class TestDeploymentScopedSearch:
         test_data: TestData,
     ) -> None:
         result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentOperationScope(user_id=UserID(test_data.owner_id))]
+            querier, [UserDeploymentTarget(user_id=UserID(test_data.owner_id))]
         )
 
         assert result.total_count == 3
@@ -377,7 +377,7 @@ class TestDeploymentScopedSearch:
         test_data: TestData,
     ) -> None:
         result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentOperationScope(user_id=UserID(test_data.other_user_id))]
+            querier, [UserDeploymentTarget(user_id=UserID(test_data.other_user_id))]
         )
 
         assert result.total_count == 0
@@ -391,7 +391,7 @@ class TestDeploymentScopedSearch:
     ) -> None:
         with pytest.raises(ProjectNotFound):
             await repository.search_endpoints_in_scopes(
-                querier, [ProjectDeploymentOperationScope(project_id=uuid.uuid4())]
+                querier, [ProjectDeploymentTarget(project_id=uuid.uuid4())]
             )
 
     async def test_unknown_user_is_refused(
@@ -402,5 +402,5 @@ class TestDeploymentScopedSearch:
     ) -> None:
         with pytest.raises(UserNotFound):
             await repository.search_endpoints_in_scopes(
-                querier, [UserDeploymentOperationScope(user_id=UserID(uuid.uuid4()))]
+                querier, [UserDeploymentTarget(user_id=UserID(uuid.uuid4()))]
             )

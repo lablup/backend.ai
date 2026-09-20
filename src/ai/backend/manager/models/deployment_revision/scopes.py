@@ -15,7 +15,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class DeploymentRevisionOperationScope(OperationScope):
+class DeploymentRevisionTarget(OperationScope):
     """The revisions one deployment holds."""
 
     deployment_id: DeploymentID

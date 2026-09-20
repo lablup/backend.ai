@@ -30,17 +30,17 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
-    "DeploymentHistoryOperationScope",
-    "DeploymentReplicaGroupHistoryOperationScope",
-    "KernelKernelHistoryOperationScope",
-    "RouteHistoryOperationScope",
-    "SessionKernelHistoryOperationScope",
-    "SessionSchedulingHistoryOperationScope",
+    "DeploymentHistoryTarget",
+    "DeploymentReplicaGroupHistoryTarget",
+    "KernelKernelHistoryTarget",
+    "RouteHistoryTarget",
+    "SessionKernelHistoryTarget",
+    "SessionSchedulingHistoryTarget",
 )
 
 
 @dataclass(frozen=True)
-class SessionSchedulingHistoryOperationScope(OperationScope):
+class SessionSchedulingHistoryTarget(OperationScope):
     """Scope for session scheduling history search.
 
     Used for entity-scoped queries where session_id is the scope parameter.
@@ -70,7 +70,7 @@ class SessionSchedulingHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class KernelKernelHistoryOperationScope(OperationScope):
+class KernelKernelHistoryTarget(OperationScope):
     """Scope for kernel scheduling history search bounded by one kernel.
 
     Not reachable yet: kernels hold no RBAC permission records of their own, so
@@ -103,7 +103,7 @@ class KernelKernelHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class SessionKernelHistoryOperationScope(OperationScope):
+class SessionKernelHistoryTarget(OperationScope):
     """Scope for kernel scheduling history search bounded by the owning session.
 
     Returns the history of every kernel belonging to the session.
@@ -133,7 +133,7 @@ class SessionKernelHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class DeploymentHistoryOperationScope(OperationScope):
+class DeploymentHistoryTarget(OperationScope):
     """Scope for deployment scheduling history search.
 
     Used for entity-scoped queries where deployment_id is the scope parameter.
@@ -163,7 +163,7 @@ class DeploymentHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class DeploymentReplicaGroupHistoryOperationScope(OperationScope):
+class DeploymentReplicaGroupHistoryTarget(OperationScope):
     """Scope for replica-group history search bounded by the owning deployment.
 
     Returns the history of every replica group belonging to the deployment.
@@ -195,7 +195,7 @@ class DeploymentReplicaGroupHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class RouteHistoryOperationScope(OperationScope):
+class RouteHistoryTarget(OperationScope):
     """Scope for route scheduling history search.
 
     Used for entity-scoped queries where route_id is the scope parameter.

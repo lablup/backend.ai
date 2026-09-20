@@ -20,14 +20,14 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
-    "EntityShareOwningScope",
-    "EntityShareRecipientProjectScope",
-    "EntityShareRecipientScope",
+    "OwningEntityShareTarget",
+    "RecipientProjectEntityShareTarget",
+    "RecipientUserEntityShareTarget",
 )
 
 
 @dataclass(frozen=True)
-class EntityShareRecipientScope(OperationScope):
+class RecipientUserEntityShareTarget(OperationScope):
     """The offers addressed to one person, whichever way they were named.
 
     The one read that cannot go through the ownership graph: an offer may name an
@@ -49,7 +49,8 @@ class EntityShareRecipientScope(OperationScope):
             return sa.or_(
                 EntityShareRow.recipient_email
                 == (
-                    sa.select(UserRow.email)
+                    sa
+                    .select(UserRow.email)
                     .where(UserRow.uuid == recipient_user_id)
                     .scalar_subquery()
                 ),
@@ -69,7 +70,7 @@ class EntityShareRecipientScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class EntityShareRecipientProjectScope(OperationScope):
+class RecipientProjectEntityShareTarget(OperationScope):
     """The offers addressed to one project."""
 
     project_id: ProjectID
@@ -116,7 +117,7 @@ class EntityShareSharerScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class EntityShareOwningScope(OperationScope):
+class OwningEntityShareTarget(OperationScope):
     """The offers a scope reaches, through the entity each offer is attached to.
 
     An offer is created in the entity it offers, so who reaches the offer is who

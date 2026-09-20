@@ -22,14 +22,14 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
 __all__ = (
-    "AppConfigFragmentOperationScope",
-    "PublicAppConfigFragmentOperationScope",
-    "VisibleAppConfigFragmentOperationScope",
+    "AppConfigFragmentTarget",
+    "PublicAppConfigFragmentTarget",
+    "VisibleAppConfigFragmentTarget",
 )
 
 
 @dataclass(frozen=True)
-class AppConfigFragmentOperationScope(OperationScope):
+class AppConfigFragmentTarget(OperationScope):
     """The fragments written at one scope, matching the row's ``(scope_type, scope_id)``.
 
     The owner named by ``scope_id`` is existence-checked so a search at a scope that does
@@ -83,7 +83,7 @@ class AppConfigFragmentOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class VisibleAppConfigFragmentOperationScope(OperationScope):
+class VisibleAppConfigFragmentTarget(OperationScope):
     """Everything one signed-in user may read: ``public``, their domain's, and their own.
 
     One scope rather than three the caller ORs together, so no call site can read the
@@ -114,7 +114,7 @@ class VisibleAppConfigFragmentOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class PublicAppConfigFragmentOperationScope(OperationScope):
+class PublicAppConfigFragmentTarget(OperationScope):
     """What a caller may read before signing in — ``public`` alone."""
 
     @override

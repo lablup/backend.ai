@@ -13,11 +13,11 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import RolePermissionPresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("RolePresetPermissionOperationScope",)
+__all__ = ("RolePresetPermissionTarget",)
 
 
 @dataclass(frozen=True)
-class RolePresetPermissionOperationScope(OperationScope):
+class RolePresetPermissionTarget(OperationScope):
     """The permission entries one preset holds."""
 
     preset_id: RolePresetID

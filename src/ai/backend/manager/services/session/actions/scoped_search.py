@@ -17,9 +17,9 @@ from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.scopes import (
-    DomainSessionOperationScope,
-    ProjectSessionOperationScope,
-    UserSessionOperationScope,
+    DomainSessionTarget,
+    ProjectSessionTarget,
+    UserSessionTarget,
 )
 from ai.backend.manager.models.session.searchers import SessionSearcher
 
@@ -48,7 +48,7 @@ class DomainSessionScopeItem(SessionScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return DomainSessionOperationScope(domain_id=self.domain_id)
+        return DomainSessionTarget(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ class UserSessionScopeItem(SessionScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserSessionOperationScope(user_id=self.user_id)
+        return UserSessionTarget(user_id=self.user_id)
 
 
 @dataclass(frozen=True)
@@ -78,7 +78,7 @@ class ProjectSessionScopeItem(SessionScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ProjectSessionOperationScope(project_id=self.project_id)
+        return ProjectSessionTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)

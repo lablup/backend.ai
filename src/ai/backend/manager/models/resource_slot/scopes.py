@@ -14,11 +14,11 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("AgentResourceOperationScope",)
+__all__ = ("AgentResourceTarget",)
 
 
 @dataclass(frozen=True)
-class AgentResourceOperationScope(OperationScope):
+class AgentResourceTarget(OperationScope):
     """The slot rows of one agent; the row names the agent by ``agents.id``."""
 
     agent_uuid: AgentUUID

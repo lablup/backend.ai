@@ -15,9 +15,9 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.models.endpoint.scopes import (
-    DomainDeploymentOperationScope,
-    ProjectDeploymentOperationScope,
-    UserDeploymentOperationScope,
+    DomainDeploymentTarget,
+    ProjectDeploymentTarget,
+    UserDeploymentTarget,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -52,7 +52,7 @@ class DomainDeploymentScopeItem(DeploymentScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return DomainDeploymentOperationScope(domain_id=self.domain_id)
+        return DomainDeploymentTarget(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class ProjectDeploymentScopeItem(DeploymentScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ProjectDeploymentOperationScope(project_id=self.project_id)
+        return ProjectDeploymentTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)
@@ -82,7 +82,7 @@ class UserDeploymentScopeItem(DeploymentScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserDeploymentOperationScope(user_id=self.user_id)
+        return UserDeploymentTarget(user_id=self.user_id)
 
 
 @dataclass

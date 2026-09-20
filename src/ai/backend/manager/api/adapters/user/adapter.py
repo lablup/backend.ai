@@ -110,7 +110,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.orders import KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
@@ -745,7 +745,7 @@ class UserAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserKeypairOperationScope(user_uuid=me.user_id)
+        scope = UserKeypairTarget(user_uuid=me.user_id)
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._convert_keypair_orders(input.order) if input.order else []
         querier = self._build_querier(

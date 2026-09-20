@@ -70,9 +70,9 @@ from ai.backend.common.dto.manager.fair_share import (
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
 )
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_usage_history.searchers import (
@@ -583,7 +583,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_domain_fair_share_querier_rg(body.parsed)
         resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
-        scope = DomainFairShareOperationScope(resource_group_id=resource_group_id)
+        scope = DomainFairShareTarget(resource_group_id=resource_group_id)
 
         action_result = await self._fair_share.search_rg_domain_fair_shares.run(
             SearchRGDomainFairSharesAction(
@@ -635,7 +635,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_project_fair_share_querier_rg(body.parsed)
         resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             domain_name=path.parsed.domain_name,
             resource_group_id=resource_group_id,
         )
@@ -692,7 +692,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_user_fair_share_querier_rg(body.parsed)
         resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             domain_name=path.parsed.domain_name,
             project_id=path.parsed.project_id,
             resource_group_id=resource_group_id,

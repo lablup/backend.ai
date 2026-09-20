@@ -15,7 +15,7 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.scope.target import SearchableScopeTarget
 from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
 from ai.backend.manager.models.scheduling_history.scopes import (
-    DeploymentReplicaGroupHistoryOperationScope,
+    DeploymentReplicaGroupHistoryTarget,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -38,7 +38,7 @@ class DeploymentReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
 
     @override
     def to_search_scope(self) -> OperationScope:
-        return DeploymentReplicaGroupHistoryOperationScope(deployment_id=self.deployment_id)
+        return DeploymentReplicaGroupHistoryTarget(deployment_id=self.deployment_id)
 
     @override
     def to_scope_id(self) -> EntityIdentifier:

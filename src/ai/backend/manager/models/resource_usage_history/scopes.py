@@ -30,7 +30,7 @@ from ai.backend.manager.models.user import UserRow
 
 
 @dataclass(frozen=True)
-class DomainUsageBucketOperationScope(OperationScope):
+class DomainUsageBucketTarget(OperationScope):
     """Scope for domain usage bucket queries."""
 
     resource_group_id: ResourceGroupID
@@ -69,7 +69,7 @@ class DomainUsageBucketOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectUsageBucketOperationScope(OperationScope):
+class ProjectUsageBucketTarget(OperationScope):
     """Scope for project usage bucket queries."""
 
     resource_group_id: ResourceGroupID
@@ -116,7 +116,7 @@ class ProjectUsageBucketOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserUsageBucketOperationScope(OperationScope):
+class UserUsageBucketTarget(OperationScope):
     """Scope for user usage bucket queries."""
 
     resource_group_id: ResourceGroupID

@@ -78,7 +78,7 @@ from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.scopes import VFolderModelCardOperationScope
+from ai.backend.manager.models.model_card.scopes import VFolderModelCardTarget
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
     ModelCardSearcher,
@@ -288,7 +288,7 @@ class ModelCardAdapter(BaseAdapter):
 
     async def search_by_vfolder(
         self,
-        scope: VFolderModelCardOperationScope,
+        scope: VFolderModelCardTarget,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
         """Search model cards backed by a specific VFolder.

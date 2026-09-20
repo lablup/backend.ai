@@ -17,7 +17,7 @@ from ai.backend.manager.models.user import UserRow
 
 
 @dataclass(frozen=True)
-class MyLoginSessionOperationScope(OperationScope):
+class MyLoginSessionTarget(OperationScope):
     """Scope for searching login sessions owned by the current user."""
 
     user_id: UUID
@@ -44,7 +44,7 @@ class MyLoginSessionOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class MyLoginHistoryOperationScope(OperationScope):
+class MyLoginHistoryTarget(OperationScope):
     """Scope for searching login history of the current user."""
 
     user_id: UUID

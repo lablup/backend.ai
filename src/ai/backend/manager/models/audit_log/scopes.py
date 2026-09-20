@@ -15,14 +15,14 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
-    "EntityAuditLogOperationScope",
-    "ScopeAuditLogOperationScope",
-    "TriggeredByAuditLogOperationScope",
+    "EntityAuditLogTarget",
+    "ScopeAuditLogTarget",
+    "TriggeredByAuditLogTarget",
 )
 
 
 @dataclass(frozen=True)
-class EntityAuditLogOperationScope(OperationScope):
+class EntityAuditLogTarget(OperationScope):
     """The records about one entity: the run named it as what it touched.
 
     ``existence_checks`` is empty -- RBAC validation already gates entity reachability.
@@ -51,7 +51,7 @@ class EntityAuditLogOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ScopeAuditLogOperationScope(OperationScope):
+class ScopeAuditLogTarget(OperationScope):
     """The records of the runs that named one entity as the scope they ran in.
 
     The other half of what an entity's history means, kept apart so a caller asks for
@@ -85,7 +85,7 @@ class ScopeAuditLogOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class TriggeredByAuditLogOperationScope(OperationScope):
+class TriggeredByAuditLogTarget(OperationScope):
     """Audit log rows triggered by a single actor user."""
 
     triggered_by: str

@@ -25,9 +25,9 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
 from ai.backend.manager.models.scheduling_history.scopes import (
-    DeploymentHistoryOperationScope,
-    RouteHistoryOperationScope,
-    SessionSchedulingHistoryOperationScope,
+    DeploymentHistoryTarget,
+    RouteHistoryTarget,
+    SessionSchedulingHistoryTarget,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -80,7 +80,7 @@ class SchedulingHistoryRepository:
     async def search_session_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: SessionSchedulingHistoryOperationScope,
+        scope: SessionSchedulingHistoryTarget,
     ) -> SessionSchedulingHistoryListResult:
         """Search session scheduling history within scope."""
         return await self._db_source.search_session_scoped_history(querier, scope)
@@ -130,7 +130,7 @@ class SchedulingHistoryRepository:
     async def search_deployment_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: DeploymentHistoryOperationScope,
+        scope: DeploymentHistoryTarget,
     ) -> DeploymentHistoryListResult:
         """Search deployment history within scope."""
         return await self._db_source.search_deployment_scoped_history(querier, scope)
@@ -172,7 +172,7 @@ class SchedulingHistoryRepository:
     async def search_route_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: RouteHistoryOperationScope,
+        scope: RouteHistoryTarget,
     ) -> RouteHistoryListResult:
         """Search route history within scope."""
         return await self._db_source.search_route_scoped_history(querier, scope)

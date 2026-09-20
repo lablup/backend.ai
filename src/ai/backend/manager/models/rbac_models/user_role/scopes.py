@@ -17,13 +17,13 @@ from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
-    "RoleRoleAssignmentOperationScope",
-    "UserRoleAssignmentOperationScope",
+    "RoleRoleAssignmentTarget",
+    "UserRoleAssignmentTarget",
 )
 
 
 @dataclass(frozen=True)
-class UserRoleAssignmentOperationScope(OperationScope):
+class UserRoleAssignmentTarget(OperationScope):
     """The assignment rows of the roles one user holds."""
 
     user_id: UserID
@@ -44,7 +44,7 @@ class UserRoleAssignmentOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class RoleRoleAssignmentOperationScope(OperationScope):
+class RoleRoleAssignmentTarget(OperationScope):
     """The assignment rows of the users holding one role."""
 
     role_id: RoleID

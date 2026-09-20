@@ -16,11 +16,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.image.scopes import (
-    ContainerRegistryImageOperationScope,
-    DomainImageOperationScope,
-    GlobalImageOperationScope,
-    ProjectImageOperationScope,
-    UserImageOperationScope,
+    ContainerRegistryImageTarget,
+    DomainImageTarget,
+    GlobalImageTarget,
+    ProjectImageTarget,
+    UserImageTarget,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -56,7 +56,7 @@ class DomainImageScopeItem(ImageScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return DomainImageOperationScope(domain_id=self.domain_id)
+        return DomainImageTarget(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
@@ -71,7 +71,7 @@ class ProjectImageScopeItem(ImageScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ProjectImageOperationScope(project_id=self.project_id)
+        return ProjectImageTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class UserImageScopeItem(ImageScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserImageOperationScope(user_id=self.user_id)
+        return UserImageTarget(user_id=self.user_id)
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ class ContainerRegistryImageScopeItem(ImageScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ContainerRegistryImageOperationScope(registry_id=self.registry_id)
+        return ContainerRegistryImageTarget(registry_id=self.registry_id)
 
 
 @dataclass
@@ -125,7 +125,7 @@ class ScopedSearchImagesAction(ImageScopeAction):
     def operation_scopes(self) -> Sequence[OperationScope]:
         scopes: list[OperationScope] = [item.operation_scope() for item in self.items]
         if self.include_global:
-            scopes.append(GlobalImageOperationScope())
+            scopes.append(GlobalImageTarget())
         return scopes
 
     @override

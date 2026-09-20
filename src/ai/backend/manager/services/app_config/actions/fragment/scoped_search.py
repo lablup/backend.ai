@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.app_config_fragment.scopes import AppConfigFragmentOperationScope
+from ai.backend.manager.models.app_config_fragment.scopes import AppConfigFragmentTarget
 from ai.backend.manager.models.app_config_fragment.searchers import (
     AppConfigFragmentSearcher,
 )
@@ -52,7 +52,7 @@ class ScopedSearchAppConfigFragmentAction(
     def operation_scopes(self) -> Sequence[OperationScope]:
         owner = self.owner
         return (
-            AppConfigFragmentOperationScope(
+            AppConfigFragmentTarget(
                 scope_type=AppConfigScopeType.of_owner(owner),
                 scope_id=None if owner is None else AppConfigScopeID(owner),
             ),

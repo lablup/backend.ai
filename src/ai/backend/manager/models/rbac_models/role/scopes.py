@@ -17,7 +17,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class ScopedRoleOperationScope(OperationScope):
+class ScopedRoleTarget(OperationScope):
     """The roles of a given scope (project, domain, ...)."""
 
     scope: EntityIdentifier
@@ -41,7 +41,7 @@ class ScopedRoleOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class HeldRoleOperationScope(OperationScope):
+class HeldRoleTarget(OperationScope):
     """The roles one user holds."""
 
     user_id: UserID

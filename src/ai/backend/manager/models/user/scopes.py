@@ -23,14 +23,14 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 __all__ = (
-    "DomainUserOperationScope",
-    "ProjectUserOperationScope",
-    "RoleUserOperationScope",
+    "DomainUserTarget",
+    "ProjectUserTarget",
+    "RoleUserTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainUserOperationScope(OperationScope):
+class DomainUserTarget(OperationScope):
     """Required scope for searching users within a domain.
 
     Used for domain_users query (domain admin+).
@@ -63,7 +63,7 @@ class DomainUserOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectUserOperationScope(OperationScope):
+class ProjectUserTarget(OperationScope):
     """Required scope for searching users within a project.
 
     Used for project_users query (project member+).
@@ -98,7 +98,7 @@ class ProjectUserOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class RoleUserOperationScope(OperationScope):
+class RoleUserTarget(OperationScope):
     """Required scope for searching the users a role is assigned to."""
 
     role_id: RoleID

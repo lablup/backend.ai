@@ -15,9 +15,9 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, Scop
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.scopes import (
-    EntityShareOwningScope,
-    EntityShareRecipientProjectScope,
-    EntityShareRecipientScope,
+    OwningEntityShareTarget,
+    RecipientProjectEntityShareTarget,
+    RecipientUserEntityShareTarget,
 )
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -47,7 +47,7 @@ class EntityShareRecipientScopeItem(EntityShareScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return EntityShareRecipientScope(recipient_user_id=self.user_id)
+        return RecipientUserEntityShareTarget(recipient_user_id=self.user_id)
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,7 @@ class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return EntityShareRecipientProjectScope(project_id=self.project_id)
+        return RecipientProjectEntityShareTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)
@@ -77,7 +77,7 @@ class EntityShareOwningScopeItem(EntityShareScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return EntityShareOwningScope(scope=self.target)
+        return OwningEntityShareTarget(scope=self.target)
 
 
 @dataclass

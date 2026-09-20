@@ -16,8 +16,8 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.scope.target import SearchableScopeTarget
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
 from ai.backend.manager.models.scheduling_history.scopes import (
-    KernelKernelHistoryOperationScope,
-    SessionKernelHistoryOperationScope,
+    KernelKernelHistoryTarget,
+    SessionKernelHistoryTarget,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -47,7 +47,7 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
 
     @override
     def to_search_scope(self) -> OperationScope:
-        return KernelKernelHistoryOperationScope(kernel_id=self.kernel_id)
+        return KernelKernelHistoryTarget(kernel_id=self.kernel_id)
 
     @override
     def to_scope_id(self) -> EntityIdentifier:
@@ -62,7 +62,7 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
 
     @override
     def to_search_scope(self) -> OperationScope:
-        return SessionKernelHistoryOperationScope(session_id=self.session_id)
+        return SessionKernelHistoryTarget(session_id=self.session_id)
 
     @override
     def to_scope_id(self) -> EntityIdentifier:

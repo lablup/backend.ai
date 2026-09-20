@@ -23,14 +23,14 @@ from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
-    "DomainFairShareOperationScope",
-    "ProjectFairShareOperationScope",
-    "UserFairShareOperationScope",
+    "DomainFairShareTarget",
+    "ProjectFairShareTarget",
+    "UserFairShareTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainFairShareOperationScope(OperationScope):
+class DomainFairShareTarget(OperationScope):
     """Required scope for domain fair share entity search.
 
     Used for field-level queries where the resource group is determined by
@@ -67,7 +67,7 @@ class DomainFairShareOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectFairShareOperationScope(OperationScope):
+class ProjectFairShareTarget(OperationScope):
     """Required scope for project fair share entity search.
 
     Used for field-level queries where the resource group and domain are
@@ -113,7 +113,7 @@ class ProjectFairShareOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserFairShareOperationScope(OperationScope):
+class UserFairShareTarget(OperationScope):
     """Required scope for user fair share entity search.
 
     Used for field-level queries where the resource group, domain, and project

@@ -27,16 +27,16 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
-    "DomainModelCardOperationScope",
-    "ModelCardResourceRequirementOperationScope",
-    "ProjectModelCardOperationScope",
-    "UserModelCardOperationScope",
-    "VFolderModelCardOperationScope",
+    "DomainModelCardTarget",
+    "ModelCardResourceRequirementTarget",
+    "ProjectModelCardTarget",
+    "UserModelCardTarget",
+    "VFolderModelCardTarget",
 )
 
 
 @dataclass
-class ModelCardResourceRequirementOperationScope(OperationScope):
+class ModelCardResourceRequirementTarget(OperationScope):
     """The minimum quantities one card declares."""
 
     model_card_id: ModelCardID
@@ -57,7 +57,7 @@ class ModelCardResourceRequirementOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class DomainModelCardOperationScope(OperationScope):
+class DomainModelCardTarget(OperationScope):
     """The model cards of one domain."""
 
     domain_id: DomainID
@@ -86,7 +86,7 @@ class DomainModelCardOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserModelCardOperationScope(OperationScope):
+class UserModelCardTarget(OperationScope):
     """The model cards one user holds.
 
     Read from the membership edge alone: `creator` records who the card came into
@@ -117,7 +117,7 @@ class UserModelCardOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectModelCardOperationScope(OperationScope):
+class ProjectModelCardTarget(OperationScope):
     """Scope for searching model cards within a MODEL_STORE project."""
 
     project_id: UUID
@@ -146,7 +146,7 @@ class ProjectModelCardOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class VFolderModelCardOperationScope(OperationScope):
+class VFolderModelCardTarget(OperationScope):
     """Scope for searching model cards backed by a specific VFolder.
 
     Access is delegated to the parent VFolder resolver — if the caller

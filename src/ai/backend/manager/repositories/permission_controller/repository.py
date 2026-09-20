@@ -36,7 +36,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -174,7 +174,7 @@ class PermissionControllerRepository:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
+        scope: RolePermissionTarget | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         return await self._db_source.search_permissions(querier=querier, scope=scope)

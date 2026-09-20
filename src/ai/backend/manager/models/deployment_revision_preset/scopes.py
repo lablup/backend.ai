@@ -13,11 +13,11 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("DeploymentPresetSlotOperationScope",)
+__all__ = ("DeploymentPresetSlotTarget",)
 
 
 @dataclass(frozen=True)
-class DeploymentPresetSlotOperationScope(OperationScope):
+class DeploymentPresetSlotTarget(OperationScope):
     """The slot amounts one preset declares."""
 
     preset_id: DeploymentPresetID

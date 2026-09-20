@@ -14,11 +14,11 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("EntityLabelOperationScope",)
+__all__ = ("EntityLabelTarget",)
 
 
 @dataclass(frozen=True)
-class EntityLabelOperationScope(OperationScope):
+class EntityLabelTarget(OperationScope):
     """The labels on one entity.
 
     A label is readable exactly when its entity is, so the scopes a search runs in are

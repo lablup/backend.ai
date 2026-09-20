@@ -14,11 +14,11 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("ResourceGroupDomainOperationScope",)
+__all__ = ("ResourceGroupDomainTarget",)
 
 
 @dataclass(frozen=True)
-class ResourceGroupDomainOperationScope(OperationScope):
+class ResourceGroupDomainTarget(OperationScope):
     """The domains a resource group serves."""
 
     resource_group_id: ResourceGroupID

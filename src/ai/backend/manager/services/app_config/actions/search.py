@@ -14,8 +14,8 @@ from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFra
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.app_config_fragment.scopes import (
-    PublicAppConfigFragmentOperationScope,
-    VisibleAppConfigFragmentOperationScope,
+    PublicAppConfigFragmentTarget,
+    VisibleAppConfigFragmentTarget,
 )
 from ai.backend.manager.models.app_config_fragment.searchers import (
     RankedAppConfigFragmentSearcher,
@@ -55,9 +55,7 @@ class SearchAppConfigsAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (
-            VisibleAppConfigFragmentOperationScope(user_id=self.user_id, domain_id=self.domain_id),
-        )
+        return (VisibleAppConfigFragmentTarget(user_id=self.user_id, domain_id=self.domain_id),)
 
     @override
     def to_searcher(self) -> Searcher[AppConfigFragmentRow, AppConfigFragmentData]:
@@ -95,7 +93,7 @@ class AnonymousSearchAppConfigsAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (PublicAppConfigFragmentOperationScope(),)
+        return (PublicAppConfigFragmentTarget(),)
 
     @override
     def to_searcher(self) -> Searcher[AppConfigFragmentRow, AppConfigFragmentData]:

@@ -26,7 +26,7 @@ from ai.backend.manager.models.virtual_entity.queries import scope_membership_ex
 
 
 @dataclass(frozen=True)
-class DomainDeploymentOperationScope(OperationScope):
+class DomainDeploymentTarget(OperationScope):
     """The deployments of one domain."""
 
     domain_id: DomainID
@@ -55,7 +55,7 @@ class DomainDeploymentOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectDeploymentOperationScope(OperationScope):
+class ProjectDeploymentTarget(OperationScope):
     """Required scope for searching endpoints within a project.
 
     Used for project-scoped deployment search (project admin).
@@ -87,7 +87,7 @@ class ProjectDeploymentOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserDeploymentOperationScope(OperationScope):
+class UserDeploymentTarget(OperationScope):
     """The deployments one user created."""
 
     user_id: UserID
@@ -114,7 +114,7 @@ class UserDeploymentOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class DeploymentAccessTokenOperationScope(OperationScope):
+class DeploymentAccessTokenTarget(OperationScope):
     """The access tokens one deployment holds."""
 
     deployment_id: DeploymentID

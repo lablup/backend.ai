@@ -44,7 +44,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.scopes import ProjectSessionTarget
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -56,7 +56,7 @@ from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestSessionSearchInProject:
-    """Tests for ProjectSessionOperationScope."""
+    """Tests for ProjectSessionTarget."""
 
     @pytest.fixture
     def test_domain_id(self) -> DomainID:
@@ -329,7 +329,7 @@ class TestSessionSearchInProject:
         }
 
     async def _scoped_ids(self, db: ExtendedAsyncSAEngine, project_id: uuid.UUID) -> set[uuid.UUID]:
-        scope = ProjectSessionOperationScope(project_id=project_id)
+        scope = ProjectSessionTarget(project_id=project_id)
         async with db.begin_readonly_session() as sess:
             rows = await sess.scalars(sa.select(SessionRow.id).where(scope.to_condition()()))
             return set(rows)

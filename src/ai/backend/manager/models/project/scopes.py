@@ -24,14 +24,14 @@ from ai.backend.manager.models.virtual_entity.queries import (
 )
 
 __all__ = (
-    "DomainProjectOperationScope",
-    "ResourceGroupProjectOperationScope",
-    "UserProjectOperationScope",
+    "DomainProjectTarget",
+    "ResourceGroupProjectTarget",
+    "UserProjectTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainProjectOperationScope(OperationScope):
+class DomainProjectTarget(OperationScope):
     """Required scope for searching projects within a domain.
 
     Used for domain-scoped project search (domain admin+).
@@ -70,7 +70,7 @@ class DomainProjectOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserProjectOperationScope(OperationScope):
+class UserProjectTarget(OperationScope):
     """Required scope for searching projects a user is member of.
 
     Used for user-scoped project search (any authenticated user).
@@ -102,7 +102,7 @@ class UserProjectOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ResourceGroupProjectOperationScope(OperationScope):
+class ResourceGroupProjectTarget(OperationScope):
     """The projects one resource group serves."""
 
     resource_group_id: ResourceGroupID

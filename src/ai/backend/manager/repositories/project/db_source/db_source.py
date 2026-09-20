@@ -49,8 +49,8 @@ from ai.backend.manager.models.project.row import (
     ProjectRow,
 )
 from ai.backend.manager.models.project.scopes import (
-    DomainProjectOperationScope,
-    UserProjectOperationScope,
+    DomainProjectTarget,
+    UserProjectTarget,
 )
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
@@ -83,7 +83,8 @@ class ProjectDBSource:
         """Mark a group as inactive (soft delete)."""
         async with self._db.begin_session() as session:
             result = await session.execute(
-                sa.update(groups)
+                sa
+                .update(groups)
                 .values(
                     is_active=False,
                     integration_id=None,
@@ -108,7 +109,8 @@ class ProjectDBSource:
                 users, users.c.uuid == kernels.c.user_uuid
             )
             query = (
-                sa.select(
+                sa
+                .select(
                     kernels.c.id,
                     kernels.c.container_id,
                     kernels.c.session_id,
@@ -483,13 +485,13 @@ class ProjectDBSource:
 
     async def search_projects_by_domain(
         self,
-        scope: DomainProjectOperationScope,
+        scope: DomainProjectTarget,
         querier: BatchQuerier,
     ) -> ProjectSearchResult:
         """Search projects within a domain.
 
         Args:
-            scope: DomainProjectOperationScope defining the domain to search within.
+            scope: DomainProjectTarget defining the domain to search within.
             querier: Contains conditions, orders, and pagination.
 
         Returns:
@@ -510,7 +512,7 @@ class ProjectDBSource:
 
     async def search_projects_by_user(
         self,
-        scope: UserProjectOperationScope,
+        scope: UserProjectTarget,
         querier: BatchQuerier,
     ) -> ProjectSearchResult:
         """Search projects a user is member of.
@@ -519,7 +521,7 @@ class ProjectDBSource:
         the membership predicate.
 
         Args:
-            scope: UserProjectOperationScope defining the user to search for.
+            scope: UserProjectTarget defining the user to search for.
             querier: Contains conditions, orders, and pagination.
 
         Returns:

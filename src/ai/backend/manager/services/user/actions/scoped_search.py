@@ -17,9 +17,9 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.scopes import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-    RoleUserOperationScope,
+    DomainUserTarget,
+    ProjectUserTarget,
+    RoleUserTarget,
 )
 from ai.backend.manager.models.user.searchers import UserSearcher
 
@@ -48,7 +48,7 @@ class DomainUserScopeItem(UserScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return DomainUserOperationScope(domain_id=self.domain_id)
+        return DomainUserTarget(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ class ProjectUserScopeItem(UserScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ProjectUserOperationScope(project_id=self.project_id)
+        return ProjectUserTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)
@@ -78,7 +78,7 @@ class RoleUserScopeItem(UserScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return RoleUserOperationScope(role_id=self.role_id)
+        return RoleUserTarget(role_id=self.role_id)
 
 
 @dataclass(frozen=True)

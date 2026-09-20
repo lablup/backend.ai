@@ -15,7 +15,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class ArtifactRevisionOperationScope(OperationScope):
+class ArtifactRevisionTarget(OperationScope):
     """The revisions one artifact holds."""
 
     artifact_id: ArtifactID

@@ -43,7 +43,7 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -163,7 +163,8 @@ class PermissionDBSource:
         """
         async with self._db.begin_session() as db_session:
             user_role_row = await db_session.scalar(
-                sa.select(UserRoleRow)
+                sa
+                .select(UserRoleRow)
                 .where(UserRoleRow.user_id == data.user_id)
                 .where(UserRoleRow.role_id == data.role_id)
             )
@@ -183,7 +184,8 @@ class PermissionDBSource:
             )
             rows = (
                 await db_session.execute(
-                    sa.select(RoleRow.scope_id, sa.func.count(UserRoleRow.id))
+                    sa
+                    .select(RoleRow.scope_id, sa.func.count(UserRoleRow.id))
                     .outerjoin(
                         UserRoleRow,
                         (UserRoleRow.role_id == RoleRow.id) & (UserRoleRow.user_id == data.user_id),
@@ -284,7 +286,7 @@ class PermissionDBSource:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
+        scope: RolePermissionTarget | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -465,7 +467,8 @@ class PermissionDBSource:
                 try:
                     async with db_session.begin_nested():
                         stmt = (
-                            sa.select(UserRoleRow)
+                            sa
+                            .select(UserRoleRow)
                             .where(UserRoleRow.user_id == user_id)
                             .where(UserRoleRow.role_id == data.role_id)
                         )

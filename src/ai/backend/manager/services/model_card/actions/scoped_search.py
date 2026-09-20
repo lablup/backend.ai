@@ -14,9 +14,9 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, Scop
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import (
-    DomainModelCardOperationScope,
-    ProjectModelCardOperationScope,
-    UserModelCardOperationScope,
+    DomainModelCardTarget,
+    ProjectModelCardTarget,
+    UserModelCardTarget,
 )
 from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -46,7 +46,7 @@ class DomainModelCardScopeItem(ModelCardScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return DomainModelCardOperationScope(domain_id=self.domain_id)
+        return DomainModelCardTarget(domain_id=self.domain_id)
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class ProjectModelCardScopeItem(ModelCardScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ProjectModelCardOperationScope(project_id=self.project_id)
+        return ProjectModelCardTarget(project_id=self.project_id)
 
 
 @dataclass(frozen=True)
@@ -76,7 +76,7 @@ class UserModelCardScopeItem(ModelCardScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserModelCardOperationScope(user_id=self.user_id)
+        return UserModelCardTarget(user_id=self.user_id)
 
 
 @dataclass(frozen=True)

@@ -30,16 +30,16 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
-    "ContainerRegistryImageOperationScope",
-    "DomainImageOperationScope",
-    "GlobalImageOperationScope",
-    "ProjectImageOperationScope",
-    "UserImageOperationScope",
+    "ContainerRegistryImageTarget",
+    "DomainImageTarget",
+    "GlobalImageTarget",
+    "ProjectImageTarget",
+    "UserImageTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainImageOperationScope(OperationScope):
+class DomainImageTarget(OperationScope):
     """The images of one domain."""
 
     domain_id: DomainID
@@ -68,7 +68,7 @@ class DomainImageOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectImageOperationScope(OperationScope):
+class ProjectImageTarget(OperationScope):
     """The images of one project."""
 
     project_id: ProjectID
@@ -97,7 +97,7 @@ class ProjectImageOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserImageOperationScope(OperationScope):
+class UserImageTarget(OperationScope):
     """The images one user reaches."""
 
     user_id: UserID
@@ -124,7 +124,7 @@ class UserImageOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ContainerRegistryImageOperationScope(OperationScope):
+class ContainerRegistryImageTarget(OperationScope):
     """The images of one container registry."""
 
     registry_id: ContainerRegistryID
@@ -153,7 +153,7 @@ class ContainerRegistryImageOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class GlobalImageOperationScope(OperationScope):
+class GlobalImageTarget(OperationScope):
     """The images every caller sees: those of a registry marked global.
 
     The column is nullable, and a registry that leaves it unset is not global.
@@ -163,7 +163,8 @@ class GlobalImageOperationScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.exists(
-                sa.select(sa.literal(1))
+                sa
+                .select(sa.literal(1))
                 .select_from(ContainerRegistryRow)
                 .where(
                     ContainerRegistryRow.id == ImageRow.registry_id,

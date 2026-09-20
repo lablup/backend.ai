@@ -15,7 +15,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class IdleCheckerAssignmentOperationScope(OperationScope):
+class IdleCheckerAssignmentTarget(OperationScope):
     """Idle checker bindings attached to one scope entity.
 
     One scope = one item of a scoped binding query; the repository layer

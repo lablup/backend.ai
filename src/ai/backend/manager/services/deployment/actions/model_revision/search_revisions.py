@@ -10,7 +10,7 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.scopes import (
-    DeploymentRevisionOperationScope,
+    DeploymentRevisionTarget,
 )
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -43,7 +43,7 @@ class SearchRevisionsAction(OperationScopeOpsAction[DeploymentRevisionRow, Model
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentRevisionOperationScope(deployment_id=self.deployment_id),)
+        return (DeploymentRevisionTarget(deployment_id=self.deployment_id),)
 
     @override
     def to_searcher(self) -> ModelRevisionSearcher:

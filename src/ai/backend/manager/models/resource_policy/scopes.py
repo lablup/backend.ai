@@ -19,13 +19,13 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
-    "UserKeypairResourcePolicyOperationScope",
-    "UserResourcePolicyOperationScope",
+    "UserKeypairResourcePolicyTarget",
+    "UserResourcePolicyTarget",
 )
 
 
 @dataclass(frozen=True)
-class UserKeypairResourcePolicyOperationScope(OperationScope):
+class UserKeypairResourcePolicyTarget(OperationScope):
     """The policy one user's default keypair is subject to.
 
     Picks the keypair marked default, else the earliest active one: the marker is
@@ -40,7 +40,8 @@ class UserKeypairResourcePolicyOperationScope(OperationScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KeyPairResourcePolicyRow.name == (
-                sa.select(KeyPairRow.resource_policy)
+                sa
+                .select(KeyPairRow.resource_policy)
                 .where(KeyPairRow.user == user_id)
                 .where(KeyPairRow.is_active.is_(True))
                 .order_by(
@@ -61,7 +62,7 @@ class UserKeypairResourcePolicyOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserResourcePolicyOperationScope(OperationScope):
+class UserResourcePolicyTarget(OperationScope):
     """The policy one user is subject to.
 
     The policy row carries no owner column, so the name is read off the user.

@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.error_log.scopes import UserErrorLogOperationScope
+from ai.backend.manager.models.error_log.scopes import UserErrorLogTarget
 from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -32,7 +32,7 @@ class SearchErrorLogsAction(OperationScopeOpsAction[ErrorLogRow, ErrorLogData]):
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (UserErrorLogOperationScope(user_id=self.user_id),)
+        return (UserErrorLogTarget(user_id=self.user_id),)
 
     @override
     @classmethod

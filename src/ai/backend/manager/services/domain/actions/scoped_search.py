@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.domain.scopes import ResourceGroupDomainOperationScope
+from ai.backend.manager.models.domain.scopes import ResourceGroupDomainTarget
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -36,7 +36,7 @@ class ResourceGroupDomainScopeItem(DomainScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ResourceGroupDomainOperationScope(resource_group_id=self.resource_group_id)
+        return ResourceGroupDomainTarget(resource_group_id=self.resource_group_id)
 
 
 @dataclass(frozen=True)

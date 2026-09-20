@@ -13,11 +13,11 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("SessionKernelOperationScope",)
+__all__ = ("SessionKernelTarget",)
 
 
 @dataclass(frozen=True)
-class SessionKernelOperationScope(OperationScope):
+class SessionKernelTarget(OperationScope):
     """The kernels of one session."""
 
     session_id: SessionID

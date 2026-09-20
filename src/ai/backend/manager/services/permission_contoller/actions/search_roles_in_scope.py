@@ -13,8 +13,8 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.models.rbac_models.role.scopes import (
-    HeldRoleOperationScope,
-    ScopedRoleOperationScope,
+    HeldRoleTarget,
+    ScopedRoleTarget,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -44,7 +44,7 @@ class RegisteredRoleScopeItem(RoleScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ScopedRoleOperationScope(scope=self.scope)
+        return ScopedRoleTarget(scope=self.scope)
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class HolderRoleScopeItem(RoleScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return HeldRoleOperationScope(user_id=self.user_id)
+        return HeldRoleTarget(user_id=self.user_id)
 
 
 @dataclass(frozen=True)

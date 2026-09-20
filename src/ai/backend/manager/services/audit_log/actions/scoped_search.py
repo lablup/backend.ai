@@ -13,9 +13,9 @@ from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scopes import (
-    EntityAuditLogOperationScope,
-    ScopeAuditLogOperationScope,
-    TriggeredByAuditLogOperationScope,
+    EntityAuditLogTarget,
+    ScopeAuditLogTarget,
+    TriggeredByAuditLogTarget,
 )
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -52,9 +52,7 @@ class EntityAuditLogScopeItem(AuditLogScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return EntityAuditLogOperationScope(
-            entity_type=self.owner.entity_type(), entity_id=str(self.owner)
-        )
+        return EntityAuditLogTarget(entity_type=self.owner.entity_type(), entity_id=str(self.owner))
 
 
 @dataclass(frozen=True)
@@ -69,9 +67,7 @@ class ScopeAuditLogScopeItem(AuditLogScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return ScopeAuditLogOperationScope(
-            entity_type=self.owner.entity_type(), entity_id=str(self.owner)
-        )
+        return ScopeAuditLogTarget(entity_type=self.owner.entity_type(), entity_id=str(self.owner))
 
 
 @dataclass(frozen=True)
@@ -86,7 +82,7 @@ class TriggeredByAuditLogScopeItem(AuditLogScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return TriggeredByAuditLogOperationScope(triggered_by=str(self.user_id))
+        return TriggeredByAuditLogTarget(triggered_by=str(self.user_id))
 
 
 @dataclass

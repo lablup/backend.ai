@@ -13,11 +13,11 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
-__all__ = ("UserErrorLogOperationScope",)
+__all__ = ("UserErrorLogTarget",)
 
 
 @dataclass(frozen=True)
-class UserErrorLogOperationScope(OperationScope):
+class UserErrorLogTarget(OperationScope):
     """The errors one user may see.
 
     Cleared rows drop out here rather than in the searcher: clearing is this domain's

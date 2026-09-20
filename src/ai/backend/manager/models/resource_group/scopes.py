@@ -31,14 +31,14 @@ from ai.backend.manager.models.resource_group.row import (
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
-    "DomainResourceGroupOperationScope",
-    "ProjectResourceGroupOperationScope",
-    "UserResourceGroupOperationScope",
+    "DomainResourceGroupTarget",
+    "ProjectResourceGroupTarget",
+    "UserResourceGroupTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainResourceGroupOperationScope(OperationScope):
+class DomainResourceGroupTarget(OperationScope):
     """The resource groups a domain may schedule on."""
 
     domain_id: DomainID
@@ -63,7 +63,7 @@ class DomainResourceGroupOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectResourceGroupOperationScope(OperationScope):
+class ProjectResourceGroupTarget(OperationScope):
     """The resource groups a project may schedule on."""
 
     project_id: ProjectID
@@ -88,7 +88,7 @@ class ProjectResourceGroupOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserResourceGroupOperationScope(OperationScope):
+class UserResourceGroupTarget(OperationScope):
     """The resource groups a user's keypairs may schedule on.
 
     Keyed on the user rather than one access key: a keypair carries no permission of

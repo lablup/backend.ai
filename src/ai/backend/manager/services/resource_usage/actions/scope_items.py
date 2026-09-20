@@ -11,9 +11,9 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
 )
 
 __all__ = (
@@ -46,8 +46,8 @@ class DomainUsageBucketScopeItem(UsageBucketScopeItem):
     domain_name: str
 
     @override
-    def operation_scope(self) -> DomainUsageBucketOperationScope:
-        return DomainUsageBucketOperationScope(
+    def operation_scope(self) -> DomainUsageBucketTarget:
+        return DomainUsageBucketTarget(
             resource_group_id=self.resource_group_id,
             domain_name=self.domain_name,
         )
@@ -62,8 +62,8 @@ class ProjectUsageBucketScopeItem(UsageBucketScopeItem):
     project_id: uuid.UUID
 
     @override
-    def operation_scope(self) -> ProjectUsageBucketOperationScope:
-        return ProjectUsageBucketOperationScope(
+    def operation_scope(self) -> ProjectUsageBucketTarget:
+        return ProjectUsageBucketTarget(
             resource_group_id=self.resource_group_id,
             domain_name=self.domain_name,
             project_id=self.project_id,
@@ -80,8 +80,8 @@ class UserUsageBucketScopeItem(UsageBucketScopeItem):
     user_uuid: uuid.UUID
 
     @override
-    def operation_scope(self) -> UserUsageBucketOperationScope:
-        return UserUsageBucketOperationScope(
+    def operation_scope(self) -> UserUsageBucketTarget:
+        return UserUsageBucketTarget(
             resource_group_id=self.resource_group_id,
             domain_name=self.domain_name,
             project_id=self.project_id,

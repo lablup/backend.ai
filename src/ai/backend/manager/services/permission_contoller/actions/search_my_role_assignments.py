@@ -15,8 +15,8 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import AssignedUserData
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
-    RoleRoleAssignmentOperationScope,
-    UserRoleAssignmentOperationScope,
+    RoleRoleAssignmentTarget,
+    UserRoleAssignmentTarget,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -46,7 +46,7 @@ class UserRoleAssignmentScopeItem(RoleAssignmentScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return UserRoleAssignmentOperationScope(user_id=self.user_id)
+        return UserRoleAssignmentTarget(user_id=self.user_id)
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class RoleRoleAssignmentScopeItem(RoleAssignmentScopeItem):
 
     @override
     def operation_scope(self) -> OperationScope:
-        return RoleRoleAssignmentOperationScope(role_id=self.role_id)
+        return RoleRoleAssignmentTarget(role_id=self.role_id)
 
 
 @dataclass(frozen=True)

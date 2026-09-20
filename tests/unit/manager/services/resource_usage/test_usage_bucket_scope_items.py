@@ -6,9 +6,9 @@ import uuid
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
 )
 from ai.backend.manager.services.resource_usage.actions.scope_items import (
     DomainUsageBucketScopeItem,
@@ -24,7 +24,7 @@ USER_UUID = uuid.uuid4()
 def test_domain_item_is_read_for_the_resource_group() -> None:
     item = DomainUsageBucketScopeItem(resource_group_id=RESOURCE_GROUP_ID, domain_name="default")
     assert item.scope_id() == RESOURCE_GROUP_ID
-    assert item.operation_scope() == DomainUsageBucketOperationScope(
+    assert item.operation_scope() == DomainUsageBucketTarget(
         resource_group_id=RESOURCE_GROUP_ID, domain_name="default"
     )
 
@@ -34,7 +34,7 @@ def test_project_item_is_read_for_the_resource_group() -> None:
         resource_group_id=RESOURCE_GROUP_ID, domain_name="default", project_id=PROJECT_ID
     )
     assert item.scope_id() == RESOURCE_GROUP_ID
-    assert item.operation_scope() == ProjectUsageBucketOperationScope(
+    assert item.operation_scope() == ProjectUsageBucketTarget(
         resource_group_id=RESOURCE_GROUP_ID, domain_name="default", project_id=PROJECT_ID
     )
 
@@ -47,7 +47,7 @@ def test_user_item_is_read_for_the_resource_group() -> None:
         user_uuid=USER_UUID,
     )
     assert item.scope_id() == RESOURCE_GROUP_ID
-    assert item.operation_scope() == UserUsageBucketOperationScope(
+    assert item.operation_scope() == UserUsageBucketTarget(
         resource_group_id=RESOURCE_GROUP_ID,
         domain_name="default",
         project_id=PROJECT_ID,

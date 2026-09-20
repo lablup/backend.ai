@@ -88,9 +88,9 @@ from ai.backend.manager.models.fair_share.row import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
 )
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -225,7 +225,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._fair_share.search_rg_domain_fair_shares.run(
             SearchRGDomainFairSharesAction(
                 resource_group_id=resource_group_id_result.entity_id(),
-                scope=DomainFairShareOperationScope(
+                scope=DomainFairShareTarget(
                     resource_group_id=resource_group_id_result.entity_id(),
                 ),
                 querier=querier,
@@ -348,7 +348,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._fair_share.search_rg_project_fair_shares.run(
             SearchRGProjectFairSharesAction(
                 resource_group_id=resource_group_id_result.entity_id(),
-                scope=ProjectFairShareOperationScope(
+                scope=ProjectFairShareTarget(
                     domain_name=domain_name,
                     resource_group_id=resource_group_id_result.entity_id(),
                 ),
@@ -477,7 +477,7 @@ class FairShareAdapter(BaseAdapter):
         result = await self._fair_share.search_rg_user_fair_shares.run(
             SearchRGUserFairSharesAction(
                 resource_group_id=resource_group_id_result.entity_id(),
-                scope=UserFairShareOperationScope(
+                scope=UserFairShareTarget(
                     domain_name=domain_name,
                     project_id=project_id,
                     resource_group_id=resource_group_id_result.entity_id(),

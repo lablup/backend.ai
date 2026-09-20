@@ -17,7 +17,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class PermissionOperationScope(OperationScope):
+class RolePermissionTarget(OperationScope):
     """Scope for searching scoped permissions by role."""
 
     role_id: RoleID
