@@ -108,16 +108,6 @@ class SchedulingHistoryRepository:
         """Search deployment history within scope."""
         return await self._db_source.search_deployment_scoped_history(querier, scope)
 
-    # ========== Replica Group History (Admin) ==========
-
-    @scheduling_history_repository_resilience.apply()
-    async def admin_search_replica_group_history(
-        self,
-        querier: BatchQuerier,
-    ) -> ReplicaGroupHistoryListResult:
-        """Search replica-group history with pagination (admin API)."""
-        return await self._db_source.admin_search_replica_group_history(querier)
-
     # ========== Replica Group History (Scoped) ==========
 
     @scheduling_history_repository_resilience.apply()
