@@ -11,10 +11,12 @@ from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
@@ -44,7 +46,7 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
     KernelUserInfoGQLDTO,
     ResourceAllocationGQLDTO,
 )
-from ai.backend.common.dto.manager.v2.kernel.types import KernelStatusFilter
+from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField, KernelStatusFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
@@ -108,7 +110,7 @@ from ai.backend.common.types import (
 from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
@@ -121,14 +123,8 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.models.kernel.orders import (
-    DEFAULT_FORWARD_ORDER as KERNEL_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.kernel.orders import (
-    resolve_order as resolve_kernel_order,
-)
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.scopes import (
@@ -227,7 +223,7 @@ _SESSION_PAGINATION_SPEC = PaginationSpec(
 )
 
 _KERNEL_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
+    forward_order=KernelSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=KernelRow.id,
 )
 
@@ -628,8 +624,15 @@ class SessionAdapter(BaseAdapter):
             return []
         linked = SessionSearchableFields.linked
         return [
-            linked.deployments.used_by(DeploymentID(entity_id))
-            for entity_id in used_by.deployment or ()
+            *(
+                linked.deployments.used_by(DeploymentID(entity_id))
+                for entity_id in used_by.deployment or ()
+            ),
+            *(linked.agents.used_by(AgentUUID(entity_id)) for entity_id in used_by.agent or ()),
+            *(
+                linked.resource_groups.used_by(ResourceGroupID(entity_id))
+                for entity_id in used_by.resource_group or ()
+            ),
         ]
 
     def _scoped_search_action(
@@ -935,6 +938,12 @@ class SessionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
+    def _kernel_on_agent(self, agent_id: AgentId) -> QueryCondition:
+        """The kernels running on the agent."""
+        return KernelSearchableFields.own.agent.filter.equals(
+            StringMatchSpec(str(agent_id), case_insensitive=False, negated=False)
+        )
+
     async def search_kernels_by_agent(
         self,
         agent_id: AgentId,
@@ -946,7 +955,7 @@ class SessionAdapter(BaseAdapter):
                 searcher=GlobalSearcher(
                     used_by=(),
                     searcher=self._build_kernel_searcher(
-                        input, base_condition=KernelConditions.by_agent_id(agent_id)
+                        input, base_condition=self._kernel_on_agent(agent_id)
                     ),
                 )
             )
@@ -1001,25 +1010,12 @@ class SessionAdapter(BaseAdapter):
         )
 
     def _convert_kernel_filter(self, f: KernelFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.id is not None:
-            c = self.convert_uuid_filter(
-                f.id,
-                equals_factory=KernelConditions.by_id_filter_equals,
-                in_factory=KernelConditions.by_id_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.session_id is not None:
-            c = self.convert_uuid_filter(
-                f.session_id,
-                equals_factory=KernelConditions.by_session_id_filter_equals,
-                in_factory=KernelConditions.by_session_id_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.status is not None:
-            conditions.extend(self._convert_kernel_status_filter(f.status))
+        fields = KernelSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.session_id, fields.session_id.filter),
+            *self._convert_kernel_status_filter(f.status),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_kernel_filter(sub))
@@ -1037,40 +1033,43 @@ class SessionAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_kernel_status_filter(f: KernelStatusFilter) -> list[QueryCondition]:
+    def _convert_kernel_status_filter(self, f: KernelStatusFilter | None) -> list[QueryCondition]:
+        if f is None:
+            return []
+        status = KernelSearchableFields.own.status.filter
         conditions: list[QueryCondition] = []
         if f.equals is not None:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(values=[KernelStatus(f.equals)], negated=False)
-                )
-            )
+            conditions.append(status.equals(KernelStatus(f.equals)))
         if f.in_:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(values=[KernelStatus(s) for s in f.in_], negated=False)
-                )
-            )
+            conditions.append(status.in_([KernelStatus(s) for s in f.in_]))
         if f.not_equals is not None:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(values=[KernelStatus(f.not_equals)], negated=True)
-                )
-            )
+            conditions.append(status.not_equals(KernelStatus(f.not_equals)))
         if f.not_in:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(
-                        values=[KernelStatus(s) for s in f.not_in], negated=True
-                    )
-                )
-            )
+            conditions.append(status.not_in([KernelStatus(s) for s in f.not_in]))
         return conditions
 
-    @staticmethod
-    def _convert_kernel_orders(orders: list[KernelOrder]) -> list[QueryOrder]:
-        return [resolve_kernel_order(o.field, o.direction) for o in orders]
+    def _convert_kernel_orders(self, orders: list[KernelOrder]) -> list[QueryOrder]:
+        return [self._convert_kernel_order(o) for o in orders]
+
+    def _convert_kernel_order(self, order: KernelOrder) -> QueryOrder:
+        """The query order one requested kernel order field names."""
+        fields = KernelSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case KernelOrderField.CLUSTER_IDX:
+                return fields.cluster_idx.order.apply(ascending)
+            case KernelOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case KernelOrderField.TERMINATED_AT:
+                return fields.terminated_at.order.apply(ascending)
+            case KernelOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case KernelOrderField.CLUSTER_MODE:
+                return fields.cluster_mode.order.apply(ascending)
+            case KernelOrderField.CLUSTER_HOSTNAME:
+                return fields.cluster_hostname.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     # -------------------------------------------------------------------------
     # Terminate

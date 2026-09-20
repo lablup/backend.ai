@@ -35,6 +35,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -84,8 +85,8 @@ from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
-from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.creators import KernelCreator
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
@@ -4018,7 +4019,7 @@ class ScheduleDBSource:
 
         Args:
             querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use KernelConditions for filtering.
+                     Use KernelSearchableFields for filtering.
 
         Returns:
             KernelListResult containing KernelInfo objects.
@@ -4704,7 +4705,11 @@ class ScheduleDBSource:
             # 2. Query kernels for these sessions (full rows for to_kernel_info conversion)
             kernel_query = (
                 sa.select(KernelRow)
-                .where(KernelConditions.by_session_ids(session_ids)())
+                .where(
+                    KernelSearchableFields.own.session_id.filter.in_(
+                        UUIDInMatchSpec(values=session_ids, negated=False)
+                    )()
+                )
                 .order_by(KernelRow.session_id, KernelRow.cluster_idx)
             )
             kernel_result = await db_sess.execute(kernel_query)

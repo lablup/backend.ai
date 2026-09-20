@@ -10,6 +10,7 @@ from collections import defaultdict
 from typing import Any, assert_never
 from uuid import UUID
 
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.compute_session import (
     ComputeSessionDTO,
     ComputeSessionFilter,
@@ -24,7 +25,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
@@ -45,7 +46,11 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
 
     def build_kernel_searcher_for_sessions(self, session_ids: list[SessionId]) -> KernelSearcher:
         """Build a KernelSearcher for kernels belonging to the given sessions."""
-        conditions: list[QueryCondition] = [KernelConditions.by_session_ids(session_ids)]
+        conditions: list[QueryCondition] = [
+            KernelSearchableFields.own.session_id.filter.in_(
+                UUIDInMatchSpec(values=session_ids, negated=False)
+            )
+        ]
         return KernelSearcher(conditions=conditions, orders=[], pagination=NoPagination())
 
     def group_kernels_by_session(self, kernels: list[KernelInfo]) -> dict[UUID, list[KernelInfo]]:
