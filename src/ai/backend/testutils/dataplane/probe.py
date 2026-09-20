@@ -9,6 +9,7 @@ the other's test module.
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
@@ -119,7 +120,8 @@ async def _exec_in_container(
             "tasks",
             "exec",
             "--exec-id",
-            f"dp-{exec_tag}-{abs(hash(exec_tag)) % 100000}",
+            # ctr names a fifo after the id, so it must be a single path segment.
+            f"dp-{re.sub(r'[^A-Za-z0-9_.-]', '_', exec_tag)}-{abs(hash(exec_tag)) % 100000}",
             container_id,
             *argv,
         ],
