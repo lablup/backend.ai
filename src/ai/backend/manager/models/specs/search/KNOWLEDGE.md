@@ -1,22 +1,26 @@
 ---
 name: search-field-declarations
 type: design-rationale
-description: why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why an unreadable using entity refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters
+description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why an unreadable using entity refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters
 scope: src/ai/backend/manager/models/specs/search
-keywords: [SearchableField, NestedSearchableField, RowDataConverter, ToManyCorrelation, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by]
+keywords: [endpoint_tokens.token, access_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by]
 sources:
   - src/ai/backend/manager/models/specs/search
   - src/ai/backend/manager/models/specs/conditions
   - src/ai/backend/manager/models/specs/orders
   - src/ai/backend/manager/repositories/base/filter_adapter.py
   - src/ai/backend/manager/models/vfolder/searchable_fields.py
+  - src/ai/backend/manager/models/session/row.py
+  - src/ai/backend/manager/models/endpoint/row.py
+  - src/ai/backend/manager/models/deployment_revision/row.py
+  - src/ai/backend/manager/models/user/row.py
   - src/ai/backend/manager/models/entity_label/searchable_fields.py
   - src/ai/backend/manager/models/scopes.py
   - src/ai/backend/manager/models/specs/searcher.py
   - src/ai/backend/manager/actions/v2/scope/validator/used_by.py
 generated:
   by: claude-code/opus-5
-  at: 2026-09-19
+  at: 2026-09-20
 status: stable
 ---
 
@@ -39,17 +43,37 @@ This package replaces the condition functions and order methods written by hand 
 - `read` returns the column's value type, so mypy also checks that the declaration and the data field agree on type.
 - Reading `row.x` directly instead of through the declaration cannot be stopped by types; review stops it.
 
-## Every order is declared unless something forbids it
+## Why the reasons for an empty slot are split into three axes
 
-| Column kind | Order | Why |
-|---|---|---|
-| JSON/JSONB, arrays | No | A document structure; order has no meaning |
-| `SecretColumn` | No | Comparing ciphertext means nothing and hints at the value |
-| `DecimalType` | Needs a cast | Stored as VARCHAR, so `"10" < "9"` |
-| enum | Yes | Alphabetical, not a meaningful order |
-| Other scalars | Yes | |
+- The earlier rule listed only what the type forbids. A value that works but is deliberately left out had no rule, so each entity's author decided again.
+- Splitting the axes removes that decision. The type settles the impossible ones; sensitive and cost are settled by matching against a row of a table.
+- Fixing the count at three is itself a rule. A slot emptied for a fourth reason carries that reason nowhere.
 
-- The order-field enum decides what is exposed. Cost (ordering without an index) is reviewed when a field is added to the enum.
+## The type settles what is impossible
+
+| Column kind | Why it does not hold |
+|---|---|
+| JSON/JSONB, arrays | A document structure; comparing size means nothing |
+| `SecretColumn` | Comparing ciphertext bears no relation to plaintext order, and equality hints at the value |
+| Derived field | There is no column to put the operation on |
+| `DecimalType` | Stored as VARCHAR, so `"10" < "9"`. A cast makes it hold |
+| enum | Holds. Alphabetical, not a meaningful order |
+
+## A sensitive value leaks even when it is not in the response
+
+- A filter reports whether a row satisfying the condition exists. Repeating `starts_with` one character at a time recovers the whole value. An order gives the same information.
+- So masking a value behind a field cap means nothing while its filter and order stay open. It is why caps check orders too.
+- Leaving equality alone as a compromise is not used. Tokens and access keys have a narrow candidate set, so repeated equality confirms them.
+- The rows of the table are the cases found in the survey. `endpoint_tokens.token` is `sa.String`, not `SecretColumn`, so the type axis does not catch it. `sessions.bootstrap_script` and `startup_command` are scripts the user wrote and can hold credentials verbatim.
+- `users.allowed_client_ip` is caught by the type axis as well, being an array. It is listed as sensitive too so that it stays closed if it ever stops being an array.
+
+## Cost is settled by column kind and index
+
+- A partial match on a large text column reaches no index and becomes a full scan; one search reads the whole table. A short string is not held to the same bar, since even scanned in full the per-row comparison is cheap.
+- The single boundary at 1024 comes from counting the schema. Declared lengths cluster at 16, 20, 32, 64, 128, 255, 256, 500, 512 and 1024, and the next one up is `16 * 1024`. Everything at 1024 or below is a single-line value — a name, a path, a URL, a description — and is what users actually search by partial match. Anything larger is `sa.Text` or a script.
+- A boundary at 256 would close partial matching on `endpoints.name` and `model_cards.name`, both 512. A rule that closes name search removes a feature rather than saving cost.
+- Two bands would leave 257 through 1023 with no rule, and columns do sit there (`endpoints.name`, `model_cards.name` and `groups.description` are all 512), so the boundary has to be single.
+- An index ships in the same change as the declaration. A partial match opened without one stays until the load shows up.
 
 ## Condition classes do not know filter DTOs
 
