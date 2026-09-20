@@ -94,8 +94,8 @@ class ContainerRegistryRepository:
             return data
 
     async def set_global(self, updater: ContainerRegistryGlobalUpdater) -> ContainerRegistryData:
-        """Write `is_global` and move the registry and its images into the `public`
-        scope or out of it.
+        """Write `is_global` and put the registry and its images into the `public`
+        scope, or take them out.
 
         The registry goes in before its images and comes out after them, so a run that
         stops part way leaves `public` holding no image of a registry it cannot reach.
@@ -109,7 +109,8 @@ class ContainerRegistryRepository:
         return data
 
     async def _write_global(self, updater: ContainerRegistryGlobalUpdater) -> ContainerRegistryData:
-        """Write `is_global` and move the registry alone, in one transaction."""
+        """Write `is_global` and settle the registry's own membership of `public`, in
+        one transaction."""
         public = global_entity_id(GlobalEntityName.PUBLIC)
         async with self._ops_provider.write_ops() as w:
             data = await w.update_data(updater)
@@ -118,9 +119,9 @@ class ContainerRegistryRepository:
                     f"Container registry not found (id:{updater.registry_id})"
                 )
             if updater.is_global:
-                await w.transfer([], [public], updater.registry_id)
+                await w.add_membership([public], [updater.registry_id])
             else:
-                await w.transfer([public], [], updater.registry_id)
+                await w.remove_membership([public], [updater.registry_id])
             return data
 
     async def _move_images(self, registry_id: ContainerRegistryID, *, to_public: bool) -> None:
@@ -143,9 +144,9 @@ class ContainerRegistryRepository:
                 return
             async with self._ops_provider.write_ops() as w:
                 if to_public:
-                    await w.transfer_all([], [public], image_ids)
+                    await w.add_membership([public], image_ids)
                 else:
-                    await w.transfer_all([public], [], image_ids)
+                    await w.remove_membership([public], image_ids)
             after = image_ids[-1]
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:

@@ -168,8 +168,8 @@ class ResourcePresetDBSource:
     async def set_preset_resource_group(
         self, updater: ResourcePresetResourceGroupUpdater
     ) -> ResourcePresetData:
-        """Write the preset's resource group and move it into the `public` scope or out
-        of it, in one transaction.
+        """Write the preset's resource group and put it into the `public` scope or take
+        it out, in one transaction.
         """
         public = global_entity_id(GlobalEntityName.PUBLIC)
         async with self._v2_ops.write_ops() as w:
@@ -179,9 +179,9 @@ class ResourcePresetDBSource:
                     f"Resource preset with ID {updater.preset_id} not found."
                 )
             if updater.resource_group_name is None:
-                await w.transfer([], [public], updater.preset_id)
+                await w.add_membership([public], [updater.preset_id])
             else:
-                await w.transfer([public], [], updater.preset_id)
+                await w.remove_membership([public], [updater.preset_id])
             return preset
 
     async def delete_preset(self, preset_id: ResourcePresetID) -> ResourcePresetData:
