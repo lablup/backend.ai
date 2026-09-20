@@ -698,11 +698,7 @@ class ProcessorGroup[TData: EntityData]:
         return ScopeActionProcessor(
             ScopedSearchService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
-            validators=(
-                *self._deps.validators.scope,
-                *self._deps.validators.scoped_search,
-                *validators,
-            ),
+            validators=(*self._deps.validators.scope, *validators),
         )
 
     def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
