@@ -67,10 +67,6 @@ from .actions.search_my_role_assignments import (
 )
 from .actions.search_permissions import GlobalSearchPermissionsAction
 from .actions.search_role_permissions import SearchRolePermissionsAction
-from .actions.search_scopes import (
-    GlobalSearchScopesAction,
-    GlobalSearchScopesActionResult,
-)
 from .actions.search_users_assigned_to_role import (
     GlobalSearchRoleAssignmentsAction,
     GlobalSearchRoleAssignmentsActionResult,
@@ -106,9 +102,6 @@ class PermissionControllerProcessors:
     ]
     replace_role_permissions: SingleEntityActionProcessor[
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
-    ]
-    global_search_scopes: GlobalActionProcessor[
-        GlobalSearchScopesAction, GlobalSearchScopesActionResult
     ]
     public_get_scope_types: PublicActionProcessor[
         PublicGetScopeTypesAction, PublicGetScopeTypesActionResult
@@ -172,9 +165,6 @@ class PermissionControllerProcessors:
         )
         self.replace_role_permissions = role_group.single_entity(
             ReplaceRolePermissionsAction, service.replace_role_permissions
-        )
-        self.global_search_scopes = role_group.global_scope(
-            GlobalSearchScopesAction, service.search_scopes
         )
         self.public_get_scope_types = role_group.public(
             PublicGetScopeTypesAction, service.get_scope_types

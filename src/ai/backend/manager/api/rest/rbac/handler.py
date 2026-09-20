@@ -33,16 +33,13 @@ from ai.backend.common.dto.manager.rbac import (
     UpdateRoleRequest,
     UpdateRoleResponse,
 )
-from ai.backend.common.dto.manager.rbac.path import SearchScopesPathParam
 from ai.backend.common.dto.manager.rbac.request import (
     DeleteRoleRequest,
     PurgeRoleRequest,
-    SearchScopesRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import (
     GetEntityTypesResponse,
     GetScopeTypesResponse,
-    SearchScopesResponse,
 )
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
@@ -65,9 +62,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     PublicGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
-from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
-    GlobalSearchScopesAction,
-)
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
@@ -77,7 +71,6 @@ from ai.backend.manager.services.rbac.processors import RbacProcessors
 
 from .assigned_user_adapter import AssignedUserAdapter
 from .role_adapter import RoleAdapter
-from .scope_adapter import ScopeAdapter
 
 
 class RBACHandler:
@@ -93,7 +86,6 @@ class RBACHandler:
         self._rbac = rbac
         self._role_adapter = RoleAdapter()
         self._assigned_user_adapter = AssignedUserAdapter()
-        self._scope_adapter = ScopeAdapter()
 
     # Role Management Endpoints
 
@@ -269,27 +261,6 @@ class RBACHandler:
             PublicGetScopeTypesAction()
         )
         resp = GetScopeTypesResponse(items=action_result.entity_types)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    async def search_scopes(
-        self,
-        path: PathParam[SearchScopesPathParam],
-        body: BodyParam[SearchScopesRequest],
-        ctx: UserContext,
-    ) -> APIResponse:
-        """Search scopes for a specific scope type with filters and pagination."""
-        scope_type = path.parsed.scope_type
-        querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = GlobalSearchScopesAction(scope_type=scope_type, querier=querier)
-        action_result = await self._permission_controller.global_search_scopes.run(action)
-        resp = SearchScopesResponse(
-            items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
-            pagination=PaginationInfo(
-                total=action_result.result.total_count,
-                offset=body.parsed.offset,
-                limit=body.parsed.limit,
-            ),
-        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # Entity Management Endpoints

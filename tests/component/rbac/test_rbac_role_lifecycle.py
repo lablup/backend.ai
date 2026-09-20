@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     RevokeRoleRequest,
     RoleFilter,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -284,14 +283,6 @@ class TestScopeAndEntityDiscovery:
     ) -> None:
         result = await admin_registry.rbac.get_entity_types()
         assert len(result.items) > 0
-
-    async def test_search_domain_scopes(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.rbac.search_scopes("domain", SearchScopesRequest())
-        assert result.pagination.total >= 1
-        assert len(result.items) >= 1
 
 
 class TestRoleSearchPagination:

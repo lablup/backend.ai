@@ -10,7 +10,6 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     role_scope_types,
 )
-from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ScopeId
 
@@ -23,7 +22,6 @@ __all__ = (
     "RBACElementRef",
     "RoleSource",
     "ScopeData",
-    "ScopeListResult",
     "role_scope_types",
 )
 
@@ -62,10 +60,3 @@ class ScopeData:
 
     id: ScopeId
     name: str
-
-
-@dataclass(frozen=True)
-class ScopeListResult(SearchResult[ScopeData]):
-    """Result of searching scopes."""
-
-    pass

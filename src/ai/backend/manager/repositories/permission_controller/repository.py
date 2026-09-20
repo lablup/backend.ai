@@ -3,11 +3,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -29,9 +26,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeListResult,
 )
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
@@ -184,30 +178,3 @@ class PermissionControllerRepository:
         return await self._db_source.search_role_assignments_in_scope(
             scopes=scopes, searcher=searcher
         )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_scopes(
-        self,
-        scope_type: EntityType,
-        querier: BatchQuerier,
-    ) -> ScopeListResult:
-        """Search scopes of the given type.
-
-        Args:
-            scope_type: The entity type of scope to search.
-            querier: BatchQuerier with conditions, orders, and pagination.
-
-        Returns:
-            ScopeListResult with matching scopes.
-        """
-        match scope_type:
-            case DomainEntityType():
-                return await self._db_source.search_domain_scopes(querier)
-            case ProjectEntityType():
-                return await self._db_source.search_project_scopes(querier)
-            case UserEntityType():
-                return await self._db_source.search_user_scopes(querier)
-            case _:
-                raise NotImplementedError(
-                    "This function will be deprecated and new repository functions will be implemented for each scope"
-                )
