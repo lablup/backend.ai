@@ -869,3 +869,165 @@ class TestGroupUserNestedSearchIntegration:
         # alice@example.com < bob@example.com
         assert result.items[0].id == projects_with_users["proj_alpha"]["project_id"]
         assert result.items[1].id == projects_with_users["proj_beta"]["project_id"]
+
+
+class TestGroupUserNestedSameMember:
+    """One EXISTS over every user condition, so one member has to satisfy them all."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(database_connection, _WITH_TABLES):
+            yield database_connection
+
+    @pytest.fixture
+    async def group_db_source(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ProjectDBSource:
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
+    async def project_with_two_members(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> uuid.UUID:
+        """One project holding carol and dave, whose usernames and emails do not cross."""
+        domain_name = f"two-member-dom-{uuid.uuid4().hex[:8]}"
+        project_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as session:
+            domain_id = DomainID(uuid.uuid4())
+            session.add(
+                DomainRow(
+                    id=domain_id,
+                    name=domain_name,
+                    description="Two member domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    allowed_docker_registries=[],
+                    dotfiles=b"",
+                    integration_id=None,
+                )
+            )
+            await session.flush()
+
+            user_policy = UserResourcePolicyRow(
+                name=f"upol-{uuid.uuid4().hex[:8]}",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            project_policy = ProjectResourcePolicyRow(
+                name=f"ppol-{uuid.uuid4().hex[:8]}",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(user_policy)
+            session.add(project_policy)
+            await session.flush()
+
+            member_ids: list[uuid.UUID] = []
+            for username, email in [("carol", "carol@example.com"), ("dave", "dave@example.com")]:
+                member_id = uuid.uuid4()
+                session.add(
+                    UserRow(
+                        uuid=member_id,
+                        username=username,
+                        email=email,
+                        password=PasswordInfo(
+                            password="test_password",
+                            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                            rounds=100_000,
+                            salt_size=32,
+                        ),
+                        domain_id=domain_id,
+                        need_password_change=False,
+                        full_name=username,
+                        description="member",
+                        status=UserStatus.ACTIVE,
+                        status_info="admin-requested",
+                        domain_name=domain_name,
+                        role=UserRole.USER,
+                        resource_policy=user_policy.name,
+                    )
+                )
+                member_ids.append(member_id)
+            await session.flush()
+
+            session.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"proj-{project_id.hex[:8]}",
+                    description="two member project",
+                    is_active=True,
+                    domain_name=domain_name,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    integration_id=None,
+                    resource_policy=project_policy.name,
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await session.flush()
+
+            for member_id in member_ids:
+                session.add(AssocGroupUserRow(group_id=project_id, user_id=member_id))
+
+            await session.commit()
+
+        return project_id
+
+    async def test_conditions_met_by_one_member_match(
+        self,
+        group_db_source: ProjectDBSource,
+        project_with_two_members: uuid.UUID,
+    ) -> None:
+        """Carol's username and Carol's email are the same member, so the project matches."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[
+                DeprecatedProjectConditions.exists_user_combined([
+                    UserConditions.by_username_contains(
+                        StringMatchSpec(value="carol", case_insensitive=False, negated=False)
+                    ),
+                    UserConditions.by_email_contains(
+                        StringMatchSpec(value="carol@", case_insensitive=False, negated=False)
+                    ),
+                ])
+            ],
+            orders=[],
+        )
+        result = await group_db_source.search_projects(querier)
+
+        assert result.total_count == 1
+        assert result.items[0].id == project_with_two_members
+
+    async def test_conditions_split_across_members_do_not_match(
+        self,
+        group_db_source: ProjectDBSource,
+        project_with_two_members: uuid.UUID,
+    ) -> None:
+        """Carol's username and Dave's email are different members, so nothing matches."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[
+                DeprecatedProjectConditions.exists_user_combined([
+                    UserConditions.by_username_contains(
+                        StringMatchSpec(value="carol", case_insensitive=False, negated=False)
+                    ),
+                    UserConditions.by_email_contains(
+                        StringMatchSpec(value="dave@", case_insensitive=False, negated=False)
+                    ),
+                ])
+            ],
+            orders=[],
+        )
+        result = await group_db_source.search_projects(querier)
+
+        assert result.total_count == 0
