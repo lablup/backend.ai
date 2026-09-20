@@ -93,7 +93,7 @@ class DomainProcessors:
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
         self.bulk_get = group.public_partial_bulk_get_ops(BulkGetDomainsAction)
         self.global_search = group.global_searcher_ops(GlobalSearchDomainsAction)
-        self.scoped_search = group.scope_search_ops(ScopedSearchDomainsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchDomainsAction)
         self.update_domain = group.single_update_ops(UpdateDomainAction)
         self.delete_domain = group.single_delete_ops(DeleteDomainAction)
         self.restore_domain = group.single_restore_ops(RestoreDomainAction)

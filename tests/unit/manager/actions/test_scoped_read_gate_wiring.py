@@ -32,6 +32,7 @@ from ai.backend.manager.models.domain.scopes import (
 )
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.domain.actions.scoped_search import (
     ScopedSearchDomainsAction,
@@ -86,8 +87,11 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
-        targets=[ResourceGroupDomainTarget(resource_group_id=resource_group_id)],
-        searcher=DomainSearcher(pagination=NoPagination(), conditions=[]),
+        searcher=ScopedSearcher(
+            scopes=[ResourceGroupDomainTarget(resource_group_id=resource_group_id)],
+            used_by=(),
+            searcher=DomainSearcher(pagination=NoPagination(), conditions=[]),
+        )
     )
 
     with with_user(regular_user), pytest.raises(NotEnoughPermission):

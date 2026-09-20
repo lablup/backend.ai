@@ -5369,8 +5369,12 @@ input DomainV2Filter {
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
   modifiedAt: DateTimeFilter = null
-  project: DomainProjectNestedFilter = null
-  user: DomainUserNestedFilter = null
+
+  """Filter by the projects the domain holds."""
+  project: DomainProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by their domain.")
+
+  """Filter by the users the domain holds."""
+  user: DomainUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by their domain.")
   AND: [DomainV2Filter!] = null
   OR: [DomainV2Filter!] = null
   NOT: [DomainV2Filter!] = null
@@ -5385,16 +5389,16 @@ input DomainV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name. USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
 """
 enum DomainV2OrderField {
   CREATED_AT
   MODIFIED_AT
   NAME
   IS_ACTIVE
-  PROJECT_NAME
-  USER_USERNAME
-  USER_EMAIL
+  PROJECT_NAME @deprecated(reason: "Deprecated since 26.9.0. A domain holds many projects, so this order folds them into a single project name. Narrow the results with the matching filter instead.")
+  USER_USERNAME @deprecated(reason: "Deprecated since 26.9.0. A domain holds many users, so this order folds them into a single username. Narrow the results with the matching filter instead.")
+  USER_EMAIL @deprecated(reason: "Deprecated since 26.9.0. A domain holds many users, so this order folds them into a single email address. Narrow the results with the matching filter instead.")
 }
 
 """
