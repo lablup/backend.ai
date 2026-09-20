@@ -36,9 +36,9 @@ from ai.backend.manager.models.virtual_entity.queries import scope_membership_ex
 __all__ = (
     "ContainerRegistryImageTarget",
     "DomainImageTarget",
-    "GlobalImageTarget",
     "ImageTarget",
     "ProjectImageTarget",
+    "PublicImageTarget",
     "UserImageTarget",
 )
 
@@ -178,11 +178,10 @@ class ContainerRegistryImageTarget(ImageTarget):
 
 
 @dataclass(frozen=True)
-class GlobalImageTarget(ImageTarget):
-    """The images every caller sees: those of a registry marked global.
+class PublicImageTarget(ImageTarget):
+    """The images of the registries registered in public.
 
-    The column is nullable, and a registry that leaves it unset is not global. The read
-    is answered for at the public scope, where every account holds image READ.
+    `is_global` is the column that records the registration; unset is not registered.
     """
 
     @override

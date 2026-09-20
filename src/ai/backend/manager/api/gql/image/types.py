@@ -448,10 +448,9 @@ class ImageSearchScopeGQL(PydanticInputMixin[ImageScope]):
     container_registry: list[UUIDScopeGQL] | None = gql_field(
         default=None, description="Container registries whose images are being read."
     )
-    global_: bool = gql_field(
+    public: bool = gql_field(
         default=False,
-        name="global",
-        description="Include the images of every registry marked global.",
+        description="Include the images of every registry registered in public.",
     )
 
 

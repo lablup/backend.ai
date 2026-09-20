@@ -9468,8 +9468,8 @@ input ImageSearchScope
   """Container registries whose images are being read."""
   containerRegistry: [UUIDScope!] = null
 
-  """Include the images of every registry marked global."""
-  global: Boolean! = false
+  """Include the images of every registry registered in public."""
+  public: Boolean! = false
 }
 
 """Added in 25.4.0."""
