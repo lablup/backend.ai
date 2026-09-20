@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
@@ -401,6 +402,22 @@ class BaseFilterAdapter:
             applied.append(conditions.not_equals(conditions.to_value(enum_filter.not_equals)))
         if enum_filter.not_in is not None:
             applied.append(conditions.not_in([conditions.to_value(v) for v in enum_filter.not_in]))
+        return applied
+
+    @final
+    def apply_array_filter[V](
+        self, array_filter: ArrayFilter[V] | None, conditions: ArrayConditions[V]
+    ) -> list[QueryCondition]:
+        """Apply every containment ``array_filter`` sets, each as its own condition."""
+        if array_filter is None:
+            return []
+        applied: list[QueryCondition] = []
+        if array_filter.contains is not None:
+            applied.append(conditions.contains(array_filter.contains))
+        if array_filter.contains_any is not None:
+            applied.append(conditions.contains_any(array_filter.contains_any))
+        if array_filter.contains_all is not None:
+            applied.append(conditions.contains_all(array_filter.contains_all))
         return applied
 
     @final
