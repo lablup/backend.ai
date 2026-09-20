@@ -19,7 +19,7 @@ sources:
   - src/ai/backend/manager/models/entity_label/searchable_fields.py
   - src/ai/backend/manager/models/scopes.py
   - src/ai/backend/manager/models/specs/searcher.py
-  - src/ai/backend/manager/actions/v2/scope/validator/used_by.py
+  - src/ai/backend/manager/actions/v2/scope/validator/rbac.py
 generated:
   by: claude-code/opus-5
   at: 2026-09-20
@@ -201,7 +201,7 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 - Results only come from rows the scopes allow, so a row a using entity uses is still left out when the caller cannot read it.
 - Search APIs with a permission model (GitHub search `repo:`, GCP Cloud Asset scopes) refuse a condition target the caller cannot read and limit results to what the caller can read. This follows them.
 - The using side's permission is checked before the query, so SQL carries only the usage condition.
-- The check has its own validator, apart from the scope validator: used_by exists only on searches and means nothing to other scope actions such as create. The two validators query the database separately; merging them is follow-up work.
+- used_by exists only on searches and means nothing to other scope actions such as create, so it started as a separate validator. BA-8024 merged it into the scope validator, which now reads both in one database round trip.
 - A global search does not check using entities: the SUPERADMIN gate answers for the unscoped read.
 - This does not answer an owner asking "who uses my resource". That needs a limited usage listing on the result entity's side.
 
