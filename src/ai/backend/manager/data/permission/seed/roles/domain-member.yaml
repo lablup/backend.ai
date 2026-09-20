@@ -15,7 +15,7 @@ permissions:
   container_registry:               []
   deployment:                       []
   deployment_preset:                []
-  domain:                           []
+  domain:                           [read]
   entity_share:                     []
   global:                           []
   idle_checker:                     []

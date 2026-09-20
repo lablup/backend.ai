@@ -60,7 +60,7 @@ class DomainProcessors:
     bulk_lookup: BulkLookupActionProcessor[
         BulkLookupDomainsAction, BulkLookupOpsResult[DomainName, DomainID]
     ]
-    # What the DataLoaders read: open to every authenticated caller.
+    # What the DataLoaders read: one READ check per domain named.
     bulk_get: PartialBulkActionProcessor[BulkGetDomainsAction, DomainData]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
     scoped_search: ScopeActionProcessor[ScopedSearchDomainsAction, ScopedBatchOpsResult[DomainData]]
@@ -91,7 +91,7 @@ class DomainProcessors:
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup = group.public_lookup_ops(LookupDomainAction)
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
-        self.bulk_get = group.public_partial_bulk_get_ops(BulkGetDomainsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetDomainsAction)
         self.global_search = group.global_searcher_ops(GlobalSearchDomainsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchDomainsAction)
         self.update_domain = group.single_update_ops(UpdateDomainAction)

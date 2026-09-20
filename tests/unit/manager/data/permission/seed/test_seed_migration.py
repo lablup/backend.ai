@@ -18,6 +18,7 @@ _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
 _USER_OWNER_REVISION = "dc61fa027fc1_assign_every_user_their_user_owner_role"
 _DOMAIN_MEMBER_REVISION = "e7d2a9c41b60_assign_every_user_their_domain_member_role"
 _PROJECT_MEMBER_READ_REVISION = "a0f597deb5e5_grant_project_members_read_on_their_project"
+_DOMAIN_MEMBER_READ_REVISION = "c4a71e0d5b38_grant_domain_members_read_on_their_domain"
 _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
@@ -42,6 +43,11 @@ def domain_member_migration() -> Any:
 @pytest.fixture(scope="module")
 def project_member_read_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_PROJECT_MEMBER_READ_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def domain_member_read_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_DOMAIN_MEMBER_READ_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -101,6 +107,7 @@ class TestMigrationMatchesFixture:
         self,
         migration: Any,
         domain_member_migration: Any,
+        domain_member_read_migration: Any,
         project_member_read_migration: Any,
         public_member_migration: Any,
         fixture: dict[str, Any],
@@ -146,6 +153,17 @@ class TestMigrationMatchesFixture:
             for entity_type, bits in public_member_migration._GRANTS
             for bit in bits
         }
+        written.add((
+            domain_member_read_migration._identify(
+                "role_permission_preset",
+                domain_member_read_migration._PRESET_ID,
+                domain_member_read_migration._ENTITY_TYPE,
+                str(domain_member_read_migration._READ),
+            ),
+            domain_member_read_migration._PRESET_ID,
+            domain_member_read_migration._ENTITY_TYPE,
+            domain_member_read_migration._READ,
+        ))
         written.add((
             project_member_read_migration._identify(
                 "role_permission_preset",

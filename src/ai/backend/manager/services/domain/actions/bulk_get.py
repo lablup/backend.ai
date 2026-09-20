@@ -16,8 +16,8 @@ from ai.backend.manager.models.domain.row import DomainRow
 class BulkGetDomainsAction(PartialBulkGetEntityOpsAction[DomainRow, DomainData]):
     """Read the domains the caller named, answering for each id.
 
-    Wired public: a regular user holds no read on the domain entity, and the domains
-    a DataLoader names are the ones the caller's own rows already point at.
+    Every member of a domain holds READ on it through the domain_member role, so the
+    check is per domain rather than per login.
     """
 
     ids: Sequence[DomainID]
