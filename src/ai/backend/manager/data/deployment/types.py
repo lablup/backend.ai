@@ -1241,33 +1241,6 @@ class LegacyDeploymentData:
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
-class DeploymentOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-    UPDATED_AT = "UPDATED_AT"
-    NAME = "NAME"
-
-
-class ModelRevisionOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-    NAME = "NAME"
-
-
-class ReplicaOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-    ID = "ID"
-
-
-class AccessTokenOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-
-
-class AutoScalingRuleOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-
-
-# ========== Scheduling History Types ==========
-
-
 @dataclass
 class DeploymentHistoryData(FieldData):
     """Domain model for deployment history."""

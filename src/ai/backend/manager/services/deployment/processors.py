@@ -26,6 +26,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
     OwnedFieldsOpsResult,
+    ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -188,11 +189,9 @@ from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
-    ScopedSearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     GlobalSearchDeploymentsAction,
-    GlobalSearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
     GlobalSearchLegacyDeploymentsAction,
@@ -236,14 +235,14 @@ class DeploymentProcessors:
         DestroyDeploymentAction, DestroyDeploymentActionResult
     ]
     global_search: GlobalActionProcessor[
-        GlobalSearchDeploymentsAction, GlobalSearchDeploymentsActionResult
+        GlobalSearchDeploymentsAction, BatchOpsResult[ModelDeploymentData]
     ]
     # Legacy (REST v1) read variants — full revision. DO NOT USE in new code.
     global_search_legacy: GlobalActionProcessor[
         GlobalSearchLegacyDeploymentsAction, GlobalSearchLegacyDeploymentsActionResult
     ]
     scoped_search: ScopeActionProcessor[
-        ScopedSearchDeploymentsAction, ScopedSearchDeploymentsActionResult
+        ScopedSearchDeploymentsAction, ScopedBatchOpsResult[ModelDeploymentData]
     ]
     get_deployment_by_id: SingleEntityActionProcessor[
         GetDeploymentByIdAction, GetDeploymentByIdActionResult
@@ -445,15 +444,11 @@ class DeploymentProcessors:
         self.destroy_deployment = group.single_entity(
             DestroyDeploymentAction, service.destroy_deployment
         )
-        self.global_search = group.global_scope(
-            GlobalSearchDeploymentsAction, service.search_deployments
-        )
+        self.global_search = group.global_searcher_ops(GlobalSearchDeploymentsAction)
         self.global_search_legacy = group.global_scope(
             GlobalSearchLegacyDeploymentsAction, service.search_legacy_deployments
         )
-        self.scoped_search = group.scope(
-            ScopedSearchDeploymentsAction, service.scoped_search_deployments
-        )
+        self.scoped_search = group.scoped_search_ops(ScopedSearchDeploymentsAction)
         self.get_deployment_by_id = group.single_entity(
             GetDeploymentByIdAction, service.get_deployment_by_id
         )

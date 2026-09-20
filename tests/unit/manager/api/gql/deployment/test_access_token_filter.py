@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter as AccessTokenFilterDTO,
 )
-from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter
 from ai.backend.manager.api.gql.deployment.types.access_token import AccessTokenFilter
 
 # Row imports to trigger mapper initialization (FK dependency order).
@@ -67,26 +67,30 @@ _MAPPER_ROWS = [
     ResourcePresetRow,
 ]
 
+_T1 = datetime(2026, 1, 1, tzinfo=UTC)
+_T2 = datetime(2026, 2, 1, tzinfo=UTC)
+_T3 = datetime(2026, 3, 1, tzinfo=UTC)
+
 
 class TestAccessTokenFilterAND:
     """Tests for AND logical operator on AccessTokenFilter.to_pydantic()."""
 
     def test_and_extends_conditions_from_sub_filter(self) -> None:
         f = AccessTokenFilter(
-            AND=[AccessTokenFilter(token=StringFilter(equals="tok-abc"))],
+            AND=[AccessTokenFilter(expires_at=DateTimeFilter(equals=_T1))],
         )
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
         assert dto.AND is not None
         assert len(dto.AND) == 1
-        assert dto.AND[0].token is not None
-        assert dto.AND[0].token.equals == "tok-abc"
+        assert dto.AND[0].expires_at is not None
+        assert dto.AND[0].expires_at.equals == _T1
 
     def test_and_combines_multiple_sub_filters(self) -> None:
         f = AccessTokenFilter(
             AND=[
-                AccessTokenFilter(token=StringFilter(equals="tok-abc")),
-                AccessTokenFilter(token=StringFilter(equals="tok-xyz")),
+                AccessTokenFilter(expires_at=DateTimeFilter(equals=_T1)),
+                AccessTokenFilter(expires_at=DateTimeFilter(equals=_T2)),
             ],
         )
         dto = f.to_pydantic()
@@ -102,13 +106,13 @@ class TestAccessTokenFilterAND:
 
     def test_and_combined_with_field_filter(self) -> None:
         f = AccessTokenFilter(
-            token=StringFilter(equals="tok-abc"),
-            AND=[AccessTokenFilter(token=StringFilter(equals="tok-xyz"))],
+            expires_at=DateTimeFilter(equals=_T1),
+            AND=[AccessTokenFilter(expires_at=DateTimeFilter(equals=_T2))],
         )
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
-        assert dto.token is not None
-        assert dto.token.equals == "tok-abc"
+        assert dto.expires_at is not None
+        assert dto.expires_at.equals == _T1
         assert dto.AND is not None
         assert len(dto.AND) == 1
 
@@ -119,16 +123,16 @@ class TestAccessTokenFilterOR:
     def test_or_produces_sub_filter_dtos(self) -> None:
         f = AccessTokenFilter(
             OR=[
-                AccessTokenFilter(token=StringFilter(equals="tok-abc")),
-                AccessTokenFilter(token=StringFilter(equals="tok-xyz")),
+                AccessTokenFilter(expires_at=DateTimeFilter(equals=_T1)),
+                AccessTokenFilter(expires_at=DateTimeFilter(equals=_T2)),
             ],
         )
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
         assert dto.OR is not None
         assert len(dto.OR) == 2
-        assert dto.OR[0].token is not None
-        assert dto.OR[0].token.equals == "tok-abc"
+        assert dto.OR[0].expires_at is not None
+        assert dto.OR[0].expires_at.equals == _T1
 
     def test_or_with_empty_list_produces_none_or_empty(self) -> None:
         f = AccessTokenFilter(OR=[])
@@ -138,15 +142,15 @@ class TestAccessTokenFilterOR:
 
     def test_or_combined_with_field_filter(self) -> None:
         f = AccessTokenFilter(
-            token=StringFilter(equals="tok-abc"),
+            expires_at=DateTimeFilter(equals=_T1),
             OR=[
-                AccessTokenFilter(token=StringFilter(equals="tok-xyz")),
-                AccessTokenFilter(token=StringFilter(equals="tok-def")),
+                AccessTokenFilter(expires_at=DateTimeFilter(equals=_T2)),
+                AccessTokenFilter(expires_at=DateTimeFilter(equals=_T3)),
             ],
         )
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
-        assert dto.token is not None
+        assert dto.expires_at is not None
         assert dto.OR is not None
         assert len(dto.OR) == 2
 
@@ -155,7 +159,7 @@ class TestAccessTokenFilterOR:
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
         assert dto.OR is not None
-        assert dto.OR[0].token is None
+        assert dto.OR[0].expires_at is None
 
 
 class TestAccessTokenFilterNOT:
@@ -165,7 +169,7 @@ class TestAccessTokenFilterNOT:
         f = AccessTokenFilter(
             NOT=[
                 AccessTokenFilter(
-                    token=StringFilter(equals="tok-revoked"),
+                    expires_at=DateTimeFilter(equals=_T3),
                     created_at=DateTimeFilter(
                         before=datetime(2024, 1, 1, tzinfo=UTC),
                     ),
@@ -176,8 +180,8 @@ class TestAccessTokenFilterNOT:
         assert isinstance(dto, AccessTokenFilterDTO)
         assert dto.NOT is not None
         assert len(dto.NOT) == 1
-        assert dto.NOT[0].token is not None
-        assert dto.NOT[0].token.equals == "tok-revoked"
+        assert dto.NOT[0].expires_at is not None
+        assert dto.NOT[0].expires_at.equals == _T3
 
     def test_not_with_empty_list_produces_none_or_empty(self) -> None:
         f = AccessTokenFilter(NOT=[])
@@ -187,12 +191,12 @@ class TestAccessTokenFilterNOT:
 
     def test_not_combined_with_field_filter(self) -> None:
         f = AccessTokenFilter(
-            token=StringFilter(equals="tok-abc"),
-            NOT=[AccessTokenFilter(token=StringFilter(equals="tok-revoked"))],
+            expires_at=DateTimeFilter(equals=_T1),
+            NOT=[AccessTokenFilter(expires_at=DateTimeFilter(equals=_T3))],
         )
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
-        assert dto.token is not None
+        assert dto.expires_at is not None
         assert dto.NOT is not None
         assert len(dto.NOT) == 1
 
@@ -201,4 +205,4 @@ class TestAccessTokenFilterNOT:
         dto = f.to_pydantic()
         assert isinstance(dto, AccessTokenFilterDTO)
         assert dto.NOT is not None
-        assert dto.NOT[0].token is None
+        assert dto.NOT[0].expires_at is None

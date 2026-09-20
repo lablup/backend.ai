@@ -6,9 +6,11 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from typing import assert_never
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.model_deployment.types import (
     RouteStatus as CommonRouteStatus,
@@ -77,13 +79,13 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
-from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
+from ai.backend.manager.models.deployment_revision.searchable_fields import (
+    ModelRevisionSearchableFields,
+)
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.models.endpoint.orders import DeploymentOrders
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.routing.orders import RouteOrders
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.routing.cursors import ReplicaCursor
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -185,59 +187,40 @@ class DeploymentAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: DeploymentFilter) -> list[QueryCondition]:
         """Convert deployment filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        # Name filter
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=DeploymentConditions.by_name_contains,
-                equals_factory=DeploymentConditions.by_name_equals,
-                starts_with_factory=DeploymentConditions.by_name_starts_with,
-                ends_with_factory=DeploymentConditions.by_name_ends_with,
-                in_factory=DeploymentConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        # Domain name filter
-        if filter.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter.domain_name,
-                contains_factory=DeploymentConditions.by_domain_name_contains,
-                equals_factory=DeploymentConditions.by_domain_name_equals,
-                starts_with_factory=DeploymentConditions.by_domain_name_starts_with,
-                ends_with_factory=DeploymentConditions.by_domain_name_ends_with,
-                in_factory=DeploymentConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        # Project ID filter
+        fields = DeploymentSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(filter.domain_name, fields.domain.filter),
+        ]
         if filter.project_id is not None:
-            conditions.append(DeploymentConditions.by_project_id(filter.project_id))
-
+            conditions.append(
+                fields.project.filter.equals(
+                    UUIDEqualMatchSpec(value=filter.project_id, negated=False)
+                )
+            )
         return conditions
 
     def _convert_order(self, order: DeploymentOrder) -> QueryOrder:
         """Convert deployment order specification to query order."""
+        fields = DeploymentSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
-
-        if order.field == DeploymentOrderField.NAME:
-            return DeploymentOrders.name(ascending=ascending)
-        if order.field == DeploymentOrderField.CREATED_AT:
-            return DeploymentOrders.created_at(ascending=ascending)
-        if order.field == DeploymentOrderField.DESTROYED_AT:
-            return DeploymentOrders.destroyed_at(ascending=ascending)
-        if order.field == DeploymentOrderField.DOMAIN:
-            return DeploymentOrders.domain(ascending=ascending)
-        if order.field == DeploymentOrderField.PROJECT:
-            return DeploymentOrders.project(ascending=ascending)
-        if order.field == DeploymentOrderField.RESOURCE_GROUP:
-            return DeploymentOrders.resource_group(ascending=ascending)
-        if order.field == DeploymentOrderField.TAG:
-            return DeploymentOrders.tag(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
+        match order.field:
+            case DeploymentOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case DeploymentOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case DeploymentOrderField.DESTROYED_AT:
+                return fields.destroyed_at.order.apply(ascending)
+            case DeploymentOrderField.DOMAIN:
+                return fields.domain.order.apply(ascending)
+            case DeploymentOrderField.PROJECT:
+                return fields.project.order.apply(ascending)
+            case DeploymentOrderField.RESOURCE_GROUP:
+                return fields.resource_group.order.apply(ascending)
+            case DeploymentOrderField.TAG:
+                return fields.tag.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -294,38 +277,36 @@ class RevisionAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: RevisionFilter) -> list[QueryCondition]:
         """Convert revision filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        # Revision number filter
-        if filter.revision_number is not None:
-            condition = self.convert_int_filter(
-                filter.revision_number,
-                RevisionConditions.by_revision_number,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        # Deployment ID filter
+        fields = ModelRevisionSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_int_filter(filter.revision_number, fields.revision_number.filter),
+        ]
         if filter.deployment_id is not None:
-            conditions.append(RevisionConditions.by_deployment_id(filter.deployment_id))
-
+            conditions.append(
+                fields.deployment_id.filter.equals(
+                    UUIDEqualMatchSpec(value=filter.deployment_id, negated=False)
+                )
+            )
         return conditions
 
     def _convert_order(self, order: RevisionOrder) -> QueryOrder:
         """Convert revision order specification to query order."""
+        fields = ModelRevisionSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
-
-        if order.field == RevisionOrderField.REVISION_NUMBER:
-            return RevisionOrders.revision_number(ascending=ascending)
-        if order.field == RevisionOrderField.CREATED_AT:
-            return RevisionOrders.created_at(ascending=ascending)
-        if order.field == RevisionOrderField.RESOURCE_GROUP:
-            return RevisionOrders.resource_group(ascending=ascending)
-        if order.field == RevisionOrderField.CLUSTER_MODE:
-            return RevisionOrders.cluster_mode(ascending=ascending)
-        if order.field == RevisionOrderField.RUNTIME_VARIANT:
-            return RevisionOrders.runtime_variant_name(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
+        match order.field:
+            case RevisionOrderField.REVISION_NUMBER:
+                return fields.revision_number.order.apply(ascending)
+            case RevisionOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case RevisionOrderField.RESOURCE_GROUP:
+                return fields.resource_group.order.apply(ascending)
+            case RevisionOrderField.CLUSTER_MODE:
+                return fields.cluster_mode.order.apply(ascending)
+            case RevisionOrderField.RUNTIME_VARIANT:
+                variant = ModelRevisionSearchableFields.nested.runtime_variant
+                return variant.correlation.order(variant.fields.name.column).apply(ascending)
+            case _:
+                assert_never(order.field)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
@@ -364,10 +345,11 @@ class RouteAdapter(BaseFilterAdapter):
 
         # Add cursor conditions if provided
         if request.cursor:
+            cursor = ReplicaCursor()
             if request.cursor_direction == "forward":
-                conditions.append(RouteConditions.by_cursor_forward(request.cursor))
+                conditions.append(cursor.after(request.cursor))
             elif request.cursor_direction == "backward":
-                conditions.append(RouteConditions.by_cursor_backward(request.cursor))
+                conditions.append(cursor.before(request.cursor))
 
         pagination = self._build_pagination(request.limit, request.offset)
 
@@ -375,37 +357,39 @@ class RouteAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: RouteFilter) -> list[QueryCondition]:
         """Convert route filter to list of query conditions."""
+        fields = ReplicaSearchableFields.own
         conditions: list[QueryCondition] = []
-
-        # Deployment ID filter
         if filter.deployment_id is not None:
-            conditions.append(RouteConditions.by_endpoint_id(filter.deployment_id))
-
-        # Status filter - convert common types to manager types
+            conditions.append(
+                fields.deployment_id.filter.equals(
+                    UUIDEqualMatchSpec(value=filter.deployment_id, negated=False)
+                )
+            )
         if filter.statuses is not None:
-            manager_statuses = [ManagerRouteStatus(s.value) for s in filter.statuses]
-            conditions.append(RouteConditions.by_statuses(manager_statuses))
-
-        # Traffic status filter - convert common types to manager types
+            conditions.append(
+                fields.status.filter.in_([ManagerRouteStatus(s.value) for s in filter.statuses])
+            )
         if filter.traffic_statuses is not None:
-            manager_traffic_statuses = [
-                ManagerRouteTrafficStatus(s.value) for s in filter.traffic_statuses
-            ]
-            conditions.append(RouteConditions.by_traffic_statuses(manager_traffic_statuses))
-
+            conditions.append(
+                fields.traffic_status.filter.in_([
+                    ManagerRouteTrafficStatus(s.value) for s in filter.traffic_statuses
+                ])
+            )
         return conditions
 
     def _convert_order(self, order: RouteOrder) -> QueryOrder:
         """Convert route order specification to query order."""
+        fields = ReplicaSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
-
-        if order.field == RouteOrderField.CREATED_AT:
-            return RouteOrders.created_at(ascending=ascending)
-        if order.field == RouteOrderField.STATUS:
-            return RouteOrders.status(ascending=ascending)
-        if order.field == RouteOrderField.TRAFFIC_RATIO:
-            return RouteOrders.traffic_ratio(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
+        match order.field:
+            case RouteOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case RouteOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case RouteOrderField.TRAFFIC_RATIO:
+                return fields.traffic_ratio.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

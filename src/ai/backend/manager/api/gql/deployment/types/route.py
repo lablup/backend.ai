@@ -62,8 +62,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
@@ -229,14 +229,33 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
+_ROUTE_STATUS_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A bare list only asks for membership."
+    " Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which"
+    " also offers equals / notEquals / notIn."
+)
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
     name="RouteFilter",
 )
 class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
-    status: list[RouteStatusGQL] | None = None
-    health_status: list[RouteHealthStatusGQL] | None = None
-    traffic_status: list[RouteTrafficStatusGQL] | None = None
+    status: list[RouteStatusGQL] | None = gql_field(
+        description="Route lifecycle statuses to match.",
+        default=None,
+        deprecation_reason=_ROUTE_STATUS_DEPRECATION,
+    )
+    health_status: list[RouteHealthStatusGQL] | None = gql_field(
+        description="Route health statuses to match.",
+        default=None,
+        deprecation_reason=_ROUTE_STATUS_DEPRECATION,
+    )
+    traffic_status: list[RouteTrafficStatusGQL] | None = gql_field(
+        description="Route traffic statuses to match.",
+        default=None,
+        deprecation_reason=_ROUTE_STATUS_DEPRECATION,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -257,7 +276,7 @@ class RouteOrderBy(PydanticInputMixin[RouteOrderDTO]):
 @lru_cache(maxsize=1)
 def get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RouteOrders.created_at(ascending=False),
+        forward_order=ReplicaSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=RoutingRow.id,
     )
 

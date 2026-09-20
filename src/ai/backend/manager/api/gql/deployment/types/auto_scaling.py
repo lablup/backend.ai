@@ -26,6 +26,9 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     UpdateAutoScalingRuleInput as UpdateAutoScalingRuleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    AutoScalingMetricSourceFilter as AutoScalingMetricSourceFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     AutoScalingRuleFilter as AutoScalingRuleFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -47,7 +50,15 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    DecimalFilter,
+    IntFilter,
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -76,6 +87,28 @@ class AutoScalingMetricSource(StrEnum):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the auto-scaling metric source.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AutoScalingMetricSourceFilter",
+)
+class AutoScalingMetricSourceFilterGQL(PydanticInputMixin[AutoScalingMetricSourceFilterDTO]):
+    in_: list[AutoScalingMetricSource] | None = gql_field(
+        description="Metric sources to match.", name="in", default=None
+    )
+    equals: AutoScalingMetricSource | None = gql_field(
+        description="Exact metric source match.", default=None
+    )
+    not_in: list[AutoScalingMetricSource] | None = gql_field(
+        description="Excludes metric sources in the list.", name="notIn", default=None
+    )
+    not_equals: AutoScalingMetricSource | None = gql_field(
+        description="Excludes exact metric source match.", name="notEquals", default=None
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="AutoScalingRuleFilter",
 )
@@ -85,6 +118,60 @@ class AutoScalingRuleFilter(PydanticInputMixin[AutoScalingRuleFilterDTO]):
     created_at: DateTimeFilter | None = None
     last_triggered_at: NullableDateTimeFilter | None = None
 
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by rule ID."),
+        default=None,
+    )
+    metric_source: AutoScalingMetricSourceFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by metric source."
+        ),
+        default=None,
+    )
+    metric_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by metric name."),
+        default=None,
+    )
+    min_threshold: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the scale-down threshold."
+        ),
+        default=None,
+    )
+    max_threshold: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the scale-up threshold."
+        ),
+        default=None,
+    )
+    step_size: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by step size."),
+        default=None,
+    )
+    time_window: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the cooldown window."
+        ),
+        default=None,
+    )
+    min_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the replica floor."
+        ),
+        default=None,
+    )
+    max_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the replica ceiling."
+        ),
+        default=None,
+    )
+    prometheus_query_preset_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the Prometheus query preset."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
