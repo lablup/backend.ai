@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
@@ -20,9 +20,7 @@ from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
-from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation, ToOneCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
-from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 
@@ -135,14 +133,6 @@ class _ProjectLinkedEntities:
     """How a project connects to other entities; the other entity's permission governs."""
 
     membership = _ProjectMembershipConditions(ProjectEntityType(), ProjectRow.id)
-    domain = ToOneCorrelation(DomainRow, ProjectRow, DomainRow.name == ProjectRow.domain_name)
-    """The domain holding the project. Its conditions come from the domain's own module."""
-    members = ToManyCorrelation(
-        sa.join(AssocGroupUserRow, UserRow, AssocGroupUserRow.user_id == UserRow.uuid),
-        ProjectRow,
-        AssocGroupUserRow.group_id == ProjectRow.id,
-    )
-    """The users enrolled in the project. Their conditions come from the user's own module."""
 
 
 class ProjectSearchableFields:

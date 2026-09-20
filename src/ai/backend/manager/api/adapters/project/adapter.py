@@ -61,7 +61,10 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.deprecated_search import DeprecatedProjectOrders
+from ai.backend.manager.models.project.deprecated_search import (
+    DeprecatedProjectConditions,
+    DeprecatedProjectOrders,
+)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
@@ -474,7 +477,7 @@ class ProjectAdapter(BaseAdapter):
             raw_conditions.append(DomainConditions.by_is_active(domain_filter.is_active))
         if not raw_conditions:
             return []
-        return [ProjectSearchableFields.linked.domain.has(raw_conditions)]
+        return [DeprecatedProjectConditions.exists_domain_combined(raw_conditions)]
 
     def _convert_user_nested_filter(
         self, user_filter: ProjectUserFilter | None
@@ -517,7 +520,7 @@ class ProjectAdapter(BaseAdapter):
             raw_conditions.append(UserConditions.by_is_active(user_filter.is_active))
         if not raw_conditions:
             return []
-        return [ProjectSearchableFields.linked.members.some(raw_conditions)]
+        return [DeprecatedProjectConditions.exists_user_combined(raw_conditions)]
 
     def _convert_orders(self, order: list[ProjectOrder]) -> list[QueryOrder]:
         return [self._convert_order(o) for o in order]
