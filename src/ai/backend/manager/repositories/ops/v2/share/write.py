@@ -123,6 +123,17 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         await self._removed_from(from_scopes, entity)
         await self._created_in(to_scopes, entity)
 
+    async def transfer_all(
+        self,
+        from_scopes: Collection[EntityIdentifier],
+        to_scopes: Collection[EntityIdentifier],
+        entities: Collection[EntityIdentifier],
+    ) -> None:
+        """:meth:`transfer` over many entities at once. Idempotent, so a move split
+        into parts can be repeated from the start."""
+        await self._removed_from_all(from_scopes, entities)
+        await self._created_in_all(to_scopes, entities)
+
     async def accept_share(self, updater: EntityShareAcceptUpdater) -> EntityShareData | None:
         """Settle the invitation as accepted and share its entity to the invitee.
 
