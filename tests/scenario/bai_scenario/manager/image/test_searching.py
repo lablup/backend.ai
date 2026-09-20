@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImagesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
+    ImageAliasOrderField,
     ImageOrderField,
     ImageStatusType,
     OrderDirection,
@@ -233,7 +234,7 @@ class SearchingAliasesForOneImage(
                     ),
                     order=[
                         ImageAliasOrderByInputDTO(
-                            field="alias",
+                            field=ImageAliasOrderField.ALIAS,
                             direction=OrderDirection.DESC,
                         )
                     ],

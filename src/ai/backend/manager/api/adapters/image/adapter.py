@@ -46,6 +46,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
+    ImageAliasOrderField,
     ImageLabelInfo,
     ImageOrderField,
     ImageResourceLimitGQLInfo,
@@ -385,6 +386,16 @@ class ImageAdapter(BaseAdapter):
             *self.apply_string_filter(filter.architecture, fields.architecture.filter),
             *self.apply_uuid_filter(filter.registry_id, fields.registry_id.filter),
             *self.apply_enum_filter(filter.status, fields.status.filter),
+            *self.apply_string_filter(filter.image, fields.image.filter),
+            *self.apply_string_filter(filter.registry, fields.registry.filter),
+            *self.apply_string_filter(filter.project, fields.project.filter),
+            *self.apply_string_filter(filter.tag, fields.tag.filter),
+            *self.apply_string_filter(filter.config_digest, fields.config_digest.filter),
+            *self.apply_string_filter(filter.accelerators, fields.accelerators.filter),
+            *self.apply_int_filter(filter.size_bytes, fields.size_bytes.filter),
+            *self.apply_bool_filter(filter.is_local, fields.is_local.filter),
+            *self.apply_enum_filter(filter.type, fields.type.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
         ]
         if filter.alias is not None:
@@ -421,6 +432,7 @@ class ImageAdapter(BaseAdapter):
         conditions = [
             *self.apply_string_filter(filter.alias, fields.alias.filter),
             *self.apply_uuid_filter(filter.image_id, fields.image_id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
         ]
 
         if filter.AND:
@@ -456,18 +468,48 @@ class ImageAdapter(BaseAdapter):
                 return fields.created_at.order.apply(ascending)
             case ImageOrderField.LAST_USED:
                 return fields.last_used_at.order.apply(ascending)
+            case ImageOrderField.ENTITY_ID:
+                return fields.id.order.apply(ascending)
+            case ImageOrderField.IMAGE:
+                return fields.image.order.apply(ascending)
+            case ImageOrderField.PROJECT:
+                return fields.project.order.apply(ascending)
+            case ImageOrderField.TAG:
+                return fields.tag.order.apply(ascending)
+            case ImageOrderField.REGISTRY:
+                return fields.registry.order.apply(ascending)
+            case ImageOrderField.REGISTRY_ID:
+                return fields.registry_id.order.apply(ascending)
+            case ImageOrderField.ARCHITECTURE:
+                return fields.architecture.order.apply(ascending)
+            case ImageOrderField.CONFIG_DIGEST:
+                return fields.config_digest.order.apply(ascending)
+            case ImageOrderField.SIZE_BYTES:
+                return fields.size_bytes.order.apply(ascending)
+            case ImageOrderField.IS_LOCAL:
+                return fields.is_local.order.apply(ascending)
+            case ImageOrderField.TYPE:
+                return fields.type.order.apply(ascending)
+            case ImageOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case ImageOrderField.ACCELERATORS:
+                return fields.accelerators.order.apply(ascending)
             case _:
                 assert_never(order.field)
 
     def _convert_alias_orders(self, orders: list[ImageAliasOrderByInputDTO]) -> list[QueryOrder]:
+        return [self._convert_alias_order(order) for order in orders]
+
+    def _convert_alias_order(self, order: ImageAliasOrderByInputDTO) -> QueryOrder:
         fields = ImageAliasSearchableFields.own
-        result: list[QueryOrder] = []
-        for order in orders:
-            ascending = order.direction == OrderDirection.ASC
-            match order.field:
-                case "alias":
-                    result.append(fields.alias.order.apply(ascending))
-        return result
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ImageAliasOrderField.ALIAS:
+                return fields.alias.order.apply(ascending)
+            case ImageAliasOrderField.FIELD_ID:
+                return fields.id.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     @staticmethod
     def _convert_max(value: Decimal | str | None) -> str | None:

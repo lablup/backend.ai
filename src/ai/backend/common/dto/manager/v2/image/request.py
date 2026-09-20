@@ -14,12 +14,21 @@ from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     EnumFilter,
+    IntFilter,
     StringFilter,
     UUIDFilter,
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
 
-from .types import ImageOrderField, ImageScope, ImageStatusType, ImageUsedBy, OrderDirection
+from .types import (
+    ImageAliasOrderField,
+    ImageOrderField,
+    ImageScope,
+    ImageStatusType,
+    ImageTypeEnum,
+    ImageUsedBy,
+    OrderDirection,
+)
 
 __all__ = (
     "AdminSearchImageAliasesInput",
@@ -38,6 +47,7 @@ __all__ = (
     "ImageOrderByInputDTO",
     "ImageScopeInputDTO",
     "ImageStatusFilterInputDTO",
+    "ImageTypeFilterInputDTO",
     "ImageUsedBy",
     "PurgeImageInput",
     "RescanImagesInput",
@@ -64,6 +74,10 @@ class ImageStatusFilterInputDTO(EnumFilter[ImageStatusType]):
     """Filter for image status."""
 
 
+class ImageTypeFilterInputDTO(EnumFilter[ImageTypeEnum]):
+    """Filter for the image type category."""
+
+
 class ImageAliasNestedFilterInputDTO(BaseRequestModel):
     """Nested filter for image aliases within an image."""
 
@@ -79,6 +93,28 @@ class ImageFilterInputDTO(BaseRequestModel):
     architecture: StringFilter | None = Field(default=None, description="Filter by architecture.")
     registry_id: UUIDFilter | None = Field(
         default=None, description="Filter by container registry ID."
+    )
+    image: StringFilter | None = Field(
+        default=None, description="Filter by namespace/path within the registry."
+    )
+    registry: StringFilter | None = Field(default=None, description="Filter by registry hostname.")
+    project: StringFilter | None = Field(
+        default=None, description="Filter by project (namespace) within the registry."
+    )
+    tag: StringFilter | None = Field(default=None, description="Filter by image tag.")
+    config_digest: StringFilter | None = Field(
+        default=None, description="Filter by image config digest."
+    )
+    accelerators: StringFilter | None = Field(
+        default=None, description="Filter by accelerator requirement string."
+    )
+    size_bytes: IntFilter | None = Field(default=None, description="Filter by image size in bytes.")
+    is_local: bool | None = Field(default=None, description="Filter by local-only status.")
+    type: ImageTypeFilterInputDTO | None = Field(
+        default=None, description="Filter by image type category."
+    )
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by creation datetime (before/after)."
     )
     alias: ImageAliasNestedFilterInputDTO | None = Field(
         default=None, description="Filter by nested alias conditions."
@@ -108,6 +144,7 @@ class ImageAliasFilterInputDTO(BaseRequestModel):
 
     alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
     image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by alias row ID.")
     AND: list[ImageAliasFilterInputDTO] | None = Field(
         default=None, description="Combine with AND logic."
     )
@@ -123,7 +160,7 @@ ImageAliasFilterInputDTO.model_rebuild()
 class ImageAliasOrderByInputDTO(BaseRequestModel):
     """Order specification for image alias queries."""
 
-    field: str = Field(description="Field to order by.")
+    field: ImageAliasOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 

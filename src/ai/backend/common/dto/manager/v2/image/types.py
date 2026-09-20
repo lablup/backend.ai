@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
+    "ImageAliasOrderField",
     "ImageLabelInfo",
     "ImageScope",
     "ImageUsedBy",
@@ -49,6 +50,26 @@ class ImageOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
     LAST_USED = "last_used"
+    ENTITY_ID = "entity_id"
+    IMAGE = "image"
+    PROJECT = "project"
+    TAG = "tag"
+    REGISTRY = "registry"
+    REGISTRY_ID = "registry_id"
+    ARCHITECTURE = "architecture"
+    CONFIG_DIGEST = "config_digest"
+    SIZE_BYTES = "size_bytes"
+    IS_LOCAL = "is_local"
+    TYPE = "type"
+    STATUS = "status"
+    ACCELERATORS = "accelerators"
+
+
+class ImageAliasOrderField(StrEnum):
+    """Fields available for ordering image aliases."""
+
+    ALIAS = "alias"
+    FIELD_ID = "field_id"
 
 
 class ImageTagInfo(BaseResponseModel):
