@@ -105,7 +105,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
-from ai.backend.manager.models.project.conditions import ProjectConditions
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.deprecated_search import (
@@ -1136,20 +1136,11 @@ class UserAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over one of the user's projects."""
         if f is None:
             return []
-        conditions: list[QueryCondition] = []
-        if f.name is not None:
-            condition = self.convert_string_filter(
-                f.name,
-                contains_factory=ProjectConditions.by_name_contains,
-                equals_factory=ProjectConditions.by_name_equals,
-                starts_with_factory=ProjectConditions.by_name_starts_with,
-                ends_with_factory=ProjectConditions.by_name_ends_with,
-                in_factory=ProjectConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.is_active is not None:
-            conditions.append(ProjectConditions.by_is_active(f.is_active))
+        fields = ProjectSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
+        ]
         if not conditions:
             return []
         return [DeprecatedUserConditions.exists_project_combined(conditions)]

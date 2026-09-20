@@ -11721,12 +11721,22 @@ input ProjectV2Filter {
   id: UUIDFilter = null
   name: StringFilter = null
   domainName: StringFilter = null
+
+  """Added in 26.9.0. Filter by project description."""
+  description: StringFilter = null
+
+  """Added in 26.9.0. Filter by the external integration name."""
+  integrationName: StringFilter = null
   type: ProjectTypeV2EnumFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
   modifiedAt: DateTimeFilter = null
-  domain: ProjectDomainNestedFilter = null
-  user: ProjectUserNestedFilter = null
+
+  """Filter by the domain holding the project."""
+  domain: ProjectDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by `domainName`.")
+
+  """Filter by the users enrolled in the project."""
+  user: ProjectUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then pass their ids as the `user` scope.")
   AND: [ProjectV2Filter!] = null
   OR: [ProjectV2Filter!] = null
   NOT: [ProjectV2Filter!] = null
@@ -11741,7 +11751,7 @@ input ProjectV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
+Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name. ID: Order by project ID. DESCRIPTION: Order by project description. INTEGRATION_NAME: Order by the external integration name. USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
 """
 enum ProjectV2OrderField {
   CREATED_AT
@@ -11750,6 +11760,9 @@ enum ProjectV2OrderField {
   IS_ACTIVE
   TYPE
   DOMAIN_NAME
+  ID
+  DESCRIPTION
+  INTEGRATION_NAME
   USER_USERNAME @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single username. Narrow the results with the `user` filter instead.")
   USER_EMAIL @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single email address. Narrow the results with the `user` filter instead.")
 }

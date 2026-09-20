@@ -22,6 +22,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
 )
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
@@ -158,4 +159,4 @@ class ProjectPurger(EntityPurger[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)

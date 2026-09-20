@@ -17109,6 +17109,30 @@
             "default": null,
             "description": "Filter by domain name."
           },
+          "description": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project description."
+          },
+          "integration_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the external integration name."
+          },
           "type": {
             "anyOf": [
               {
@@ -17168,7 +17192,8 @@
               }
             ],
             "default": null,
-            "description": "Nested filter for domain conditions."
+            "deprecated": true,
+            "description": "Filter by the domain holding the project. Deprecated: search domains first, then narrow by `domain_name`."
           },
           "user": {
             "anyOf": [
@@ -17180,7 +17205,8 @@
               }
             ],
             "default": null,
-            "description": "Nested filter for user conditions."
+            "deprecated": true,
+            "description": "Filter by the users enrolled in the project. Deprecated: search users first, then pass their ids as the `user` scope."
           },
           "AND": {
             "anyOf": [
@@ -17256,12 +17282,15 @@
       "ProjectOrderField": {
         "description": "Fields available for ordering projects.",
         "enum": [
+          "id",
           "name",
           "created_at",
           "modified_at",
           "is_active",
           "type",
           "domain_name",
+          "description",
+          "integration_name",
           "user_username",
           "user_email"
         ],

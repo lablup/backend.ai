@@ -52,6 +52,7 @@ from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
     UserProjectTarget,
 )
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
@@ -428,7 +429,7 @@ class ProjectDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ProjectNotFound(f"Project {project_id} not found")
-            return row.to_data()
+            return ProjectSearchableFields.own.to_data(row)
 
     async def project_id_by_name_in_domain(
         self, domain_name: str, project_name: str
@@ -472,7 +473,7 @@ class ProjectDBSource:
             query = sa.select(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            items = [row.ProjectRow.to_data() for row in result.rows]
+            items = [ProjectSearchableFields.own.to_data(row.ProjectRow) for row in result.rows]
 
             return ProjectSearchResult(
                 items=items,
@@ -499,7 +500,7 @@ class ProjectDBSource:
             query = sa.select(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
-            items = [row.ProjectRow.to_data() for row in result.rows]
+            items = [ProjectSearchableFields.own.to_data(row.ProjectRow) for row in result.rows]
 
             return ProjectSearchResult(
                 items=items,
@@ -529,7 +530,7 @@ class ProjectDBSource:
             query = sa.select(ProjectRow).select_from(ProjectRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
-            items = [row.ProjectRow.to_data() for row in result.rows]
+            items = [ProjectSearchableFields.own.to_data(row.ProjectRow) for row in result.rows]
 
             return ProjectSearchResult(
                 items=items,

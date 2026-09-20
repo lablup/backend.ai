@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,4 +21,4 @@ class ProjectSearcher(Searcher[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
