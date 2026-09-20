@@ -157,10 +157,9 @@ def release_gate_preflight() -> None:
             pytrace=False,
         )
     runtime = _env("BAI_DATAPLANE_RUNTIME", "docker")
-    if runtime != "docker":
+    if runtime not in ("docker", "containerd"):
         pytest.fail(
-            "the production gate requires BAI_DATAPLANE_RUNTIME=docker; other runtime seams are "
-            "not implemented",
+            f"the production gate runs on the docker or containerd runtime seam, not {runtime!r}",
             pytrace=False,
         )
     if _env("BAI_DATAPLANE_PRIVNET_MODE", "0") != "1":
@@ -210,10 +209,15 @@ def dataplane_config() -> DataplaneConfig:
 def release_gate_privnet_preflight(
     request: pytest.FixtureRequest, dataplane_config: DataplaneConfig
 ) -> None:
-    """Require a reachable privnet socket from the agent account on every release-gate node."""
+    """Require a reachable privnet socket on every release-gate node.
+
+    Probed with the node's privilege wrapper: the socket is owned by the account the agent runs
+    as, which on a containerd node is root, and a probe from the harness account would be refused
+    at the socket before the daemon ever answered.
+    """
     if not _release_gate_required():
         return
-    raw_nodes: Sequence[Node] = request.getfixturevalue("raw_nodes")
+    raw_nodes: Sequence[Node] = request.getfixturevalue("nodes")
     probe = (
         "import socket,sys; "
         "s=socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect(sys.argv[1]); s.close()"
