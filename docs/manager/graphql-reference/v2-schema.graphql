@@ -4928,6 +4928,14 @@ enum DeploymentStrategyType {
 }
 
 """
+Added in 26.9.0. Entities whose use narrows a deployment query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only deployments the caller can read are returned, even when a listed entity uses others.
+"""
+input DeploymentUsedBy {
+  """Resource groups the deployment runs in."""
+  resourceGroup: [UUID!] = null
+}
+
+"""
 Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
 """
 type DomainBasicInfo {
@@ -12129,7 +12137,20 @@ type Query {
   adminKernelSchedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
 
   """Added in 25.16.0. List all deployments (superadmin only)."""
-  adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  adminDeployments(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usedBy: DeploymentUsedBy = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """Added in 26.4.2. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
@@ -12323,15 +12344,58 @@ type Query {
   sessionV2(id: UUID!): SessionV2
 
   """Added in 25.19.0. List deployments within a specific project."""
-  projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  projectDeployments(
+    scope: ProjectDeploymentScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usedBy: DeploymentUsedBy = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """
   Added in 26.9.0. Page through the deployments the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedDeployments(scope: DeploymentSearchScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  scopedDeployments(
+    scope: DeploymentSearchScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usedBy: DeploymentUsedBy = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """Added in 25.19.0. List deployments owned by the current user."""
-  myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  myDeployments(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usedBy: DeploymentUsedBy = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
@@ -16325,6 +16389,12 @@ Added in 26.9.0. Entities whose use narrows a session query; every id is AND-ed.
 input SessionUsedBy {
   """Deployments whose route rows the session serves as a replica."""
   deployment: [UUID!] = null
+
+  """Agents running a kernel of the session."""
+  agent: [UUID!] = null
+
+  """Resource groups the session runs in."""
+  resourceGroup: [UUID!] = null
 }
 
 """Added in 26.3.0. Represents a compute session in Backend.AI."""

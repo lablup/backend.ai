@@ -42,7 +42,7 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
@@ -638,11 +638,14 @@ class ScheduleCoordinator:
         # Build querier with kernel conditions
         target_kernel_statuses = handler.target_kernel_statuses()
 
+        fields = KernelSearchableFields.own
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
-                KernelConditions.by_resource_group_id(resource_group_id),
-                KernelConditions.by_statuses(target_kernel_statuses),
+                fields.resource_group_id.filter.equals(
+                    UUIDEqualMatchSpec(value=resource_group_id, negated=False)
+                ),
+                fields.status.filter.in_(target_kernel_statuses),
             ],
         )
 

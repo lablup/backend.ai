@@ -124,6 +124,9 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -2949,7 +2952,7 @@ class DeploymentDBSource:
                 raise DeploymentPolicyNotFound(
                     f"Deployment policy for endpoint {endpoint_id} not found"
                 )
-            return row.to_data()
+            return DeploymentPolicySearchableFields.own.to_data(row)
 
     async def delete_deployment_policy(
         self,

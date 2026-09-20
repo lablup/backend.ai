@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.scopes import UserErrorLogTarget
@@ -15,29 +15,27 @@ from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchErrorLogsAction(OperationScopeOpsAction[ErrorLogRow, ErrorLogData]):
-    """Page through the errors recorded against one user."""
+class SearchErrorLogsAction(BulkScopedSearchOpsAction[ErrorLogRow, ErrorLogData]):
+    """Page through the errors recorded against the users named, combined with OR.
 
-    user_id: UserID
+    Every user is authorized before the read runs.
+    """
+
+    user_ids: Sequence[UserID]
     searcher: ErrorLogSearcher
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return UserEntityType()
-
-    @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.user_id,)
-
-    @override
-    def operation_scopes(self) -> Sequence[OperationScope]:
-        return (UserErrorLogTarget(user_id=self.user_id),)
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "search_error_logs"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.user_ids)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return [UserErrorLogTarget(user_id=user_id) for user_id in self.user_ids]
 
     @override
     def to_searcher(self) -> ErrorLogSearcher:

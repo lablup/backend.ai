@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
     DeploymentOrderField,
     DeploymentScope,
+    DeploymentUsedBy,
     OrderDirection,
     ReplicaOrderField,
     RevisionOrderField,
@@ -861,6 +862,13 @@ class ScopedSearchDeploymentsInput(BaseRequestModel):
     """Input for searching the deployments the named scopes reach."""
 
     scope: DeploymentScope = Field(description="Scope (OR across all items).")
+    used_by: DeploymentUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; deployments the caller cannot read are left out."
+        ),
+    )
     filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
     order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
@@ -874,6 +882,13 @@ class ScopedSearchDeploymentsInput(BaseRequestModel):
 class AdminSearchDeploymentsInput(BaseRequestModel):
     """Input for searching deployments (admin, no scope)."""
 
+    used_by: DeploymentUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; deployments the caller cannot read are left out."
+        ),
+    )
     filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
     order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")

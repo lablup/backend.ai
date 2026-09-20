@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType, Deplo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import ResourceSlot
@@ -38,6 +39,7 @@ from ai.backend.manager.models.endpoint.scopes import (
     ProjectDeploymentTarget,
     UserDeploymentTarget,
 )
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -76,6 +78,7 @@ class TestData:
     other_user_id: uuid.UUID
     project_a_id: uuid.UUID
     project_b_id: uuid.UUID
+    resource_group_id: ResourceGroupID
     endpoint_ids_in_a: list[uuid.UUID]
     endpoint_ids_in_b: list[uuid.UUID]
 
@@ -168,15 +171,15 @@ class TestDeploymentScopedSearch:
             )
             await db_sess.flush()
 
-            db_sess.add(
-                ResourceGroupRow(
-                    name=sgroup_name,
-                    driver="static",
-                    scheduler="fifo",
-                    scheduler_opts=ResourceGroupOpts(),
-                )
+            resource_group = ResourceGroupRow(
+                name=sgroup_name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ResourceGroupOpts(),
             )
+            db_sess.add(resource_group)
             await db_sess.flush()
+            resource_group_id = resource_group.id
 
             db_sess.add(
                 UserResourcePolicyRow(
@@ -303,6 +306,7 @@ class TestDeploymentScopedSearch:
             other_user_id=other_user_id,
             project_a_id=project_a_id,
             project_b_id=project_b_id,
+            resource_group_id=resource_group_id,
             endpoint_ids_in_a=endpoint_ids_in_a,
             endpoint_ids_in_b=endpoint_ids_in_b,
         )
@@ -425,3 +429,41 @@ class TestDeploymentScopedSearch:
                     searcher=searcher,
                 )
             )
+
+    async def test_used_by_narrows_to_the_resource_group_the_deployments_run_in(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
+        test_data: TestData,
+    ) -> None:
+        used_by = DeploymentSearchableFields.linked.resource_groups.used_by(
+            test_data.resource_group_id
+        )
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[used_by],
+                searcher=searcher,
+            )
+        )
+
+        assert {item.id for item in result.items} == set(test_data.endpoint_ids_in_a)
+
+    async def test_used_by_another_resource_group_returns_none(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
+        test_data: TestData,
+    ) -> None:
+        used_by = DeploymentSearchableFields.linked.resource_groups.used_by(
+            ResourceGroupID(uuid.uuid4())
+        )
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[used_by],
+                searcher=searcher,
+            )
+        )
+
+        assert result.total_count == 0

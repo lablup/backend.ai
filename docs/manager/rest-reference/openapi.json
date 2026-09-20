@@ -4898,6 +4898,30 @@
         "title": "DeploymentStatusFilter",
         "type": "object"
       },
+      "DeploymentUsedBy": {
+        "description": "Entities whose use narrows the deployments read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Deployments the caller cannot\nread are left out even when a listed entity uses them.",
+        "properties": {
+          "resource_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource groups the deployment runs in",
+            "title": "Resource Group"
+          }
+        },
+        "title": "DeploymentUsedBy",
+        "type": "object"
+      },
       "IntFilter": {
         "description": "Filter for integer fields supporting equality and comparison operations.",
         "properties": {
@@ -5500,6 +5524,18 @@
       "AdminSearchDeploymentsInput": {
         "description": "Input for searching deployments (admin, no scope).",
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -5690,6 +5726,18 @@
           "scope": {
             "$ref": "#/components/schemas/DeploymentScope",
             "description": "Scope (OR across all items)."
+          },
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -32061,6 +32109,40 @@
             "default": null,
             "description": "Deployments whose route rows the session serves as a replica",
             "title": "Deployment"
+          },
+          "agent": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Agents running a kernel of the session",
+            "title": "Agent"
+          },
+          "resource_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource groups the session runs in",
+            "title": "Resource Group"
           }
         },
         "title": "SessionUsedBy",

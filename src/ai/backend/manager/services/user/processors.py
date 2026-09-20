@@ -193,11 +193,11 @@ class UserProcessors:
         group: ProcessorGroup[UserData],
         user_service: UserService,
     ) -> None:
-        self.lookup = group.public_lookup_ops(LookupUserAction)
+        self.lookup = group.lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetUsersAction)
         self.global_search = group.global_searcher_ops(GlobalSearchUsersAction)
-        self.scoped_search = group.scope_search_ops(ScopedSearchUsersAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchUsersAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
         self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)

@@ -45,6 +45,7 @@ __all__ = (
     "DeploymentOrderField",
     "DeploymentPolicyInfo",
     "DeploymentStrategy",
+    "DeploymentUsedBy",
     "DeploymentStrategyInfoDTO",
     "DeploymentStrategySpecInfo",
     "EndpointLifecycle",
@@ -495,6 +496,18 @@ class DeploymentStrategyInfoDTO(BaseResponseModel):
     """
 
     type: DeploymentStrategy
+
+
+class DeploymentUsedBy(BaseRequestModel):
+    """Entities whose use narrows the deployments read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Deployments the caller cannot
+    read are left out even when a listed entity uses them.
+    """
+
+    resource_group: list[UUID] | None = Field(
+        default=None, description="Resource groups the deployment runs in"
+    )
 
 
 class DeploymentScope(BaseRequestModel):

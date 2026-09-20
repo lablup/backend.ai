@@ -1222,3 +1222,9 @@ class SessionUsedByGQL(PydanticInputMixin[SessionUsedBy]):
     deployment: list[UUID] | None = gql_field(
         default=None, description="Deployments whose route rows the session serves as a replica."
     )
+    agent: list[UUID] | None = gql_field(
+        default=None, description="Agents running a kernel of the session."
+    )
+    resource_group: list[UUID] | None = gql_field(
+        default=None, description="Resource groups the session runs in."
+    )

@@ -1,7 +1,1 @@
-"""Query conditions and orders for deployment-related entities."""
-
-from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
-
-__all__ = [
-    "DeploymentPolicyConditions",
-]
+"""Conditions and orders for deployment models have moved to models/{domain}/."""
