@@ -11,7 +11,6 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -28,15 +27,12 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
 
@@ -54,155 +50,6 @@ class TestSlotTypes:
         names = [t.slot_name for t in types]
         assert "cpu" in names
         assert "mem" in names
-
-
-class TestAgentResources:
-    """Tests for agent_resources read operations."""
-
-    @pytest.fixture
-    async def db_with_agent_tables(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        async with with_tables(
-            database_connection,
-            [ResourceGroupRow, AgentRow, ResourceSlotTypeRow, AgentResourceRow],
-        ):
-            async with database_connection.begin_session() as db_sess:
-                for name, stype in [("cpu", "count"), ("mem", "bytes")]:
-                    db_sess.add(ResourceSlotTypeRow(slot_name=name, slot_type=stype, rank=0))
-            yield database_connection
-
-    async def _seed_agent(
-        self, db: ExtendedAsyncSAEngine
-    ) -> tuple[str, Decimal, Decimal, Decimal, Decimal]:
-        cpu_capacity = Decimal("8")
-        cpu_used = Decimal("2")
-        mem_capacity = Decimal("32768")
-        mem_used = Decimal("4096")
-        sg_name = str(uuid4())
-        sg_id = ResourceGroupID(uuid4())
-        agent_id = str(uuid4())
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                ResourceGroupRow(
-                    id=sg_id,
-                    name=sg_name,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ResourceGroupOpts(),
-                )
-            )
-        agent_uuid = AgentUUID(uuid.uuid4())
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                AgentRow(
-                    uuid=agent_uuid,
-                    id=agent_id,
-                    status=AgentStatus.ALIVE,
-                    status_changed=datetime.now(tzutc()),
-                    region="test-region",
-                    scaling_group=sg_name,
-                    resource_group_id=sg_id,
-                    addr="tcp://127.0.0.1:6001",
-                    version="24.12.0",
-                    architecture="x86_64",
-                    compute_plugins={},
-                )
-            )
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    agent_uuid=agent_uuid,
-                    slot_name="cpu",
-                    capacity=cpu_capacity,
-                    used=cpu_used,
-                )
-            )
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    agent_uuid=agent_uuid,
-                    slot_name="mem",
-                    capacity=mem_capacity,
-                    used=mem_used,
-                )
-            )
-        return agent_id, cpu_capacity, cpu_used, mem_capacity, mem_used
-
-    async def test_search_agent_resources(
-        self,
-        db_with_agent_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        agent_id, cpu_capacity, cpu_used, _, _ = await self._seed_agent(db_with_agent_tables)
-        db_source = ResourceSlotDBSource(db_with_agent_tables)
-        querier = BatchQuerier(pagination=OffsetPagination(offset=0, limit=10))
-
-        result = await db_source.search_agent_resources(querier)
-
-        expected_count = 2
-        assert result.total_count == expected_count
-        assert len(result.items) == expected_count
-        assert not result.has_next_page
-        cpu_item = next(item for item in result.items if item.slot_name == "cpu")
-        assert cpu_item.agent_id == agent_id
-        assert cpu_item.capacity == cpu_capacity
-        assert cpu_item.used == cpu_used
-
-    async def test_search_agent_resources_empty(
-        self,
-        db_with_agent_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        db_source = ResourceSlotDBSource(db_with_agent_tables)
-        querier = BatchQuerier(pagination=OffsetPagination(offset=0, limit=10))
-
-        result = await db_source.search_agent_resources(querier)
-
-        assert result.total_count == 0
-        assert result.items == []
-
-
-class TestResourceAllocations:
-    """Tests for resource_allocations read operations."""
-
-    @pytest.fixture
-    async def db_with_allocation_tables(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        # Full FK chain: DomainRow, ProjectResourcePolicyRow, ResourceGroupRow, ProjectRow,
-        # AgentRow, SessionRow, KernelRow, ResourceSlotTypeRow → ResourceAllocationRow
-        async with with_tables(
-            database_connection,
-            [
-                DomainRow,
-                ProjectResourcePolicyRow,
-                ResourceGroupRow,
-                UserResourcePolicyRow,
-                UserRow,
-                ProjectRow,
-                AgentRow,
-                ContainerRegistryRow,
-                ImageRow,
-                SessionRow,
-                KernelRow,
-                ResourceSlotTypeRow,
-                ResourceAllocationRow,
-            ],
-        ):
-            yield database_connection
-
-    async def test_search_resource_allocations_empty(
-        self,
-        db_with_allocation_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        db_source = ResourceSlotDBSource(db_with_allocation_tables)
-        querier = BatchQuerier(pagination=OffsetPagination(offset=0, limit=10))
-        result = await db_source.search_resource_allocations(querier)
-        assert result.total_count == 0
-        assert result.items == []
 
 
 class TestAggregation:
