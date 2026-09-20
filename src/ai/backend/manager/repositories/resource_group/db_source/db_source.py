@@ -31,6 +31,9 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 
@@ -100,7 +103,7 @@ class ResourceGroupDBSource:
             row = await db_sess.get(ResourceGroupRow, name)
             if row is None:
                 raise ResourceGroupNotFound(name)
-            return row.to_dataclass()
+            return ResourceGroupSearchableFields.own.to_data(row)
 
     async def replace_default_deployment_options(
         self,

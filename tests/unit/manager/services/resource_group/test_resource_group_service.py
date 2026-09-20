@@ -10,8 +10,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import ResourceGroupConflict
@@ -36,6 +34,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.resource_group import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.scopes import UserResourceGroupTarget
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.registry import check_resource_group
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
@@ -336,7 +335,9 @@ class TestGetWsproxyVersion:
         sample_sgroup_with_wsproxy: ResourceGroupData,
     ) -> None:
         """Accessible scaling group returns wsproxy version string."""
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[sample_sgroup_with_wsproxy])
+        mock_repository.list_active_resource_groups = AsyncMock(
+            return_value=[sample_sgroup_with_wsproxy]
+        )
         mock_client = AsyncMock()
         mock_status = MagicMock()
         mock_status.api_version = "v2.0.0"
@@ -345,9 +346,7 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         result = await resource_group_service.get_wsproxy_version(action)
@@ -363,13 +362,11 @@ class TestGetWsproxyVersion:
         mock_repository: MagicMock,
     ) -> None:
         """Non-allowed scaling group raises ResourceGroupNotFound."""
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[])
+        mock_repository.list_active_resource_groups = AsyncMock(return_value=[])
 
         action = GetWsproxyVersionAction(
             resource_group_name="nonexistent-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         with pytest.raises(ResourceGroupNotFound):
@@ -398,13 +395,11 @@ class TestGetWsproxyVersion:
             default_deployment_options=DeploymentOptions(),
             default_session_options=DefaultSessionOptions(),
         )
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[no_wsproxy])
+        mock_repository.list_active_resource_groups = AsyncMock(return_value=[no_wsproxy])
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         result = await resource_group_service.get_wsproxy_version(action)
@@ -419,9 +414,7 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         with pytest.raises(ObjectNotFound):

@@ -1,4 +1,4 @@
-"""Tests for ScalingGroupConditions and ScalingGroupOrders."""
+"""Tests for the resource group search field declarations."""
 
 from __future__ import annotations
 
@@ -22,7 +22,9 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -80,7 +82,7 @@ class TestScalingGroupOrdersCursor:
 
     def test_name_ascending(self) -> None:
         """Test that name() with ascending=True returns ascending order."""
-        order = ResourceGroupOrders.name(ascending=True)
+        order = ResourceGroupSearchableFields.own.name.order.apply(ascending=True)
         assert isinstance(order, sa.sql.ClauseElement)
         # Check the modifier shows ASC
         order_str = str(order)
@@ -88,7 +90,7 @@ class TestScalingGroupOrdersCursor:
 
     def test_name_descending(self) -> None:
         """Test that name() with ascending=False returns descending order."""
-        order = ResourceGroupOrders.name(ascending=False)
+        order = ResourceGroupSearchableFields.own.name.order.apply(ascending=False)
         assert isinstance(order, sa.sql.ClauseElement)
         # Check the modifier shows DESC
         order_str = str(order)
