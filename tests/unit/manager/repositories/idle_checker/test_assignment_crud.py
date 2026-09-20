@@ -40,7 +40,7 @@ from ai.backend.manager.models.idle_checker.creators import (
 )
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
-from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentTarget
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -556,14 +556,14 @@ class TestIdleCheckerAssignmentRepository:
         )
 
         single_scope_result = await repository.scoped_search_assignments(
-            [IdleCheckerAssignmentOperationScope(scope=domain_id)],
+            [IdleCheckerAssignmentTarget(scope=domain_id)],
             IdleCheckerAssignmentSearcher(pagination=NoPagination()),
         )
         mixed_union_result = await repository.scoped_search_assignments(
             [
-                IdleCheckerAssignmentOperationScope(scope=domain_id),
-                IdleCheckerAssignmentOperationScope(scope=resource_group_id),
-                IdleCheckerAssignmentOperationScope(scope=project_id),
+                IdleCheckerAssignmentTarget(scope=domain_id),
+                IdleCheckerAssignmentTarget(scope=resource_group_id),
+                IdleCheckerAssignmentTarget(scope=project_id),
             ],
             IdleCheckerAssignmentSearcher(pagination=NoPagination()),
         )

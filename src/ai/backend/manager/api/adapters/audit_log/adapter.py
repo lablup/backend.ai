@@ -29,17 +29,19 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.audit_log.scopes import (
+    AuditLogTarget,
+    EntityAuditLogTarget,
+    ScopeAuditLogTarget,
+    TriggeredByAuditLogTarget,
+)
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
-    AuditLogScopeItem,
-    EntityAuditLogScopeItem,
-    ScopeAuditLogScopeItem,
     ScopedSearchAuditLogsAction,
-    TriggeredByAuditLogScopeItem,
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
@@ -117,7 +119,7 @@ class AuditLogAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._audit_log.scoped_search.run(
-            ScopedSearchAuditLogsAction(items=self._scope_items(input), searcher=searcher)
+            ScopedSearchAuditLogsAction(targets=self._scope_targets(input), searcher=searcher)
         )
         return SearchAuditLogsPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -127,12 +129,12 @@ class AuditLogAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _scope_items(input: ScopedSearchAuditLogsInput) -> list[AuditLogScopeItem]:
+    def _scope_targets(input: ScopedSearchAuditLogsInput) -> list[AuditLogTarget]:
         """The scopes the request names; an entity id that is not one is refused here.
 
         A scope is an entity — a session, a deployment, a user — so its id has to be one.
         """
-        items: list[AuditLogScopeItem] = []
+        targets: list[AuditLogTarget] = []
         for entity_scope in input.scope.entity or []:
             try:
                 entity_id = uuid.UUID(entity_scope.entity_id)
@@ -143,11 +145,11 @@ class AuditLogAdapter(BaseAdapter):
             owner = RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id)
             # An entity's history is both halves: what was done to it, and what was done
             # in it. The request names the entity once and the action ORs the two.
-            items.append(EntityAuditLogScopeItem(owner=owner))
-            items.append(ScopeAuditLogScopeItem(owner=owner))
+            targets.append(EntityAuditLogTarget(owner=owner))
+            targets.append(ScopeAuditLogTarget(owner=owner))
         for user_scope in input.scope.triggered_user or []:
-            items.append(TriggeredByAuditLogScopeItem(user_id=UserID(user_scope.value)))
-        return items
+            targets.append(TriggeredByAuditLogTarget(user_id=UserID(user_scope.value)))
+        return targets
 
     def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

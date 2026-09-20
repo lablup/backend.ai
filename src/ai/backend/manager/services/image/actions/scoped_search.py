@@ -2,26 +2,14 @@
 
 from __future__ import annotations
 
-from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.image.scopes import (
-    ContainerRegistryImageOperationScope,
-    DomainImageOperationScope,
-    GlobalImageOperationScope,
-    ProjectImageOperationScope,
-    UserImageOperationScope,
-)
+from ai.backend.manager.models.image.scopes import GlobalImageTarget, ImageTarget
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.image.actions.base import (
@@ -30,78 +18,9 @@ from ai.backend.manager.services.image.actions.base import (
 )
 
 __all__ = (
-    "ContainerRegistryImageScopeItem",
-    "DomainImageScopeItem",
-    "ImageScopeItem",
-    "ProjectImageScopeItem",
     "ScopedSearchImagesAction",
     "ScopedSearchImagesActionResult",
-    "UserImageScopeItem",
 )
-
-
-class ImageScopeItem(ScopeItem, ABC):
-    """One side an image is reachable from."""
-
-
-@dataclass(frozen=True)
-class DomainImageScopeItem(ImageScopeItem):
-    """The images of one domain."""
-
-    domain_id: DomainID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.domain_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return DomainImageOperationScope(domain_id=self.domain_id)
-
-
-@dataclass(frozen=True)
-class ProjectImageScopeItem(ImageScopeItem):
-    """The images of one project."""
-
-    project_id: ProjectID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.project_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return ProjectImageOperationScope(project_id=self.project_id)
-
-
-@dataclass(frozen=True)
-class UserImageScopeItem(ImageScopeItem):
-    """The images one user reaches."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return UserImageOperationScope(user_id=self.user_id)
-
-
-@dataclass(frozen=True)
-class ContainerRegistryImageScopeItem(ImageScopeItem):
-    """The images of one container registry."""
-
-    registry_id: ContainerRegistryID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.registry_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return ContainerRegistryImageOperationScope(registry_id=self.registry_id)
 
 
 @dataclass
@@ -114,18 +33,19 @@ class ScopedSearchImagesAction(ImageScopeAction):
     everyone.
     """
 
-    items: Sequence[ImageScopeItem]
+    targets: Sequence[ImageTarget]
     include_global: bool
     querier: BatchQuerier
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
     def operation_scopes(self) -> Sequence[OperationScope]:
-        scopes: list[OperationScope] = [item.operation_scope() for item in self.items]
+        scopes: list[OperationScope] = list(self.targets)
         if self.include_global:
-            scopes.append(GlobalImageOperationScope())
+            scopes.append(GlobalImageTarget())
         return scopes
 
     @override

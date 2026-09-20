@@ -43,7 +43,7 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -284,7 +284,7 @@ class PermissionDBSource:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
+        scope: RolePermissionTarget | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:

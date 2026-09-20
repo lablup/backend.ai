@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
-    DeploymentPresetSlotOperationScope,
+    DeploymentPresetSlotTarget,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
@@ -45,7 +45,7 @@ class SearchPresetResourceSlotsAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentPresetSlotOperationScope(preset_id=self.preset_id),)
+        return (DeploymentPresetSlotTarget(preset_id=self.preset_id),)
 
     @override
     @classmethod

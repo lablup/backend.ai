@@ -47,9 +47,9 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
 )
 from ai.backend.manager.models.fair_share.upserters import (
     DomainFairShareUpserter,
@@ -205,7 +205,7 @@ class FairShareDBSource:
 
     async def search_rg_domain_fair_shares(
         self,
-        scope: DomainFairShareOperationScope,
+        scope: DomainFairShareTarget,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
         """Search domain fair shares within a resource group.
@@ -404,7 +404,7 @@ class FairShareDBSource:
 
     async def search_rg_project_fair_shares(
         self,
-        scope: ProjectFairShareOperationScope,
+        scope: ProjectFairShareTarget,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
         """Search project fair shares within a resource group.
@@ -750,7 +750,7 @@ class FairShareDBSource:
 
     async def search_rg_user_fair_shares(
         self,
-        scope: UserFairShareOperationScope,
+        scope: UserFairShareTarget,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
         """Search user fair shares within a resource group.

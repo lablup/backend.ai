@@ -94,9 +94,11 @@ from ai.backend.manager.models.scheduling_history.row import (
     SessionSchedulingHistoryRow,
 )
 from ai.backend.manager.models.scheduling_history.scopes import (
-    DeploymentHistoryOperationScope,
-    RouteHistoryOperationScope,
-    SessionSchedulingHistoryOperationScope,
+    DeploymentHistoryTarget,
+    DeploymentReplicaGroupHistoryTarget,
+    RouteHistoryTarget,
+    SessionKernelHistoryTarget,
+    SessionSchedulingHistoryTarget,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
@@ -119,7 +121,6 @@ from ai.backend.manager.services.scheduling_history.actions.global_search_replic
     GlobalSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
-    DeploymentReplicaGroupHistoryTarget,
     ScopedSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
@@ -133,7 +134,6 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
-    SessionKernelHistoryTarget,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -270,7 +270,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchSessionHistoriesInput,
     ) -> AdminSearchSessionHistoriesPayload:
         """Search session scheduling histories scoped to a session."""
-        scope = SessionSchedulingHistoryOperationScope(session_id=session_id)
+        scope = SessionSchedulingHistoryTarget(session_id=session_id)
         querier = self._build_session_querier(input)
         action_result = await self._scheduling_history.search_session_scoped_history.run(
             SearchSessionScopedHistoryAction(
@@ -655,7 +655,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchDeploymentHistoriesInput,
     ) -> AdminSearchDeploymentHistoriesPayload:
         """Search deployment histories scoped to a deployment."""
-        scope = DeploymentHistoryOperationScope(deployment_id=deployment_id)
+        scope = DeploymentHistoryTarget(deployment_id=deployment_id)
         querier = self._build_deployment_querier(input)
         action_result = await self._scheduling_history.search_deployment_scoped_history.run(
             SearchDeploymentScopedHistoryAction(
@@ -1017,7 +1017,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchRouteHistoriesInput,
     ) -> AdminSearchRouteHistoriesPayload:
         """Search route histories scoped to a route."""
-        scope = RouteHistoryOperationScope(route_id=ReplicaID(route_id))
+        scope = RouteHistoryTarget(route_id=ReplicaID(route_id))
         querier = self._build_route_querier(input)
         action_result = await self._scheduling_history.search_route_scoped_history.run(
             SearchRouteScopedHistoryAction(scope=scope, querier=querier)

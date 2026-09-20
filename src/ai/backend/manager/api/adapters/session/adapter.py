@@ -133,6 +133,12 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.scopes import (
+    DomainSessionTarget,
+    ProjectSessionTarget,
+    SessionTarget,
+    UserSessionTarget,
+)
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
@@ -172,11 +178,7 @@ from ai.backend.manager.services.session.actions.global_search_kernels import (
 )
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.scoped_search import (
-    DomainSessionScopeItem,
-    ProjectSessionScopeItem,
     ScopedSearchSessionsAction,
-    SessionScopeItem,
-    UserSessionScopeItem,
 )
 from ai.backend.manager.services.session.actions.scoped_search_kernels import (
     ScopedSearchKernelsAction,
@@ -666,7 +668,7 @@ class SessionAdapter(BaseAdapter):
         """Search sessions owned by the current user."""
         action_result = await self._session.scoped_search.run(
             ScopedSearchSessionsAction(
-                items=[UserSessionScopeItem(user_id=UserID(self._require_user_id()))],
+                targets=[UserSessionTarget(user_id=UserID(self._require_user_id()))],
                 searcher=self._build_session_searcher(input),
             )
         )
@@ -687,7 +689,7 @@ class SessionAdapter(BaseAdapter):
         """Search sessions within a project, cursor-based pagination."""
         action_result = await self._session.scoped_search.run(
             ScopedSearchSessionsAction(
-                items=[ProjectSessionScopeItem(project_id=project_id)],
+                targets=[ProjectSessionTarget(project_id=project_id)],
                 searcher=self._build_session_searcher(input),
             )
         )
@@ -700,19 +702,16 @@ class SessionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: SessionScope) -> list[SessionScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[SessionScopeItem] = [
-            DomainSessionScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: SessionScope) -> list[SessionTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[SessionTarget] = [
+            DomainSessionTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectSessionScopeItem(project_id=ProjectID(entry.value))
-            for entry in scope.project or ()
+        targets.extend(
+            ProjectSessionTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
-        items.extend(
-            UserSessionScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
-        )
-        return items
+        targets.extend(UserSessionTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return targets
 
     async def scoped_search(
         self,
@@ -721,7 +720,7 @@ class SessionAdapter(BaseAdapter):
         """Search the sessions the named scopes reach, combined with OR."""
         action_result = await self._session.scoped_search.run(
             ScopedSearchSessionsAction(
-                items=self._scope_items(input.scope),
+                targets=self._scope_targets(input.scope),
                 searcher=self._build_scoped_session_searcher(input),
             )
         )

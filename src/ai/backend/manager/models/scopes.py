@@ -72,7 +72,8 @@ class OperationScope(ABC):
 class ScopeTarget(OperationScope):
     """An operation scope that also names the scope the operation is authorized against.
 
-    Replaces :class:`OperationScope` as each scoped operation moves to it.
+    What a read is authorized against and what it is served are declared on one class, so
+    they cannot come apart. Every scope is one except where no entity id can be named.
     """
 
     @abstractmethod

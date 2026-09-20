@@ -26,7 +26,7 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
+from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleTarget
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -132,7 +132,7 @@ class TestSearchRolesInScope:
         scoped_roles: ScopedRoleFixture,
     ) -> None:
         """Only roles registered in the given scope should be returned."""
-        scope = ScopedRoleOperationScope(scope=ProjectID(scoped_roles.project_id))
+        scope = ScopedRoleTarget(scope=ProjectID(scoped_roles.project_id))
         querier = BatchQuerier(
             conditions=[],
             orders=[],
@@ -151,7 +151,7 @@ class TestSearchRolesInScope:
         scoped_roles: ScopedRoleFixture,
     ) -> None:
         """Total count should reflect only roles in scope."""
-        scope = ScopedRoleOperationScope(scope=ProjectID(scoped_roles.project_id))
+        scope = ScopedRoleTarget(scope=ProjectID(scoped_roles.project_id))
         querier = BatchQuerier(
             conditions=[],
             orders=[],
@@ -169,7 +169,7 @@ class TestSearchRolesInScope:
     ) -> None:
         """A scope with no registered roles should return empty results."""
         empty_project_id = uuid.uuid4()
-        scope = ScopedRoleOperationScope(scope=ProjectID(empty_project_id))
+        scope = ScopedRoleTarget(scope=ProjectID(empty_project_id))
         querier = BatchQuerier(
             conditions=[],
             orders=[],
@@ -199,11 +199,11 @@ class TestSearchRolesInScope:
         )
 
         # Search with DOMAIN scope using the same scope_id
-        domain_scope = ScopedRoleOperationScope(scope=DomainID(scope_id))
+        domain_scope = ScopedRoleTarget(scope=DomainID(scope_id))
         result = await db_source.search_roles_in_scope(querier, [domain_scope])
         assert result.items == []
 
         # Search with PROJECT scope should find it
-        project_scope = ScopedRoleOperationScope(scope=ProjectID(scope_id))
+        project_scope = ScopedRoleTarget(scope=ProjectID(scope_id))
         result = await db_source.search_roles_in_scope(querier, [project_scope])
         assert len(result.items) == 1

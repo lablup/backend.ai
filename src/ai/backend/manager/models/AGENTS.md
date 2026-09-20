@@ -11,12 +11,14 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 
 Domains migrated to the v2 specs add them next to `row.py` — `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
-reads, `scopes.py` for the `OperationScope` subclasses that filter the row.
+reads, `scopes.py` for the scopes that filter the row.
 What a search can filter and order by is declared in `searchable_fields.py`; see
-`models/specs/search/AGENTS.md`. A scope that also names the scope the operation is authorized
-against inherits `ScopeTarget` (`models/scopes.py`) and is named
-`{scope entity}{target entity}Target` (`DomainVFolderTarget`). Classes still inheriting
-`OperationScope` directly move over when their entity does.
+`models/specs/search/AGENTS.md`. A scope inherits `ScopeTarget` (`models/scopes.py`), names
+the scope the operation is authorized against in `scope_id()`, and is named
+`{scope entity}{target entity}Target` (`DomainVFolderTarget`). Where several targets reach
+one entity, they share an ABC named `{target entity}Target` that the action takes as its
+list type. Inherit `OperationScope` directly only where no entity id can be named; say why
+in the class docstring.
 An `OperationScope` on the domain, project or user axis answers from the ownership graph:
 `scope_membership_exists` (`models/virtual_entity/queries.py`) asks whether the scope's
 virtual entity holds the row, correlating on the column the creator's `entity_id(row)`

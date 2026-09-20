@@ -10,7 +10,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.data.auth.login_session_types import LoginSessionData
 from ai.backend.manager.models.login_session.row import LoginSessionRow
-from ai.backend.manager.models.login_session.scopes import MyLoginSessionOperationScope
+from ai.backend.manager.models.login_session.scopes import MyLoginSessionTarget
 from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -54,7 +54,7 @@ class SearchLoginSessionsAction(OperationScopeOpsAction[LoginSessionRow, LoginSe
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (MyLoginSessionOperationScope(user_id=self.user_id),)
+        return (MyLoginSessionTarget(user_id=self.user_id),)
 
     @override
     @classmethod

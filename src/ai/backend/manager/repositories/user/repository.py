@@ -36,7 +36,7 @@ from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -310,7 +310,7 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def search_my_keypairs(
         self,
-        scope: UserKeypairOperationScope,
+        scope: UserKeypairTarget,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.

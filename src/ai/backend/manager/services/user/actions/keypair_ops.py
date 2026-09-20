@@ -26,7 +26,7 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import LookupKeypairOwnerAction
@@ -197,8 +197,8 @@ class SearchMyKeypairsAction(BaseScopeAction):
     def action_name(cls) -> str:
         return "search_keypairs"
 
-    def scope(self) -> UserKeypairOperationScope:
-        return UserKeypairOperationScope(user_uuid=self.user_id)
+    def scope(self) -> UserKeypairTarget:
+        return UserKeypairTarget(user_uuid=self.user_id)
 
 
 @dataclass(frozen=True)

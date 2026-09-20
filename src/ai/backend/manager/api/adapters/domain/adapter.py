@@ -39,6 +39,9 @@ from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.scopes import (
+    ResourceGroupDomainTarget,
+)
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.domain.updaters import (
     DomainRestoreUpdater,
@@ -54,7 +57,6 @@ from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import (
-    ResourceGroupDomainScopeItem,
     ScopedSearchDomainsAction,
 )
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
@@ -179,8 +181,8 @@ class DomainAdapter(BaseAdapter):
         )
         result = await self._domain.scoped_search.run(
             ScopedSearchDomainsAction(
-                items=[
-                    ResourceGroupDomainScopeItem(resource_group_id=ResourceGroupID(entry.value))
+                targets=[
+                    ResourceGroupDomainTarget(resource_group_id=ResourceGroupID(entry.value))
                     for entry in input.scope.resource_group or ()
                 ],
                 searcher=searcher,
@@ -219,7 +221,7 @@ class DomainAdapter(BaseAdapter):
 
         result = await self._domain.scoped_search.run(
             ScopedSearchDomainsAction(
-                items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group.entity_id())],
+                targets=[ResourceGroupDomainTarget(resource_group_id=resource_group.entity_id())],
                 searcher=searcher,
             )
         )

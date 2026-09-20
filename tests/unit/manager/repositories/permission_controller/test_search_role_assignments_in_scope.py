@@ -20,8 +20,8 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
-    RoleRoleAssignmentOperationScope,
-    UserRoleAssignmentOperationScope,
+    RoleRoleAssignmentTarget,
+    UserRoleAssignmentTarget,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -157,7 +157,7 @@ class TestSearchRoleAssignmentsInScope:
         seeded: SeededAssignments,
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
-            [UserRoleAssignmentOperationScope(user_id=seeded.alice)], searcher
+            [UserRoleAssignmentTarget(user_id=seeded.alice)], searcher
         )
 
         assert result.total_count == 2
@@ -173,7 +173,7 @@ class TestSearchRoleAssignmentsInScope:
         seeded: SeededAssignments,
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
-            [RoleRoleAssignmentOperationScope(role_id=seeded.role_a)], searcher
+            [RoleRoleAssignmentTarget(role_id=seeded.role_a)], searcher
         )
 
         assert result.total_count == 2
@@ -190,8 +190,8 @@ class TestSearchRoleAssignmentsInScope:
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
             [
-                UserRoleAssignmentOperationScope(user_id=seeded.bob),
-                RoleRoleAssignmentOperationScope(role_id=seeded.role_b),
+                UserRoleAssignmentTarget(user_id=seeded.bob),
+                RoleRoleAssignmentTarget(role_id=seeded.role_b),
             ],
             searcher,
         )
@@ -214,7 +214,7 @@ class TestSearchRoleAssignmentsInScope:
     ) -> None:
         with pytest.raises(RoleNotFound):
             await repository.search_role_assignments_in_scope(
-                [RoleRoleAssignmentOperationScope(role_id=RoleID(uuid.uuid4()))], searcher
+                [RoleRoleAssignmentTarget(role_id=RoleID(uuid.uuid4()))], searcher
             )
 
     async def test_user_scope_without_assignments_is_empty(
@@ -224,7 +224,7 @@ class TestSearchRoleAssignmentsInScope:
         seeded: SeededAssignments,
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
-            [UserRoleAssignmentOperationScope(user_id=seeded.charlie)], searcher
+            [UserRoleAssignmentTarget(user_id=seeded.charlie)], searcher
         )
 
         assert result.total_count == 0

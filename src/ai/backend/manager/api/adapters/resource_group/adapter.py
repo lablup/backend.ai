@@ -101,6 +101,12 @@ from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
+from ai.backend.manager.models.resource_group.scopes import (
+    DomainResourceGroupTarget,
+    ProjectResourceGroupTarget,
+    ResourceGroupTarget,
+    UserResourceGroupTarget,
+)
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -150,11 +156,7 @@ from ai.backend.manager.services.resource_group.actions.resolve_resource_group_i
     ResolveResourceGroupIDsByNamesAction,
 )
 from ai.backend.manager.services.resource_group.actions.scoped_search import (
-    DomainResourceGroupScopeItem,
-    ProjectResourceGroupScopeItem,
-    ResourceGroupScopeItem,
     ScopedSearchResourceGroupsAction,
-    UserResourceGroupScopeItem,
 )
 from ai.backend.manager.services.resource_group.actions.update import UpdateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
@@ -330,20 +332,20 @@ class ResourceGroupAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: ResourceGroupScope) -> list[ResourceGroupScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[ResourceGroupScopeItem] = [
-            DomainResourceGroupScopeItem(domain_id=DomainID(entry.value))
+    def _scope_targets(self, scope: ResourceGroupScope) -> list[ResourceGroupTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[ResourceGroupTarget] = [
+            DomainResourceGroupTarget(domain_id=DomainID(entry.value))
             for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectResourceGroupScopeItem(project_id=ProjectID(entry.value))
+        targets.extend(
+            ProjectResourceGroupTarget(project_id=ProjectID(entry.value))
             for entry in scope.project or ()
         )
-        items.extend(
-            UserResourceGroupScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        targets.extend(
+            UserResourceGroupTarget(user_id=UserID(entry.value)) for entry in scope.user or ()
         )
-        return items
+        return targets
 
     async def scoped_search(
         self,
@@ -366,7 +368,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         result = await self._resource_group.scoped_search_resource_groups.run(
             ScopedSearchResourceGroupsAction(
-                items=self._scope_items(input.scope), searcher=searcher
+                targets=self._scope_targets(input.scope), searcher=searcher
             )
         )
         return ResourceGroupSearchPayload(
@@ -946,12 +948,12 @@ class ResourceGroupAdapter(BaseAdapter):
         return AllowedProjectsPayload(items=result.items)
 
     async def _scoped_resource_group_names(
-        self, items: Sequence[ResourceGroupScopeItem]
+        self, targets: Sequence[ResourceGroupTarget]
     ) -> list[str]:
         """Read the resource groups the named scopes reach, by name."""
         result = await self._resource_group.scoped_search_resource_groups.run(
             ScopedSearchResourceGroupsAction(
-                items=items,
+                targets=targets,
                 searcher=ResourceGroupSearcher(
                     pagination=NoPagination(),
                     orders=[ResourceGroupOrders.name()],
@@ -967,7 +969,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """Get allowed resource groups for a domain."""
         return AllowedResourceGroupsPayload(
             items=await self._scoped_resource_group_names([
-                DomainResourceGroupScopeItem(domain_id=await self._resolve_domain_id(domain_name))
+                DomainResourceGroupTarget(domain_id=await self._resolve_domain_id(domain_name))
             ])
         )
 
@@ -983,12 +985,12 @@ class ResourceGroupAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        items: list[ResourceGroupScopeItem] = [
-            DomainResourceGroupScopeItem(domain_id=me.domain_id),
-            ProjectResourceGroupScopeItem(project_id=ProjectID(project_id)),
-            UserResourceGroupScopeItem(user_id=UserID(me.user_id)),
+        targets: list[ResourceGroupTarget] = [
+            DomainResourceGroupTarget(domain_id=me.domain_id),
+            ProjectResourceGroupTarget(project_id=ProjectID(project_id)),
+            UserResourceGroupTarget(user_id=UserID(me.user_id)),
         ]
-        return AllowedResourceGroupsPayload(items=await self._scoped_resource_group_names(items))
+        return AllowedResourceGroupsPayload(items=await self._scoped_resource_group_names(targets))
 
     async def get_allowed_domains_for_resource_group(
         self,

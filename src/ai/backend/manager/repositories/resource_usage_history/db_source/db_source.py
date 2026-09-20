@@ -30,9 +30,9 @@ from ai.backend.manager.models.resource_usage_history import (
 )
 from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.repositories.base import (
@@ -262,7 +262,7 @@ class ResourceUsageHistoryDBSource:
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: DomainUsageBucketOperationScope | None = None,
+        scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -283,7 +283,7 @@ class ResourceUsageHistoryDBSource:
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: ProjectUsageBucketOperationScope | None = None,
+        scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -304,7 +304,7 @@ class ResourceUsageHistoryDBSource:
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: UserUsageBucketOperationScope | None = None,
+        scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:

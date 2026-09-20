@@ -68,6 +68,13 @@ from ai.backend.manager.models.image.conditions import (
 )
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.image.scopes import (
+    ContainerRegistryImageTarget,
+    DomainImageTarget,
+    ImageTarget,
+    ProjectImageTarget,
+    UserImageTarget,
+)
 from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
@@ -77,12 +84,7 @@ from ai.backend.manager.services.image.actions.forget_image import ForgetImageBy
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
 from ai.backend.manager.services.image.actions.scoped_search import (
-    ContainerRegistryImageScopeItem,
-    DomainImageScopeItem,
-    ImageScopeItem,
-    ProjectImageScopeItem,
     ScopedSearchImagesAction,
-    UserImageScopeItem,
 )
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
@@ -185,21 +187,20 @@ class ImageAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: ImageScope) -> list[ImageScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[ImageScopeItem] = [
-            DomainImageScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: ImageScope) -> list[ImageTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[ImageTarget] = [
+            DomainImageTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectImageScopeItem(project_id=ProjectID(entry.value))
-            for entry in scope.project or ()
+        targets.extend(
+            ProjectImageTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
-        items.extend(UserImageScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ())
-        items.extend(
-            ContainerRegistryImageScopeItem(registry_id=ContainerRegistryID(entry.value))
+        targets.extend(UserImageTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        targets.extend(
+            ContainerRegistryImageTarget(registry_id=ContainerRegistryID(entry.value))
             for entry in scope.container_registry or ()
         )
-        return items
+        return targets
 
     async def scoped_search(self, input: ScopedSearchImagesInput) -> ScopedSearchImagesPayload:
         """Search the images the named scopes reach, combined with OR."""
@@ -218,7 +219,7 @@ class ImageAdapter(BaseAdapter):
         )
         action_result = await self._image.scoped_search.run(
             ScopedSearchImagesAction(
-                items=self._scope_items(input.scope),
+                targets=self._scope_targets(input.scope),
                 include_global=input.scope.global_,
                 querier=querier,
             )

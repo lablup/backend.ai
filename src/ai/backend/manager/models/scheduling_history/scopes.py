@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
@@ -10,6 +11,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
@@ -26,21 +29,22 @@ from ai.backend.manager.models.scheduling_history.conditions import (
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
 from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
-    "DeploymentHistoryOperationScope",
-    "DeploymentReplicaGroupHistoryOperationScope",
-    "KernelKernelHistoryOperationScope",
-    "RouteHistoryOperationScope",
-    "SessionKernelHistoryOperationScope",
-    "SessionSchedulingHistoryOperationScope",
+    "DeploymentHistoryTarget",
+    "DeploymentReplicaGroupHistoryTarget",
+    "KernelHistoryTarget",
+    "KernelKernelHistoryTarget",
+    "RouteHistoryTarget",
+    "SessionKernelHistoryTarget",
+    "SessionSchedulingHistoryTarget",
 )
 
 
 @dataclass(frozen=True)
-class SessionSchedulingHistoryOperationScope(OperationScope):
+class SessionSchedulingHistoryTarget(ScopeTarget):
     """Scope for session scheduling history search.
 
     Used for entity-scoped queries where session_id is the scope parameter.
@@ -48,6 +52,10 @@ class SessionSchedulingHistoryOperationScope(OperationScope):
 
     session_id: UUID
     """Required. The session to search history for."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return SessionID(self.session_id)
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -69,8 +77,12 @@ class SessionSchedulingHistoryOperationScope(OperationScope):
         ]
 
 
+class KernelHistoryTarget(ScopeTarget, ABC):
+    """One side a kernel's scheduling history is read from."""
+
+
 @dataclass(frozen=True)
-class KernelKernelHistoryOperationScope(OperationScope):
+class KernelKernelHistoryTarget(KernelHistoryTarget):
     """Scope for kernel scheduling history search bounded by one kernel.
 
     Not reachable yet: kernels hold no RBAC permission records of their own, so
@@ -81,6 +93,10 @@ class KernelKernelHistoryOperationScope(OperationScope):
 
     kernel_id: KernelId
     """Required. The kernel to search history for."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return SessionID(self.kernel_id)
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -103,7 +119,7 @@ class KernelKernelHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class SessionKernelHistoryOperationScope(OperationScope):
+class SessionKernelHistoryTarget(KernelHistoryTarget):
     """Scope for kernel scheduling history search bounded by the owning session.
 
     Returns the history of every kernel belonging to the session.
@@ -111,6 +127,10 @@ class SessionKernelHistoryOperationScope(OperationScope):
 
     session_id: SessionId
     """Required. The session whose kernels' history is searched."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return SessionID(self.session_id)
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -133,7 +153,7 @@ class SessionKernelHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class DeploymentHistoryOperationScope(OperationScope):
+class DeploymentHistoryTarget(ScopeTarget):
     """Scope for deployment scheduling history search.
 
     Used for entity-scoped queries where deployment_id is the scope parameter.
@@ -141,6 +161,10 @@ class DeploymentHistoryOperationScope(OperationScope):
 
     deployment_id: UUID
     """Required. The deployment to search history for."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return DeploymentID(self.deployment_id)
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -163,7 +187,7 @@ class DeploymentHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class DeploymentReplicaGroupHistoryOperationScope(OperationScope):
+class DeploymentReplicaGroupHistoryTarget(ScopeTarget):
     """Scope for replica-group history search bounded by the owning deployment.
 
     Returns the history of every replica group belonging to the deployment.
@@ -171,6 +195,10 @@ class DeploymentReplicaGroupHistoryOperationScope(OperationScope):
 
     deployment_id: DeploymentID
     """Required. The deployment whose replica groups' history is searched."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.deployment_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -195,10 +223,13 @@ class DeploymentReplicaGroupHistoryOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class RouteHistoryOperationScope(OperationScope):
+class RouteHistoryTarget(OperationScope):
     """Scope for route scheduling history search.
 
     Used for entity-scoped queries where route_id is the scope parameter.
+
+    Names no scope of its own: a replica is authorized through the deployment that owns
+    it, and this carries only the replica's id.
     """
 
     route_id: ReplicaID

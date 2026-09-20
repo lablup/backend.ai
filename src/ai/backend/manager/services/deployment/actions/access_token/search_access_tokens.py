@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
 from ai.backend.manager.models.endpoint.row import EndpointTokenRow
-from ai.backend.manager.models.endpoint.scopes import DeploymentAccessTokenOperationScope
+from ai.backend.manager.models.endpoint.scopes import DeploymentAccessTokenTarget
 from ai.backend.manager.models.endpoint.searchers import DeploymentAccessTokenSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -43,7 +43,7 @@ class SearchAccessTokensAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentAccessTokenOperationScope(deployment_id=self.deployment_id),)
+        return (DeploymentAccessTokenTarget(deployment_id=self.deployment_id),)
 
     @override
     def to_searcher(self) -> DeploymentAccessTokenSearcher:

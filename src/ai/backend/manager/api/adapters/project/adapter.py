@@ -63,6 +63,11 @@ from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.orders import ProjectOrders
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.scopes import (
+    DomainProjectTarget,
+    ProjectTarget,
+    UserProjectTarget,
+)
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.project.updaters import (
     ProjectRestoreUpdater,
@@ -77,10 +82,7 @@ from ai.backend.manager.services.project.actions.delete_project import DeletePro
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
-    DomainProjectScopeItem,
-    ProjectScopeItem,
     ScopedSearchProjectsAction,
-    UserProjectScopeItem,
 )
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
@@ -283,7 +285,7 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                items=[DomainProjectScopeItem(domain_id=domain_id)], searcher=searcher
+                targets=[DomainProjectTarget(domain_id=domain_id)], searcher=searcher
             )
         )
 
@@ -294,15 +296,13 @@ class ProjectAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    def _scope_items(self, scope: ProjectScope) -> list[ProjectScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[ProjectScopeItem] = [
-            DomainProjectScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: ProjectScope) -> list[ProjectTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[ProjectTarget] = [
+            DomainProjectTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            UserProjectScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
-        )
-        return items
+        targets.extend(UserProjectTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return targets
 
     async def scoped_search(
         self,
@@ -324,7 +324,7 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project.scoped_search.run(
-            ScopedSearchProjectsAction(items=self._scope_items(input.scope), searcher=searcher)
+            ScopedSearchProjectsAction(targets=self._scope_targets(input.scope), searcher=searcher)
         )
         return AdminSearchGroupsPayload(
             items=[self._group_data_to_node(item) for item in result.items],
@@ -356,7 +356,7 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                items=[UserProjectScopeItem(user_id=user_id)], searcher=searcher
+                targets=[UserProjectTarget(user_id=user_id)], searcher=searcher
             )
         )
 

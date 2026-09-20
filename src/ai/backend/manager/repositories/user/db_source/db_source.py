@@ -65,7 +65,7 @@ from ai.backend.manager.models.keypair.row import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -941,7 +941,7 @@ class UserDBSource:
 
     async def search_my_keypairs(
         self,
-        scope: UserKeypairOperationScope,
+        scope: UserKeypairTarget,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.

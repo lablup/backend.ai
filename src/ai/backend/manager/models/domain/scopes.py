@@ -9,19 +9,24 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
-__all__ = ("ResourceGroupDomainOperationScope",)
+__all__ = ("ResourceGroupDomainTarget",)
 
 
 @dataclass(frozen=True)
-class ResourceGroupDomainOperationScope(OperationScope):
+class ResourceGroupDomainTarget(ScopeTarget):
     """The domains a resource group serves."""
 
     resource_group_id: ResourceGroupID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:

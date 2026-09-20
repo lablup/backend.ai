@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.models.artifact_revision.scopes import ArtifactRevisionOperationScope
+from ai.backend.manager.models.artifact_revision.scopes import ArtifactRevisionTarget
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -42,7 +42,7 @@ class GetArtifactRevisionsAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (ArtifactRevisionOperationScope(artifact_id=self.artifact_id),)
+        return (ArtifactRevisionTarget(artifact_id=self.artifact_id),)
 
     @override
     def to_searcher(self) -> ArtifactRevisionSearcher:

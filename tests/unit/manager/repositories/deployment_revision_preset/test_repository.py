@@ -32,7 +32,7 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
 from ai.backend.manager.models.deployment_revision_preset.purgers import DeploymentPresetPurger
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
-    DeploymentPresetSlotOperationScope,
+    DeploymentPresetSlotTarget,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
@@ -156,7 +156,7 @@ async def _slot_map(
 ) -> dict[str, Decimal]:
     async with V2DBOpsProvider(database).read_ops() as r:
         result = await r.search_with_scopes(
-            (DeploymentPresetSlotOperationScope(preset_id=preset_id),),
+            (DeploymentPresetSlotTarget(preset_id=preset_id),),
             PresetResourceSlotSearcher(pagination=NoPagination()),
         )
     return {item.slot_name: item.quantity for item in result.items}

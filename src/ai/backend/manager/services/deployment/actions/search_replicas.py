@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment.types import ModelReplicaData
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.scopes import DeploymentReplicaOperationScope
+from ai.backend.manager.models.routing.scopes import DeploymentReplicaTarget
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -41,7 +41,7 @@ class SearchReplicasAction(OperationScopeOpsAction[RoutingRow, ModelReplicaData]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentReplicaOperationScope(deployment_id=self.deployment_id),)
+        return (DeploymentReplicaTarget(deployment_id=self.deployment_id),)
 
     @override
     def to_searcher(self) -> ModelReplicaSearcher:

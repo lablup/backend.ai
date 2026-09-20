@@ -2,36 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyOperationScope
+from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyTarget
 from ai.backend.manager.models.resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
 )
 from ai.backend.manager.models.scopes import OperationScope
-
-
-@dataclass(frozen=True)
-class KeypairResourcePolicyScopeItem(ScopeItem):
-    """The keypair resource policies of one user."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return UserKeypairResourcePolicyOperationScope(user_id=self.user_id)
 
 
 @dataclass
@@ -44,7 +28,7 @@ class SearchKeypairResourcePoliciesAction(
     Which users those are, is the caller's business: the scopes are an argument.
     """
 
-    items: Sequence[KeypairResourcePolicyScopeItem]
+    targets: Sequence[UserKeypairResourcePolicyTarget]
     searcher: KeyPairResourcePolicySearcher
 
     @override
@@ -52,13 +36,15 @@ class SearchKeypairResourcePoliciesAction(
     def entity_type(cls) -> EntityType:
         return KeyPairResourcePolicyEntityType()
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
+    @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
+        return self.targets
 
     @override
     @classmethod

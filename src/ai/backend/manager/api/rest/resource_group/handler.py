@@ -25,6 +25,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
 from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
+from ai.backend.manager.models.resource_group.scopes import (
+    DomainResourceGroupTarget,
+    ProjectResourceGroupTarget,
+    ResourceGroupTarget,
+    UserResourceGroupTarget,
+)
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -35,11 +41,7 @@ from ai.backend.manager.services.resource_group.actions.get_wsproxy_version impo
     GetWsproxyVersionAction,
 )
 from ai.backend.manager.services.resource_group.actions.scoped_search import (
-    DomainResourceGroupScopeItem,
-    ProjectResourceGroupScopeItem,
-    ResourceGroupScopeItem,
     ScopedSearchResourceGroupsAction,
-    UserResourceGroupScopeItem,
 )
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 
@@ -80,19 +82,19 @@ class ResourceGroupHandler:
         domain_lookup = await self._domain.lookup.run(
             LookupDomainAction(name=DomainName(ctx.user_domain))
         )
-        items: list[ResourceGroupScopeItem] = [
-            DomainResourceGroupScopeItem(domain_id=domain_lookup.resolved_entity_id),
-            ProjectResourceGroupScopeItem(
+        targets: list[ResourceGroupTarget] = [
+            DomainResourceGroupTarget(domain_id=domain_lookup.resolved_entity_id),
+            ProjectResourceGroupTarget(
                 project_id=await self._resolve_project_id(ctx.user_domain, params.group)
             ),
-            UserResourceGroupScopeItem(user_id=UserID(ctx.user_uuid)),
+            UserResourceGroupTarget(user_id=UserID(ctx.user_uuid)),
         ]
         conditions = [ResourceGroupConditions.by_is_active(True)]
         if not ctx.is_admin:
             conditions.append(ResourceGroupConditions.by_is_public(True))
         result = await self._resource_group.scoped_search_resource_groups.run(
             ScopedSearchResourceGroupsAction(
-                items=items,
+                targets=targets,
                 searcher=ResourceGroupSearcher(
                     pagination=NoPagination(),
                     conditions=conditions,

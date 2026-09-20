@@ -240,6 +240,12 @@ from ai.backend.manager.models.endpoint.orders import (
     AutoScalingRuleOrders,
     DeploymentOrders,
 )
+from ai.backend.manager.models.endpoint.scopes import (
+    DeploymentTarget,
+    DomainDeploymentTarget,
+    ProjectDeploymentTarget,
+    UserDeploymentTarget,
+)
 from ai.backend.manager.models.endpoint.searchers import DeploymentAccessTokenSearcher
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
@@ -361,11 +367,7 @@ from ai.backend.manager.services.deployment.actions.route.update_route_traffic_s
     UpdateRouteTrafficStatusAction,
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
-    DeploymentScopeItem,
-    DomainDeploymentScopeItem,
-    ProjectDeploymentScopeItem,
     ScopedSearchDeploymentsAction,
-    UserDeploymentScopeItem,
 )
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     GlobalSearchDeploymentsAction,
@@ -720,20 +722,19 @@ class DeploymentAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: DeploymentScope) -> list[DeploymentScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[DeploymentScopeItem] = [
-            DomainDeploymentScopeItem(domain_id=DomainID(entry.value))
-            for entry in scope.domain or ()
+    def _scope_targets(self, scope: DeploymentScope) -> list[DeploymentTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[DeploymentTarget] = [
+            DomainDeploymentTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectDeploymentScopeItem(project_id=ProjectID(entry.value))
+        targets.extend(
+            ProjectDeploymentTarget(project_id=ProjectID(entry.value))
             for entry in scope.project or ()
         )
-        items.extend(
-            UserDeploymentScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        targets.extend(
+            UserDeploymentTarget(user_id=UserID(entry.value)) for entry in scope.user or ()
         )
-        return items
+        return targets
 
     async def scoped_search(
         self,
@@ -742,7 +743,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search the deployments the named scopes reach, combined with OR."""
         action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
-                items=self._scope_items(input.scope),
+                targets=self._scope_targets(input.scope),
                 querier=self._build_scoped_deployment_querier(input),
             )
         )
@@ -763,7 +764,7 @@ class DeploymentAdapter(BaseAdapter):
             raise RuntimeError("No authenticated user in context")
         action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
-                items=[UserDeploymentScopeItem(user_id=UserID(user.user_id))],
+                targets=[UserDeploymentTarget(user_id=UserID(user.user_id))],
                 querier=self._build_deployment_querier(input),
             )
         )
@@ -782,7 +783,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployments within a specific project."""
         action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
-                items=[ProjectDeploymentScopeItem(project_id=ProjectID(project_id))],
+                targets=[ProjectDeploymentTarget(project_id=ProjectID(project_id))],
                 querier=self._build_deployment_querier(input),
             )
         )

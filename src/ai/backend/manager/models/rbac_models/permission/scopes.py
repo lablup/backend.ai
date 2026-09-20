@@ -9,18 +9,23 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 
 @dataclass(frozen=True)
-class PermissionOperationScope(OperationScope):
+class RolePermissionTarget(ScopeTarget):
     """Scope for searching scoped permissions by role."""
 
     role_id: RoleID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.role_id
 
     @override
     def to_condition(self) -> QueryCondition:

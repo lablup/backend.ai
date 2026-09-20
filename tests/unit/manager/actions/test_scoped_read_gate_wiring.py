@@ -27,11 +27,13 @@ from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValida
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.domain.scopes import (
+    ResourceGroupDomainTarget,
+)
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.domain.actions.scoped_search import (
-    ResourceGroupDomainScopeItem,
     ScopedSearchDomainsAction,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -84,7 +86,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     processors = DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     resource_group_id = ResourceGroupID(uuid.uuid4())
     action = ScopedSearchDomainsAction(
-        items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group_id)],
+        targets=[ResourceGroupDomainTarget(resource_group_id=resource_group_id)],
         searcher=DomainSearcher(pagination=NoPagination(), conditions=[]),
     )
 
