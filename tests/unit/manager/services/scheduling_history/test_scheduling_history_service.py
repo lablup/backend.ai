@@ -50,9 +50,6 @@ from ai.backend.manager.models.scheduling_history.scopes import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
-from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
-    GlobalSearchReplicaGroupHistoryAction,
-)
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
 )
@@ -299,31 +296,6 @@ class TestSearchKernelScopedHistoryAction:
             querier=querier,
             scopes=[SessionKernelHistoryTarget(session_id=_SESSION_ID)],
         )
-
-
-class TestGlobalSearchReplicaGroupHistoryAction:
-    async def test_returns_histories(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-        replica_group_history: ReplicaGroupHistoryData,
-    ) -> None:
-        mock_repository.admin_search_replica_group_history.return_value = (
-            ReplicaGroupHistoryListResult(
-                items=[replica_group_history],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = GlobalSearchReplicaGroupHistoryAction(querier=querier)
-        result = await service.global_search_replica_group_history(action)
-
-        assert result.items == [replica_group_history]
-        assert result.total_count == 1
-        mock_repository.admin_search_replica_group_history.assert_awaited_once_with(querier=querier)
 
 
 class TestScopedSearchReplicaGroupHistoryAction:

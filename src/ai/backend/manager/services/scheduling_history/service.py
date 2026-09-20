@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 
-from .actions.global_search_replica_group_history import (
-    GlobalSearchReplicaGroupHistoryAction,
-    GlobalSearchReplicaGroupHistoryActionResult,
-)
 from .actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
@@ -37,22 +33,6 @@ class SchedulingHistoryService:
         self._repository = repository
 
     # Admin methods (no scope)
-
-    async def global_search_replica_group_history(
-        self,
-        action: GlobalSearchReplicaGroupHistoryAction,
-    ) -> GlobalSearchReplicaGroupHistoryActionResult:
-        """Searches replica-group scheduling history across every scope."""
-        result = await self._repository.admin_search_replica_group_history(
-            querier=action.querier,
-        )
-
-        return GlobalSearchReplicaGroupHistoryActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def search_session_scoped_history(
         self,

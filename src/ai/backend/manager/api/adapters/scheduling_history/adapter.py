@@ -71,6 +71,7 @@ from ai.backend.manager.models.replica_group_history.orders import (
     resolve_replica_group_order,
 )
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.searchers import ReplicaGroupHistorySearcher
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     KernelSchedulingHistoryConditions,
@@ -853,7 +854,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._scheduling_history.global_search_replica_group_history.run(
-            GlobalSearchReplicaGroupHistoryAction(querier=querier)
+            GlobalSearchReplicaGroupHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ReplicaGroupHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchReplicaGroupHistoriesPayload(
             items=[self._replica_group_data_to_dto(h) for h in action_result.items],
