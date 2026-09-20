@@ -24884,6 +24884,22 @@ input UserInput
   container_gids: [Int]
 }
 
+"""Added in 26.9.0. Filter users by conditions on the keypairs they own."""
+input UserKeypairNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches users with at least one keypair satisfying all conditions."""
+  some: KeypairFilter = null
+
+  """
+  Matches users whose every keypair satisfies all conditions (also true when the user has no keypair).
+  """
+  every: KeypairFilter = null
+
+  """Matches users with no keypair satisfying all conditions."""
+  none: KeypairFilter = null
+}
+
 type UserList implements PaginatedList
   @join__implements(graph: GRAPHENE, interface: "PaginatedList")
   @join__type(graph: GRAPHENE)
@@ -25499,6 +25515,9 @@ input UserV2Filter
   statusInfo: StringFilter = null
   domainName: StringFilter = null
 
+  """Added in 26.9.0. Filter by domain ID."""
+  domainId: UUIDFilter = null
+
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
 
@@ -25524,7 +25543,24 @@ input UserV2Filter
   """Added in 26.4.4. Filter by container supplementary GIDs."""
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by last modification timestamp."""
+  modifiedAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by when TOTP two-factor auth was activated."""
+  totpActivatedAt: NullableDateTimeFilter = null
+
+  """Added in 26.9.0. Filter by conditions on the user's keypairs."""
+  keypairs: UserKeypairNestedFilter = null
+
+  """
+  Filter by the user's domain. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use the `domainName` filter, or look the domain up first.
+  """
   domain: UserDomainNestedFilter = null
+
+  """
+  Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
+  """
   project: UserProjectNestedFilter = null
   AND: [UserV2Filter!] = null
   OR: [UserV2Filter!] = null
@@ -25542,17 +25578,31 @@ input UserV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name.
+Added in 26.2.0. Fields available for ordering user query results. Added in 26.9.0: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. Each value orders by the user column of the same name; ENTITY_ID orders by the user's own id and PROJECT_NAME folds the projects the user is on.
 """
 enum UserV2OrderField
   @join__type(graph: STRAWBERRY)
 {
+  ENTITY_ID @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
   USERNAME @join__enumValue(graph: STRAWBERRY)
   EMAIL @join__enumValue(graph: STRAWBERRY)
+  FULL_NAME @join__enumValue(graph: STRAWBERRY)
+  DESCRIPTION @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
+  STATUS_INFO @join__enumValue(graph: STRAWBERRY)
+  ROLE @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_ID @join__enumValue(graph: STRAWBERRY)
+  INTEGRATION_NAME @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
+  NEED_PASSWORD_CHANGE @join__enumValue(graph: STRAWBERRY)
+  TOTP_ACTIVATED @join__enumValue(graph: STRAWBERRY)
+  TOTP_ACTIVATED_AT @join__enumValue(graph: STRAWBERRY)
+  SUDO_SESSION_ENABLED @join__enumValue(graph: STRAWBERRY)
+  CONTAINER_UID @join__enumValue(graph: STRAWBERRY)
+  CONTAINER_MAIN_GID @join__enumValue(graph: STRAWBERRY)
   PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A user belongs to many projects, so this order folds them into a single name. Narrow the results with the `project` filter instead.")
 }
 
@@ -25564,6 +25614,9 @@ type UserV2OrganizationInfo
 {
   """Name of the domain this user belongs to."""
   domainName: String
+
+  """Added in 26.9.0. ID of the domain this user belongs to."""
+  domainId: UUID
 
   """User's role determining access permissions. See UserRoleV2 enum."""
   role: UserRoleV2

@@ -25,6 +25,7 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.user.row import UserRole, UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -136,4 +137,4 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+        return UserSearchableFields.own.to_data(row)

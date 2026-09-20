@@ -96,6 +96,10 @@ class UserOrganizationInfo(BackendAISchema):
         default=None,
         description="Name of the domain this user belongs to.",
     )
+    domain_id: UUID | None = Field(
+        default=None,
+        description="ID of the domain this user belongs to.",
+    )
     role: UserRole | None = Field(
         default=None,
         description="User's role determining access permissions. See UserRole enum.",

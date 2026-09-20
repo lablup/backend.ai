@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, override
@@ -18,6 +18,7 @@ from ai.backend.common.data.filter_specs import (
     UUIDInMatchSpec,
 )
 from ai.backend.common.dto.manager.query import (
+    ArrayFilter,
     DateTimeFilter,
     EnumFilter,
     IntFilter,
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
@@ -160,6 +162,20 @@ class RecordingBoolConditions(BoolConditions):
     @override
     def equals(self, value: bool) -> QueryCondition:
         return Recorded("equals", value)
+
+
+class RecordingArrayConditions(ArrayConditions[int]):
+    @override
+    def contains(self, value: int) -> QueryCondition:
+        return Recorded("contains", value)
+
+    @override
+    def contains_all(self, values: Sequence[int]) -> QueryCondition:
+        return Recorded("contains_all", list(values))
+
+    @override
+    def contains_any(self, values: Sequence[int]) -> QueryCondition:
+        return Recorded("contains_any", list(values))
 
 
 class RecordingToManyCorrelation(ToManyCorrelation):
@@ -551,6 +567,64 @@ class TestApplyBoolFilter:
         self, adapter: BaseFilterAdapter, column: sa.sql.expression.ColumnClause[Any]
     ) -> None:
         assert adapter.apply_bool_filter(None, RecordingBoolConditions(column)) == []
+
+
+class TestApplyArrayFilter:
+    @pytest.fixture
+    def conditions(self, column: sa.sql.expression.ColumnClause[Any]) -> RecordingArrayConditions:
+        return RecordingArrayConditions(column, sa.Integer())
+
+    @pytest.mark.parametrize(
+        ("filter_input", "expected"),
+        [
+            ({"contains": 1000}, Recorded("contains", 1000)),
+            ({"contains_any": [1000, 1001]}, Recorded("contains_any", [1000, 1001])),
+            ({"contains_all": [1000, 1001]}, Recorded("contains_all", [1000, 1001])),
+        ],
+    )
+    def test_each_field_calls_its_operation(
+        self,
+        adapter: BaseFilterAdapter,
+        conditions: RecordingArrayConditions,
+        filter_input: dict[str, Any],
+        expected: Recorded,
+    ) -> None:
+        applied = adapter.apply_array_filter(
+            ArrayFilter[int].model_validate(filter_input), conditions
+        )
+
+        assert applied == [expected]
+
+    def test_every_set_field_applies_in_order(
+        self, adapter: BaseFilterAdapter, conditions: RecordingArrayConditions
+    ) -> None:
+        applied = adapter.apply_array_filter(
+            ArrayFilter[int](contains_all=[1002], contains_any=[1001], contains=1000),
+            conditions,
+        )
+
+        assert applied == [
+            Recorded("contains", 1000),
+            Recorded("contains_any", [1001]),
+            Recorded("contains_all", [1002]),
+        ]
+
+    def test_zero_is_a_set_value(
+        self, adapter: BaseFilterAdapter, conditions: RecordingArrayConditions
+    ) -> None:
+        applied = adapter.apply_array_filter(ArrayFilter[int](contains=0), conditions)
+
+        assert applied == [Recorded("contains", 0)]
+
+    def test_none_applies_nothing(
+        self, adapter: BaseFilterAdapter, conditions: RecordingArrayConditions
+    ) -> None:
+        assert adapter.apply_array_filter(None, conditions) == []
+
+    def test_empty_filter_applies_nothing(
+        self, adapter: BaseFilterAdapter, conditions: RecordingArrayConditions
+    ) -> None:
+        assert adapter.apply_array_filter(ArrayFilter[int](), conditions) == []
 
 
 class TestApplyToManyFilter:

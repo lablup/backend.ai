@@ -76,7 +76,7 @@ from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -740,8 +740,8 @@ class ResourcePolicyAdapter(BaseAdapter):
             return None
         cond = self.convert_uuid_filter(
             filter.user_id,
-            equals_factory=KeypairConditions.by_user_id_equals,
-            in_factory=KeypairConditions.by_user_id_in,
+            equals_factory=KeyPairSearchableFields.own.user_id.filter.equals,
+            in_factory=KeyPairSearchableFields.own.user_id.filter.in_,
         )
         if cond is None:
             return None

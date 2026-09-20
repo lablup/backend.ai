@@ -30,6 +30,7 @@ def items_table() -> sa.Table:
         sa.Column("count", sa.Integer),
         sa.Column("status", sa.Enum(ItemStatus)),
         sa.Column("flag", sa.Boolean),
+        sa.Column("gids", sa.ARRAY(sa.Integer)),
     )
 
 

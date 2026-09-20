@@ -32420,8 +32420,51 @@
         "title": "ArrayFilter[int]",
         "type": "object"
       },
+      "KeypairNestedFilter": {
+        "description": "The `keypairs` field of a user filter.\n\nEach quantifier matches one keypair at a time. To require two different keypairs,\ncombine two of these with the user filter's own `AND`.",
+        "properties": {
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "KeypairNestedFilter",
+        "type": "object"
+      },
       "UserDomainFilter": {
-        "description": "Nested filter for the domain a user belongs to.",
+        "description": "Deprecated. Nested filter for the domain a user belongs to.",
         "properties": {
           "name": {
             "anyOf": [
@@ -32583,7 +32626,7 @@
         "type": "string"
       },
       "UserProjectFilter": {
-        "description": "Nested filter for projects a user belongs to.",
+        "description": "Deprecated. Nested filter for projects a user belongs to.",
         "properties": {
           "name": {
             "anyOf": [
@@ -32637,7 +32680,7 @@
               }
             ],
             "default": null,
-            "description": "Exact match for user role."
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -32652,7 +32695,7 @@
               }
             ],
             "default": null,
-            "description": "Match any of the provided roles.",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -32665,7 +32708,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude exact role match."
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -32680,7 +32723,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude any of the provided roles.",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -32710,7 +32753,7 @@
               }
             ],
             "default": null,
-            "description": "Exact match for user status."
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -32725,7 +32768,7 @@
               }
             ],
             "default": null,
-            "description": "Match any of the provided statuses.",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -32738,7 +32781,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude exact status match."
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -32753,7 +32796,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude any of the provided statuses.",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
