@@ -37,7 +37,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
-from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
+from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -244,24 +244,6 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     @classmethod
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
-
-    def to_data(self) -> ProjectData:
-        return ProjectData(
-            id=self.id,
-            name=self.name,
-            description=self.description,
-            is_active=self.is_active,
-            created_at=self.created_at,
-            modified_at=self.updated_at,
-            integration_name=self.integration_id,  # DB column is integration_id
-            domain_name=self.domain_name,
-            total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            dotfiles=self.dotfiles,
-            resource_policy=self.resource_policy,
-            type=self.type,
-            container_registry=self.container_registry,
-        )
 
     @classmethod
     async def get(

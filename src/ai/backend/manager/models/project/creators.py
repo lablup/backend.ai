@@ -21,6 +21,7 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -128,4 +129,4 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)

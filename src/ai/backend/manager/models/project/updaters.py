@@ -16,8 +16,8 @@ from ai.backend.manager.errors.resource import (
     ProjectPurgeInProgress,
 )
 from ai.backend.manager.models.condition_utils import negate_conditions
-from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -62,7 +62,9 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ProjectConditions.not_being_purged(),
+                condition=ProjectSearchableFields.own.status.filter.not_in(
+                    ProjectStatus.purge_in_progress()
+                ),
                 error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
             ),
         )
@@ -90,7 +92,7 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -124,7 +126,7 @@ class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -151,12 +153,14 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ProjectConditions.not_being_purged(),
+                condition=ProjectSearchableFields.own.status.filter.not_in(
+                    ProjectStatus.purge_in_progress()
+                ),
                 error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
             ),
             GuardCheck(
                 condition=negate_conditions([
-                    ProjectConditions.by_type_equals(ProjectType.PERSONAL)
+                    ProjectSearchableFields.own.type.filter.equals(ProjectType.PERSONAL)
                 ]),
                 error=PersonalProjectDeletionError(
                     f"Project {self.project_id} is a personal project."
@@ -175,7 +179,7 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -202,7 +206,9 @@ class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ProjectConditions.not_being_purged(),
+                condition=ProjectSearchableFields.own.status.filter.not_in(
+                    ProjectStatus.purge_in_progress()
+                ),
                 error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
             ),
         )
@@ -218,4 +224,4 @@ class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
