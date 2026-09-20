@@ -2201,6 +2201,20 @@ class AbstractAgent[
         """The runtime's image/snapshot root, so node disk statistics skip its mounts."""
         return None
 
+    def get_container_device_allocation(
+        self, container_id: str, device_name: DeviceName
+    ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
+        """Which devices of ``device_name`` a running container holds, per slot.
+
+        The agent already knows: it is what was allocated and what `resource_spec` persists, so a
+        compute plugin never has to ask the container runtime. Empty when the container is not
+        (or no longer) registered, which callers treat as nothing to measure.
+        """
+        for kernel_obj in self.kernel_registry.values():
+            if kernel_obj.data.get("container_id") == container_id:
+                return kernel_obj.resource_spec.allocations.get(device_name, {})
+        return {}
+
     async def enumerate_container_pids(self, container_id: ContainerId) -> Sequence[PID]:
         """The host PIDs running in a container, for the per-process statistics.
 
