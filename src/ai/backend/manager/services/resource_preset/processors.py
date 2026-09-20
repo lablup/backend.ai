@@ -5,6 +5,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     EntityOpsResult,
@@ -37,6 +38,10 @@ from ai.backend.manager.services.resource_preset.actions.lookup import (
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
 )
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
+    SetResourcePresetResourceGroupActionResult,
+)
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
     UpdateResourcePresetActionResult,
@@ -51,6 +56,9 @@ class ResourcePresetProcessors:
     ]
     update_preset: SingleEntityActionProcessor[
         UpdateResourcePresetAction, UpdateResourcePresetActionResult
+    ]
+    set_preset_resource_group: MembershipActionProcessor[
+        SetResourcePresetResourceGroupAction, SetResourcePresetResourceGroupActionResult
     ]
     delete_preset: SingleEntityActionProcessor[
         DeleteResourcePresetAction, DeleteResourcePresetActionResult
@@ -72,6 +80,9 @@ class ResourcePresetProcessors:
         self.lookup = group.public_lookup_ops(LookupResourcePresetAction)
         self.create_preset = group.global_scope(CreateResourcePresetAction, service.create_preset)
         self.update_preset = group.single_entity(UpdateResourcePresetAction, service.update_preset)
+        self.set_preset_resource_group = group.membership(
+            SetResourcePresetResourceGroupAction, service.set_preset_resource_group
+        )
         self.delete_preset = group.single_entity(DeleteResourcePresetAction, service.delete_preset)
         self.get_preset = group.single_get_ops(GetResourcePresetAction)
         self.list_presets = group.public(ListResourcePresetsAction, service.list_presets)

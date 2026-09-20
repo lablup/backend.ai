@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.entity.user import UserID
@@ -26,6 +27,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
 )
@@ -46,7 +48,10 @@ from ai.backend.manager.models.resource_group.searchers import AllowedResourceGr
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
-from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+    ResourcePresetUpdater,
+)
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -55,7 +60,7 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_slot.types import (
     add_quantities,
     min_quantities,
@@ -83,12 +88,12 @@ class ResourcePresetDBSource:
     """Database source for resource preset operations."""
 
     _db: ExtendedAsyncSAEngine
-    _v2_ops: V2DBOpsProvider
+    _v2_ops: ShareOpsProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        v2_ops: V2DBOpsProvider,
+        v2_ops: ShareOpsProvider,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops
@@ -159,6 +164,25 @@ class ResourcePresetDBSource:
         if preset is None:
             raise ResourcePresetNotFound(f"Resource preset with ID {updater.preset_id} not found.")
         return preset
+
+    async def set_preset_resource_group(
+        self, updater: ResourcePresetResourceGroupUpdater
+    ) -> ResourcePresetData:
+        """Write the preset's resource group and move it into the `public` scope or out
+        of it, in one transaction.
+        """
+        public = global_entity_id(GlobalEntityName.PUBLIC)
+        async with self._v2_ops.write_ops() as w:
+            preset = await w.update_data(updater)
+            if preset is None:
+                raise ResourcePresetNotFound(
+                    f"Resource preset with ID {updater.preset_id} not found."
+                )
+            if updater.resource_group_name is None:
+                await w.transfer([], [public], updater.preset_id)
+            else:
+                await w.transfer([public], [], updater.preset_id)
+            return preset
 
     async def delete_preset(self, preset_id: ResourcePresetID) -> ResourcePresetData:
         """
