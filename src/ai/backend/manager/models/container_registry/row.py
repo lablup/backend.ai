@@ -134,8 +134,8 @@ class ContainerRegistryRow(Base):
     ssl_verify: Mapped[bool | None] = mapped_column(
         "ssl_verify", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
-    is_global: Mapped[bool | None] = mapped_column(
-        "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
+    is_global: Mapped[bool] = mapped_column(
+        "is_global", sa.Boolean, nullable=False, server_default=sa.text("true"), index=True
     )
     extra: Mapped[dict[str, Any] | None] = mapped_column(
         "extra", sa.JSON, nullable=True, default=None
@@ -158,7 +158,7 @@ class ContainerRegistryRow(Base):
         username: str | None = None,
         password: str | None = None,
         ssl_verify: bool | None = None,
-        is_global: bool | None = None,
+        is_global: bool = True,
         extra: dict[str, Any] | None = None,
     ) -> None:
         self.id = id

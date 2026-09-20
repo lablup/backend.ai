@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -49,7 +50,7 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
+    repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service

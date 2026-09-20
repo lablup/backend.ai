@@ -24,6 +24,7 @@ class ContainerRegistryUpdater(DataUpdater[ContainerRegistryRow, ContainerRegist
 
     The projects allowed on it are rows of their own, written by the relation
     operations; a value whose change drags other writes along is not an updater field.
+    `is_global` is one: :class:`ContainerRegistryGlobalUpdater` writes it.
     """
 
     registry_id: ContainerRegistryID
@@ -32,7 +33,6 @@ class ContainerRegistryUpdater(DataUpdater[ContainerRegistryRow, ContainerRegist
         default_factory=OptionalState[ContainerRegistryType].nop
     )
     registry_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    is_global: TriState[bool] = field(default_factory=TriState[bool].nop)
     project: TriState[str] = field(default_factory=TriState[str].nop)
     username: TriState[str] = field(default_factory=TriState[str].nop)
     password: TriState[str] = field(default_factory=TriState[str].nop)
@@ -63,13 +63,47 @@ class ContainerRegistryUpdater(DataUpdater[ContainerRegistryRow, ContainerRegist
         self.url.update_dict(to_update, "url")
         self.type.update_dict(to_update, "type")
         self.registry_name.update_dict(to_update, "registry_name")
-        self.is_global.update_dict(to_update, "is_global")
         self.project.update_dict(to_update, "project")
         self.username.update_dict(to_update, "username")
         self.password.update_dict(to_update, "password")
         self.ssl_verify.update_dict(to_update, "ssl_verify")
         self.extra.update_dict(to_update, "extra")
         return to_update
+
+    @override
+    def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
+        return row.to_dataclass()
+
+
+@dataclass
+class ContainerRegistryGlobalUpdater(DataUpdater[ContainerRegistryRow, ContainerRegistryData]):
+    """Write `is_global`, which the repository follows with the registry's membership
+    of the `public` scope."""
+
+    registry_id: ContainerRegistryID
+    is_global: bool
+
+    @property
+    @override
+    def row_class(self) -> builtins.type[ContainerRegistryRow]:
+        return ContainerRegistryRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ContainerRegistryRow.id
+
+    @override
+    def target_id_value(self) -> ContainerRegistryID:
+        return self.registry_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"is_global": self.is_global}
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:

@@ -47,7 +47,6 @@ from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRep
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
@@ -82,7 +81,7 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
+    repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
@@ -115,7 +114,7 @@ def resource_preset_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourcePresetProcessors:
     repo = ResourcePresetRepository(
-        database_engine, valkey_clients.stat, config_provider, V2DBOpsProvider(database_engine)
+        database_engine, valkey_clients.stat, config_provider, ShareOpsProvider(database_engine)
     )
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(

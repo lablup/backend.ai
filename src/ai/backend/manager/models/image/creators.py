@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus, ImageType
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
@@ -23,11 +25,11 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class ImageCreator(EntityCreator[ImageRow, ImageData]):
     """Creator for an image.
 
-    The image joins the registry it was scanned from; a customized image additionally
-    joins the project it is created in. ``customized`` records that a session commit
-    made it and ``creator_id`` the user it was made for. All three come from the
-    customized-owner label, which the caller reads at write time and no read goes
-    back to.
+    The image joins the registry it was scanned from, and `public` as well when that
+    registry is global; a customized image additionally joins the project it is
+    created in. ``customized`` records that a session commit made it and
+    ``creator_id`` the user it was made for. All three come from the customized-owner
+    label, which the caller reads at write time and no read goes back to.
     """
 
     name: str
@@ -47,6 +49,7 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     customized: bool = False
     creator_id: UserID | None = None
     created_in_project_id: ProjectID | None = None
+    registry_is_global: bool = False
 
     @override
     def entity_id(self, row: ImageRow) -> ImageID:
@@ -54,9 +57,12 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
 
     @override
     def created_in(self, row: ImageRow) -> Collection[EntityIdentifier]:
-        if self.created_in_project_id is None:
-            return (self.registry_id,)
-        return (self.registry_id, self.created_in_project_id)
+        scopes: list[EntityIdentifier] = [self.registry_id]
+        if self.registry_is_global:
+            scopes.append(global_entity_id(GlobalEntityName.PUBLIC))
+        if self.created_in_project_id is not None:
+            scopes.append(self.created_in_project_id)
+        return scopes
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

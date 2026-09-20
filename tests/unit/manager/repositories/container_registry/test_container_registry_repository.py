@@ -15,12 +15,15 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
 )
@@ -38,7 +41,10 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
-from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
+from ai.backend.manager.models.container_registry.updaters import (
+    ContainerRegistryGlobalUpdater,
+    ContainerRegistryUpdater,
+)
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
@@ -50,6 +56,7 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
@@ -85,6 +92,8 @@ from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -182,7 +191,7 @@ class TestContainerRegistryRepository:
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
         return ContainerRegistryRepository(
-            db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture
@@ -799,7 +808,6 @@ class TestContainerRegistryRepository:
                 username=TriState.update(changed_username),
                 password=TriState.update(changed_password),
                 ssl_verify=TriState.nop(),
-                is_global=TriState.nop(),
                 extra=TriState.update(changed_extra),
             )
         )
@@ -833,7 +841,6 @@ class TestContainerRegistryRepository:
                     username=TriState.update("new-user"),
                     password=TriState.nop(),
                     ssl_verify=TriState.nop(),
-                    is_global=TriState.nop(),
                     extra=TriState.nop(),
                 )
             )
@@ -1184,19 +1191,19 @@ class TestContainerRegistryRepository:
                 [(ProjectID(uuid.uuid4()), registry_id)], ContainerRegistryProjectCreator()
             )
 
-    async def test_modify_registry_set_is_global_keeps_project_relations(
+    async def test_set_global_keeps_project_relations(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_associated_groups: _RegistryWithGroups,
     ) -> None:
-        """is_global is a legacy read flag; the project relations are not touched."""
+        """Switching the registry into public does not touch its project relations."""
         registry_id = registry_with_associated_groups.registry.id
 
-        result = await repository.modify_registry(
-            ContainerRegistryUpdater(
+        result = await repository.set_global(
+            ContainerRegistryGlobalUpdater(
                 registry_id=ContainerRegistryID(registry_id),
-                is_global=TriState.update(True),
+                is_global=True,
             )
         )
 
@@ -1371,6 +1378,198 @@ class TestContainerRegistryRepository:
         assert result.is_global is False
 
 
+class TestContainerRegistryPublicMembership:
+    """A global registry and the images it owns belong to the `public` scope, and a
+    switch moves them in or out."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        global_entity_ids: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            global_entity_ids,
+            [
+                ImageRow,
+                ContainerRegistryRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
+                EntityShareRow,
+            ],
+        ):
+            yield global_entity_ids
+
+    @pytest.fixture
+    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
+        return ContainerRegistryRepository(
+            db=db_with_cleanup, ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
+
+    def _creator(self, *, is_global: bool | None) -> ContainerRegistryCreator:
+        name = f"{uuid.uuid4().hex[:8]}.example.com"
+        return ContainerRegistryCreator(
+            url=f"https://{name}",
+            type=ContainerRegistryType.HARBOR2,
+            registry_name=name,
+            project="stable",
+            is_global=is_global,
+        )
+
+    async def _add_image(
+        self, db: ExtendedAsyncSAEngine, registry: ContainerRegistryData, *, in_public: bool
+    ) -> ImageID:
+        """An image written the way the scan path writes one."""
+        tag = uuid.uuid4().hex[:8]
+        async with db.begin_session() as session:
+            ops = V2ShareWriteOps(session)
+            data = await ops.create_entity(
+                ImageCreator(
+                    name=f"{registry.registry_name}/stable/python:{tag}",
+                    project="stable",
+                    architecture="x86_64",
+                    registry_id=ContainerRegistryID(registry.id),
+                    registry=registry.registry_name,
+                    image="python",
+                    tag=tag,
+                    config_digest=f"sha256:{uuid.uuid4().hex}",
+                    size_bytes=1024,
+                    type=ImageType.COMPUTE,
+                    status=ImageStatus.ALIVE,
+                    labels={},
+                    registry_is_global=in_public,
+                )
+            )
+        return ImageID(data.id)
+
+    async def _in_public(self, db: ExtendedAsyncSAEngine, entity: EntityIdentifier) -> bool:
+        """Whether `public` both owns and governs the entity."""
+        public = global_entity_id(GlobalEntityName.PUBLIC)
+        node = (
+            sa.select(VirtualEntityRow.id)
+            .where(
+                VirtualEntityRow.entity_type == entity.entity_type(),
+                VirtualEntityRow.entity_id == entity,
+            )
+            .scalar_subquery()
+        )
+        public_node = (
+            sa.select(VirtualEntityRow.id)
+            .where(
+                VirtualEntityRow.entity_type == "global",
+                VirtualEntityRow.entity_id == public,
+            )
+            .scalar_subquery()
+        )
+        async with db.begin_readonly_session() as session:
+            owned = await session.scalar(
+                sa.select(EntityMembershipRow.id).where(
+                    EntityMembershipRow.virtual_entity_id == public_node,
+                    EntityMembershipRow.member_entity_id == node,
+                    EntityMembershipRow.capped.is_(False),
+                )
+            )
+            governed = await session.scalar(
+                sa.select(ScopeBindingRow.virtual_entity_id).where(
+                    ScopeBindingRow.virtual_entity_id == node,
+                    ScopeBindingRow.scope_entity_id == public_node,
+                )
+            )
+        return owned is not None and governed is not None
+
+    async def test_a_global_registry_is_created_in_public(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        registry = await repository.create_registry(self._creator(is_global=True))
+
+        assert await self._in_public(db_with_cleanup, ContainerRegistryID(registry.id))
+
+    async def test_a_registry_created_without_the_column_is_global(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        """The column defaults to true, so the row and its scopes have to agree."""
+        registry = await repository.create_registry(self._creator(is_global=None))
+
+        assert registry.is_global is True
+        assert await self._in_public(db_with_cleanup, ContainerRegistryID(registry.id))
+
+    async def test_a_project_registry_is_not_created_in_public(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        registry = await repository.create_registry(self._creator(is_global=False))
+
+        assert not await self._in_public(db_with_cleanup, ContainerRegistryID(registry.id))
+
+    async def test_switching_it_on_takes_the_registry_and_its_images_in(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        registry = await repository.create_registry(self._creator(is_global=False))
+        image_ids = [
+            await self._add_image(db_with_cleanup, registry, in_public=False) for _ in range(2)
+        ]
+
+        await repository.set_global(
+            ContainerRegistryGlobalUpdater(
+                registry_id=ContainerRegistryID(registry.id), is_global=True
+            )
+        )
+
+        assert await self._in_public(db_with_cleanup, ContainerRegistryID(registry.id))
+        for image_id in image_ids:
+            assert await self._in_public(db_with_cleanup, image_id)
+
+    async def test_switching_it_off_takes_the_registry_and_its_images_out(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        registry = await repository.create_registry(self._creator(is_global=True))
+        image_ids = [
+            await self._add_image(db_with_cleanup, registry, in_public=True) for _ in range(2)
+        ]
+
+        await repository.set_global(
+            ContainerRegistryGlobalUpdater(
+                registry_id=ContainerRegistryID(registry.id), is_global=False
+            )
+        )
+
+        assert not await self._in_public(db_with_cleanup, ContainerRegistryID(registry.id))
+        for image_id in image_ids:
+            assert not await self._in_public(db_with_cleanup, image_id)
+
+    async def test_switching_it_on_twice_leaves_the_same_edges(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        """A run that stopped part way is finished by repeating the call."""
+        registry = await repository.create_registry(self._creator(is_global=False))
+        image_id = await self._add_image(db_with_cleanup, registry, in_public=False)
+        updater = ContainerRegistryGlobalUpdater(
+            registry_id=ContainerRegistryID(registry.id), is_global=True
+        )
+
+        await repository.set_global(updater)
+        await repository.set_global(updater)
+
+        assert await self._in_public(db_with_cleanup, image_id)
+
+    async def test_an_image_of_a_project_registry_stays_out_when_another_is_switched(
+        self, repository: ContainerRegistryRepository, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> None:
+        switched = await repository.create_registry(self._creator(is_global=False))
+        other = await repository.create_registry(self._creator(is_global=False))
+        untouched = await self._add_image(db_with_cleanup, other, in_public=False)
+
+        await repository.set_global(
+            ContainerRegistryGlobalUpdater(
+                registry_id=ContainerRegistryID(switched.id), is_global=True
+            )
+        )
+
+        assert not await self._in_public(db_with_cleanup, untouched)
+
+
 class TestSearchContainerRegistries:
     """Integration tests for search_container_registries repository method."""
 
@@ -1416,7 +1615,7 @@ class TestSearchContainerRegistries:
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         return ContainerRegistryRepository(
-            db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture

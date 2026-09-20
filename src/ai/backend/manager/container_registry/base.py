@@ -295,6 +295,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             created_in_project_id=_created_in_project(
                                 update["labels"], scanned_projects
                             ),
+                            registry_is_global=self.registry_info.is_global,
                         ),
                     )
 

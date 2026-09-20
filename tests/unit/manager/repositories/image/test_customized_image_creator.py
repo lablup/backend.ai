@@ -106,10 +106,12 @@ class TestImageOwnershipGraph:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """The global entities come with it: an image of a global registry joins
+        `public`, which needs that singleton's id."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 DomainRow,
                 UserResourcePolicyRow,
@@ -130,7 +132,7 @@ class TestImageOwnershipGraph:
                 ScopeBindingRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     async def domain_id(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DomainID:

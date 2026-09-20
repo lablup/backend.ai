@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -50,6 +51,7 @@ async def adapter(
     provider = V2DBOpsProvider(engine)
     relations = RelationOpsProvider(engine)
     roster = RosterOpsProvider(engine)
+    shares = ShareOpsProvider(engine)
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
@@ -61,7 +63,7 @@ async def adapter(
     return ContainerRegistryAdapter(
         ContainerRegistryProcessors(
             registry.group(GroupMeta(ContainerRegistryEntityType())),
-            ContainerRegistryService(engine, ContainerRegistryRepository(engine, relations)),
+            ContainerRegistryService(engine, ContainerRegistryRepository(engine, shares)),
         ),
         RbacProcessors(
             rbac_groups.relation_group(),

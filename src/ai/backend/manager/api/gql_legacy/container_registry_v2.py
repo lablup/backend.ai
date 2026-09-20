@@ -166,7 +166,6 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
                 url=OptionalState.from_graphql(self.url),
                 type=OptionalState.from_graphql(self.type),
                 registry_name=OptionalState.from_graphql(self.registry_name),
-                is_global=TriState.from_graphql(self.is_global),
                 project=TriState.from_graphql(self.project),
                 username=TriState.from_graphql(self.username),
                 password=TriState.from_graphql(self.password),
@@ -212,7 +211,12 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         result = await ctx.processors.container_registry.update_container_registry.run(
             props.to_action(reg_id)
         )
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
+        data = result.data
+        if props.is_global is not Undefined:
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(ContainerRegistryID(reg_id), props.is_global)
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(data))
 
 
 class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]

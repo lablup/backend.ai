@@ -13,6 +13,7 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryGlobalUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
@@ -61,6 +62,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+    SetContainerRegistryGlobalActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
     UpdateContainerRegistryActionResult,
@@ -105,6 +110,16 @@ class ContainerRegistryService:
     ) -> UpdateContainerRegistryActionResult:
         data = await self._container_registry_repository.modify_registry(action.updater)
         return UpdateContainerRegistryActionResult(data=data)
+
+    async def set_container_registry_global(
+        self, action: SetContainerRegistryGlobalAction
+    ) -> SetContainerRegistryGlobalActionResult:
+        data = await self._container_registry_repository.set_global(
+            ContainerRegistryGlobalUpdater(
+                registry_id=action.registry_id, is_global=action.is_global
+            )
+        )
+        return SetContainerRegistryGlobalActionResult(data=data)
 
     async def delete_container_registry(
         self, action: DeleteContainerRegistryAction

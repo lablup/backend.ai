@@ -61,6 +61,9 @@ from ai.backend.manager.services.container_registry.actions.delete_container_reg
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
 )
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+)
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
 )
@@ -181,9 +184,6 @@ class ContainerRegistryAdapter(BaseAdapter):
                 if input.registry_name is not None
                 else OptionalState.nop()
             ),
-            is_global=(
-                TriState.update(input.is_global) if input.is_global is not None else TriState.nop()
-            ),
             project=(
                 TriState.update(input.project) if input.project is not None else TriState.nop()
             ),
@@ -203,7 +203,25 @@ class ContainerRegistryAdapter(BaseAdapter):
         result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
-        return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
+        data = result.data
+        if input.is_global is not None:
+            data = await self.apply_global(ContainerRegistryID(input.id), input.is_global)
+        return UpdateContainerRegistryPayload(registry=self._data_to_dto(data))
+
+    async def apply_global(
+        self, registry_id: ContainerRegistryID, is_global: bool | None
+    ) -> ContainerRegistryData:
+        """Put the registry in the `public` scope or take it out, as its own run: that
+        changes who reads it, which a settings update does not.
+
+        ``None`` is the caller naming no value, which means global, as it does on create.
+        """
+        result = await self._container_registry.set_container_registry_global.run(
+            SetContainerRegistryGlobalAction(
+                registry_id=registry_id, is_global=True if is_global is None else is_global
+            )
+        )
+        return result.data
 
     async def apply_allowed_groups(
         self,

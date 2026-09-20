@@ -67,6 +67,7 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
             customized=self.customized,
             creator_id=self.creator_id,
             accelerators=self.accelerators,
+            registry_is_global=bool(source.is_global),
         )
 
 
