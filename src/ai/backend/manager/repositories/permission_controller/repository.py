@@ -15,7 +15,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
-    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
@@ -36,7 +35,6 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
@@ -154,14 +152,6 @@ class PermissionControllerRepository:
         return result.to_data() if result else None
 
     @permission_controller_repository_resilience.apply()
-    async def search_roles(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleListResult:
-        """Searches roles with pagination and filtering."""
-        return await self._db_source.search_roles(querier=querier)
-
-    @permission_controller_repository_resilience.apply()
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
@@ -169,15 +159,6 @@ class PermissionControllerRepository:
     ) -> RoleListResult:
         """Search the roles the named scopes reach, combined with OR."""
         return await self._db_source.search_roles_in_scope(querier=querier, scopes=scopes)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: RolePermissionTarget | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
-        return await self._db_source.search_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:

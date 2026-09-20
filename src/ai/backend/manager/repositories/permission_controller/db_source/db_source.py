@@ -14,7 +14,6 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
-    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
@@ -43,7 +42,6 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -233,29 +231,6 @@ class PermissionDBSource:
                 return None
             return result
 
-    async def search_roles(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleListResult:
-        """Searches roles with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(RoleRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.RoleRow.to_data() for row in result.rows]
-
-            return RoleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
@@ -275,31 +250,6 @@ class PermissionDBSource:
             items = [row.RoleRow.to_data() for row in result.rows]
 
             return RoleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: RolePermissionTarget | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(PermissionRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope] if scope is not None else (),
-            )
-
-            items = [row.PermissionRow.to_data() for row in result.rows]
-
-            return PermissionListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
