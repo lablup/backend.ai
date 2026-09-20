@@ -3,6 +3,8 @@ back."""
 
 from __future__ import annotations
 
+import importlib.util
+import pathlib
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -252,6 +254,23 @@ async def _upgrade(db: ExtendedAsyncSAEngine) -> None:
 async def _downgrade(db: ExtendedAsyncSAEngine) -> None:
     async with db.begin() as conn:
         await conn.run_sync(revision.remove_public_edges)
+
+
+class TestTheRevisionLoadsAsAlembicLoadsIt:
+    """Alembic reads a revision file without putting the module in `sys.modules`, so a
+    declaration that resolves its annotations through there fails only there — an
+    ordinary import, which every other test here does, would not catch it."""
+
+    async def test_the_module_executes_outside_sys_modules(self) -> None:
+        path = pathlib.Path(revision.__file__)
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+
+        spec.loader.exec_module(module)
+
+        assert module.revision == revision.revision
+        assert module.down_revision == revision.down_revision
 
 
 class TestSettleIsGlobal:

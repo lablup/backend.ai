@@ -18,7 +18,6 @@ Create Date: 2026-09-21
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Final
 
 import sqlalchemy as sa
@@ -74,17 +73,34 @@ _REMOVE_BINDINGS: Final = sa.text(f"""
 """)
 
 
-@dataclass(frozen=True)
 class _Source:
     """The rows of one table that belong in `public`, paged by the column naming the
     entity. ``where`` is the condition a row meets to belong there, and is empty where
-    the whole table does."""
+    the whole table does.
+
+    A plain class rather than a dataclass: alembic loads a revision without putting it
+    in `sys.modules`, and `@dataclass` reads the module's namespace to resolve its
+    annotations."""
 
     entity_type: str
     table: str
     id_column: str
-    where: str = ""
-    joins: str = ""
+    where: str
+    joins: str
+
+    def __init__(
+        self,
+        entity_type: str,
+        table: str,
+        id_column: str,
+        where: str = "",
+        joins: str = "",
+    ) -> None:
+        self.entity_type = entity_type
+        self.table = table
+        self.id_column = id_column
+        self.where = where
+        self.joins = joins
 
     def page(self) -> sa.TextClause:
         conditions = [f"({self.where})"] if self.where else []
