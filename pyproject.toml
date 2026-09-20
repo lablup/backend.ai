@@ -85,6 +85,7 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 src = ["src"]
+extend-exclude = ["src/ai/backend/agent/containerd/_grpcapi"]
 
 [tool.ruff.lint]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
@@ -395,6 +396,12 @@ disable_error_code = ["explicit-override"]
 [[tool.mypy.overrides]]
 module = "ai.backend.common.clients.valkey_client.*"
 disable_error_code = ["no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = "ai.backend.agent.containerd._grpcapi.*"
+# Generated modules, described by the .pyi stubs beside them; their bodies build the message
+# classes at runtime and are not worth type-checking.
+ignore_errors = true
 
 [tool.pyright]
 pythonVersion = "3.13"
