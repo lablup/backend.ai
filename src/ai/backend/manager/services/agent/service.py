@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
 from typing import Any, Literal, cast
 from uuid import UUID
 
@@ -52,10 +51,6 @@ from ai.backend.manager.services.agent.actions.load_container_counts import (
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
-)
-from ai.backend.manager.services.agent.actions.search_agents import (
-    SearchAgentsAction,
-    SearchAgentsActionResult,
 )
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -289,23 +284,6 @@ class AgentService:
                 )
                 for uuid in action.agent_uuids
             ]
-        )
-
-    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
-        """Searches agents, with what the caller holds on each."""
-        result = await self._agent_repository.search_agents(
-            querier=action.querier,
-        )
-        permissions = await self._permissions_on([item.agent.uuid for item in result.items])
-
-        return SearchAgentsActionResult(
-            agents=[
-                replace(item, permissions=permissions.get(item.agent.uuid, []))
-                for item in result.items
-            ],
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def bulk_load_container_counts(
