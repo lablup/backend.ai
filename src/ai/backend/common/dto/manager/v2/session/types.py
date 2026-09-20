@@ -148,6 +148,12 @@ class SessionUsedBy(BaseRequestModel):
     deployment: list[UUID] | None = Field(
         default=None, description="Deployments whose route rows the session serves as a replica"
     )
+    agent: list[UUID] | None = Field(
+        default=None, description="Agents running a kernel of the session"
+    )
+    resource_group: list[UUID] | None = Field(
+        default=None, description="Resource groups the session runs in"
+    )
 
 
 class ProjectSessionScope(BaseRequestModel):

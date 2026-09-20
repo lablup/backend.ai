@@ -13,12 +13,14 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
@@ -27,6 +29,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -45,6 +48,8 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.scopes import ProjectSessionTarget
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -222,6 +227,25 @@ class TestSessionSearchInProject:
                 )
             await db_sess.flush()
 
+            agent_id = AgentId("test-agent-1")
+            agent = AgentRow(
+                id=agent_id,
+                status=AgentStatus.ALIVE,
+                scaling_group="default",
+                resource_group_id=test_scaling_group_id,
+                schedulable=True,
+                addr="tcp://127.0.0.1:6001",
+                region="local",
+                first_contact=datetime.now(tzutc()),
+                lost_at=None,
+                version="1.0.0",
+                architecture="x86_64",
+                compute_plugins={},
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+            agent_uuid = agent.uuid
+
             now = datetime.now(tzutc())
             for sid, group_id, name in [
                 (session_a1_id, project_a_id, "session-a1"),
@@ -281,7 +305,7 @@ class TestSessionSearchInProject:
                         image="cr.backend.ai/stable/python:latest",
                         architecture="x86_64",
                         registry="cr.backend.ai",
-                        agent=None,
+                        agent=agent_id if sid == session_a1_id else None,
                         agent_addr=None,
                         container_id=None,
                         repl_in_port=2000,
@@ -321,6 +345,7 @@ class TestSessionSearchInProject:
                 )
 
         yield {
+            "agent_uuid": agent_uuid,
             "project_a_id": project_a_id,
             "project_b_id": project_b_id,
             "session_a1_id": session_a1_id,
@@ -354,3 +379,48 @@ class TestSessionSearchInProject:
         assert await self._scoped_ids(db_with_cleanup, test_data["project_b_id"]) == {
             test_data["session_b1_id"]
         }
+
+    async def _used_by_ids(self, db: ExtendedAsyncSAEngine, used_by: UsedBy) -> set[uuid.UUID]:
+        async with db.begin_readonly_session() as sess:
+            rows = await sess.scalars(sa.select(SessionRow.id).where(used_by.condition()))
+            return set(rows)
+
+    async def test_used_by_agent_narrows_to_the_sessions_it_runs(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> None:
+        """Only the session whose kernel sits on the agent comes back."""
+        used_by = SessionSearchableFields.linked.agents.used_by(AgentUUID(test_data["agent_uuid"]))
+        assert await self._used_by_ids(db_with_cleanup, used_by) == {test_data["session_a1_id"]}
+
+    async def test_used_by_another_agent_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> None:
+        used_by = SessionSearchableFields.linked.agents.used_by(AgentUUID(uuid.uuid4()))
+        assert await self._used_by_ids(db_with_cleanup, used_by) == set()
+
+    async def test_used_by_resource_group_narrows_to_the_sessions_it_runs(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+        test_scaling_group_id: ResourceGroupID,
+    ) -> None:
+        used_by = SessionSearchableFields.linked.resource_groups.used_by(test_scaling_group_id)
+        assert await self._used_by_ids(db_with_cleanup, used_by) == {
+            test_data["session_a1_id"],
+            test_data["session_a2_id"],
+            test_data["session_b1_id"],
+        }
+
+    async def test_used_by_another_resource_group_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> None:
+        used_by = SessionSearchableFields.linked.resource_groups.used_by(
+            ResourceGroupID(uuid.uuid4())
+        )
+        assert await self._used_by_ids(db_with_cleanup, used_by) == set()

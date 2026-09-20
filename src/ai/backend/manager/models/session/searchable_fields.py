@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from typing import override
 
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.types import AccessKey, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.entity_label.searchable_fields import (
     EntityLabelCorrelation,
     EntityLabelSearchableFields,
@@ -15,6 +20,7 @@ from ai.backend.manager.models.entity_label.searchable_fields import (
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
@@ -271,6 +277,22 @@ class _SessionLinkedEntities:
         RoutingRow.endpoint,
     )
     """Sessions a deployment's route rows serve as their replica."""
+    agents = UsageConditions[AgentUUID](
+        ToManyCorrelation(
+            sa.join(KernelRow, AgentRow, AgentRow.id == KernelRow.agent),
+            SessionRow,
+            KernelRow.session_id == SessionRow.id,
+        ),
+        AgentRow.uuid,
+    )
+    """Sessions an agent runs a kernel of."""
+    resource_groups = UsageConditions[ResourceGroupID](
+        ToManyCorrelation(
+            ResourceGroupRow, SessionRow, ResourceGroupRow.id == SessionRow.resource_group_id
+        ),
+        ResourceGroupRow.id,
+    )
+    """Sessions a resource group runs."""
 
 
 class SessionSearchableFields:
