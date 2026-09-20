@@ -60,6 +60,7 @@ class EntityLabelFilterGQL(PydanticInputMixin[EntityLabelFilter]):
     name="EntityLabelNestedFilter",
 )
 class EntityLabelNestedFilterGQL(PydanticInputMixin[EntityLabelNestedFilter]):
+    exists: bool | None = None
     some: EntityLabelFilterGQL | None = None
     every: EntityLabelFilterGQL | None = None
     none: EntityLabelFilterGQL | None = None

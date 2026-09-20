@@ -5671,6 +5671,7 @@ input EntityLabelFilter {
 Added in 26.9.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
 """
 input EntityLabelNestedFilter {
+  exists: Boolean = null
   some: EntityLabelFilter = null
   every: EntityLabelFilter = null
   none: EntityLabelFilter = null
@@ -8408,6 +8409,11 @@ input ModelCardV2ResourceRequirementFilter {
 Added in 26.9.0. Filter model cards by conditions on their minimum resource requirements.
 """
 input ModelCardV2ResourceRequirementNestedFilter {
+  """
+  Matches cards that carry at least one requirement when true, and cards carrying none when false. Says nothing about what the requirements hold.
+  """
+  exists: Boolean = null
+
   """Matches cards with at least one requirement satisfying all conditions."""
   some: ModelCardV2ResourceRequirementFilter = null
 
@@ -13661,6 +13667,11 @@ input ReplicaHealthStatusFilter {
 
 """Added in 26.8.0. Filter deployments by conditions on their replicas."""
 input ReplicaNestedFilter {
+  """
+  Added in 26.9.0. Matches parents that have at least one replica when true, and parents with none when false. Says nothing about what the replicas hold.
+  """
+  exists: Boolean = null
+
   """Matches parents with at least one replica satisfying all conditions."""
   some: ReplicaFilter = null
 
@@ -18704,6 +18715,11 @@ input UserFairShareUserNestedFilter {
 
 """Added in 26.9.0. Filter users by conditions on the keypairs they own."""
 input UserKeypairNestedFilter {
+  """
+  Matches users that own at least one keypair when true, and users owning none when false. Says nothing about what the keypairs hold.
+  """
+  exists: Boolean = null
+
   """Matches users with at least one keypair satisfying all conditions."""
   some: KeypairFilter = null
 

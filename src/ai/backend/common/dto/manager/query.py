@@ -157,8 +157,19 @@ class EnumFilter[E: Enum](BaseRequestModel):
 
 
 class ToManyFilter[F](BaseRequestModel):
-    """Filter over the rows a to-many relation reaches; each quantifier takes one row filter."""
+    """Filter over the rows a to-many relation reaches.
 
+    Each matching mode takes one row filter and must carry a condition; ``exists``
+    answers whether there is a related row at all.
+    """
+
+    exists: bool | None = Field(
+        default=None,
+        description=(
+            "True for a row that has at least one related row, false for one that has none. "
+            "Asks nothing about what the related rows hold."
+        ),
+    )
     some: F | None = Field(default=None, description="At least one related row matches.")
     every: F | None = Field(
         default=None, description="Every related row matches; true when there is none."
