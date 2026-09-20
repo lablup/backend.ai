@@ -260,6 +260,19 @@
       "EntityLabelNestedFilter": {
         "description": "The `labels` field of a labelable entity's filter.\n\nEach relation matches one label at a time. To require two different labels, combine\ntwo of these with the entity filter's own `AND`.",
         "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
           "some": {
             "anyOf": [
               {
@@ -5314,6 +5327,19 @@
       "ReplicaNestedFilter": {
         "description": "The `replicas` field of a deployment filter.\n\nEach quantifier matches one replica at a time. To require two different replicas,\ncombine two of these with the deployment filter's own `AND`.",
         "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
           "some": {
             "anyOf": [
               {
@@ -27697,6 +27723,19 @@
       "ModelCardResourceRequirementNestedFilter": {
         "description": "The `min_resource` field of a model card filter.\n\nEach quantifier matches one requirement at a time. To require two different slots,\ncombine two of these with the model card filter's own `AND`.",
         "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
           "some": {
             "anyOf": [
               {
@@ -33121,6 +33160,19 @@
       "KeypairNestedFilter": {
         "description": "The `keypairs` field of a user filter.\n\nEach quantifier matches one keypair at a time. To require two different keypairs,\ncombine two of these with the user filter's own `AND`.",
         "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
           "some": {
             "anyOf": [
               {
