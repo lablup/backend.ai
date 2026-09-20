@@ -59,7 +59,7 @@ from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.domain.conditions import DomainConditions
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.deprecated_search import (
     DeprecatedProjectConditions,
@@ -473,20 +473,11 @@ class ProjectAdapter(BaseAdapter):
         """The domain conditions, gathered into one EXISTS on the holding domain row."""
         if domain_filter is None:
             return []
-        raw_conditions: list[QueryCondition] = []
-        if domain_filter.name is not None:
-            condition = self.convert_string_filter(
-                domain_filter.name,
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if domain_filter.is_active is not None:
-            raw_conditions.append(DomainConditions.by_is_active(domain_filter.is_active))
+        fields = DomainSearchableFields.own
+        raw_conditions = [
+            *self.apply_string_filter(domain_filter.name, fields.name.filter),
+            *self.apply_bool_filter(domain_filter.is_active, fields.is_active.filter),
+        ]
         if not raw_conditions:
             return []
         return [DeprecatedProjectConditions.exists_domain_combined(raw_conditions)]

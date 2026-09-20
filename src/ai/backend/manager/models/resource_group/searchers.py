@@ -12,13 +12,14 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
-from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.scopes import (
     DomainResourceGroupTarget,
     ProjectResourceGroupTarget,
     UserResourceGroupTarget,
+)
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -38,7 +39,7 @@ class ResourceGroupSearcher(Searcher[ResourceGroupRow, ResourceGroupData]):
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return row.to_dataclass()
+        return ResourceGroupSearchableFields.own.to_data(row)
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,6 @@ class AllowedResourceGroupsSearch:
     def searcher(self) -> ResourceGroupSearcher:
         return ResourceGroupSearcher(
             pagination=NoPagination(),
-            conditions=[ResourceGroupConditions.by_is_active(True)],
-            orders=[ResourceGroupOrders.name()],
+            conditions=[ResourceGroupSearchableFields.own.is_active.filter.equals(True)],
+            orders=[ResourceGroupSearchableFields.own.name.order.apply(ascending=True)],
         )

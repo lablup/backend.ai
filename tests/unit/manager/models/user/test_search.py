@@ -26,7 +26,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.domain.conditions import DomainConditions
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -34,7 +34,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.project.conditions import ProjectConditions
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -458,7 +458,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
-                    DomainConditions.by_is_active(True)
+                    DomainSearchableFields.own.is_active.filter.equals(True)
                 ])
             ],
             orders=[],
@@ -479,7 +479,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
-                    DomainConditions.by_description_contains(spec)
+                    DomainSearchableFields.own.description.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -502,7 +502,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
-                    ProjectConditions.by_name_contains(spec)
+                    ProjectSearchableFields.own.name.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -523,7 +523,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
-                    ProjectConditions.by_name_contains(spec)
+                    ProjectSearchableFields.own.name.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -585,7 +585,7 @@ class TestUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
-                    DomainConditions.by_is_active(True)
+                    DomainSearchableFields.own.is_active.filter.equals(True)
                 ])
             ],
             orders=[DeprecatedUserOrders.by_project_name(ascending=True)],

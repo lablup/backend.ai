@@ -26,7 +26,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.domain.conditions import DomainConditions
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -91,18 +91,18 @@ _WITH_TABLES: list[TableOrORM] = [
 ]
 
 
-class TestProjectLinkedDomainConditions:
+class TestProjectLinkedDomainFilters:
     """The deprecated domain filter gathers the domain conditions into one EXISTS."""
 
     def test_exists_domain_returns_callable(self) -> None:
         condition = DeprecatedProjectConditions.exists_domain_combined([
-            DomainConditions.by_is_active(True)
+            DomainSearchableFields.own.is_active.filter.equals(True)
         ])
         assert callable(condition)
 
     def test_by_domain_is_active_true(self) -> None:
         condition = DeprecatedProjectConditions.exists_domain_combined([
-            DomainConditions.by_is_active(True)
+            DomainSearchableFields.own.is_active.filter.equals(True)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -110,7 +110,7 @@ class TestProjectLinkedDomainConditions:
 
     def test_by_domain_is_active_false(self) -> None:
         condition = DeprecatedProjectConditions.exists_domain_combined([
-            DomainConditions.by_is_active(False)
+            DomainSearchableFields.own.is_active.filter.equals(False)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -253,7 +253,7 @@ class TestGroupNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
-                    DomainConditions.by_is_active(True)
+                    DomainSearchableFields.own.is_active.filter.equals(True)
                 ])
             ],
             orders=[],
@@ -280,7 +280,7 @@ class TestGroupNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
-                    DomainConditions.by_name_equals(spec)
+                    DomainSearchableFields.own.name.filter.equals(spec)
                 ])
             ],
             orders=[],
@@ -306,7 +306,7 @@ class TestGroupNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
-                    DomainConditions.by_name_equals(spec)
+                    DomainSearchableFields.own.name.filter.equals(spec)
                 ])
             ],
             orders=[],
@@ -344,7 +344,7 @@ class TestGroupNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
-                    DomainConditions.by_is_active(True)
+                    DomainSearchableFields.own.is_active.filter.equals(True)
                 ])
             ],
             orders=[ProjectSearchableFields.own.domain_name.order.apply(ascending=True)],

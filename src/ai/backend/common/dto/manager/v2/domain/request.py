@@ -114,10 +114,20 @@ class DomainFilter(BaseRequestModel):
         default=None, description="Filter by last modification time."
     )
     project: DomainProjectFilter | None = Field(
-        default=None, description="Filter by nested project conditions."
+        default=None,
+        description=(
+            "Filter by the projects the domain holds. Deprecated: search projects first, "
+            "then narrow by `name`."
+        ),
+        deprecated=True,
     )
     user: DomainUserFilter | None = Field(
-        default=None, description="Filter by nested user conditions."
+        default=None,
+        description=(
+            "Filter by the users the domain holds. Deprecated: search users first, then "
+            "narrow by `name`."
+        ),
+        deprecated=True,
     )
     AND: list[DomainFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[DomainFilter] | None = Field(default=None, description="OR logical combinator.")

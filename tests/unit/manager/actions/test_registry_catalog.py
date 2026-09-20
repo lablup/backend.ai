@@ -962,10 +962,9 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
     assert (LookupBulkKernelOwnerAction, ActionGate.PERMISSION) in lookup_gates
 
 
-def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:
-    """The resource group, notification, artifact, user and project DataLoaders read per
-    named entity; the domain one is public, since a regular user holds no read on domains.
-    """
+def test_entity_data_loader_reads_are_checked_per_entity() -> None:
+    """The resource group, notification, artifact, domain, user and project DataLoaders
+    read per named entity."""
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
@@ -1062,7 +1061,7 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     assert recorded[BulkGetDomainsAction] == (
         DomainEntityType(),
         ActionKind.BULK,
-        ActionGate.PUBLIC,
+        ActionGate.PERMISSION,
     )
     assert recorded[BulkLookupDomainsAction] == (
         DomainEntityType(),

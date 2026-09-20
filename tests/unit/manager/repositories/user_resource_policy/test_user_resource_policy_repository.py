@@ -26,6 +26,9 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    UserResourcePolicySearchableFields,
+)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
@@ -105,7 +108,7 @@ class TestUserResourcePolicyRepository:
             db_sess.add(policy_row)
             await db_sess.flush()
 
-        yield policy_row.to_dataclass()
+        yield UserResourcePolicySearchableFields.own.to_data(policy_row)
 
     async def test_get_by_name_success(
         self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData
