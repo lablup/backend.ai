@@ -13,9 +13,7 @@ from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentData,
-    AgentDetailData,
     AgentHeartbeatUpsert,
-    AgentListResult,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -30,7 +28,6 @@ from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -247,42 +244,6 @@ class AgentDBSource:
                     AgentUUID(agent.uuid),
                 )
         return kernels
-
-    async def search_agents(
-        self,
-        querier: BatchQuerier,
-    ) -> AgentListResult:
-        """Searches agents with total count."""
-
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AgentRow).options(
-                selectinload(AgentRow.agent_resource_rows).joinedload(
-                    AgentResourceRow.slot_type_row
-                ),
-            )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-            agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
-            # The caller's permissions are the service's to resolve.
-            agents_with_permissions = [
-                AgentDetailData(
-                    agent=agent_row.to_data(),
-                    resources=agent_row.resources_by_rank(),
-                    permissions=[],
-                )
-                for agent_row in agent_rows
-            ]
-
-            return AgentListResult(
-                items=agents_with_permissions,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def sync_agent_resource_capacity(
         self,
