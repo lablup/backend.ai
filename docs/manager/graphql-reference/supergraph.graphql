@@ -7884,8 +7884,11 @@ input EnqueueSessionInput
   """Bootstrap script."""
   bootstrapScript: String = null
 
-  """Scheduling priority (0-100)."""
-  priority: Int! = 10
+  """Added in 26.9.0. Scheduling tier (0-100)."""
+  tier: Int = null
+
+  """Scheduling tier (0-100)."""
+  priority: Int = null @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """Scope-local preemption priority among the requester's own sessions."""
   jobPriority: Int! = 0
@@ -17266,17 +17269,60 @@ type Query
   """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
-  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
+  adminSessionsV2(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usedBy: SessionUsedBy = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. List sessions within a specific project. Requires project membership or higher privileges.
   """
-  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
+  projectSessionsV2(
+    scope: ProjectSessionV2Scope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usedBy: SessionUsedBy = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Page through the sessions the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedSessionsV2(scope: SessionSearchScope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection @join__field(graph: STRAWBERRY)
+  scopedSessionsV2(
+    scope: SessionSearchScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usedBy: SessionUsedBy = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.3. Query a single session by ID. Returns an error if not found.
@@ -22017,6 +22063,16 @@ enum SessionTypes
   SYSTEM @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.9.0. Entities whose use narrows a session query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only sessions the caller can read are returned, even when a listed entity uses others.
+"""
+input SessionUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Deployments whose route rows the session serves as a replica."""
+  deployment: [UUID!] = null
+}
+
 """Added in 26.3.0. Represents a compute session in Backend.AI."""
 type SessionV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -22126,6 +22182,64 @@ input SessionV2Filter
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.9.0. Filter by the id the creating request carried."""
+  creationId: StringFilter = null
+
+  """Added in 26.9.0. Filter by session type."""
+  sessionType: SessionV2TypeFilter = null
+
+  """Added in 26.9.0. Filter by the scheduling tier of the pending queue."""
+  tier: IntFilter = null
+
+  """Added in 26.9.0. Filter by the scheduling tier of the pending queue."""
+  priority: IntFilter = null @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+
+  """
+  Added in 26.9.0. Filter by the preemption priority among the owner's sessions.
+  """
+  jobPriority: IntFilter = null
+
+  """Added in 26.9.0. Filter by whether the session may be preempted."""
+  isPreemptible: Boolean = null
+
+  """Added in 26.9.0. Filter by the number of kernels in the session."""
+  clusterSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the resource group the session runs in."""
+  resourceGroupName: StringFilter = null
+
+  """
+  Added in 26.9.0. Filter by the access key the session was created with.
+  """
+  accessKey: StringFilter = null
+
+  """Added in 26.9.0. Filter by the user-supplied tag."""
+  tag: StringFilter = null
+
+  """Added in 26.9.0. Filter by whether the session uses the host network."""
+  useHostNetwork: Boolean = null
+
+  """Added in 26.9.0. Filter by the batch execution timeout in seconds."""
+  batchTimeout: IntFilter = null
+
+  """Added in 26.9.0. Filter by when the session started running."""
+  startsAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by when the session terminated."""
+  terminatedAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by the session result."""
+  result: SessionV2ResultFilter = null
+
+  """Added in 26.9.0. Filter by the inter-container network type."""
+  networkType: SessionV2NetworkTypeFilter = null
+
+  """Added in 26.9.0. Filter by the network reference the session uses."""
+  networkId: StringFilter = null
+
+  """Added in 26.9.0. Filter by the deployment replica the session serves."""
+  replicaId: UUIDFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -22176,8 +22290,11 @@ type SessionV2MetadataInfo
   """Number of nodes in the cluster."""
   clusterSize: Int!
 
-  """Scheduling priority of the session."""
-  priority: Int!
+  """Added in 26.9.0. Scheduling tier of the session."""
+  tier: Int!
+
+  """Scheduling tier of the session."""
+  priority: Int! @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """
   Added in 26.8.0. Preemption priority among the owner's own sessions. A pending session may reclaim another session's resources only when both belong to the same user and the other session's value is strictly lower, so equal values never preempt each other; among the eligible sessions the lowest value is reclaimed first. Independent of `priority`, which orders the pending queue and takes no part in this comparison.
@@ -22207,6 +22324,32 @@ type SessionV2NetworkInfo
   networkId: String
 }
 
+"""Added in 26.9.0. Inter-container network type a session uses."""
+enum SessionV2NetworkType
+  @join__type(graph: STRAWBERRY)
+{
+  VOLATILE @join__enumValue(graph: STRAWBERRY)
+  PERSISTENT @join__enumValue(graph: STRAWBERRY)
+  HOST @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.9.0. Filter for the session network type."""
+input SessionV2NetworkTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact network type match."""
+  equals: SessionV2NetworkType = null
+
+  """Network types to match."""
+  in: [SessionV2NetworkType!] = null
+
+  """Excludes exact network type match."""
+  notEquals: SessionV2NetworkType = null
+
+  """Excludes network types in the list."""
+  notIn: [SessionV2NetworkType!] = null
+}
+
 """Added in 26.3.0. Ordering specification for sessions."""
 input SessionV2OrderBy
   @join__type(graph: STRAWBERRY)
@@ -22224,6 +22367,26 @@ enum SessionV2OrderField
   STATUS @join__enumValue(graph: STRAWBERRY)
   ID @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  CREATION_ID @join__enumValue(graph: STRAWBERRY)
+  SESSION_TYPE @join__enumValue(graph: STRAWBERRY)
+  PRIORITY @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+  TIER @join__enumValue(graph: STRAWBERRY)
+  JOB_PRIORITY @join__enumValue(graph: STRAWBERRY)
+  IS_PREEMPTIBLE @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_SIZE @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_GROUP_NAME @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  PROJECT_ID @join__enumValue(graph: STRAWBERRY)
+  USER_ID @join__enumValue(graph: STRAWBERRY)
+  ACCESS_KEY @join__enumValue(graph: STRAWBERRY)
+  TAG @join__enumValue(graph: STRAWBERRY)
+  USE_HOST_NETWORK @join__enumValue(graph: STRAWBERRY)
+  BATCH_TIMEOUT @join__enumValue(graph: STRAWBERRY)
+  STARTS_AT @join__enumValue(graph: STRAWBERRY)
+  RESULT @join__enumValue(graph: STRAWBERRY)
+  NETWORK_TYPE @join__enumValue(graph: STRAWBERRY)
+  NETWORK_ID @join__enumValue(graph: STRAWBERRY)
+  REPLICA_ID @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.3.0. Resource allocation information for a session."""
@@ -22246,6 +22409,23 @@ enum SessionV2Result
   UNDEFINED @join__enumValue(graph: STRAWBERRY)
   SUCCESS @join__enumValue(graph: STRAWBERRY)
   FAILURE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.9.0. Filter for the session result."""
+input SessionV2ResultFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact result match."""
+  equals: SessionV2Result = null
+
+  """Results to match."""
+  in: [SessionV2Result!] = null
+
+  """Excludes exact result match."""
+  notEquals: SessionV2Result = null
+
+  """Excludes results in the list."""
+  notIn: [SessionV2Result!] = null
 }
 
 """Added in 26.3.0. Runtime execution configuration for a session."""
@@ -22308,6 +22488,23 @@ enum SessionV2Type
   BATCH @join__enumValue(graph: STRAWBERRY)
   INFERENCE @join__enumValue(graph: STRAWBERRY)
   SYSTEM @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.9.0. Filter for the session type."""
+input SessionV2TypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact session type match."""
+  equals: SessionV2Type = null
+
+  """Session types to match."""
+  in: [SessionV2Type!] = null
+
+  """Excludes exact session type match."""
+  notEquals: SessionV2Type = null
+
+  """Excludes session types in the list."""
+  notIn: [SessionV2Type!] = null
 }
 
 type SetQuotaScope

@@ -39,8 +39,8 @@ from ai.backend.manager.models.idle_checker.upserters import (
     SessionIdleCheckExcluder,
     SessionIdleCheckIncluder,
 )
-from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -155,7 +155,7 @@ class IdleCheckerDBSource:
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
-                SessionConditions.by_statuses(session_statuses),
+                SessionSearchableFields.own.status.filter.in_(session_statuses),
             ],
         )
         async with self._db.begin_readonly_session_read_committed() as db_sess:

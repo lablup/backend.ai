@@ -28,7 +28,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -1617,7 +1617,7 @@ class SessionService:
                 dependencies=dependencies,
                 resource=ResourceSpecDraft(
                     options=SessionOptionsDraft(
-                        priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                        priority=action.scheduling.tier,
                         job_priority=action.scheduling.job_priority,
                         is_preemptible=action.scheduling.is_preemptible,
                         cluster_mode=action.resource.cluster_mode,

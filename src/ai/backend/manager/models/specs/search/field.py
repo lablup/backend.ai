@@ -15,13 +15,17 @@ from ai.backend.manager.models.specs.conditions.number import (
     DecimalConditions,
     FloatConditions,
 )
-from ai.backend.manager.models.specs.conditions.string import StringConditions
+from ai.backend.manager.models.specs.conditions.string import (
+    StringConditions,
+    StringEqualityConditions,
+)
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.base import SearchOrder
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation, ToOneCorrelation
 
 type FieldConditions = (
-    StringConditions
+    StringEqualityConditions
+    | StringConditions
     | UUIDConditions
     | DateTimeConditions
     | IntConditions
