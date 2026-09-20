@@ -12,14 +12,14 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class RuntimeVariantCreator(
-    CreatedInGlobal[RuntimeVariantRow], EntityCreator[RuntimeVariantRow, RuntimeVariantData]
+    CreatedInPublic[RuntimeVariantRow], EntityCreator[RuntimeVariantRow, RuntimeVariantData]
 ):
     """Creator for a runtime variant — a name in the global runtime catalog."""
 

@@ -13,14 +13,14 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class PrometheusQueryPresetCategoryCreator(
-    CreatedInGlobal[PrometheusQueryPresetCategoryRow],
+    CreatedInPublic[PrometheusQueryPresetCategoryRow],
     EntityCreator[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData],
 ):
     """Creator for a category in the global preset catalog."""

@@ -21,14 +21,14 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator, NestedFieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class ResourceSlotTypeCreator(
-    CreatedInGlobal[ResourceSlotTypeRow], EntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]
+    CreatedInPublic[ResourceSlotTypeRow], EntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]
 ):
     """Creator for a resource slot type — a global catalog row.
 
