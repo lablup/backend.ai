@@ -834,11 +834,11 @@ class ScheduleCoordinator:
         status = kernels.fields.status.filter.in_(spec.target_kernel_statuses)
         match spec.kernel_match_type:
             case KernelMatchType.ALL:
-                return [kernels.correlation.every([status]), kernels.correlation.some([])]
+                return [kernels.correlation.every([status]), kernels.correlation.exists()]
             case KernelMatchType.ANY:
                 return [kernels.correlation.some([status])]
             case KernelMatchType.NOT_ANY:
-                return [kernels.correlation.none([status]), kernels.correlation.some([])]
+                return [kernels.correlation.none([status]), kernels.correlation.exists()]
             case _:
                 assert_never(spec.kernel_match_type)
 

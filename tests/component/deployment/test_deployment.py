@@ -529,7 +529,7 @@ class TestDeploymentAdapterFilter:
             replica_filter_deployments[name] for name in expected_names
         }
 
-    async def test_replica_some_and_every_require_nonempty_all_match(
+    async def test_replica_exists_and_every_require_nonempty_all_match(
         self,
         deployment_adapter: DeploymentAdapter,
         admin_user_fixture: UserFixtureData,
@@ -543,7 +543,7 @@ class TestDeploymentAdapterFilter:
                 AdminSearchDeploymentsInput(
                     filter=DeploymentFilterV2(
                         replicas=ReplicaNestedFilter(
-                            some=ReplicaFilter(),
+                            exists=True,
                             every=ReplicaFilter(
                                 health_status=ReplicaHealthStatusFilter(
                                     equals=CommonRouteHealthStatus.HEALTHY

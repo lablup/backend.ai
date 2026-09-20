@@ -439,6 +439,13 @@ class ModelCardResourceRequirementFilterGQL(PydanticInputMixin[RequirementFilter
     name="ModelCardV2ResourceRequirementNestedFilter",
 )
 class ModelCardResourceRequirementNestedFilterGQL(PydanticInputMixin[RequirementNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "Matches cards that carry at least one requirement when true, and cards "
+            "carrying none when false. Says nothing about what the requirements hold."
+        ),
+        default=None,
+    )
     some: ModelCardResourceRequirementFilterGQL | None = gql_field(
         description="Matches cards with at least one requirement satisfying all conditions.",
         default=None,

@@ -65,7 +65,7 @@ class _VFolderOwnFields(RowDataConverter[VFolderRow, VFolderData]):
     default_mount_permission = SearchableField(
         VFolderRow.default_mount_permission,
         EnumConditions(VFolderRow.default_mount_permission, VFolderMountPolicy),
-        ColumnOrder(VFolderRow.usage_mode),
+        ColumnOrder(VFolderRow.default_mount_permission),
     )
     created_at = SearchableField(
         VFolderRow.created_at,
@@ -75,7 +75,7 @@ class _VFolderOwnFields(RowDataConverter[VFolderRow, VFolderData]):
     last_used = SearchableField(
         VFolderRow.last_used,
         DateTimeConditions(VFolderRow.last_used),
-        ColumnOrder(VFolderRow.created_at),
+        ColumnOrder(VFolderRow.last_used),
     )
     updated_at = SearchableField(
         VFolderRow.updated_at,

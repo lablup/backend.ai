@@ -780,6 +780,16 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
     name="ReplicaNestedFilter",
 )
 class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    exists: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Matches parents that have at least one replica when true, and parents "
+                "with none when false. Says nothing about what the replicas hold."
+            ),
+        ),
+        default=None,
+    )
     some: ReplicaFilter | None = gql_field(
         description="Matches parents with at least one replica satisfying all conditions.",
         default=None,

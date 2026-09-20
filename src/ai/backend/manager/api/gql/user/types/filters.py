@@ -111,6 +111,13 @@ class UserProjectNestedFilterGQL(PydanticInputMixin[UserProjectFilter]):
     name="UserKeypairNestedFilter",
 )
 class UserKeypairNestedFilterGQL(PydanticInputMixin[KeypairNestedFilter]):
+    exists: bool | None = gql_field(
+        description=(
+            "Matches users that own at least one keypair when true, and users owning "
+            "none when false. Says nothing about what the keypairs hold."
+        ),
+        default=None,
+    )
     some: KeypairFilterGQL | None = gql_field(
         description="Matches users with at least one keypair satisfying all conditions.",
         default=None,

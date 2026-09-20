@@ -8072,6 +8072,7 @@ Added in 26.9.0. Filter selecting entities by the labels on them. Each relation 
 input EntityLabelNestedFilter
   @join__type(graph: STRAWBERRY)
 {
+  exists: Boolean = null
   some: EntityLabelFilter = null
   every: EntityLabelFilter = null
   none: EntityLabelFilter = null
@@ -11887,6 +11888,11 @@ Added in 26.9.0. Filter model cards by conditions on their minimum resource requ
 input ModelCardV2ResourceRequirementNestedFilter
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Matches cards that carry at least one requirement when true, and cards carrying none when false. Says nothing about what the requirements hold.
+  """
+  exists: Boolean = null
+
   """Matches cards with at least one requirement satisfying all conditions."""
   some: ModelCardV2ResourceRequirementFilter = null
 
@@ -18930,6 +18936,11 @@ input ReplicaHealthStatusFilter
 input ReplicaNestedFilter
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in 26.9.0. Matches parents that have at least one replica when true, and parents with none when false. Says nothing about what the replicas hold.
+  """
+  exists: Boolean = null
+
   """Matches parents with at least one replica satisfying all conditions."""
   some: ReplicaFilter = null
 
@@ -25239,6 +25250,11 @@ input UserInput
 input UserKeypairNestedFilter
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Matches users that own at least one keypair when true, and users owning none when false. Says nothing about what the keypairs hold.
+  """
+  exists: Boolean = null
+
   """Matches users with at least one keypair satisfying all conditions."""
   some: KeypairFilter = null
 

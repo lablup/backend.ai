@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.manager.errors.repository import EmptyMatchConditionError
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
@@ -179,6 +180,14 @@ class RecordingArrayConditions(ArrayConditions[int]):
 
 
 class RecordingToManyCorrelation(ToManyCorrelation):
+    @override
+    def exists(self) -> QueryCondition:
+        return Recorded("exists", [])
+
+    @override
+    def not_exists(self) -> QueryCondition:
+        return Recorded("not_exists", [])
+
     @override
     def some(self, conditions: list[QueryCondition]) -> QueryCondition:
         return Recorded("some", conditions)
@@ -656,6 +665,39 @@ class TestApplyToManyFilter:
         )
 
         assert applied == [Recorded(quantifier, [Recorded("row", "a")])]
+
+    @pytest.mark.parametrize(("asked", "expected"), [(True, "exists"), (False, "not_exists")])
+    def test_exists_asks_only_whether_a_related_row_is_there(
+        self,
+        adapter: BaseFilterAdapter,
+        correlation: RecordingToManyCorrelation,
+        row_conditions: Callable[[RowFilter], list[QueryCondition]],
+        asked: bool,
+        expected: str,
+    ) -> None:
+        applied = adapter.apply_to_many_filter(
+            ToManyFilter[RowFilter](exists=asked), correlation, row_conditions
+        )
+
+        assert applied == [Recorded(expected, [])]
+
+    @pytest.mark.parametrize("quantifier", ["some", "every", "none"])
+    def test_a_quantifier_with_no_condition_is_refused(
+        self,
+        adapter: BaseFilterAdapter,
+        quantifier: str,
+    ) -> None:
+        """A row filter with nothing set reduces to no condition, which `exists` says."""
+
+        def no_conditions(_row_filter: RowFilter) -> list[QueryCondition]:
+            return []
+
+        with pytest.raises(EmptyMatchConditionError):
+            adapter.apply_to_many_filter(
+                ToManyFilter[RowFilter].model_validate({quantifier: {}}),
+                ToManyCorrelation(sa.table("rows"), sa.table("owners"), sa.true()),
+                no_conditions,
+            )
 
     def test_every_set_quantifier_applies_in_order(
         self,

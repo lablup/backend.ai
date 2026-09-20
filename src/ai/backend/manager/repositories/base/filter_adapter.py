@@ -435,13 +435,20 @@ class BaseFilterAdapter:
         correlation: ToManyCorrelation,
         row_conditions: Callable[[F], list[QueryCondition]],
     ) -> list[QueryCondition]:
-        """Apply every quantifier ``to_many_filter`` sets, each as its own condition.
+        """Apply every matching mode ``to_many_filter`` sets, each as its own condition.
 
-        ``row_conditions`` turns the row filter into the conditions one related row must meet.
+        ``row_conditions`` turns the row filter into the conditions one related row must
+        meet. A mode carrying no condition is refused by the correlation, so a request
+        that names one without saying what to match answers with a 400 rather than
+        silently widening to "has a related row" — which is what ``exists`` says.
         """
         if to_many_filter is None:
             return []
         applied: list[QueryCondition] = []
+        if to_many_filter.exists is not None:
+            applied.append(
+                correlation.exists() if to_many_filter.exists else correlation.not_exists()
+            )
         if to_many_filter.some is not None:
             applied.append(correlation.some(row_conditions(to_many_filter.some)))
         if to_many_filter.every is not None:
