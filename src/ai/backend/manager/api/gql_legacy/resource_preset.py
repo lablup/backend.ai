@@ -234,7 +234,6 @@ class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
                 if self.shared_memory is not Undefined and self.shared_memory is not None
                 else self.shared_memory
             ),
-            resource_group_name=TriState[str].from_graphql(self.scaling_group_name),
         )
 
 
@@ -296,6 +295,9 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
         name: str | None,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+            SetResourcePresetResourceGroupAction,
+        )
         from ai.backend.manager.services.resource_preset.actions.update_preset import (
             UpdateResourcePresetAction,
         )
@@ -306,6 +308,12 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
         await graph_ctx.processors.resource_preset.update_preset.run(
             UpdateResourcePresetAction(updater=props.to_updater(preset_id))
         )
+        if props.scaling_group_name is not Undefined:
+            await graph_ctx.processors.resource_preset.set_preset_resource_group.run(
+                SetResourcePresetResourceGroupAction(
+                    preset_id=preset_id, resource_group_name=props.scaling_group_name
+                )
+            )
 
         return cls(True, "success")
 

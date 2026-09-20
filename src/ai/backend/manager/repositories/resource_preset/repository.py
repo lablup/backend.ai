@@ -22,9 +22,12 @@ from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
 )
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
-from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+    ResourcePresetUpdater,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
@@ -63,7 +66,7 @@ class ResourcePresetRepository:
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
-        v2_ops_provider: V2DBOpsProvider,
+        v2_ops_provider: ShareOpsProvider,
     ) -> None:
         self._db_source = ResourcePresetDBSource(db, v2_ops_provider)
         self._cache_source = ResourcePresetCacheSource(valkey_stat)
@@ -136,6 +139,21 @@ class ResourcePresetRepository:
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         preset = await self._db_source.update_preset(updater)
+        with suppress_with_log(
+            [Exception], message="Failed to invalidate cache after preset modification"
+        ):
+            await self._cache_source.invalidate_preset(updater.preset_id, None)
+        return preset
+
+    @resource_preset_repository_resilience.apply()
+    async def set_preset_resource_group(
+        self, updater: ResourcePresetResourceGroupUpdater
+    ) -> ResourcePresetData:
+        """Bind the preset to a resource group or to none, moving it into the `public`
+        scope or out of it.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
+        """
+        preset = await self._db_source.set_preset_resource_group(updater)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset modification"
         ):

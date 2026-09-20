@@ -18,7 +18,7 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_preset.cache_source.cache_source import (
     ResourcePresetCacheSource,
 )
@@ -71,7 +71,7 @@ class TestResourcePresetRepository:
             db=mock_db_engine,
             valkey_stat=MagicMock(),
             config_provider=mock_config_provider,
-            v2_ops_provider=V2DBOpsProvider(mock_db_engine),
+            v2_ops_provider=ShareOpsProvider(mock_db_engine),
         )
         # Replace internal sources with mocks
         repo._db_source = mock_db_source
@@ -290,7 +290,6 @@ class TestResourcePresetRepository:
             name=OptionalState.update("modified-preset"),
             resource_slots=OptionalState.update(ResourceSlot({"cpu": "8", "mem": "16G"})),
             shared_memory=TriState.nullify(),
-            resource_group_name=TriState.update("new-group"),
         )
 
         # Mock modify operation

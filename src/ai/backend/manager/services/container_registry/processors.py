@@ -4,6 +4,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
 )
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
@@ -56,6 +57,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
 )
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+    SetContainerRegistryGlobalActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
     UpdateContainerRegistryActionResult,
@@ -84,6 +89,9 @@ class ContainerRegistryProcessors:
     ]
     update_container_registry: GlobalActionProcessor[
         UpdateContainerRegistryAction, UpdateContainerRegistryActionResult
+    ]
+    set_container_registry_global: MembershipActionProcessor[
+        SetContainerRegistryGlobalAction, SetContainerRegistryGlobalActionResult
     ]
     delete_container_registry: GlobalActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
@@ -128,6 +136,9 @@ class ContainerRegistryProcessors:
         )
         self.update_container_registry = group.global_scope(
             UpdateContainerRegistryAction, service.update_container_registry
+        )
+        self.set_container_registry_global = group.membership(
+            SetContainerRegistryGlobalAction, service.set_container_registry_global
         )
         self.delete_container_registry = group.global_scope(
             DeleteContainerRegistryAction, service.delete_container_registry

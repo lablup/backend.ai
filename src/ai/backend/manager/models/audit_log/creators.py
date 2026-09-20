@@ -230,6 +230,17 @@ class RelationAuditLogCreator(DanglingAuditLogCreator):
 
 
 @dataclass
+class MembershipAuditLogCreator(OwnedAuditLogCreator):
+    """One entity moved into scopes or out of them. The scopes go to
+    ``audit_log_scopes``."""
+
+    @classmethod
+    @override
+    def action_kind(cls) -> ActionKind:
+        return ActionKind.MEMBERSHIP
+
+
+@dataclass
 class GlobalAuditLogCreator(DanglingAuditLogCreator):
     @classmethod
     @override

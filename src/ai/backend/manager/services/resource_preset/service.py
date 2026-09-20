@@ -5,6 +5,9 @@ from typing import Any
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+)
 from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
@@ -21,6 +24,10 @@ from ai.backend.manager.services.resource_preset.actions.delete_preset import (
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
+)
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
+    SetResourcePresetResourceGroupActionResult,
 )
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
@@ -58,6 +65,16 @@ class ResourcePresetService:
 
         preset_data = await self._resource_preset_repository.modify_preset_validated(action.updater)
         return UpdateResourcePresetActionResult(resource_preset=preset_data)
+
+    async def set_preset_resource_group(
+        self, action: SetResourcePresetResourceGroupAction
+    ) -> SetResourcePresetResourceGroupActionResult:
+        preset_data = await self._resource_preset_repository.set_preset_resource_group(
+            ResourcePresetResourceGroupUpdater(
+                preset_id=action.preset_id, resource_group_name=action.resource_group_name
+            )
+        )
+        return SetResourcePresetResourceGroupActionResult(resource_preset=preset_data)
 
     async def delete_preset(
         self, action: DeleteResourcePresetAction

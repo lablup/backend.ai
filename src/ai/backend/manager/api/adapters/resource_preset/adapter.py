@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
 )
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -54,6 +55,9 @@ from ai.backend.manager.services.resource_preset.actions.get_preset import (
 )
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
+)
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
 )
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
@@ -177,14 +181,30 @@ class ResourcePresetAdapter(BaseAdapter):
             shared_memory=TriState.from_unset(input.shared_memory).map(
                 lambda v: BinarySize(v.bytes)
             ),
-            resource_group_name=TriState.from_unset(input.resource_group_name),
         )
         result = await self._resource_preset.update_preset.run(
             UpdateResourcePresetAction(updater=updater)
         )
+        preset = result.resource_preset
+        if not isinstance(input.resource_group_name, Unset):
+            preset = await self.apply_resource_group(
+                ResourcePresetID(input.id), input.resource_group_name
+            )
         return UpdateResourcePresetPayload(
-            resource_preset=self._data_to_node(result.resource_preset),
+            resource_preset=self._data_to_node(preset),
         )
+
+    async def apply_resource_group(
+        self, preset_id: ResourcePresetID, resource_group_name: str | None
+    ) -> ResourcePresetData:
+        """Bind the preset to a resource group or to none, as its own run: that changes
+        who is offered the preset, which a retune does not."""
+        result = await self._resource_preset.set_preset_resource_group.run(
+            SetResourcePresetResourceGroupAction(
+                preset_id=preset_id, resource_group_name=resource_group_name
+            )
+        )
+        return result.resource_preset
 
     async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
         """Delete a resource preset by ID."""

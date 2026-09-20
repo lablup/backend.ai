@@ -258,28 +258,28 @@ class ContainerRegistryHandler:
                 if params.ssl_verify is not None
                 else TriState.nop()
             ),
-            is_global=(
-                TriState.update(params.is_global)
-                if params.is_global is not None
-                else TriState.nop()
-            ),
             extra=(TriState.update(params.extra) if params.extra is not None else TriState.nop()),
         )
         result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
+        data = result.data
+        if params.is_global is not None:
+            data = await self._adapter.apply_global(
+                ContainerRegistryID(registry_id), params.is_global
+            )
 
         resp = PatchContainerRegistryResponseModel(
-            id=result.data.id,
-            url=result.data.url,
-            registry_name=result.data.registry_name,
-            type=result.data.type,
-            project=result.data.project,
-            username=result.data.username,
-            password=result.data.password,
-            ssl_verify=result.data.ssl_verify,
-            is_global=result.data.is_global,
-            extra=result.data.extra,
+            id=data.id,
+            url=data.url,
+            registry_name=data.registry_name,
+            type=data.type,
+            project=data.project,
+            username=data.username,
+            password=data.password,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 

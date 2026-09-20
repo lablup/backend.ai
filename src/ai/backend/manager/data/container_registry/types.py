@@ -16,7 +16,7 @@ class ContainerRegistryData(EntityData):
     username: str | None
     password: str | None
     ssl_verify: bool | None
-    is_global: bool | None
+    is_global: bool
     # TODO: Add proper type
     extra: dict[str, Any] | None
 

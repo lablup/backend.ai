@@ -83,6 +83,10 @@ from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
+from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
+from ai.backend.manager.actions.v2.membership.monitor.base import MembershipActionMonitor
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
+from ai.backend.manager.actions.v2.membership.validator.base import MembershipActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateEntityOpsAction,
     AtomicCreateGlobalEntityOpsAction,
@@ -449,6 +453,22 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def membership[TAction: BaseMembershipAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[MembershipActionValidator] = (),
+        monitors: Sequence[MembershipActionMonitor] = (),
+    ) -> MembershipActionProcessor[TAction, TResult]:
+        """An entity of this type entering scopes or leaving them."""
+        self._record(action_cls, ActionKind.MEMBERSHIP, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return MembershipActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.membership, *monitors),
+            validators=(*self._deps.validators.membership, *validators),
         )
 
     def lookup[TAction: BaseLookupAction, TResult: BaseLookupActionResult](
