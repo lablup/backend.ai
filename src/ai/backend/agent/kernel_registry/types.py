@@ -13,10 +13,14 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServicePort, SessionTypes
 
 if TYPE_CHECKING:
+    from ai.backend.agent.containerd.kernel import ContainerdKernel
     from ai.backend.agent.docker.kernel import DockerKernel
 
 #: The kernel class every record written before `KernelRecoveryData.kernel_type` came from.
 DOCKER_KERNEL_TYPE: Final = "docker"
+CONTAINERD_KERNEL_TYPE: Final = "containerd"
+#: The containerd kernel has no network driver; the shared schema still requires one.
+_CONTAINERD_NETWORK_DRIVER_PLACEHOLDER: Final = "bridge"
 
 
 class KernelRecoveryData(BackendAISchema):
@@ -63,6 +67,19 @@ class KernelRecoveryData(BackendAISchema):
     )
     resource_spec: KernelResourceSpec = Field(description="Resource specifications for the kernel")
     environ: Mapping[str, str] = Field(description="Environment variables for the kernel")
+    #: Runtime handles a containerd kernel is rebuilt from. Docker re-derives them from the daemon
+    #: and leaves them None.
+    container_id: str | None = Field(default=None, description="Runtime container id, if pinned")
+    kernel_host: str | None = Field(
+        default=None, description="Advertised address the manager routes to, if pinned"
+    )
+    repl_host: str | None = Field(
+        default=None,
+        description=(
+            "Node-local address the agent dials the REPL at, if pinned. Distinct from kernel_host: "
+            "containerd gives the container a private LOCAL address and publishes only its services."
+        ),
+    )
 
     @classmethod
     def from_kernel(cls, kernel: AbstractKernel) -> Self:
@@ -72,11 +89,14 @@ class KernelRecoveryData(BackendAISchema):
         not know rather than returning nothing: a registry that quietly skips a backend's kernels
         loses them at the next restart, and reports the same "saved" it does when it saved them.
         """
+        from ai.backend.agent.containerd.kernel import ContainerdKernel
         from ai.backend.agent.docker.kernel import DockerKernel
 
         match kernel:
             case DockerKernel():
                 return cls.from_docker_kernel(kernel)
+            case ContainerdKernel():
+                return cls.from_containerd_kernel(kernel)
             case _:
                 raise UnsupportedKernelType(
                     f"{type(kernel).__name__} has no recovery record; add its case to"
@@ -89,6 +109,8 @@ class KernelRecoveryData(BackendAISchema):
         match self.kernel_type:
             case _ if self.kernel_type == DOCKER_KERNEL_TYPE:
                 return self.to_docker_kernel()
+            case _ if self.kernel_type == CONTAINERD_KERNEL_TYPE:
+                return self.to_containerd_kernel()
             case _:
                 raise UnsupportedKernelType(
                     f"this node holds a recovery record of kernel type {self.kernel_type!r}, which"
@@ -135,5 +157,53 @@ class KernelRecoveryData(BackendAISchema):
                 "repl_out_port": self.repl_out_port,
                 "block_service_ports": self.block_service_ports,
                 "domain_socket_proxies": self.domain_socket_proxies,
+            },
+        )
+
+    @classmethod
+    def from_containerd_kernel(cls, kernel: ContainerdKernel) -> Self:
+        return cls(
+            kernel_type=CONTAINERD_KERNEL_TYPE,
+            id=kernel.kernel_id,
+            agent_id=kernel.agent_id,
+            image_ref=kernel.image,
+            session_type=kernel.session_type,
+            ownership_data=kernel.ownership_data,
+            network_id=kernel.network_id,
+            version=kernel.version,
+            network_driver=_CONTAINERD_NETWORK_DRIVER_PLACEHOLDER,
+            resource_spec=kernel.resource_spec,
+            service_ports=kernel.service_ports,
+            environ=kernel.environ,
+            block_service_ports=kernel.data.get("block_service_ports", False),
+            domain_socket_proxies=kernel.data.get("domain_socket_proxies", []),
+            repl_in_port=kernel.data["repl_in_port"],
+            repl_out_port=kernel.data["repl_out_port"],
+            # The code runner and the log path are rebuilt from these, so they must persist.
+            container_id=kernel.data["container_id"],
+            kernel_host=kernel.data["kernel_host"],
+            repl_host=kernel.data.get("repl_host"),
+        )
+
+    def to_containerd_kernel(self) -> ContainerdKernel:
+        from ai.backend.agent.containerd.kernel import ContainerdKernel
+
+        return ContainerdKernel(
+            ownership_data=self.ownership_data,
+            network_id=self.network_id,
+            image=self.image_ref,
+            version=self.version,
+            agent_config={},
+            resource_spec=self.resource_spec,
+            service_ports=self.service_ports,
+            environ=self.environ,
+            data={
+                "repl_in_port": self.repl_in_port,
+                "repl_out_port": self.repl_out_port,
+                "block_service_ports": self.block_service_ports,
+                "domain_socket_proxies": self.domain_socket_proxies,
+                "container_id": self.container_id,
+                "kernel_host": self.kernel_host,
+                "repl_host": self.repl_host,
             },
         )

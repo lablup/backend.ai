@@ -1761,6 +1761,50 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
             example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
         ),
     ]
+    deeplearning_samples_path: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("deeplearning-samples-path", "deeplearning_samples_path"),
+            serialization_alias="deeplearning-samples-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Host directory of deep-learning sample notebooks, mounted read-only at "
+                "/home/work/samples in kernels whose image is a deep-learning one (tensorflow, "
+                "torch, keras, caffe, mxnet, theano). Unset (the default) means no samples "
+                "directory, which is also what a Docker node without the volume gets. The Docker "
+                "backend mounts a named Docker volume ('deeplearning-samples'); containerd has no "
+                "volume registry, so the same content is named by its path here. Only used by the "
+                "containerd backend."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="", prod="/var/lib/backend.ai/deeplearning-samples"),
+        ),
+    ]
+    registry_hosts_dir: Annotated[
+        str,
+        Field(
+            default="/etc/containerd/certs.d",
+            validation_alias=AliasChoices("registry-hosts-dir", "registry_hosts_dir"),
+            serialization_alias="registry-hosts-dir",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Directory of containerd registry host configs (the standard `certs.d` layout: one "
+                "`<host:port>/hosts.toml` per registry). This is how a registry that is not plain "
+                "public HTTPS is described — a private CA, a self-signed certificate, plain HTTP, "
+                "or a mirror — and it is the same file `ctr` and `nerdctl` read, so an existing "
+                "host configuration works unchanged. Unlike the Docker backend, where the daemon "
+                "applies its own `daemon.json`/`certs.d`, containerd's transfer service consults "
+                "these files only when the client names the directory: an agent that does not pass "
+                "it cannot pull from such a registry no matter what the host has configured. A "
+                "missing directory is not an error. Only used by the containerd backend."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="/etc/containerd/certs.d", prod="/etc/containerd/certs.d"),
+        ),
+    ]
     local_network_pool: Annotated[
         str,
         Field(
@@ -2454,6 +2498,9 @@ class AgentSpecificConfig(BaseConfigSchema):
             case AgentBackend.KUBERNETES:
                 self.container.validate_kubernetes_nfs()
             case AgentBackend.DOCKER:
+                DockerExtraConfig.model_validate(self.container.model_dump())
+            case AgentBackend.CONTAINERD:
+                # The same Linux containers as Docker, so the same container-config validation.
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass

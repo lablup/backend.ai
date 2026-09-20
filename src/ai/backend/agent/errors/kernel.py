@@ -105,3 +105,18 @@ class RunIdNotSetError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_READY,
         )
+
+
+class ContainerExecTimeout(BackendAIError, web.HTTPGatewayTimeout):
+    """Raised when a command exec'd inside a container does not finish in time."""
+
+    error_type = "https://api.backend.ai/probs/agent/container-exec-timeout"
+    error_title = "The command executed in the container timed out."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.TIMEOUT,
+        )

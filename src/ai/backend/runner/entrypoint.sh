@@ -12,6 +12,21 @@ if [ -z "$LOCAL_USER_ID" ]; then
   echo "WARNING: \$LOCAL_USER_ID is an empty value. This may be a misbehavior of plugins manipulating the evironment variables of new containers and cause unexpected errors."
 fi
 
+# Run the main program under our PID-1 reaper when asked to (BACKENDAI_INIT=1).
+#
+# Whatever this script execs becomes PID 1, and PID 1 must reap the orphans the workload leaves
+# behind or they pile up as zombies until the container runs out of PIDs. The Docker backend gets
+# this from dockerd (HostConfig.Init -> tini); containerd has no equivalent, so we supply one.
+# init.py takes PID 1 and forks the real program, which keeps the kernel runner's own asyncio
+# subprocess handling intact. See runner/init.py.
+exec_main() {
+  if [ "$BACKENDAI_INIT" = "1" ]; then
+    exec /opt/backend.ai/bin/python -s /opt/kernel/init.py "$@"
+  else
+    exec "$@"
+  fi
+}
+
 # NOTE: /home/work may have vfolder bind-mounts containing a LOT of files (e.g., more than 10K!).
 #       Therefore, we must AVOID any filesystem operation applied RECURSIVELY to /home/work,
 #       to prevent indefinite "hangs" during a container startup.
@@ -67,7 +82,7 @@ if [ $USER_ID -eq 0 ]; then
   fi
 
   echo "Executing the main program..."
-  exec "$@"
+  exec_main "$@"
 
 else
 
@@ -226,6 +241,6 @@ else
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
   echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42\" \"$@\"..."
-  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42" "$@"
+  exec_main /opt/kernel/su-exec "$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42" "$@"
 
 fi

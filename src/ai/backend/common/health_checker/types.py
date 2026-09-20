@@ -68,6 +68,7 @@ CID_ETCD: ComponentId = ComponentId("etcd")
 
 # Built-in component IDs for container
 CID_DOCKER: ComponentId = ComponentId("docker")
+CID_CONTAINERD: ComponentId = ComponentId("containerd")
 
 # Prometheus metrics
 PROMETHEUS: ServiceGroup = ServiceGroup("prometheus")
