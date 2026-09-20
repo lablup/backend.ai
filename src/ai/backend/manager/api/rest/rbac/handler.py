@@ -47,7 +47,9 @@ from ai.backend.common.dto.manager.rbac.response import (
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
+from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.permission_contoller.actions import (
     CreateRoleAction,
     DeleteRoleAction,
@@ -122,12 +124,21 @@ class RBACHandler:
         """Search roles with filters, orders, and pagination."""
         querier = self._role_adapter.build_querier(body.parsed)
         action_result = await self._permission_controller.global_search_roles.run(
-            GlobalSearchRolesAction(querier=querier)
+            GlobalSearchRolesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=RoleSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         resp = SearchRolesResponse(
-            roles=[self._role_adapter.convert_to_dto(role) for role in action_result.result.items],
+            roles=[self._role_adapter.convert_to_dto(role) for role in action_result.items],
             pagination=PaginationInfo(
-                total=action_result.result.total_count,
+                total=action_result.total_count,
                 offset=body.parsed.offset,
                 limit=body.parsed.limit,
             ),
