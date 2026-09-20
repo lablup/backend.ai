@@ -11,7 +11,6 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.user import KeyPairForbidden
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.purger import GuardedFieldPurger
@@ -44,7 +43,7 @@ class NonDefaultKeypairPurger(GuardedFieldPurger[KeyPairRow, KeyPairData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=KeypairConditions.by_is_default(False),
+                condition=KeyPairSearchableFields.own.is_default.filter.equals(False),
                 error=KeyPairForbidden(
                     "Cannot delete the default access key. Switch the default access key first."
                 ),
