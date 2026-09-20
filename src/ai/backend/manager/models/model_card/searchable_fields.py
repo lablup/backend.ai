@@ -21,11 +21,10 @@ from ai.backend.manager.models.specs.conditions.string import (
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
-from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation, ToOneCorrelation
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.specs.search.usage import UsageConditions
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 
 
 class _ModelCardOwnFields(RowDataConverter[ModelCardRow, ModelCardData]):
@@ -189,7 +188,7 @@ class ModelCardResourceRequirementSearchableFields:
 
 
 class _ModelCardNestedFields:
-    """Rows of other tables the model card reaches: its minimum quantities and its vfolder."""
+    """The rows the model card owns. Read under the model card's own permission."""
 
     min_resource = NestedSearchableField(
         ModelCardResourceRequirementSearchableFields.own,
@@ -199,16 +198,6 @@ class _ModelCardNestedFields:
             ModelCardResourceRequirementRow.model_card_id == ModelCardRow.id,
         ),
     )
-    vfolder = NestedSearchableField(
-        VFolderSearchableFields.own,
-        ToOneCorrelation(VFolderRow, ModelCardRow, VFolderRow.id == ModelCardRow.vfolder),
-    )
-    """The vfolder the card is built on, reached by the ``storage_host`` filter alone.
-
-    A vfolder is another entity rather than a row this card owns, so the filter is a
-    migration target: it was exposed in 26.4.2 and is removed once callers move to a
-    vfolder lookup followed by ``used_by: { vfolder }``.
-    """
 
 
 class _ModelCardLinkedEntities:

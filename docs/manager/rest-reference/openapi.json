@@ -27003,6 +27003,18 @@
       },
       "ModelCardFilter": {
         "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by model card ID"
+          },
           "name": {
             "anyOf": [
               {
@@ -27012,7 +27024,20 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Name filter"
+          },
+          "vfolder_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the VFolder holding the model"
           },
           "domain_name": {
             "anyOf": [
@@ -27023,7 +27048,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Domain name filter"
           },
           "project_id": {
             "anyOf": [
@@ -27034,7 +27060,116 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by project ID"
+          },
+          "creator_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the user who created the model card"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Author filter"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Title filter"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Model version filter"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Task filter"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Category filter"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Architecture filter"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "License filter"
+          },
+          "access_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison."
           },
           "storage_host": {
             "anyOf": [
@@ -27048,6 +27183,42 @@
             "default": null,
             "deprecated": true,
             "description": "Filter by the storage host backing the model card's VFolder. Deprecated: search vfolders by host first, then pass their ids as `used_by.vfolder`."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Creation datetime filter"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Update datetime filter (supports is_null)"
+          },
+          "min_resource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by conditions on the minimum resource requirements"
           },
           "AND": {
             "anyOf": [
@@ -27116,11 +27287,99 @@
       },
       "ModelCardOrderField": {
         "enum": [
+          "entity_id",
           "name",
-          "created_at"
+          "vfolder_id",
+          "domain_name",
+          "project_id",
+          "creator_id",
+          "author",
+          "title",
+          "model_version",
+          "task",
+          "category",
+          "architecture",
+          "license",
+          "access_level",
+          "created_at",
+          "updated_at"
         ],
         "title": "ModelCardOrderField",
         "type": "string"
+      },
+      "ModelCardResourceRequirementFilter": {
+        "description": "Filter for one minimum resource requirement row.",
+        "properties": {
+          "slot_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource slot name filter"
+          },
+          "min_quantity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum quantity filter"
+          }
+        },
+        "title": "ModelCardResourceRequirementFilter",
+        "type": "object"
+      },
+      "ModelCardResourceRequirementNestedFilter": {
+        "description": "The `min_resource` field of a model card filter.\n\nEach quantifier matches one requirement at a time. To require two different slots,\ncombine two of these with the model card filter's own `AND`.",
+        "properties": {
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "ModelCardResourceRequirementNestedFilter",
+        "type": "object"
       },
       "ModelCardUsedBy": {
         "description": "Entities whose use narrows the model cards read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Model cards the caller cannot\nread are left out even when a listed entity uses them.",

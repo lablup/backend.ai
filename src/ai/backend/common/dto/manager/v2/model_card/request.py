@@ -7,7 +7,14 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    DecimalFilter,
+    NullableDateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.model_card.types import (
@@ -107,10 +114,46 @@ class UpdateModelCardInput(BaseRequestModel):
     )
 
 
+class ModelCardResourceRequirementFilter(BaseRequestModel):
+    """Filter for one minimum resource requirement row."""
+
+    slot_name: StringFilter | None = Field(default=None, description="Resource slot name filter")
+    min_quantity: DecimalFilter | None = Field(default=None, description="Minimum quantity filter")
+
+
+class ModelCardResourceRequirementNestedFilter(ToManyFilter[ModelCardResourceRequirementFilter]):
+    """The `min_resource` field of a model card filter.
+
+    Each quantifier matches one requirement at a time. To require two different slots,
+    combine two of these with the model card filter's own `AND`.
+    """
+
+
 class ModelCardFilter(BaseRequestModel):
-    name: StringFilter | None = Field(default=None)
-    domain_name: StringFilter | None = Field(default=None)
-    project_id: UUIDFilter | None = Field(default=None)
+    entity_id: UUIDFilter | None = Field(default=None, description="Filter by model card ID")
+    name: StringFilter | None = Field(default=None, description="Name filter")
+    vfolder_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the VFolder holding the model"
+    )
+    domain_name: StringFilter | None = Field(default=None, description="Domain name filter")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
+    creator_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the user who created the model card"
+    )
+    author: StringFilter | None = Field(default=None, description="Author filter")
+    title: StringFilter | None = Field(default=None, description="Title filter")
+    model_version: StringFilter | None = Field(default=None, description="Model version filter")
+    task: StringFilter | None = Field(default=None, description="Task filter")
+    category: StringFilter | None = Field(default=None, description="Category filter")
+    architecture: StringFilter | None = Field(default=None, description="Architecture filter")
+    license: StringFilter | None = Field(default=None, description="License filter")
+    access_level: StringFilter | None = Field(
+        default=None,
+        description=(
+            "Access level filter. The column stores the level as text, so this is a string "
+            "match rather than an enum comparison."
+        ),
+    )
     storage_host: StringFilter | None = Field(
         default=None,
         description=(
@@ -119,6 +162,13 @@ class ModelCardFilter(BaseRequestModel):
             "`used_by.vfolder`."
         ),
         deprecated=True,
+    )
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    updated_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Update datetime filter (supports is_null)"
+    )
+    min_resource: ModelCardResourceRequirementNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the minimum resource requirements"
     )
     AND: list[ModelCardFilter] | None = Field(default=None)
     OR: list[ModelCardFilter] | None = Field(default=None)

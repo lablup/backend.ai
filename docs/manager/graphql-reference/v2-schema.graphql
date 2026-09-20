@@ -8155,8 +8155,14 @@ type ModelCardV2Edge {
 
 """Added in 26.4.2. Filter for model cards."""
 input ModelCardV2Filter {
+  """Added in 26.9.0. Filter by model card ID."""
+  entityId: UUIDFilter = null
+
   """Name filter."""
   name: StringFilter = null
+
+  """Added in 26.9.0. Filter by the VFolder holding the model."""
+  vfolderId: UUIDFilter = null
 
   """Domain filter."""
   domainName: StringFilter = null
@@ -8164,10 +8170,50 @@ input ModelCardV2Filter {
   """Project filter."""
   projectId: UUIDFilter = null
 
+  """Added in 26.9.0. Filter by the user who created the model card."""
+  creatorId: UUIDFilter = null
+
+  """Added in 26.9.0. Author filter."""
+  author: StringFilter = null
+
+  """Added in 26.9.0. Title filter."""
+  title: StringFilter = null
+
+  """Added in 26.9.0. Model version filter."""
+  modelVersion: StringFilter = null
+
+  """Added in 26.9.0. Task filter."""
+  task: StringFilter = null
+
+  """Added in 26.9.0. Category filter."""
+  category: StringFilter = null
+
+  """Added in 26.9.0. Architecture filter."""
+  architecture: StringFilter = null
+
+  """Added in 26.9.0. License filter."""
+  license: StringFilter = null
+
+  """
+  Added in 26.9.0. Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison.
+  """
+  accessLevel: StringFilter = null
+
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
   """
   storageHost: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. Search vfolders by host first, then pass their ids as `usedBy.vfolder`.")
+
+  """Added in 26.9.0. Creation datetime filter."""
+  createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Update datetime filter."""
+  updatedAt: NullableDateTimeFilter = null
+
+  """
+  Added in 26.9.0. Filter by conditions on the minimum resource requirements.
+  """
+  minResource: ModelCardV2ResourceRequirementNestedFilter = null
 
   """Combine nested filters with logical AND."""
   AND: [ModelCardV2Filter!] = null
@@ -8233,8 +8279,49 @@ input ModelCardV2OrderBy {
 
 """Added in 26.4.2. Order fields for model cards."""
 enum ModelCardV2OrderField {
+  ENTITY_ID
   NAME
+  VFOLDER_ID
+  DOMAIN_NAME
+  PROJECT_ID
+  CREATOR_ID
+  AUTHOR
+  TITLE
+  MODEL_VERSION
+  TASK
+  CATEGORY
+  ARCHITECTURE
+  LICENSE
+  ACCESS_LEVEL
   CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.9.0. Filter for one minimum resource requirement of a model card.
+"""
+input ModelCardV2ResourceRequirementFilter {
+  """Resource slot name filter."""
+  slotName: StringFilter = null
+
+  """Minimum quantity filter."""
+  minQuantity: DecimalFilter = null
+}
+
+"""
+Added in 26.9.0. Filter model cards by conditions on their minimum resource requirements.
+"""
+input ModelCardV2ResourceRequirementNestedFilter {
+  """Matches cards with at least one requirement satisfying all conditions."""
+  some: ModelCardV2ResourceRequirementFilter = null
+
+  """
+  Matches cards where every requirement satisfies all conditions (also true when the card has none).
+  """
+  every: ModelCardV2ResourceRequirementFilter = null
+
+  """Matches cards with no requirement satisfying all conditions."""
+  none: ModelCardV2ResourceRequirementFilter = null
 }
 
 """

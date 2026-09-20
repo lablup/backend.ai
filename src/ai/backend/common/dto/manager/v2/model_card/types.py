@@ -15,8 +15,22 @@ class ModelCardAccessLevel(StrEnum):
 
 
 class ModelCardOrderField(StrEnum):
+    ENTITY_ID = "entity_id"
     NAME = "name"
+    VFOLDER_ID = "vfolder_id"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    CREATOR_ID = "creator_id"
+    AUTHOR = "author"
+    TITLE = "title"
+    MODEL_VERSION = "model_version"
+    TASK = "task"
+    CATEGORY = "category"
+    ARCHITECTURE = "architecture"
+    LICENSE = "license"
+    ACCESS_LEVEL = "access_level"
     CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 class ProjectModelCardScope(BaseRequestModel):

@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     DeployModelCardInput,
     ModelCardFilter,
     ModelCardOrder,
+    ModelCardResourceRequirementFilter,
     ResourceSlotEntryInput,
     ScopedSearchModelCardsInput,
     SearchModelCardsInput,
@@ -80,6 +81,9 @@ from ai.backend.manager.data.model_card.types import (
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
+from ai.backend.manager.models.model_card.deprecated_search import (
+    ModelCardDeprecatedSearch,
+)
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import (
@@ -88,7 +92,10 @@ from ai.backend.manager.models.model_card.scopes import (
     ProjectModelCardTarget,
     UserModelCardTarget,
 )
-from ai.backend.manager.models.model_card.searchable_fields import ModelCardSearchableFields
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardResourceRequirementSearchableFields,
+    ModelCardSearchableFields,
+)
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
     ModelCardSearcher,
@@ -512,10 +519,28 @@ class ModelCardAdapter(BaseAdapter):
     def _convert_filter(self, f: ModelCardFilter) -> list[QueryCondition]:
         fields = ModelCardSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_uuid_filter(f.vfolder_id, fields.vfolder_id.filter),
             *self.apply_string_filter(f.domain_name, fields.domain.filter),
             *self.apply_uuid_filter(f.project_id, fields.project_id.filter),
+            *self.apply_uuid_filter(f.creator_id, fields.creator_id.filter),
+            *self.apply_string_filter(f.author, fields.author.filter),
+            *self.apply_string_filter(f.title, fields.title.filter),
+            *self.apply_string_filter(f.model_version, fields.model_version.filter),
+            *self.apply_string_filter(f.task, fields.task.filter),
+            *self.apply_string_filter(f.category, fields.category.filter),
+            *self.apply_string_filter(f.architecture, fields.architecture.filter),
+            *self.apply_string_filter(f.license, fields.license.filter),
+            *self.apply_string_filter(f.access_level, fields.access_level.filter),
             *self._storage_host_conditions(f.storage_host),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_nullable_datetime_filter(f.updated_at, fields.updated_at.filter),
+            *self.apply_to_many_filter(
+                f.min_resource,
+                ModelCardSearchableFields.nested.min_resource.correlation,
+                self._convert_requirement_filter,
+            ),
         ]
         if f.AND:
             for sub in f.AND:
@@ -537,17 +562,26 @@ class ModelCardAdapter(BaseAdapter):
     def _storage_host_conditions(self, host: StringFilter | None) -> list[QueryCondition]:
         """The host of the vfolder the card is built on.
 
-        Deprecated: a vfolder is another entity, so the caller's permission on it is not
-        checked here. Callers move to a vfolder search by host followed by
-        ``used_by: { vfolder }``.
+        Deprecated. Callers move to a vfolder search by host followed by
+        ``used_by: { vfolder }``; the reason it is not simply dropped is in
+        ``models/model_card/deprecated_search.py``.
         """
         if host is None:
             return []
-        vfolder = ModelCardSearchableFields.nested.vfolder
-        matches = self.apply_string_filter(host, vfolder.fields.host.filter)
+        storage_host = ModelCardDeprecatedSearch.storage_host
+        matches = self.apply_string_filter(host, storage_host.conditions)
         if not matches:
             return []
-        return [vfolder.correlation.has(matches)]
+        return [storage_host.matching(matches)]
+
+    def _convert_requirement_filter(
+        self, f: ModelCardResourceRequirementFilter
+    ) -> list[QueryCondition]:
+        fields = ModelCardResourceRequirementSearchableFields.own
+        return [
+            *self.apply_string_filter(f.slot_name, fields.slot_name.filter),
+            *self.apply_decimal_filter(f.min_quantity, fields.min_quantity.filter),
+        ]
 
     def _convert_orders(self, orders: list[ModelCardOrder]) -> list[QueryOrder]:
         return [self._convert_order(order) for order in orders]
@@ -556,10 +590,38 @@ class ModelCardAdapter(BaseAdapter):
         fields = ModelCardSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
+            case ModelCardOrderField.ENTITY_ID:
+                return fields.id.order.apply(ascending)
             case ModelCardOrderField.NAME:
                 return fields.name.order.apply(ascending)
+            case ModelCardOrderField.VFOLDER_ID:
+                return fields.vfolder_id.order.apply(ascending)
+            case ModelCardOrderField.DOMAIN_NAME:
+                return fields.domain.order.apply(ascending)
+            case ModelCardOrderField.PROJECT_ID:
+                return fields.project_id.order.apply(ascending)
+            case ModelCardOrderField.CREATOR_ID:
+                return fields.creator_id.order.apply(ascending)
+            case ModelCardOrderField.AUTHOR:
+                return fields.author.order.apply(ascending)
+            case ModelCardOrderField.TITLE:
+                return fields.title.order.apply(ascending)
+            case ModelCardOrderField.MODEL_VERSION:
+                return fields.model_version.order.apply(ascending)
+            case ModelCardOrderField.TASK:
+                return fields.task.order.apply(ascending)
+            case ModelCardOrderField.CATEGORY:
+                return fields.category.order.apply(ascending)
+            case ModelCardOrderField.ARCHITECTURE:
+                return fields.architecture.order.apply(ascending)
+            case ModelCardOrderField.LICENSE:
+                return fields.license.order.apply(ascending)
+            case ModelCardOrderField.ACCESS_LEVEL:
+                return fields.access_level.order.apply(ascending)
             case ModelCardOrderField.CREATED_AT:
                 return fields.created_at.order.apply(ascending)
+            case ModelCardOrderField.UPDATED_AT:
+                return fields.updated_at.order.apply(ascending)
             case _:
                 assert_never(order.field)
 

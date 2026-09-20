@@ -40,6 +40,12 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardOrder as OrderDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    ModelCardResourceRequirementFilter as RequirementFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    ModelCardResourceRequirementNestedFilter as RequirementNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput as UpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
@@ -83,6 +89,11 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import DateTimeFilter as DateTimeFilterGQL
+from ai.backend.manager.api.gql.base import DecimalFilter as DecimalFilterGQL
+from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter as NullableDateTimeFilterGQL,
+)
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
@@ -122,8 +133,22 @@ if TYPE_CHECKING:
     name="ModelCardV2OrderField",
 )
 class ModelCardOrderFieldGQL(StrEnum):
+    ENTITY_ID = "entity_id"
     NAME = "name"
+    VFOLDER_ID = "vfolder_id"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    CREATOR_ID = "creator_id"
+    AUTHOR = "author"
+    TITLE = "title"
+    MODEL_VERSION = "model_version"
+    TASK = "task"
+    CATEGORY = "category"
+    ARCHITECTURE = "architecture"
+    LICENSE = "license"
+    ACCESS_LEVEL = "access_level"
     CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 @gql_enum(
@@ -391,13 +416,112 @@ class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScope
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Filter for one minimum resource requirement of a model card.",
+    ),
+    name="ModelCardV2ResourceRequirementFilter",
+)
+class ModelCardResourceRequirementFilterGQL(PydanticInputMixin[RequirementFilterDTO]):
+    slot_name: StringFilterGQL | None = gql_field(
+        default=None, description="Resource slot name filter."
+    )
+    min_quantity: DecimalFilterGQL | None = gql_field(
+        default=None, description="Minimum quantity filter."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Filter model cards by conditions on their minimum resource requirements.",
+    ),
+    name="ModelCardV2ResourceRequirementNestedFilter",
+)
+class ModelCardResourceRequirementNestedFilterGQL(PydanticInputMixin[RequirementNestedFilterDTO]):
+    some: ModelCardResourceRequirementFilterGQL | None = gql_field(
+        description="Matches cards with at least one requirement satisfying all conditions.",
+        default=None,
+    )
+    every: ModelCardResourceRequirementFilterGQL | None = gql_field(
+        description=(
+            "Matches cards where every requirement satisfies all conditions "
+            "(also true when the card has none)."
+        ),
+        default=None,
+    )
+    none: ModelCardResourceRequirementFilterGQL | None = gql_field(
+        description="Matches cards with no requirement satisfying all conditions.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(added_version="26.4.2", description="Filter for model cards."),
     name="ModelCardV2Filter",
 )
 class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by model card ID."
+        ),
+        default=None,
+    )
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
+    vfolder_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the VFolder holding the model.",
+        ),
+        default=None,
+    )
     domain_name: StringFilterGQL | None = gql_field(default=None, description="Domain filter.")
     project_id: UUIDFilterGQL | None = gql_field(default=None, description="Project filter.")
+    creator_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the user who created the model card.",
+        ),
+        default=None,
+    )
+    author: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Author filter."),
+        default=None,
+    )
+    title: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Title filter."),
+        default=None,
+    )
+    model_version: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Model version filter."),
+        default=None,
+    )
+    task: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Task filter."),
+        default=None,
+    )
+    category: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Category filter."),
+        default=None,
+    )
+    architecture: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Architecture filter."),
+        default=None,
+    )
+    license: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="License filter."),
+        default=None,
+    )
+    access_level: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Access level filter. The column stores the level as text, so this is a "
+                "string match rather than an enum comparison."
+            ),
+        ),
+        default=None,
+    )
     storage_host: StringFilterGQL | None = gql_field(
         default=None,
         description=(
@@ -405,9 +529,26 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
             "Matches via an EXISTS subquery against the VFolder host column."
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Search vfolders by host first, then pass their "
-            "ids as `usedBy.vfolder`."
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Search vfolders by host first, then "
+            "pass their ids as `usedBy.vfolder`."
         ),
+    )
+    created_at: DateTimeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Creation datetime filter."
+        ),
+        default=None,
+    )
+    updated_at: NullableDateTimeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update datetime filter."),
+        default=None,
+    )
+    min_resource: ModelCardResourceRequirementNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by conditions on the minimum resource requirements.",
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_field(
         default=None, description="Combine nested filters with logical AND."
