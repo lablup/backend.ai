@@ -78,6 +78,7 @@ from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePresetSearcher,
 )
 from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
 )
@@ -170,7 +171,9 @@ class RolePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._role_preset.search.run(SearchRolePresetsAction(searcher=searcher))
+        result = await self._role_preset.search.run(
+            SearchRolePresetsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        )
         return SearchRolePresetsPayload(
             items=[self._data_to_node(d) for d in result.items],
             total_count=result.total_count,

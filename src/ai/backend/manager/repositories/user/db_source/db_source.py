@@ -964,22 +964,6 @@ class UserDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def admin_search_keypairs(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Admin search all keypairs without scope restriction."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Read one keypair by its id."""
         async with self._db.begin_readonly_session() as db_session:

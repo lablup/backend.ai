@@ -325,13 +325,6 @@ class UserRepository:
         return await self._db_source.search_my_keypairs(scope, querier)
 
     @user_repository_resilience.apply()
-    async def admin_search_keypairs(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Admin search all keypairs without scope restriction."""
-        return await self._db_source.admin_search_keypairs(querier)
-
     @user_repository_resilience.apply()
     async def update_keypair_column(
         self, updater: GuardedDataUpdater[Any, KeyPairData]

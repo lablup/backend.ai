@@ -5,21 +5,16 @@ from typing import override
 
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.models.app_config_allow_list.searchers import (
-    AppConfigAllowListSearcher,
-)
 
 
-@dataclass
+@dataclass(frozen=True)
 class AdminSearchAppConfigAllowListAction(
-    SearchGlobalOpsAction[AppConfigAllowListRow, AppConfigAllowListData]
+    GlobalSearcherOpsAction[AppConfigAllowListRow, AppConfigAllowListData]
 ):
     """Super-admin path: search every allow-list entry, across all scope types."""
-
-    searcher: AppConfigAllowListSearcher
 
     @override
     @classmethod
@@ -30,7 +25,3 @@ class AdminSearchAppConfigAllowListAction(
     @classmethod
     def action_name(cls) -> str:
         return "admin_search_app_config_allow_lists"
-
-    @override
-    def to_searcher(self) -> AppConfigAllowListSearcher:
-        return self.searcher

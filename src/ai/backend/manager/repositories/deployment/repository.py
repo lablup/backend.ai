@@ -59,7 +59,6 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
-    AutoScalingRuleSearchResult,
     DeploymentConfig,
     DeploymentHandlerCategory,
     DeploymentInfo,
@@ -67,7 +66,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoWithAutoScalingRules,
     DeploymentOptions,
     DeploymentPolicyData,
-    DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentRevisionReadBundle,
     DeploymentWithHistory,
@@ -1603,20 +1601,6 @@ class DeploymentRepository:
     # ========== Additional Search Operations ==========
 
     @deployment_repository_resilience.apply()
-    async def search_auto_scaling_rules(
-        self,
-        querier: BatchQuerier,
-    ) -> AutoScalingRuleSearchResult:
-        """Search auto-scaling rules with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            AutoScalingRuleSearchResult with items, total_count, and pagination info.
-        """
-        return await self._db_source.search_auto_scaling_rules(querier)
-
     @deployment_repository_resilience.apply()
     async def search_access_tokens(
         self,
@@ -1633,20 +1617,6 @@ class DeploymentRepository:
         return await self._db_source.search_access_tokens(querier)
 
     @deployment_repository_resilience.apply()
-    async def search_deployment_policies(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentPolicySearchResult:
-        """Search deployment policies with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            DeploymentPolicySearchResult with items, total_count, and pagination info.
-        """
-        return await self._db_source.search_deployment_policies(querier)
-
     @deployment_repository_resilience.apply()
     async def apply_strategy_mutations(
         self,

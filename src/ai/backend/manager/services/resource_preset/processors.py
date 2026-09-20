@@ -5,7 +5,11 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import EntityOpsResult, LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+)
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
@@ -32,7 +36,6 @@ from ai.backend.manager.services.resource_preset.actions.lookup import (
 )
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
-    SearchResourcePresetsV2ActionResult,
 )
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
@@ -60,7 +63,7 @@ class ResourcePresetProcessors:
         CheckResourcePresetsAction, CheckResourcePresetsActionResult
     ]
     search_presets_v2: GlobalActionProcessor[
-        SearchResourcePresetsV2Action, SearchResourcePresetsV2ActionResult
+        SearchResourcePresetsV2Action, BatchOpsResult[ResourcePresetData]
     ]
 
     def __init__(
@@ -73,6 +76,4 @@ class ResourcePresetProcessors:
         self.get_preset = group.single_get_ops(GetResourcePresetAction)
         self.list_presets = group.public(ListResourcePresetsAction, service.list_presets)
         self.check_presets = group.public(CheckResourcePresetsAction, service.check_presets)
-        self.search_presets_v2 = group.global_scope(
-            SearchResourcePresetsV2Action, service.search_presets_v2
-        )
+        self.search_presets_v2 = group.global_searcher_ops(SearchResourcePresetsV2Action)

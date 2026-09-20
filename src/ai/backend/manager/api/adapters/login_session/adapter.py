@@ -35,6 +35,7 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
     GlobalRevokeLoginSessionAction,
@@ -80,7 +81,7 @@ class LoginSessionAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._auth.global_search_login_sessions.run(
-            GlobalSearchLoginSessionsAction(searcher=searcher)
+            GlobalSearchLoginSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchLoginSessionsPayload(
             items=[self._data_to_node(item) for item in action_result.items],

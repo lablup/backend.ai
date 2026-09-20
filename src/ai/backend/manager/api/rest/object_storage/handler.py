@@ -26,6 +26,8 @@ from ai.backend.common.dto.manager.response import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -105,7 +107,9 @@ class ObjectStorageHandler:
         # deprecated shape is the only one that wants it keyed by storage.
         action_result = await self._storage_namespace.global_search.run(
             SearchStorageNamespacesAction(
-                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=StorageNamespaceSearcher(pagination=NoPagination())
+                )
             )
         )
         buckets_by_storage: dict[uuid.UUID, list[str]] = defaultdict(list)
@@ -126,7 +130,15 @@ class ObjectStorageHandler:
         storage_id: uuid.UUID = path.parsed.storage_id
 
         action_result = await self._storage_namespace.global_get_namespaces.run(
-            GetNamespacesAction(storage_id=storage_id)
+            GetNamespacesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(
+                        pagination=NoPagination(),
+                        conditions=[StorageNamespaceConditions.by_storage_id(storage_id)],
+                    ),
+                )
+            )
         )
 
         bucket_names = [namespace_data.namespace for namespace_data in action_result.items]
@@ -138,7 +150,11 @@ class ObjectStorageHandler:
     ) -> APIResponse:
         """List all configured object storage systems."""
         action_result = await self._object_storage.global_list_storages.run(
-            ListObjectStorageAction(searcher=ObjectStorageSearcher(pagination=NoPagination()))
+            ListObjectStorageAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=ObjectStorageSearcher(pagination=NoPagination())
+                )
+            )
         )
 
         storage_responses = [storage_data.to_dto() for storage_data in action_result.items]

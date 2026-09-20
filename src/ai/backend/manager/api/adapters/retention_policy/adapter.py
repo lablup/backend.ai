@@ -30,6 +30,7 @@ from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
 )
@@ -82,7 +83,7 @@ class RetentionPolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._retention_policy.global_search.run(
-            SearchRetentionPoliciesAction(searcher=searcher)
+            SearchRetentionPoliciesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchRetentionPoliciesPayload(
             items=[self._data_to_node(d) for d in result.items],

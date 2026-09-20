@@ -84,7 +84,7 @@ class DeploymentPresetProcessors:
     ) -> None:
         self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)
         self.get = group.single_get_ops(GetDeploymentPresetAction)
-        self.global_search = group.global_search_ops(GlobalSearchDeploymentPresetsAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchDeploymentPresetsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetDeploymentPresetsAction)
         self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)

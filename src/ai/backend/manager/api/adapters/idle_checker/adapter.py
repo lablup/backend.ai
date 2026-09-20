@@ -55,6 +55,7 @@ from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
 )
@@ -133,7 +134,7 @@ class IdleCheckerAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._idle_checker.admin_search.run(
-            AdminSearchIdleCheckersAction(searcher=searcher)
+            AdminSearchIdleCheckersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchIdleCheckerPayload(
             items=[self._data_to_node(item) for item in action_result.items],

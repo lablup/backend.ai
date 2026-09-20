@@ -22,10 +22,6 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
-from ai.backend.manager.services.resource_preset.actions.search_presets import (
-    SearchResourcePresetsV2Action,
-    SearchResourcePresetsV2ActionResult,
-)
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
     UpdateResourcePresetActionResult,
@@ -92,19 +88,6 @@ class ResourcePresetService:
             })
 
         return ListResourcePresetsResult(presets=presets)
-
-    async def search_presets_v2(
-        self,
-        action: SearchResourcePresetsV2Action,
-    ) -> SearchResourcePresetsV2ActionResult:
-        """Search resource presets with filter/order/pagination."""
-        result = await self._resource_preset_repository.search_presets(action.querier)
-        return SearchResourcePresetsV2ActionResult(
-            presets=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def check_presets(
         self, action: CheckResourcePresetsAction

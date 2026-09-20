@@ -27,6 +27,7 @@ from ai.backend.manager.dto.response import (
     VFSStorage,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
@@ -154,7 +155,11 @@ class VFSStorageHandler:
         """List all VFS storages."""
 
         action_result = await self._vfs_storage.global_list_storages.run(
-            ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
+            ListVFSStorageAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=VFSStorageSearcher(pagination=NoPagination())
+                )
+            )
         )
 
         storage_data = action_result

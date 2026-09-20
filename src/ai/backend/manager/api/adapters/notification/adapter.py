@@ -92,6 +92,7 @@ from ai.backend.manager.models.notification.updaters import (
     NotificationChannelUpdater,
     NotificationRuleUpdater,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -349,7 +350,7 @@ class NotificationAdapter(BaseAdapter):
         )
 
         action_result = await self._notification.search_channels.run(
-            SearchChannelsAction(searcher=searcher)
+            SearchChannelsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return SearchNotificationChannelsPayload(
@@ -379,7 +380,7 @@ class NotificationAdapter(BaseAdapter):
         )
 
         action_result = await self._notification.search_rules.run(
-            SearchRulesAction(searcher=searcher)
+            SearchRulesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return SearchNotificationRulesPayload(

@@ -33,6 +33,7 @@ from ai.backend.manager.models.client_ip_masking.conditions import ClientIPMaski
 from ai.backend.manager.models.client_ip_masking.orders import ClientIPMaskingPolicyOrders
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.client_ip_masking.searchers import ClientIPMaskingPolicySearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.client_ip_masking.actions.purge import (
     PurgeClientIPMaskingPolicyAction,
 )
@@ -78,7 +79,9 @@ class ClientIPMaskingAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._client_ip_masking.global_search.run(
-            SearchClientIPMaskingPoliciesAction(searcher=searcher)
+            SearchClientIPMaskingPoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return AdminSearchClientIPMaskingPoliciesPayload(
             items=[self._data_to_node(item) for item in result.items],

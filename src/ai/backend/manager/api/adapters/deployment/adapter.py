@@ -220,6 +220,7 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
@@ -246,7 +247,10 @@ from ai.backend.manager.models.endpoint.scopes import (
     ProjectDeploymentTarget,
     UserDeploymentTarget,
 )
-from ai.backend.manager.models.endpoint.searchers import DeploymentAccessTokenSearcher
+from ai.backend.manager.models.endpoint.searchers import (
+    AutoScalingRuleSearcher,
+    DeploymentAccessTokenSearcher,
+)
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
@@ -256,7 +260,8 @@ from ai.backend.manager.models.resource_slot.orders import (
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
-from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher
+from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher, RouteInfoSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
@@ -1034,10 +1039,19 @@ class DeploymentAdapter(BaseAdapter):
         """Search auto-scaling rules scoped to a specific deployment."""
         querier = self._build_auto_scaling_rule_querier(input, scope=scope)
         action_result = await self._deployment.search_auto_scaling_rules.run(
-            SearchAutoScalingRulesAction(querier=querier)
+            SearchAutoScalingRulesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=AutoScalingRuleSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchAutoScalingRulesPayload(
-            items=[self._auto_scaling_rule_data_to_dto(item) for item in action_result.data],
+            items=[self._auto_scaling_rule_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1129,10 +1143,19 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployment policies with filters and pagination."""
         querier = self._build_policy_querier(input)
         action_result = await self._deployment.search_deployment_policies.run(
-            SearchDeploymentPoliciesAction(querier=querier)
+            SearchDeploymentPoliciesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DeploymentPolicySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchDeploymentPoliciesPayload(
-            items=[self._policy_data_to_dto(item) for item in action_result.data],
+            items=[self._policy_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1306,7 +1329,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search model revisions without scope (admin, all deployments)."""
         searcher = self._build_revision_searcher(input)
         action_result = await self._deployment.global_search_revisions.run(
-            GlobalSearchRevisionsAction(searcher=searcher)
+            GlobalSearchRevisionsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchRevisionsPayload(
             items=[self._revision_data_to_dto(item) for item in action_result.items],
@@ -1354,10 +1377,19 @@ class DeploymentAdapter(BaseAdapter):
         """Search routes scoped to a specific deployment."""
         querier = self._build_route_querier(input, scope=scope)
         action_result = await self._deployment.search_routes.run(
-            SearchRoutesAction(querier=querier)
+            SearchRoutesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=RouteInfoSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchRoutesPayload(
-            items=[self._route_info_to_dto(item) for item in action_result.routes],
+            items=[self._route_info_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1391,7 +1423,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search replicas without scope (admin, all deployments)."""
         searcher = self._build_replica_searcher(input)
         action_result = await self._deployment.global_search_replicas.run(
-            GlobalSearchReplicasAction(searcher=searcher)
+            GlobalSearchReplicasAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchReplicasPayload(
             items=[self._replica_data_to_dto(item) for item in action_result.items],

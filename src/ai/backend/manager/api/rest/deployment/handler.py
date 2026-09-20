@@ -53,6 +53,8 @@ from ai.backend.manager.data.deployment.types import LegacyDeploymentData, Model
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
+from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
@@ -398,12 +400,21 @@ class DeploymentAPIHandler:
 
         # Call service action
         action_result = await self._deployment.search_routes.run(
-            SearchRoutesAction(querier=querier)
+            SearchRoutesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=RouteInfoSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         # Build response
         resp = ListRoutesResponse(
-            routes=[self._route_adapter.convert_to_dto(route) for route in action_result.routes],
+            routes=[self._route_adapter.convert_to_dto(route) for route in action_result.items],
             pagination=CursorPaginationInfo(
                 total_count=action_result.total_count,
                 has_next_page=action_result.has_next_page,

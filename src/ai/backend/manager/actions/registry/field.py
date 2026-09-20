@@ -56,8 +56,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     BulkGetOwnedFieldOpsAction,
     BulkScopedSearchOpsAction,
     CreateFieldOpsAction,
+    GlobalSearcherOpsAction,
     OperationScopeOpsAction,
-    SearchGlobalOpsAction,
     UpsertFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
@@ -89,7 +89,7 @@ from ai.backend.manager.services.ops.service import (
     FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
-    GlobalSearchService,
+    GlobalSearcherService,
     RestoreService,
     SearchFieldsService,
     UpdateService,
@@ -237,7 +237,7 @@ class FieldGroup[TFieldData: FieldData]:
             validators=(*self._deps.validators.global_scope, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -249,7 +249,7 @@ class FieldGroup[TFieldData: FieldData]:
         For one owner's rows use :meth:`search_ops`; this one names no owner."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
+            GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

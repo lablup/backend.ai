@@ -715,20 +715,6 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.global_scope, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
-        self,
-        action_cls: type[TAction],
-        *,
-        validators: Sequence[GlobalActionValidator] = (),
-        monitors: Sequence[GlobalActionMonitor] = (),
-    ) -> GlobalActionProcessor[TAction, BatchOpsResult[TData]]:
-        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.global_scope, *monitors),
-            validators=(*self._deps.validators.global_scope, *validators),
-        )
-
     def global_get_ops[TAction: GetGlobalOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],

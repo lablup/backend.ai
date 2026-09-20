@@ -60,7 +60,6 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
-    AutoScalingRuleSearchResult,
     DeploymentHandlerCategory,
     DeploymentInfo,
     DeploymentInfoSearchResult,
@@ -69,7 +68,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentOptions,
     DeploymentPolicyData,
-    DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentRevisionReadBundle,
     DeploymentWithHistory,
@@ -3028,36 +3026,6 @@ class DeploymentDBSource:
 
     # ========== Additional Search Operations ==========
 
-    async def search_auto_scaling_rules(
-        self,
-        querier: BatchQuerier,
-    ) -> AutoScalingRuleSearchResult:
-        """Search auto-scaling rules with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            AutoScalingRuleSearchResult with items, total_count, and pagination info.
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointAutoScalingRuleRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            return AutoScalingRuleSearchResult(
-                items=[
-                    row.EndpointAutoScalingRuleRow.to_model_deployment_data() for row in result.rows
-                ],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def get_access_token(
         self,
         token_id: uuid.UUID,
@@ -3133,34 +3101,6 @@ class DeploymentDBSource:
                     )
                     for row in result.rows
                 ],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_deployment_policies(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentPolicySearchResult:
-        """Search deployment policies with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            DeploymentPolicySearchResult with items, total_count, and pagination info.
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DeploymentPolicyRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            return DeploymentPolicySearchResult(
-                items=[row.DeploymentPolicyRow.to_data() for row in result.rows],
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,

@@ -34,6 +34,6 @@ class ErrorLogProcessors:
 
     def __init__(self, logs: LookupFieldGroup[ErrorLogData]) -> None:
         self.create = logs.create_ops(CreateErrorLogAction)
-        self.global_search = logs.global_search_ops(GlobalSearchErrorLogsAction)
+        self.global_search = logs.global_searcher_ops(GlobalSearchErrorLogsAction)
         self.scoped_search = logs.search_ops(SearchErrorLogsAction)
         self.delete = logs.delete_ops(DeleteErrorLogAction)

@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
 )
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
+from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.models.service_catalog.row import (
     ServiceCatalogEndpointRow,
@@ -108,10 +109,10 @@ class TestServiceCatalogPagination:
 
     @pytest.fixture
     def adapter(self, database: ExtendedAsyncSAEngine) -> ServiceCatalogAdapter:
-        repository: OpsRepository[object] = OpsRepository(V2DBOpsProvider(database))
+        repository: OpsRepository[ServiceCatalogData] = OpsRepository(V2DBOpsProvider(database))
 
         async def run(action: SearchServiceCatalogsAction) -> object:
-            return await repository.search_in_global(action.searcher)
+            return await repository.global_search(action.searcher)
 
         processors = MagicMock()
         processors.global_search_service_catalogs.run = run

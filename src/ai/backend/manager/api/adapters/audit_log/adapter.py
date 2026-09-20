@@ -38,6 +38,7 @@ from ai.backend.manager.models.audit_log.scopes import (
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
@@ -91,7 +92,7 @@ class AuditLogAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._audit_log.global_search.run(
-            SearchAuditLogsAction(searcher=searcher)
+            SearchAuditLogsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchAuditLogsPayload(
             items=[self._data_to_node(item) for item in action_result.items],

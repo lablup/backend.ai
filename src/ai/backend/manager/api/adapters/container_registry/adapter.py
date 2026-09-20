@@ -45,7 +45,9 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryPurger,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
@@ -107,11 +109,20 @@ class ContainerRegistryAdapter(BaseAdapter):
         querier = self.build_querier(input)
 
         action_result = await self._container_registry.search_container_registries.run(
-            SearchContainerRegistriesAction(querier=querier)
+            SearchContainerRegistriesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ContainerRegistrySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         return AdminSearchContainerRegistriesPayload(
-            items=[self._data_to_dto(item) for item in action_result.data],
+            items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

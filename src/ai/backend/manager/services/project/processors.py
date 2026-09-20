@@ -89,7 +89,7 @@ class ProjectProcessors:
         self.lookup = group.public_lookup_ops(LookupProjectAction)
         self.get_project = group.single_get_ops(GetProjectAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetProjectsAction)
-        self.global_search = group.global_search_ops(GlobalSearchProjectsAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchProjectsAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchProjectsAction)
         self.create_project = group.role_managed_create_ops(CreateProjectAction)
         self.delete_project = group.single_delete_ops(DeleteProjectAction)

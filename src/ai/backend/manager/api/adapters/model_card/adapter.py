@@ -91,6 +91,7 @@ from ai.backend.manager.models.model_card.searchers import (
 )
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.model_card.actions.available_presets import (
@@ -200,7 +201,7 @@ class ModelCardAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._model_card.global_search.run(
-            GlobalSearchModelCardsAction(searcher=searcher)
+            GlobalSearchModelCardsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchModelCardsPayload(
             items=await self._nodes_with_min_resources(result.items),
@@ -315,7 +316,7 @@ class ModelCardAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._model_card.global_search.run(
-            GlobalSearchModelCardsAction(searcher=searcher)
+            GlobalSearchModelCardsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchModelCardsPayload(
             items=await self._nodes_with_min_resources(result.items),

@@ -55,6 +55,7 @@ from ai.backend.manager.models.notification.creators import (
     NotificationChannelCreator,
     NotificationRuleCreator,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -114,7 +115,7 @@ class NotificationHandler:
     ) -> APIResponse:
         searcher = self._channel_adapter.build_searcher(body.parsed)
         action_result = await self._notification.search_channels.run(
-            SearchChannelsAction(searcher=searcher)
+            SearchChannelsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         resp = ListNotificationChannelsResponse(
             channels=[self._channel_adapter.convert_to_dto(ch) for ch in action_result.items],
@@ -227,7 +228,7 @@ class NotificationHandler:
     ) -> APIResponse:
         searcher = self._rule_adapter.build_searcher(body.parsed)
         action_result = await self._notification.search_rules.run(
-            SearchRulesAction(searcher=searcher)
+            SearchRulesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         resp = ListNotificationRulesResponse(
             rules=[self._rule_adapter.convert_to_dto(rule) for rule in action_result.items],

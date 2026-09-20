@@ -55,8 +55,8 @@ class StorageNamespaceProcessors:
 
     def __init__(self, group: ProcessorGroup[StorageNamespaceData]) -> None:
         self.global_register = group.global_create_ops(RegisterNamespaceAction)
-        self.global_search = group.global_search_ops(SearchStorageNamespacesAction)
-        self.global_get_namespaces = group.global_search_ops(GetNamespacesAction)
+        self.global_search = group.global_searcher_ops(SearchStorageNamespacesAction)
+        self.global_get_namespaces = group.global_searcher_ops(GetNamespacesAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetStorageNamespacesAction)
         self.lookup = group.lookup_ops(LookupStorageNamespaceAction)
         self.unregister = group.entity_purge_ops(UnregisterNamespaceAction)

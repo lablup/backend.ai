@@ -56,26 +56,14 @@ from ai.backend.manager.services.scheduling_history.actions.global_search_replic
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
 )
-from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
-    SearchDeploymentHistoryAction,
-)
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_kernel_history import (
-    SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
 )
-from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
-    SearchRouteHistoryAction,
-)
 from ai.backend.manager.services.scheduling_history.actions.search_route_scoped_history import (
     SearchRouteScopedHistoryAction,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
-    SearchSessionHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_session_scoped_history import (
     SearchSessionScopedHistoryAction,
@@ -196,74 +184,6 @@ def _make_route_history() -> RouteHistoryData:
     )
 
 
-class TestSearchSessionHistoryAction:
-    async def test_returns_histories_with_pagination(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_session_history()
-        mock_repository.search_session_history.return_value = SessionSchedulingHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
-        action = SearchSessionHistoryAction(querier=querier)
-        result = await service.search_session_history(action)
-
-        assert result.histories == [history_item]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_repository.search_session_history.assert_awaited_once_with(querier=querier)
-
-    async def test_empty_result(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        mock_repository.search_session_history.return_value = SessionSchedulingHistoryListResult(
-            items=[],
-            total_count=0,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
-        action = SearchSessionHistoryAction(querier=querier)
-        result = await service.search_session_history(action)
-
-        assert result.histories == []
-        assert result.total_count == 0
-
-
-class TestSearchDeploymentHistoryAction:
-    async def test_returns_deployment_histories(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_deployment_history()
-        mock_repository.search_deployment_history.return_value = DeploymentHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-
-        action = SearchDeploymentHistoryAction(querier=querier)
-        result = await service.search_deployment_history(action)
-
-        assert result.histories == [history_item]
-        assert result.total_count == 1
-        assert result.has_next_page is True
-        mock_repository.search_deployment_history.assert_awaited_once_with(querier=querier)
-
-
 class TestSearchDeploymentScopedHistoryAction:
     async def test_scope_filters_by_deployment_id(
         self,
@@ -322,30 +242,6 @@ class TestSearchSessionScopedHistoryAction:
         )
 
 
-class TestSearchRouteHistoryAction:
-    async def test_returns_route_histories(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_route_history()
-        mock_repository.search_route_history.return_value = RouteHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=True,
-        )
-
-        action = SearchRouteHistoryAction(querier=querier)
-        result = await service.search_route_history(action)
-
-        assert result.histories == [history_item]
-        assert result.total_count == 1
-        assert result.has_previous_page is True
-        mock_repository.search_route_history.assert_awaited_once_with(querier=querier)
-
-
 class TestSearchRouteScopedHistoryAction:
     async def test_scope_filters_by_route_id(
         self,
@@ -370,31 +266,6 @@ class TestSearchRouteScopedHistoryAction:
         mock_repository.search_route_scoped_history.assert_awaited_once_with(
             querier=querier, scope=scope
         )
-
-
-class TestSearchKernelHistoryAction:
-    async def test_returns_kernel_histories_with_pagination(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_kernel_history()
-        mock_repository.search_kernel_history.return_value = KernelSchedulingHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-
-        action = SearchKernelHistoryAction(querier=querier)
-        result = await service.search_kernel_history(action)
-
-        assert result.items == [history_item]
-        assert result.total_count == 1
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
-        mock_repository.search_kernel_history.assert_awaited_once_with(querier=querier)
 
 
 class TestSearchKernelScopedHistoryAction:

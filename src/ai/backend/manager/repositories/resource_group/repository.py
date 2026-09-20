@@ -20,7 +20,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
-    ResourceGroupListResult,
     ResourceInfo,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
@@ -29,7 +28,6 @@ from ai.backend.manager.models.resource_group.creators import ResourceGroupCreat
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source import ResourceGroupDBSource
@@ -81,14 +79,6 @@ class ResourceGroupRepository:
         """
         async with self._v2_ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
-
-    @resource_group_repository_resilience.apply()
-    async def search_resource_groups(
-        self,
-        querier: BatchQuerier,
-    ) -> ResourceGroupListResult:
-        """Searches resource groups with total count."""
-        return await self._db_source.search_resource_groups(querier=querier)
 
     @resource_group_repository_resilience.apply()
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:

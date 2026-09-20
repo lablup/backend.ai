@@ -48,6 +48,7 @@ from ai.backend.manager.models.domain.updaters import (
     DomainSoftDeleteUpdater,
     DomainUpdater,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
@@ -151,7 +152,9 @@ class DomainAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._domain.global_search.run(GlobalSearchDomainsAction(searcher=searcher))
+        result = await self._domain.global_search.run(
+            GlobalSearchDomainsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        )
 
         return AdminSearchDomainsPayload(
             items=[self._domain_data_to_node(item) for item in result.items],

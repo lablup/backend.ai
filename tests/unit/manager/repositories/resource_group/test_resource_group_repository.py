@@ -63,7 +63,6 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -76,7 +75,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
@@ -434,121 +432,7 @@ class TestScalingGroupRepositoryDB:
 
         yield created.id, sgroup_name
 
-    async def test_search_scaling_groups_all(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_small: list[str],
-    ) -> None:
-        """Test searching all scaling groups without filters"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        # Should have exactly 5 test scaling groups
-        assert len(result.items) == 5
-        assert result.total_count == 5
-
-        # Verify test scaling groups are in results
-        result_names = {sg.name for sg in result.items}
-        for test_sg_name in sample_scaling_groups_small:
-            assert test_sg_name in result_names
-
-    async def test_search_scaling_groups_with_querier(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_small: list[str],
-    ) -> None:
-        """Test searching scaling groups with querier"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        assert len(result.items) == 5
-        assert result.total_count == 5
-
     # Pagination Tests
-
-    @pytest.mark.parametrize(
-        "limit,offset,expected_items,total_count,description",
-        [
-            (10, 0, 10, 25, "first page"),
-            (10, 10, 10, 25, "second page"),
-            (10, 20, 5, 25, "last page with partial results"),
-        ],
-        ids=["first_page", "second_page", "last_page"],
-    )
-    async def test_search_scaling_groups_offset_pagination(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_for_pagination: list[str],
-        limit: int,
-        offset: int,
-        expected_items: int,
-        total_count: int,
-        description: str,
-    ) -> None:
-        """Test offset-based pagination scenarios"""
-        querier = BatchQuerier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=limit, offset=offset),
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        assert len(result.items) == expected_items
-        assert result.total_count == total_count
-
-    @pytest.mark.parametrize(
-        "limit,offset,expected_items,total_count,description",
-        [
-            (100, 0, 5, 5, "limit exceeds total count"),
-            (10, 10000, 0, 5, "offset exceeds total count"),
-        ],
-        ids=["limit_exceeds", "offset_exceeds"],
-    )
-    async def test_search_scaling_groups_pagination_edge_cases(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_small: list[str],
-        limit: int,
-        offset: int,
-        expected_items: int,
-        total_count: int,
-        description: str,
-    ) -> None:
-        """Test pagination edge cases"""
-        querier = BatchQuerier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=limit, offset=offset),
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        assert len(result.items) == expected_items
-        assert result.total_count == total_count
-
-    async def test_search_scaling_groups_large_limit(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_medium: list[str],
-    ) -> None:
-        """Test searching scaling groups with large limit returns all items"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        # Should have exactly 15 test scaling groups
-        assert len(result.items) == 15
-        assert result.total_count == 15
 
     # Create Tests
 

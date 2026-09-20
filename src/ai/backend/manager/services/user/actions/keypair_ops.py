@@ -17,8 +17,10 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.ops.base import BulkGetOwnedFieldOpsAction
+from ai.backend.manager.actions.v2.ops.base import (
+    BulkGetOwnedFieldOpsAction,
+    GlobalSearcherOpsAction,
+)
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -257,10 +259,8 @@ class AdminCreateKeypairActionResult:
 
 
 @dataclass(frozen=True)
-class AdminSearchKeypairsAction(BaseGlobalAction):
+class AdminSearchKeypairsAction(GlobalSearcherOpsAction[KeyPairRow, KeyPairData]):
     """Read keypairs across every user."""
-
-    querier: BatchQuerier
 
     @override
     @classmethod
@@ -269,18 +269,8 @@ class AdminSearchKeypairsAction(BaseGlobalAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "global_search_keypairs"
-
-
-@dataclass(frozen=True)
-class AdminSearchKeypairsActionResult:
-    result: SearchResult[KeyPairData]
 
 
 @dataclass(frozen=True)

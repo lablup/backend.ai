@@ -79,10 +79,6 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_s
     GetAutoScalingRuleAction,
     GetAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
-    SearchAutoScalingRulesAction,
-    SearchAutoScalingRulesActionResult,
-)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
@@ -98,8 +94,6 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
-    SearchDeploymentPoliciesAction,
-    SearchDeploymentPoliciesActionResult,
     UpsertDeploymentPolicyAction,
     UpsertDeploymentPolicyActionResult,
 )
@@ -136,8 +130,6 @@ from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionActionResult,
 )
 from ai.backend.manager.services.deployment.actions.route import (
-    SearchRoutesAction,
-    SearchRoutesActionResult,
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
@@ -534,18 +526,6 @@ class DeploymentService:
         data = await self._deployment_repository.get_deployment_policy(action.deployment_id)
         return GetDeploymentPolicyActionResult(data=data)
 
-    async def search_deployment_policies(
-        self, action: SearchDeploymentPoliciesAction
-    ) -> SearchDeploymentPoliciesActionResult:
-        """Search deployment policies with pagination and ordering."""
-        result = await self._deployment_repository.search_deployment_policies(action.querier)
-        return SearchDeploymentPoliciesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def upsert_deployment_policy(
         self, action: UpsertDeploymentPolicyAction
     ) -> UpsertDeploymentPolicyActionResult:
@@ -690,23 +670,6 @@ class DeploymentService:
         log.info("Triggered replica sync for deployment {}", action.deployment_id)
 
         return SyncReplicaActionResult(success=True)
-
-    async def search_routes(self, action: SearchRoutesAction) -> SearchRoutesActionResult:
-        """Search routes with filtering and pagination.
-
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
-
-        Returns:
-            SearchRoutesActionResult: Result containing list of routes and pagination info
-        """
-        result = await self._deployment_repository.search_routes(action.querier)
-        return SearchRoutesActionResult(
-            routes=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def search_revision_resource_slots(
         self, action: SearchRevisionResourceSlotsAction
@@ -940,15 +903,3 @@ class DeploymentService:
     # ========== Replica Operations ==========
 
     # ========== Search Operations ==========
-
-    async def search_auto_scaling_rules(
-        self, action: SearchAutoScalingRulesAction
-    ) -> SearchAutoScalingRulesActionResult:
-        """Search auto-scaling rules with pagination and ordering."""
-        result = await self._deployment_repository.search_auto_scaling_rules(action.querier)
-        return SearchAutoScalingRulesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )

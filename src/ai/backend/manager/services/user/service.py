@@ -67,8 +67,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
-    AdminSearchKeypairsAction,
-    AdminSearchKeypairsActionResult,
     GetKeypairAction,
     GetKeypairActionResult,
     IssueMyKeypairAction,
@@ -342,13 +340,6 @@ class UserService:
             user_id=action.user_id, creator=action.creator
         )
         return AdminCreateKeypairActionResult(generated_data=generated)
-
-    async def admin_search_keypairs(
-        self, action: AdminSearchKeypairsAction
-    ) -> AdminSearchKeypairsActionResult:
-        """Admin search all keypairs."""
-        result = await self._user_repository.admin_search_keypairs(querier=action.querier)
-        return AdminSearchKeypairsActionResult(result=result)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 

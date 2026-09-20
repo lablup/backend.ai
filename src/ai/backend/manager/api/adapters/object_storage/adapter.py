@@ -36,6 +36,7 @@ from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.object_storage.actions.bulk_get import (
     BulkGetObjectStoragesAction,
 )
@@ -76,7 +77,7 @@ class ObjectStorageAdapter(BaseAdapter):
         searcher = self.build_searcher(input)
 
         action_result = await self._object_storage.global_search_object_storages.run(
-            SearchObjectStoragesAction(searcher=searcher)
+            SearchObjectStoragesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchObjectStoragesPayload(

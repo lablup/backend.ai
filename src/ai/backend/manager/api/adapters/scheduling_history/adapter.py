@@ -100,6 +100,13 @@ from ai.backend.manager.models.scheduling_history.scopes import (
     SessionKernelHistoryTarget,
     SessionSchedulingHistoryTarget,
 )
+from ai.backend.manager.models.scheduling_history.searchers import (
+    DeploymentHistorySearcher,
+    KernelSchedulingHistorySearcher,
+    RouteHistorySearcher,
+    SessionSchedulingHistorySearcher,
+)
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
@@ -255,10 +262,19 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search session scheduling histories (admin, no scope)."""
         querier = self._build_session_querier(input)
         action_result = await self._scheduling_history.search_session_history.run(
-            SearchSessionHistoryAction(querier=querier)
+            SearchSessionHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=SessionSchedulingHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchSessionHistoriesPayload(
-            items=[self._session_data_to_dto(h) for h in action_result.histories],
+            items=[self._session_data_to_dto(h) for h in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -438,7 +454,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._scheduling_history.search_kernel_history.run(
-            SearchKernelHistoryAction(querier=querier)
+            SearchKernelHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=KernelSchedulingHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchKernelHistoriesPayload(
             items=[self._kernel_data_to_dto(h) for h in action_result.items],
@@ -640,10 +665,19 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search deployment histories (admin, no scope)."""
         querier = self._build_deployment_querier(input)
         action_result = await self._scheduling_history.search_deployment_history.run(
-            SearchDeploymentHistoryAction(querier=querier)
+            SearchDeploymentHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DeploymentHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchDeploymentHistoriesPayload(
-            items=[self._deployment_data_to_dto(h) for h in action_result.histories],
+            items=[self._deployment_data_to_dto(h) for h in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1002,10 +1036,19 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search route histories (admin, no scope)."""
         querier = self._build_route_querier(input)
         action_result = await self._scheduling_history.search_route_history.run(
-            SearchRouteHistoryAction(querier=querier)
+            SearchRouteHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=RouteHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchRouteHistoriesPayload(
-            items=[self._route_data_to_dto(h) for h in action_result.histories],
+            items=[self._route_data_to_dto(h) for h in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

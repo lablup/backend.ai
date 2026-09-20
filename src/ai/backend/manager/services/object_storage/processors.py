@@ -77,8 +77,8 @@ class ObjectStorageProcessors:
         self.purge = group.entity_purge_ops(PurgeObjectStorageAction)
         self.get = group.single_get_ops(GetObjectStorageAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetObjectStoragesAction)
-        self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
-        self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
+        self.global_list_storages = group.global_searcher_ops(ListObjectStorageAction)
+        self.global_search_object_storages = group.global_searcher_ops(SearchObjectStoragesAction)
         self.get_presigned_download_url = revision.single_field(
             GetDownloadPresignedURLAction, service.get_presigned_download_url
         )

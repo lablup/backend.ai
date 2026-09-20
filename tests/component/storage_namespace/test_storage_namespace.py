@@ -21,6 +21,8 @@ from ai.backend.common.dto.manager.object_storage.response import (
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
@@ -140,7 +142,15 @@ class TestStorageNamespace:
         ns = await storage_namespace_factory(storage_id=storage["id"], namespace="to-unregister")
 
         # Verify it exists first
-        get_action = GetNamespacesAction(storage_id=storage["id"])
+        get_action = GetNamespacesAction(
+            searcher=GlobalSearcher(
+                used_by=(),
+                searcher=StorageNamespaceSearcher(
+                    pagination=NoPagination(),
+                    conditions=[StorageNamespaceConditions.by_storage_id(storage["id"])],
+                ),
+            )
+        )
         before = await storage_namespace_processors.global_get_namespaces.run(get_action)
         ns_names = [n.namespace for n in before.items]
         assert "to-unregister" in ns_names
@@ -174,7 +184,15 @@ class TestStorageNamespace:
         await storage_namespace_factory(storage_id=storage_b["id"], namespace="ns-gamma")
 
         # List storage_a namespaces
-        action_a = GetNamespacesAction(storage_id=storage_a["id"])
+        action_a = GetNamespacesAction(
+            searcher=GlobalSearcher(
+                used_by=(),
+                searcher=StorageNamespaceSearcher(
+                    pagination=NoPagination(),
+                    conditions=[StorageNamespaceConditions.by_storage_id(storage_a["id"])],
+                ),
+            )
+        )
         result_a = await storage_namespace_processors.global_get_namespaces.run(action_a)
         names_a = [n.namespace for n in result_a.items]
         assert "ns-alpha" in names_a
@@ -182,7 +200,15 @@ class TestStorageNamespace:
         assert "ns-gamma" not in names_a
 
         # List storage_b namespaces
-        action_b = GetNamespacesAction(storage_id=storage_b["id"])
+        action_b = GetNamespacesAction(
+            searcher=GlobalSearcher(
+                used_by=(),
+                searcher=StorageNamespaceSearcher(
+                    pagination=NoPagination(),
+                    conditions=[StorageNamespaceConditions.by_storage_id(storage_b["id"])],
+                ),
+            )
+        )
         result_b = await storage_namespace_processors.global_get_namespaces.run(action_b)
         names_b = [n.namespace for n in result_b.items]
         assert "ns-gamma" in names_b
@@ -204,7 +230,9 @@ class TestStorageNamespace:
 
         result = await storage_namespace_processors.global_search.run(
             SearchStorageNamespacesAction(
-                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=StorageNamespaceSearcher(pagination=NoPagination())
+                )
             )
         )
         by_storage: dict[uuid.UUID, set[str]] = {}
@@ -235,7 +263,15 @@ class TestStorageNamespace:
 
         # Verify listed
         list_result = await storage_namespace_processors.global_get_namespaces.run(
-            GetNamespacesAction(storage_id=storage["id"])
+            GetNamespacesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(
+                        pagination=NoPagination(),
+                        conditions=[StorageNamespaceConditions.by_storage_id(storage["id"])],
+                    ),
+                )
+            )
         )
         assert "lifecycle-ns" in [n.namespace for n in list_result.items]
 
@@ -249,7 +285,15 @@ class TestStorageNamespace:
 
         # Verify gone from per-storage listing
         after = await storage_namespace_processors.global_get_namespaces.run(
-            GetNamespacesAction(storage_id=storage["id"])
+            GetNamespacesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(
+                        pagination=NoPagination(),
+                        conditions=[StorageNamespaceConditions.by_storage_id(storage["id"])],
+                    ),
+                )
+            )
         )
         assert "lifecycle-ns" not in [n.namespace for n in after.items]
 
@@ -270,10 +314,13 @@ class TestStorageNamespaceSearch:
         await storage_namespace_factory(storage_id=storage["id"], namespace="search-ns-c")
 
         action = SearchStorageNamespacesAction(
-            searcher=StorageNamespaceSearcher(
-                pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[],
-                orders=[],
+            searcher=GlobalSearcher(
+                used_by=(),
+                searcher=StorageNamespaceSearcher(
+                    pagination=OffsetPagination(limit=10, offset=0),
+                    conditions=[],
+                    orders=[],
+                ),
             )
         )
         result = await storage_namespace_processors.global_search.run(action)
@@ -298,10 +345,13 @@ class TestStorageNamespaceSearch:
         # First page (limit=2)
         first_page = await storage_namespace_processors.global_search.run(
             SearchStorageNamespacesAction(
-                searcher=StorageNamespaceSearcher(
-                    pagination=OffsetPagination(limit=2, offset=0),
-                    conditions=[],
-                    orders=[],
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(
+                        pagination=OffsetPagination(limit=2, offset=0),
+                        conditions=[],
+                        orders=[],
+                    ),
                 )
             )
         )
@@ -313,10 +363,13 @@ class TestStorageNamespaceSearch:
         # Second page (limit=2, offset=2)
         second_page = await storage_namespace_processors.global_search.run(
             SearchStorageNamespacesAction(
-                searcher=StorageNamespaceSearcher(
-                    pagination=OffsetPagination(limit=2, offset=2),
-                    conditions=[],
-                    orders=[],
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(
+                        pagination=OffsetPagination(limit=2, offset=2),
+                        conditions=[],
+                        orders=[],
+                    ),
                 )
             )
         )
