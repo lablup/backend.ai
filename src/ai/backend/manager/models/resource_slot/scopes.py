@@ -9,19 +9,24 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = ("AgentResourceTarget",)
 
 
 @dataclass(frozen=True)
-class AgentResourceTarget(OperationScope):
+class AgentResourceTarget(ScopeTarget):
     """The slot rows of one agent; the row names the agent by ``agents.id``."""
 
     agent_uuid: AgentUUID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.agent_uuid
 
     @override
     def to_condition(self) -> QueryCondition:

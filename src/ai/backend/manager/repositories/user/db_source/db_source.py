@@ -351,8 +351,7 @@ class UserDBSource:
         """
         async with self._db.begin() as conn:
             result = await conn.execute(
-                sa
-                .update(users)
+                sa.update(users)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(
                     (users.c.uuid == user_uuid)
@@ -366,8 +365,7 @@ class UserDBSource:
         """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
         async with self._db.begin() as conn:
             result = await conn.execute(
-                sa
-                .update(users)
+                sa.update(users)
                 .values(status=UserStatus.ACTIVE, status_info="admin-requested")
                 .where(
                     (users.c.uuid == user_uuid)
@@ -485,8 +483,7 @@ class UserDBSource:
 
         async with self._db.begin_readonly() as conn:
             query = (
-                sa
-                .select(
+                sa.select(
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
@@ -616,14 +613,12 @@ class UserDBSource:
         allows a user only one marked keypair.
         """
         await session.execute(
-            sa
-            .update(KeyPairRow)
+            sa.update(KeyPairRow)
             .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
             .values(is_default=False)
         )
         switched = await session.scalar(
-            sa
-            .update(KeyPairRow)
+            sa.update(KeyPairRow)
             .where(
                 (KeyPairRow.user == user_id)
                 & (KeyPairRow.access_key == access_key)
@@ -642,8 +637,7 @@ class UserDBSource:
     ) -> None:
         """Private method to sync keypair roles with user role."""
         result = await session.execute(
-            sa
-            .select(
+            sa.select(
                 keypairs.c.user,
                 keypairs.c.is_active,
                 keypairs.c.is_admin,
@@ -689,8 +683,7 @@ class UserDBSource:
 
             if kp_updates:
                 await session.execute(
-                    sa
-                    .update(keypairs)
+                    sa.update(keypairs)
                     .values({
                         "is_admin": bindparam("is_admin"),
                         "is_active": bindparam("is_active"),
@@ -737,8 +730,7 @@ class UserDBSource:
         rows = result.fetchall()
         user_vfolder_ids = [row.id for row in rows]
         query = (
-            sa
-            .select(kernels.c.mounts)
+            sa.select(kernels.c.mounts)
             .select_from(kernels)
             .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
@@ -811,8 +803,7 @@ class UserDBSource:
         """
         # Gather target user's virtual folders' names.
         query = (
-            sa
-            .select(vfolders.c.name)
+            sa.select(vfolders.c.name)
             .select_from(vfolders)
             .where(vfolders.c.user == target_user_uuid)
         )
@@ -827,8 +818,7 @@ class UserDBSource:
             EntityShareRow.status == EntityShareStatus.ACCEPTED,
         )
         query = (
-            sa
-            .select(vfolders.c.id, vfolders.c.name)
+            sa.select(vfolders.c.id, vfolders.c.name)
             .select_from(vfolders)
             .where(vfolders.c.user == deleted_user_uuid, lent.exists())
         )
@@ -857,8 +847,7 @@ class UserDBSource:
             rowcount = 0
             for item in migrate_updates:
                 update_query = (
-                    sa
-                    .update(vfolders)
+                    sa.update(vfolders)
                     .values(
                         user=target_user_uuid,
                         name=item["vname"],
@@ -902,8 +891,7 @@ class UserDBSource:
         async with self._db.begin_readonly_session() as session:
             default_kp_row = (
                 await session.scalars(
-                    sa
-                    .select(KeyPairRow)
+                    sa.select(KeyPairRow)
                     .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
                     .options(noload("*"))
                 )
@@ -926,8 +914,7 @@ class UserDBSource:
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
-                    sa
-                    .select(KeyPairRow)
+                    sa.select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
                     .options(
                         load_only(
@@ -1010,8 +997,7 @@ class UserDBSource:
         async with self._db.begin_readonly_session() as db_session:
             kp_row = (
                 await db_session.scalars(
-                    sa
-                    .select(KeyPairRow)
+                    sa.select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
                     .options(noload("*"))
                 )
@@ -1036,8 +1022,7 @@ class UserDBSource:
             if exists is None:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             await session.execute(
-                sa
-                .update(keypairs)
+                sa.update(keypairs)
                 .where(keypairs.c.access_key == access_key)
                 .values(
                     ssh_public_key=ssh_public_key,
@@ -1056,8 +1041,7 @@ class UserDBSource:
             if exists is None:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             await session.execute(
-                sa
-                .update(keypairs)
+                sa.update(keypairs)
                 .where(keypairs.c.access_key == access_key)
                 .values(
                     ssh_public_key=None,

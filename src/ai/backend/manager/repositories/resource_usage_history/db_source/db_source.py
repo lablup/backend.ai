@@ -154,8 +154,7 @@ class ResourceUsageHistoryDBSource:
 
                 for observed_at, kernel_ids in time_to_kernels.items():
                     update_stmt = (
-                        sa
-                        .update(KernelRow)
+                        sa.update(KernelRow)
                         .where(KernelRow.id.in_(kernel_ids))
                         .values(last_observed_at=observed_at)
                     )
@@ -218,8 +217,7 @@ class ResourceUsageHistoryDBSource:
 
                 for observed_at, kernel_ids in time_to_kernels.items():
                     update_stmt = (
-                        sa
-                        .update(KernelRow)
+                        sa.update(KernelRow)
                         .where(KernelRow.id.in_(kernel_ids))
                         .values(last_observed_at=observed_at)
                     )
@@ -350,8 +348,7 @@ class ResourceUsageHistoryDBSource:
         """Fetch and aggregate user usage via normalized entries."""
         ube = UsageBucketEntryRow.__table__
         query = (
-            sa
-            .select(
+            sa.select(
                 UserUsageBucketRow.user_uuid,
                 UserUsageBucketRow.project_id,
                 ube.c.slot_name,
@@ -402,8 +399,7 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             ube = UsageBucketEntryRow.__table__
             query = (
-                sa
-                .select(
+                sa.select(
                     ProjectUsageBucketRow.project_id,
                     ube.c.slot_name,
                     sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
@@ -451,8 +447,7 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             ube = UsageBucketEntryRow.__table__
             query = (
-                sa
-                .select(
+                sa.select(
                     DomainUsageBucketRow.domain_name,
                     ube.c.slot_name,
                     sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
@@ -848,14 +843,12 @@ class ResourceUsageHistoryDBSource:
                     parent_table = bucket_row_cls.__table__
                     # Subquery: bucket_ids in this scaling group
                     bucket_ids_subq = (
-                        sa
-                        .select(parent_table.c.id)
+                        sa.select(parent_table.c.id)
                         .where(parent_table.c.resource_group_id == resource_group_id)
                         .scalar_subquery()
                     )
                     stmt = (
-                        sa
-                        .update(entry_table)
+                        sa.update(entry_table)
                         .where(
                             sa.and_(
                                 entry_table.c.bucket_id.in_(bucket_ids_subq),

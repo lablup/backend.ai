@@ -160,7 +160,7 @@ class SchedulingHistoryService:
         """Searches kernel scheduling history within the caller's authorized scopes."""
         result = await self._repository.search_kernel_scoped_history(
             querier=action.querier,
-            scopes=[action.target.to_search_scope()],
+            scopes=[action.target],
         )
 
         return SearchKernelScopedHistoryActionResult(
@@ -195,7 +195,7 @@ class SchedulingHistoryService:
         """Searches replica-group scheduling history within the caller's authorized scope."""
         result = await self._repository.scoped_search_replica_group_history(
             querier=action.querier,
-            scopes=[action.target.to_search_scope()],
+            scopes=[action.target],
         )
 
         return ScopedSearchReplicaGroupHistoryActionResult(

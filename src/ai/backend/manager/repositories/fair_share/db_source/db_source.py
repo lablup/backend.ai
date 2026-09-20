@@ -225,8 +225,7 @@ class FairShareDBSource:
             sg_row = await self._fetch_resource_group_row_by_id(db_sess, scope.resource_group_id)
             # Build LEFT JOIN query: all domains LEFT JOIN fair_share (filtered by resource_group)
             query = (
-                sa
-                .select(
+                sa.select(
                     DomainRow.name.label("domain_name"),
                     DomainFairShareRow,
                 )
@@ -425,8 +424,7 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query: all projects LEFT JOIN fair_share (filtered by resource_group)
             query = (
-                sa
-                .select(
+                sa.select(
                     ProjectRow.id.label("project_id"),
                     ProjectRow.domain_name.label("domain_name"),
                     ProjectFairShareRow,
@@ -600,8 +598,7 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Step 1: Check user-project association and get domain_name
             assoc_query = (
-                sa
-                .select(ProjectRow.domain_name)
+                sa.select(ProjectRow.domain_name)
                 .select_from(AssocGroupUserRow)
                 .join(ProjectRow, AssocGroupUserRow.group_id == ProjectRow.id)
                 .where(
@@ -661,8 +658,7 @@ class FairShareDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
-                sa
-                .select(ProjectRow.domain_name)
+                sa.select(ProjectRow.domain_name)
                 .select_from(AssocGroupUserRow)
                 .join(ProjectRow, ProjectRow.id == AssocGroupUserRow.group_id)
                 .where(
@@ -775,8 +771,7 @@ class FairShareDBSource:
             # Users via project membership LEFT JOIN fair_share (filtered by resource_group)
             # Path: AssocGroupUserRow -> ProjectRow -> DomainRow -> UserRow -> LEFT JOIN UserFairShareRow
             query = (
-                sa
-                .select(
+                sa.select(
                     AssocGroupUserRow.user_id.label("user_uuid"),
                     AssocGroupUserRow.group_id.label("project_id"),
                     DomainRow.name.label("domain_name"),
@@ -1065,8 +1060,7 @@ class FairShareDBSource:
 
             # 3-way JOIN query: user -> project -> domain
             query = (
-                sa
-                .select(
+                sa.select(
                     UserFairShareRow.user_uuid,
                     UserFairShareRow.project_id,
                     UserFairShareRow.domain_name,
@@ -1290,8 +1284,7 @@ class FairShareDBSource:
             ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
         )
         query = (
-            sa
-            .select(
+            sa.select(
                 AgentResourceRow.slot_name,
                 sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
             )
@@ -1476,8 +1469,7 @@ class FairShareDBSource:
             ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
         )
         query = (
-            sa
-            .select(
+            sa.select(
                 AgentResourceRow.slot_name,
                 sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
             )
@@ -1519,8 +1511,7 @@ class FairShareDBSource:
             ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
         )
         query = (
-            sa
-            .select(
+            sa.select(
                 AgentRow.resource_group_id,
                 AgentResourceRow.slot_name,
                 sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
@@ -1615,8 +1606,7 @@ class FairShareDBSource:
 
         # Fetch user usage buckets via normalized entries
         user_query = (
-            sa
-            .select(
+            sa.select(
                 UserUsageBucketRow.user_uuid,
                 UserUsageBucketRow.project_id,
                 UserUsageBucketRow.period_start,
@@ -1644,8 +1634,7 @@ class FairShareDBSource:
 
         # Fetch project usage buckets via normalized entries
         project_query = (
-            sa
-            .select(
+            sa.select(
                 ProjectUsageBucketRow.project_id,
                 ProjectUsageBucketRow.period_start,
                 ube.c.slot_name,
@@ -1672,8 +1661,7 @@ class FairShareDBSource:
 
         # Fetch domain usage buckets via normalized entries
         domain_query = (
-            sa
-            .select(
+            sa.select(
                 DomainUsageBucketRow.domain_name,
                 DomainUsageBucketRow.period_start,
                 ube.c.slot_name,

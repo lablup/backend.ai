@@ -115,8 +115,8 @@ from ai.backend.manager.api.gql.rbac.types.scope import (
     ScopeInputGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
-    RoleRoleAssignmentScopeItem,
+from ai.backend.manager.models.rbac_models.user_role.scopes import (
+    RoleRoleAssignmentTarget,
 )
 
 if TYPE_CHECKING:
@@ -329,7 +329,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         offset: int | None = None,
     ) -> RoleAssignmentConnection | None:
         result = await info.context.adapters.rbac.search_role_assignments_in_scope(
-            [RoleRoleAssignmentScopeItem(role_id=RoleID(UUID(self.id)))],
+            [RoleRoleAssignmentTarget(role_id=RoleID(UUID(self.id)))],
             SearchRoleAssignmentsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,

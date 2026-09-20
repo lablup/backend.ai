@@ -1,67 +1,24 @@
 from __future__ import annotations
 
-from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
-from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.ops.base import ScopeItem
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import AssignedUserData
-from ai.backend.manager.models.rbac_models.user_role.scopes import (
-    RoleRoleAssignmentTarget,
-    UserRoleAssignmentTarget,
-)
+from ai.backend.manager.models.rbac_models.user_role.scopes import RoleAssignmentTarget
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 __all__ = (
-    "RoleAssignmentScopeItem",
-    "RoleRoleAssignmentScopeItem",
     "ScopedSearchRoleAssignmentsAction",
     "ScopedSearchRoleAssignmentsActionResult",
-    "UserRoleAssignmentScopeItem",
 )
-
-
-class RoleAssignmentScopeItem(ScopeItem, ABC):
-    """One side an assignment row is reachable from."""
-
-
-@dataclass(frozen=True)
-class UserRoleAssignmentScopeItem(RoleAssignmentScopeItem):
-    """The assignment rows of the roles one user holds."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return UserRoleAssignmentTarget(user_id=self.user_id)
-
-
-@dataclass(frozen=True)
-class RoleRoleAssignmentScopeItem(RoleAssignmentScopeItem):
-    """The assignment rows of the users holding one role."""
-
-    role_id: RoleID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.role_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return RoleRoleAssignmentTarget(role_id=self.role_id)
 
 
 @dataclass(frozen=True)
@@ -72,7 +29,7 @@ class ScopedSearchRoleAssignmentsAction(BaseScopeAction):
     by the scopes it stays inside rather than by a row of its own.
     """
 
-    items: Sequence[RoleAssignmentScopeItem]
+    targets: Sequence[RoleAssignmentTarget]
     searcher: RoleAssignmentSearcher
 
     @override
@@ -90,12 +47,14 @@ class ScopedSearchRoleAssignmentsAction(BaseScopeAction):
     def action_name(cls) -> str:
         return "scoped_search_role_assignments"
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
+    @final
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
+        return self.targets
 
 
 @dataclass(frozen=True)

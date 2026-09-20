@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -11,13 +12,14 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.virtual_entity.queries import (
     scope_membership_exists,
     user_scope_membership_exists,
@@ -25,13 +27,18 @@ from ai.backend.manager.models.virtual_entity.queries import (
 
 __all__ = (
     "DomainProjectTarget",
+    "ProjectTarget",
     "ResourceGroupProjectTarget",
     "UserProjectTarget",
 )
 
 
+class ProjectTarget(ScopeTarget, ABC):
+    """One side a project is reachable from."""
+
+
 @dataclass(frozen=True)
-class DomainProjectTarget(OperationScope):
+class DomainProjectTarget(ProjectTarget):
     """Required scope for searching projects within a domain.
 
     Used for domain-scoped project search (domain admin+).
@@ -39,6 +46,10 @@ class DomainProjectTarget(OperationScope):
 
     domain_id: DomainID
     """Required. The domain to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -70,7 +81,7 @@ class DomainProjectTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserProjectTarget(OperationScope):
+class UserProjectTarget(ProjectTarget):
     """Required scope for searching projects a user is member of.
 
     Used for user-scoped project search (any authenticated user).
@@ -79,6 +90,10 @@ class UserProjectTarget(OperationScope):
 
     user_id: UserID
     """Required. The user to search projects for."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -102,10 +117,14 @@ class UserProjectTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class ResourceGroupProjectTarget(OperationScope):
+class ResourceGroupProjectTarget(ProjectTarget):
     """The projects one resource group serves."""
 
     resource_group_id: ResourceGroupID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:

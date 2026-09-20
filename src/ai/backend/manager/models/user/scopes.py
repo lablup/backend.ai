@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
@@ -11,6 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -18,7 +20,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
@@ -26,11 +28,16 @@ __all__ = (
     "DomainUserTarget",
     "ProjectUserTarget",
     "RoleUserTarget",
+    "UserTarget",
 )
 
 
+class UserTarget(ScopeTarget, ABC):
+    """One side a user is reachable from."""
+
+
 @dataclass(frozen=True)
-class DomainUserTarget(OperationScope):
+class DomainUserTarget(UserTarget):
     """Required scope for searching users within a domain.
 
     Used for domain_users query (domain admin+).
@@ -38,6 +45,10 @@ class DomainUserTarget(OperationScope):
 
     domain_id: DomainID
     """Required. The domain to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -63,7 +74,7 @@ class DomainUserTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectUserTarget(OperationScope):
+class ProjectUserTarget(UserTarget):
     """Required scope for searching users within a project.
 
     Used for project_users query (project member+).
@@ -72,6 +83,10 @@ class ProjectUserTarget(OperationScope):
 
     project_id: ProjectID
     """Required. The project (group) to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -98,11 +113,15 @@ class ProjectUserTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class RoleUserTarget(OperationScope):
+class RoleUserTarget(UserTarget):
     """Required scope for searching the users a role is assigned to."""
 
     role_id: RoleID
     """Required. The role whose holders to search."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.role_id
 
     @override
     def to_condition(self) -> QueryCondition:

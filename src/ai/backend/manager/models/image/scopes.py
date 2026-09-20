@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -13,9 +14,12 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
@@ -24,7 +28,7 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
@@ -33,16 +37,25 @@ __all__ = (
     "ContainerRegistryImageTarget",
     "DomainImageTarget",
     "GlobalImageTarget",
+    "ImageTarget",
     "ProjectImageTarget",
     "UserImageTarget",
 )
 
 
+class ImageTarget(ScopeTarget, ABC):
+    """One side an image is reachable from."""
+
+
 @dataclass(frozen=True)
-class DomainImageTarget(OperationScope):
+class DomainImageTarget(ImageTarget):
     """The images of one domain."""
 
     domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -68,10 +81,14 @@ class DomainImageTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectImageTarget(OperationScope):
+class ProjectImageTarget(ImageTarget):
     """The images of one project."""
 
     project_id: ProjectID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -97,10 +114,14 @@ class ProjectImageTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserImageTarget(OperationScope):
+class UserImageTarget(ImageTarget):
     """The images one user reaches."""
 
     user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -124,10 +145,14 @@ class UserImageTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class ContainerRegistryImageTarget(OperationScope):
+class ContainerRegistryImageTarget(ImageTarget):
     """The images of one container registry."""
 
     registry_id: ContainerRegistryID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.registry_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -153,18 +178,21 @@ class ContainerRegistryImageTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class GlobalImageTarget(OperationScope):
+class GlobalImageTarget(ScopeTarget):
     """The images every caller sees: those of a registry marked global.
 
     The column is nullable, and a registry that leaves it unset is not global.
     """
 
     @override
+    def scope_id(self) -> EntityIdentifier:
+        return global_entity_id(GlobalEntityName.GLOBAL)
+
+    @override
     def to_condition(self) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.exists(
-                sa
-                .select(sa.literal(1))
+                sa.select(sa.literal(1))
                 .select_from(ContainerRegistryRow)
                 .where(
                     ContainerRegistryRow.id == ImageRow.registry_id,

@@ -97,6 +97,10 @@ from ai.backend.manager.models.resource_policy.orders import (
     ProjectResourcePolicyOrders,
     UserResourcePolicyOrders,
 )
+from ai.backend.manager.models.resource_policy.scopes import (
+    UserKeypairResourcePolicyTarget,
+    UserResourcePolicyTarget,
+)
 from ai.backend.manager.models.resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
     ProjectResourcePolicySearcher,
@@ -124,7 +128,6 @@ from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_r
     PurgeKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
-    KeypairResourcePolicyScopeItem,
     SearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
@@ -169,7 +172,6 @@ from ai.backend.manager.services.user_resource_policy.actions.purge_user_resourc
 )
 from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
     SearchUserResourcePoliciesAction,
-    UserResourcePolicyScopeItem,
 )
 from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
     UpdateUserResourcePolicyAction,
@@ -325,7 +327,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             raise UnreachableError("User context is not available.")
         result = await self._keypair_resource_policy.search.run(
             SearchKeypairResourcePoliciesAction(
-                items=[KeypairResourcePolicyScopeItem(user_id=UserID(me.user_id))],
+                targets=[UserKeypairResourcePolicyTarget(user_id=UserID(me.user_id))],
                 searcher=KeyPairResourcePolicySearcher(pagination=NoPagination()),
             )
         )
@@ -428,7 +430,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             raise UnreachableError("User context is not available.")
         result = await self._user_resource_policy.search.run(
             SearchUserResourcePoliciesAction(
-                items=[UserResourcePolicyScopeItem(user_id=UserID(me.user_id))],
+                targets=[UserResourcePolicyTarget(user_id=UserID(me.user_id))],
                 searcher=UserResourcePolicySearcher(pagination=NoPagination()),
             )
         )

@@ -9,18 +9,23 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import RolePermissionPresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = ("RolePresetPermissionTarget",)
 
 
 @dataclass(frozen=True)
-class RolePresetPermissionTarget(OperationScope):
+class RolePresetPermissionTarget(ScopeTarget):
     """The permission entries one preset holds."""
 
     preset_id: RolePresetID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.preset_id
 
     @override
     def to_condition(self) -> QueryCondition:

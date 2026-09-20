@@ -41,6 +41,12 @@ from ai.backend.manager.models.entity_share.conditions import EntityShareConditi
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.orders import EntityShareOrders
 from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.scopes import (
+    EntityShareTarget,
+    OwningEntityShareTarget,
+    RecipientProjectEntityShareTarget,
+    RecipientUserEntityShareTarget,
+)
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.services.entity_share.actions.answer import (
     AcceptEntityShareAction,
@@ -54,10 +60,6 @@ from ai.backend.manager.services.entity_share.actions.create import (
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
 from ai.backend.manager.services.entity_share.actions.search import (
-    EntityShareOwningScopeItem,
-    EntityShareRecipientProjectScopeItem,
-    EntityShareRecipientScopeItem,
-    EntityShareScopeItem,
     SearchEntitySharesAction,
 )
 from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
@@ -156,17 +158,19 @@ class EntityShareAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        items: list[EntityShareScopeItem] = []
+        targets: list[EntityShareTarget] = []
         sharers: list[uuid.UUID] = []
         for side in input.sides:
             match side:
                 case EntityShareSideDTO.RECIPIENT:
-                    items.append(EntityShareRecipientScopeItem(user_id=UserID(me.user_id)))
+                    targets.append(
+                        RecipientUserEntityShareTarget(recipient_user_id=UserID(me.user_id))
+                    )
                 case EntityShareSideDTO.SHARER:
-                    items.append(EntityShareOwningScopeItem(target=UserID(me.user_id)))
+                    targets.append(OwningEntityShareTarget(scope=UserID(me.user_id)))
                     sharers.append(me.user_id)
         return await self._search(
-            items,
+            targets,
             extra_conditions=([EntityShareConditions.by_sharers(sharers)] if sharers else []),
             filter=input.filter,
             order=input.order,
@@ -187,7 +191,7 @@ class EntityShareAdapter(BaseAdapter):
         shares is refused unless the caller may reach that person's scope.
         """
         return await self._search(
-            self._to_scope_items(input.scope),
+            self._to_scope_targets(input.scope),
             filter=input.filter,
             order=input.order,
             first=input.first,
@@ -200,7 +204,7 @@ class EntityShareAdapter(BaseAdapter):
 
     async def _search(
         self,
-        items: list[EntityShareScopeItem],
+        targets: list[EntityShareTarget],
         *,
         extra_conditions: Sequence[QueryCondition] = (),
         filter: EntityShareFilter | None,
@@ -228,7 +232,7 @@ class EntityShareAdapter(BaseAdapter):
             offset=offset,
         )
         result = await self._entity_share.search.run(
-            SearchEntitySharesAction(items=items, searcher=searcher)
+            SearchEntitySharesAction(targets=targets, searcher=searcher)
         )
         return SearchEntitySharesPayload(
             items=[self._to_node(d) for d in result.items],
@@ -237,21 +241,21 @@ class EntityShareAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    def _to_scope_items(self, scope: EntityShareScope) -> list[EntityShareScopeItem]:
-        items: list[EntityShareScopeItem] = []
+    def _to_scope_targets(self, scope: EntityShareScope) -> list[EntityShareTarget]:
+        targets: list[EntityShareTarget] = []
         for recipient in scope.recipient or ():
-            items.append(EntityShareRecipientScopeItem(user_id=UserID(recipient.value)))
-        for project in scope.recipient_project or ():
-            items.append(EntityShareRecipientProjectScopeItem(project_id=ProjectID(project.value)))
-        for sharer in scope.sharer or ():
-            items.append(EntityShareOwningScopeItem(target=UserID(sharer.value)))
-        for target in scope.target or ():
-            items.append(
-                EntityShareOwningScopeItem(
-                    target=RuntimeEntityID(target.entity_type, target.entity_id)
-                )
+            targets.append(
+                RecipientUserEntityShareTarget(recipient_user_id=UserID(recipient.value))
             )
-        return items
+        for project in scope.recipient_project or ():
+            targets.append(RecipientProjectEntityShareTarget(project_id=ProjectID(project.value)))
+        for sharer in scope.sharer or ():
+            targets.append(OwningEntityShareTarget(scope=UserID(sharer.value)))
+        for target in scope.target or ():
+            targets.append(
+                OwningEntityShareTarget(scope=RuntimeEntityID(target.entity_type, target.entity_id))
+            )
+        return targets
 
     def _to_permission_cap(self, permissions: Sequence[PermissionBitDTO]) -> Permission | None:
         """An empty list means no ceiling, which is what ``None`` says to the graph."""

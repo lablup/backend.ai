@@ -130,7 +130,8 @@ This package replaces the condition functions and order methods written by hand 
 
 - `ScopedSearcher(scopes, used_by, searcher)` and `GlobalSearcher(used_by, searcher)` are the ops inputs. The action takes that one object as its field, and the checks read their targets from it.
 - A `ScopeTarget` holds the scope id to check and the row restriction; a `UsedBy` holds the entity to check and its condition. What is checked cannot drift from what is queried.
-- Before this, a `ScopeItem` wrapped an `OperationScope` one-to-one to form that pair. 31 of the 72 `OperationScope` classes had no item, so no authorization target was declared for them. Each becomes a `ScopeTarget` as its entity moves over.
+- Before this, a `ScopeItem` wrapped an `OperationScope` one-to-one to form that pair. 31 of the 72 `OperationScope` classes had no item, so no authorization target was declared for them. BA-8022 merged every wrapper into its scope and moved the rest over, so the pair is one class.
+- `RouteHistoryTarget` is the exception still on `OperationScope`: it is keyed by a `ReplicaID`, which is a `FieldIdentifier`, and a replica is authorized through the deployment that owns it. Naming that scope needs the owning deployment id, which the target does not carry.
 
 ## What field caps need from the declarations
 

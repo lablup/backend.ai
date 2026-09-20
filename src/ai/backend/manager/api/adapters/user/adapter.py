@@ -118,6 +118,12 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.scopes import (
+    DomainUserTarget,
+    ProjectUserTarget,
+    RoleUserTarget,
+    UserTarget,
+)
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -154,11 +160,7 @@ from ai.backend.manager.services.user.actions.purge_user import (
 )
 from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.scoped_search import (
-    DomainUserScopeItem,
-    ProjectUserScopeItem,
-    RoleUserScopeItem,
     ScopedSearchUsersAction,
-    UserScopeItem,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.update_user import (
@@ -280,7 +282,7 @@ class UserAdapter(BaseAdapter):
         )
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                items=[DomainUserScopeItem(domain_id=await self.resolve_domain_id(domain_name))],
+                targets=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
                 searcher=searcher,
             )
         )
@@ -313,7 +315,7 @@ class UserAdapter(BaseAdapter):
         )
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                items=[ProjectUserScopeItem(project_id=project_id)],
+                targets=[ProjectUserTarget(project_id=project_id)],
                 searcher=searcher,
             )
         )
@@ -342,16 +344,16 @@ class UserAdapter(BaseAdapter):
             ),
         )
 
-    def _scope_items(self, scope: UserScope) -> list[UserScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[UserScopeItem] = [
-            DomainUserScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: UserScope) -> list[UserTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[UserTarget] = [
+            DomainUserTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectUserScopeItem(project_id=ProjectID(entry.value)) for entry in scope.project or ()
+        targets.extend(
+            ProjectUserTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
-        items.extend(RoleUserScopeItem(role_id=RoleID(entry.value)) for entry in scope.role or ())
-        return items
+        targets.extend(RoleUserTarget(role_id=RoleID(entry.value)) for entry in scope.role or ())
+        return targets
 
     async def scoped_search(
         self,
@@ -362,7 +364,7 @@ class UserAdapter(BaseAdapter):
         orders = self._convert_orders(input.order) if input.order else []
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                items=self._scope_items(input.scope),
+                targets=self._scope_targets(input.scope),
                 searcher=UserSearcher(
                     conditions=conditions,
                     orders=orders,
@@ -400,7 +402,7 @@ class UserAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._user.scoped_search.run(
-            ScopedSearchUsersAction(items=self._scope_items(scope), searcher=searcher)
+            ScopedSearchUsersAction(targets=self._scope_targets(scope), searcher=searcher)
         )
         return AdminSearchUsersPayload(
             items=await self._user_nodes(result.items),
@@ -418,7 +420,7 @@ class UserAdapter(BaseAdapter):
         searcher = self._build_search_searcher(input)
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                items=[DomainUserScopeItem(domain_id=await self.resolve_domain_id(domain_name))],
+                targets=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
                 searcher=searcher,
             )
         )
@@ -440,7 +442,7 @@ class UserAdapter(BaseAdapter):
         searcher = self._build_search_searcher(input)
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                items=[ProjectUserScopeItem(project_id=ProjectID(project_id))],
+                targets=[ProjectUserTarget(project_id=ProjectID(project_id))],
                 searcher=searcher,
             )
         )

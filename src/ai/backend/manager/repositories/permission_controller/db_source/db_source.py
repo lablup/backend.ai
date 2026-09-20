@@ -163,8 +163,7 @@ class PermissionDBSource:
         """
         async with self._db.begin_session() as db_session:
             user_role_row = await db_session.scalar(
-                sa
-                .select(UserRoleRow)
+                sa.select(UserRoleRow)
                 .where(UserRoleRow.user_id == data.user_id)
                 .where(UserRoleRow.role_id == data.role_id)
             )
@@ -184,8 +183,7 @@ class PermissionDBSource:
             )
             rows = (
                 await db_session.execute(
-                    sa
-                    .select(RoleRow.scope_id, sa.func.count(UserRoleRow.id))
+                    sa.select(RoleRow.scope_id, sa.func.count(UserRoleRow.id))
                     .outerjoin(
                         UserRoleRow,
                         (UserRoleRow.role_id == RoleRow.id) & (UserRoleRow.user_id == data.user_id),
@@ -467,8 +465,7 @@ class PermissionDBSource:
                 try:
                     async with db_session.begin_nested():
                         stmt = (
-                            sa
-                            .select(UserRoleRow)
+                            sa.select(UserRoleRow)
                             .where(UserRoleRow.user_id == user_id)
                             .where(UserRoleRow.role_id == data.role_id)
                         )

@@ -9,18 +9,24 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user import UserRow
 
 
 @dataclass(frozen=True)
-class MyLoginSessionTarget(OperationScope):
+class MyLoginSessionTarget(ScopeTarget):
     """Scope for searching login sessions owned by the current user."""
 
     user_id: UUID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return UserID(self.user_id)
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -44,10 +50,14 @@ class MyLoginSessionTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class MyLoginHistoryTarget(OperationScope):
+class MyLoginHistoryTarget(ScopeTarget):
     """Scope for searching login history of the current user."""
 
     user_id: UUID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return UserID(self.user_id)
 
     @override
     def to_condition(self) -> QueryCondition:

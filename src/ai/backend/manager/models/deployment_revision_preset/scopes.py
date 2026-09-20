@@ -9,18 +9,23 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = ("DeploymentPresetSlotTarget",)
 
 
 @dataclass(frozen=True)
-class DeploymentPresetSlotTarget(OperationScope):
+class DeploymentPresetSlotTarget(ScopeTarget):
     """The slot amounts one preset declares."""
 
     preset_id: DeploymentPresetID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.preset_id
 
     @override
     def to_condition(self) -> QueryCondition:

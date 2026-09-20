@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -10,6 +11,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
@@ -25,16 +27,24 @@ from ai.backend.manager.models.resource_usage_history import (
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user import UserRow
 
 
+class UsageBucketTarget(ScopeTarget, ABC):
+    """One resource group a usage bucket read is answered for."""
+
+
 @dataclass(frozen=True)
-class DomainUsageBucketTarget(OperationScope):
+class DomainUsageBucketTarget(UsageBucketTarget):
     """Scope for domain usage bucket queries."""
 
     resource_group_id: ResourceGroupID
     domain_name: str
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -69,12 +79,16 @@ class DomainUsageBucketTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectUsageBucketTarget(OperationScope):
+class ProjectUsageBucketTarget(UsageBucketTarget):
     """Scope for project usage bucket queries."""
 
     resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -116,13 +130,17 @@ class ProjectUsageBucketTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserUsageBucketTarget(OperationScope):
+class UserUsageBucketTarget(UsageBucketTarget):
     """Scope for user usage bucket queries."""
 
     resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
     user_uuid: uuid.UUID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:

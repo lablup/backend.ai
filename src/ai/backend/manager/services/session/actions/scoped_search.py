@@ -2,83 +2,20 @@
 
 from __future__ import annotations
 
-from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.scopes import (
-    DomainSessionTarget,
-    ProjectSessionTarget,
-    UserSessionTarget,
-)
+from ai.backend.manager.models.session.scopes import SessionTarget
 from ai.backend.manager.models.session.searchers import SessionSearcher
 
-__all__ = (
-    "DomainSessionScopeItem",
-    "ProjectSessionScopeItem",
-    "ScopedSearchSessionsAction",
-    "SessionScopeItem",
-    "UserSessionScopeItem",
-)
-
-
-class SessionScopeItem(ScopeItem, ABC):
-    """One side a session is reachable from."""
-
-
-@dataclass(frozen=True)
-class DomainSessionScopeItem(SessionScopeItem):
-    """The sessions of one domain."""
-
-    domain_id: DomainID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.domain_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return DomainSessionTarget(domain_id=self.domain_id)
-
-
-@dataclass(frozen=True)
-class UserSessionScopeItem(SessionScopeItem):
-    """The sessions one user holds."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return UserSessionTarget(user_id=self.user_id)
-
-
-@dataclass(frozen=True)
-class ProjectSessionScopeItem(SessionScopeItem):
-    """The sessions of one project."""
-
-    project_id: ProjectID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.project_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return ProjectSessionTarget(project_id=self.project_id)
+__all__ = ("ScopedSearchSessionsAction",)
 
 
 @dataclass(frozen=True)
@@ -89,7 +26,7 @@ class ScopedSearchSessionsAction(OperationScopeOpsAction[SessionRow, SessionEnti
     cannot see is refused rather than served the rest.
     """
 
-    items: Sequence[SessionScopeItem]
+    targets: Sequence[SessionTarget]
     searcher: SessionSearcher
 
     @override
@@ -102,13 +39,15 @@ class ScopedSearchSessionsAction(OperationScopeOpsAction[SessionRow, SessionEnti
     def action_name(cls) -> str:
         return "scoped_search_sessions"
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
+    @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
+        return self.targets
 
     @override
     def to_searcher(self) -> SessionSearcher:

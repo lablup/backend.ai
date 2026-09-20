@@ -4,8 +4,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
@@ -50,13 +48,7 @@ class ScopedSearchAppConfigFragmentAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        owner = self.owner
-        return (
-            AppConfigFragmentTarget(
-                scope_type=AppConfigScopeType.of_owner(owner),
-                scope_id=None if owner is None else AppConfigScopeID(owner),
-            ),
-        )
+        return (AppConfigFragmentTarget(owner=self.owner),)
 
     @override
     def to_searcher(self) -> AppConfigFragmentSearcher:

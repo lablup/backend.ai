@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -14,20 +15,25 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
+    "EntityShareTarget",
     "OwningEntityShareTarget",
     "RecipientProjectEntityShareTarget",
     "RecipientUserEntityShareTarget",
 )
 
 
+class EntityShareTarget(ScopeTarget, ABC):
+    """One side invitations are read from."""
+
+
 @dataclass(frozen=True)
-class RecipientUserEntityShareTarget(OperationScope):
+class RecipientUserEntityShareTarget(EntityShareTarget):
     """The offers addressed to one person, whichever way they were named.
 
     The one read that cannot go through the ownership graph: an offer may name an
@@ -42,6 +48,10 @@ class RecipientUserEntityShareTarget(OperationScope):
     recipient_user_id: UserID
 
     @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.recipient_user_id
+
+    @override
     def to_condition(self) -> QueryCondition:
         recipient_user_id = self.recipient_user_id
 
@@ -49,8 +59,7 @@ class RecipientUserEntityShareTarget(OperationScope):
             return sa.or_(
                 EntityShareRow.recipient_email
                 == (
-                    sa
-                    .select(UserRow.email)
+                    sa.select(UserRow.email)
                     .where(UserRow.uuid == recipient_user_id)
                     .scalar_subquery()
                 ),
@@ -70,10 +79,14 @@ class RecipientUserEntityShareTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class RecipientProjectEntityShareTarget(OperationScope):
+class RecipientProjectEntityShareTarget(EntityShareTarget):
     """The offers addressed to one project."""
 
     project_id: ProjectID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -95,29 +108,7 @@ class RecipientProjectEntityShareTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class EntityShareSharerScope(OperationScope):
-    """The invitations one user sent."""
-
-    sharer_user_id: UserID
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        sharer_user_id = self.sharer_user_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EntityShareRow.sharer_user_id == sharer_user_id
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        # The requester is authenticated before reaching here.
-        return ()
-
-
-@dataclass(frozen=True)
-class OwningEntityShareTarget(OperationScope):
+class OwningEntityShareTarget(EntityShareTarget):
     """The offers a scope reaches, through the entity each offer is attached to.
 
     An offer is created in the entity it offers, so who reaches the offer is who
@@ -126,6 +117,10 @@ class OwningEntityShareTarget(OperationScope):
     """
 
     scope: EntityIdentifier
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.scope
 
     @override
     def to_condition(self) -> QueryCondition:

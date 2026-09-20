@@ -175,8 +175,16 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
+from ai.backend.manager.models.rbac_models.role.scopes import (
+    HeldRoleTarget,
+    RoleTarget,
+)
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.scopes import (
+    RoleAssignmentTarget,
+    UserRoleAssignmentTarget,
+)
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
@@ -211,9 +219,7 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
-    RoleAssignmentScopeItem,
     ScopedSearchRoleAssignmentsAction,
-    UserRoleAssignmentScopeItem,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     GlobalSearchPermissionsAction,
@@ -226,8 +232,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     GlobalSearchRolesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
-    HolderRoleScopeItem,
-    RoleScopeItem,
     SearchRolesInScopeAction,
     SearchRolesInScopeActionResult,
 )
@@ -611,13 +615,11 @@ class RBACAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        return await self.search_roles_in_scope(
-            [HolderRoleScopeItem(user_id=UserID(me.user_id))], input
-        )
+        return await self.search_roles_in_scope([HeldRoleTarget(user_id=UserID(me.user_id))], input)
 
     async def search_roles_in_scope(
         self,
-        items: Sequence[RoleScopeItem],
+        targets: Sequence[RoleTarget],
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search the roles the named scopes reach."""
@@ -636,7 +638,7 @@ class RBACAdapter(BaseAdapter):
         )
         action_result: SearchRolesInScopeActionResult = (
             await self._permission_controller.search_roles_in_scope.run(
-                SearchRolesInScopeAction(items=items, querier=querier)
+                SearchRolesInScopeAction(targets=targets, querier=querier)
             )
         )
         raw = action_result.result
@@ -656,12 +658,12 @@ class RBACAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         return await self.search_role_assignments_in_scope(
-            [UserRoleAssignmentScopeItem(user_id=UserID(me.user_id))], input
+            [UserRoleAssignmentTarget(user_id=UserID(me.user_id))], input
         )
 
     async def search_role_assignments_in_scope(
         self,
-        items: Sequence[RoleAssignmentScopeItem],
+        targets: Sequence[RoleAssignmentTarget],
         input: SearchRoleAssignmentsInput,
     ) -> SearchResult[RoleAssignmentNode]:
         """Search the role assignments the named scopes reach."""
@@ -678,7 +680,7 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
         )
         found = await self._permission_controller.scoped_search_role_assignments.run(
-            ScopedSearchRoleAssignmentsAction(items=items, searcher=searcher)
+            ScopedSearchRoleAssignmentsAction(targets=targets, searcher=searcher)
         )
         raw = found.result
         return SearchResult(

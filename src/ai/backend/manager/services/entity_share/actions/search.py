@@ -2,82 +2,20 @@
 
 from __future__ import annotations
 
-from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.entity_share.scopes import (
-    OwningEntityShareTarget,
-    RecipientProjectEntityShareTarget,
-    RecipientUserEntityShareTarget,
-)
+from ai.backend.manager.models.entity_share.scopes import EntityShareTarget
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
-__all__ = (
-    "EntityShareRecipientProjectScopeItem",
-    "EntityShareRecipientScopeItem",
-    "EntityShareScopeItem",
-    "EntityShareOwningScopeItem",
-    "SearchEntitySharesAction",
-)
-
-
-class EntityShareScopeItem(ScopeItem, ABC):
-    """One side invitations are read from."""
-
-
-@dataclass(frozen=True)
-class EntityShareRecipientScopeItem(EntityShareScopeItem):
-    """The shares addressed to one person, by node or by address."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return RecipientUserEntityShareTarget(recipient_user_id=self.user_id)
-
-
-@dataclass(frozen=True)
-class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
-    """The shares addressed to one project."""
-
-    project_id: ProjectID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.project_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return RecipientProjectEntityShareTarget(project_id=self.project_id)
-
-
-@dataclass(frozen=True)
-class EntityShareOwningScopeItem(EntityShareScopeItem):
-    """The offers a scope reaches through the entity each one is attached to."""
-
-    target: EntityIdentifier
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.target
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return OwningEntityShareTarget(scope=self.target)
+__all__ = ("SearchEntitySharesAction",)
 
 
 @dataclass
@@ -88,7 +26,7 @@ class SearchEntitySharesAction(OperationScopeOpsAction[EntityShareRow, EntitySha
     cannot see is refused rather than served the rest.
     """
 
-    items: Sequence[EntityShareScopeItem]
+    targets: Sequence[EntityShareTarget]
     searcher: EntityShareSearcher
 
     @override
@@ -101,13 +39,15 @@ class SearchEntitySharesAction(OperationScopeOpsAction[EntityShareRow, EntitySha
     def action_name(cls) -> str:
         return "search_entity_shares"
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
+    @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
+        return self.targets
 
     @override
     def to_searcher(self) -> EntityShareSearcher:

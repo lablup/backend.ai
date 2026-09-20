@@ -83,8 +83,7 @@ class ProjectDBSource:
         """Mark a group as inactive (soft delete)."""
         async with self._db.begin_session() as session:
             result = await session.execute(
-                sa
-                .update(groups)
+                sa.update(groups)
                 .values(
                     is_active=False,
                     integration_id=None,
@@ -109,8 +108,7 @@ class ProjectDBSource:
                 users, users.c.uuid == kernels.c.user_uuid
             )
             query = (
-                sa
-                .select(
+                sa.select(
                     kernels.c.id,
                     kernels.c.container_id,
                     kernels.c.session_id,

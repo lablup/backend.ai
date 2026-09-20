@@ -10,6 +10,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
@@ -20,7 +21,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = (
     "DomainFairShareTarget",
@@ -30,7 +31,7 @@ __all__ = (
 
 
 @dataclass(frozen=True)
-class DomainFairShareTarget(OperationScope):
+class DomainFairShareTarget(ScopeTarget):
     """Required scope for domain fair share entity search.
 
     Used for field-level queries where the resource group is determined by
@@ -39,6 +40,10 @@ class DomainFairShareTarget(OperationScope):
 
     resource_group_id: ResourceGroupID
     """Required. The scaling group id to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -67,7 +72,7 @@ class DomainFairShareTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectFairShareTarget(OperationScope):
+class ProjectFairShareTarget(ScopeTarget):
     """Required scope for project fair share entity search.
 
     Used for field-level queries where the resource group and domain are
@@ -79,6 +84,10 @@ class ProjectFairShareTarget(OperationScope):
 
     resource_group_id: ResourceGroupID
     """Required. The scaling group id to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -113,7 +122,7 @@ class ProjectFairShareTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserFairShareTarget(OperationScope):
+class UserFairShareTarget(ScopeTarget):
     """Required scope for user fair share entity search.
 
     Used for field-level queries where the resource group, domain, and project
@@ -128,6 +137,10 @@ class UserFairShareTarget(OperationScope):
 
     resource_group_id: ResourceGroupID
     """Required. The scaling group id to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     def to_condition(self) -> QueryCondition:

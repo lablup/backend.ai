@@ -54,7 +54,6 @@ from ai.backend.manager.services.scheduling_history.actions.global_search_replic
     GlobalSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
-    DeploymentReplicaGroupHistoryTarget,
     ScopedSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
@@ -68,7 +67,6 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
-    SessionKernelHistoryTarget,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,

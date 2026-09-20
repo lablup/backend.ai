@@ -56,6 +56,11 @@ from ai.backend.manager.models.resource_usage_history.row import (
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
+)
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
     ProjectUsageBucketSearcher,
@@ -84,11 +89,6 @@ from ai.backend.manager.services.resource_usage.actions.global_search_project_us
 )
 from ai.backend.manager.services.resource_usage.actions.global_search_user_usage_buckets import (
     GlobalSearchUserUsageBucketsAction,
-)
-from ai.backend.manager.services.resource_usage.actions.scope_items import (
-    DomainUsageBucketScopeItem,
-    ProjectUsageBucketScopeItem,
-    UserUsageBucketScopeItem,
 )
 from ai.backend.manager.services.resource_usage.actions.search_domain_usage_buckets import (
     SearchDomainUsageBucketsAction,
@@ -281,8 +281,8 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.search_domain_usage_buckets.run(
             SearchDomainUsageBucketsAction(
-                items=[
-                    DomainUsageBucketScopeItem(
+                targets=[
+                    DomainUsageBucketTarget(
                         resource_group_id=resource_group_id,
                         domain_name=input.domain_name,
                     )
@@ -317,8 +317,8 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.search_project_usage_buckets.run(
             SearchProjectUsageBucketsAction(
-                items=[
-                    ProjectUsageBucketScopeItem(
+                targets=[
+                    ProjectUsageBucketTarget(
                         resource_group_id=resource_group_id,
                         domain_name=input.domain_name,
                         project_id=input.project_id,
@@ -354,8 +354,8 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.search_user_usage_buckets.run(
             SearchUserUsageBucketsAction(
-                items=[
-                    UserUsageBucketScopeItem(
+                targets=[
+                    UserUsageBucketTarget(
                         resource_group_id=resource_group_id,
                         domain_name=input.domain_name,
                         project_id=input.project_id,
@@ -410,8 +410,8 @@ class ResourceUsageAdapter(BaseAdapter):
         resource_group_id = await self._resource_group_id(resource_group_name)
         action_result = await self._resource_usage.search_domain_usage_buckets.run(
             SearchDomainUsageBucketsAction(
-                items=[
-                    DomainUsageBucketScopeItem(
+                targets=[
+                    DomainUsageBucketTarget(
                         resource_group_id=resource_group_id,
                         domain_name=domain_name,
                     )
@@ -461,8 +461,8 @@ class ResourceUsageAdapter(BaseAdapter):
         resource_group_id = await self._resource_group_id(resource_group_name)
         action_result = await self._resource_usage.search_project_usage_buckets.run(
             SearchProjectUsageBucketsAction(
-                items=[
-                    ProjectUsageBucketScopeItem(
+                targets=[
+                    ProjectUsageBucketTarget(
                         resource_group_id=resource_group_id,
                         domain_name=domain_name,
                         project_id=project_id,
@@ -514,8 +514,8 @@ class ResourceUsageAdapter(BaseAdapter):
         resource_group_id = await self._resource_group_id(resource_group_name)
         action_result = await self._resource_usage.search_user_usage_buckets.run(
             SearchUserUsageBucketsAction(
-                items=[
-                    UserUsageBucketScopeItem(
+                targets=[
+                    UserUsageBucketTarget(
                         resource_group_id=resource_group_id,
                         domain_name=domain_name,
                         project_id=project_id,

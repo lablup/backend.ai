@@ -2,41 +2,20 @@
 
 from __future__ import annotations
 
-from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.resource_group import (
-    ResourceGroupID,
-)
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.scopes import ResourceGroupDomainTarget
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
-
-class DomainScopeItem(ScopeItem, ABC):
-    """One side a domain is reachable from."""
-
-
-@dataclass(frozen=True)
-class ResourceGroupDomainScopeItem(DomainScopeItem):
-    """The domains one resource group serves."""
-
-    resource_group_id: ResourceGroupID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.resource_group_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return ResourceGroupDomainTarget(resource_group_id=self.resource_group_id)
+__all__ = ("ScopedSearchDomainsAction",)
 
 
 @dataclass(frozen=True)
@@ -47,7 +26,7 @@ class ScopedSearchDomainsAction(OperationScopeOpsAction[DomainRow, DomainData]):
     cannot see is refused rather than served the rest.
     """
 
-    items: Sequence[DomainScopeItem]
+    targets: Sequence[ResourceGroupDomainTarget]
     searcher: DomainSearcher
 
     @override
@@ -60,13 +39,15 @@ class ScopedSearchDomainsAction(OperationScopeOpsAction[DomainRow, DomainData]):
     def action_name(cls) -> str:
         return "scoped_search_domains"
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
+    @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
+        return self.targets
 
     @override
     def to_searcher(self) -> DomainSearcher:

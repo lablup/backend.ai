@@ -22,15 +22,16 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Searching within scopes
 
-- A `scope`-shaped search takes `items: Sequence[<Entity>ScopeItem]` and nothing else
+- A `scope`-shaped search takes `targets: Sequence[<Entity>Target]` and nothing else
   standing for a scope. One action per entity, never one per scope kind.
-- `ScopeItem` (`actions/v2/ops/base.py`) declares the pair every item answers with:
-  `scope_ref()` names the scope the read is authorized against, `operation_scope()` the
-  rows it is restricted to. Declaring them together is what keeps a read from being
-  authorized against one thing and served another.
-- The action lists both back: `scope_targets()` is every item's `scope_ref()`, and
-  `operation_scopes()` every item's `operation_scope()`. Ops ORs the conditions; the gate
-  authorizes each scope, so a caller naming one they cannot see is refused the whole read.
+- A `ScopeTarget` (`models/scopes.py`) answers both axes: `scope_id()` names the scope the
+  read is authorized against, `to_condition()` the rows it is restricted to. Declaring them
+  on one class is what keeps a read from being authorized against one thing and served
+  another.
+- The action derives both from that one list and marks them `@final`: `scope_targets()` is
+  every target's `scope_id()`, `operation_scopes()` the targets themselves. Ops ORs the
+  conditions; the gate authorizes each scope, so a caller naming one they cannot see is
+  refused the whole read.
 
 ## Linking two entities
 

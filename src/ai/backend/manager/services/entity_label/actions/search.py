@@ -35,10 +35,7 @@ class SearchEntityLabelsAction(BulkScopedSearchOpsAction[EntityLabelRow, EntityL
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [
-            EntityLabelTarget(entity_type=owner.entity_type(), entity_id=owner)
-            for owner in self.owners
-        ]
+        return [EntityLabelTarget(owner=owner) for owner in self.owners]
 
     @override
     def to_searcher(self) -> EntityLabelSearcher:

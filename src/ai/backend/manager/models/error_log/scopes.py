@@ -9,15 +9,17 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = ("UserErrorLogTarget",)
 
 
 @dataclass(frozen=True)
-class UserErrorLogTarget(OperationScope):
+class UserErrorLogTarget(ScopeTarget):
     """The errors one user may see.
 
     Cleared rows drop out here rather than in the searcher: clearing is this domain's
@@ -28,6 +30,10 @@ class UserErrorLogTarget(OperationScope):
     """
 
     user_id: uuid.UUID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return UserID(self.user_id)
 
     @override
     def to_condition(self) -> QueryCondition:

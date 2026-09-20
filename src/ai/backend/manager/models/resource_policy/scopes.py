@@ -8,6 +8,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -15,7 +16,7 @@ from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
@@ -25,7 +26,7 @@ __all__ = (
 
 
 @dataclass(frozen=True)
-class UserKeypairResourcePolicyTarget(OperationScope):
+class UserKeypairResourcePolicyTarget(ScopeTarget):
     """The policy one user's default keypair is subject to.
 
     Picks the keypair marked default, else the earliest active one: the marker is
@@ -35,13 +36,16 @@ class UserKeypairResourcePolicyTarget(OperationScope):
     user_id: UserID
 
     @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KeyPairResourcePolicyRow.name == (
-                sa
-                .select(KeyPairRow.resource_policy)
+                sa.select(KeyPairRow.resource_policy)
                 .where(KeyPairRow.user == user_id)
                 .where(KeyPairRow.is_active.is_(True))
                 .order_by(
@@ -62,13 +66,17 @@ class UserKeypairResourcePolicyTarget(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserResourcePolicyTarget(OperationScope):
+class UserResourcePolicyTarget(ScopeTarget):
     """The policy one user is subject to.
 
     The policy row carries no owner column, so the name is read off the user.
     """
 
     user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:
