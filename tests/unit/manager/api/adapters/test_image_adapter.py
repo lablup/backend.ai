@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.dto.manager.v2.image.request import AdminSearchImagesInput
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import (
@@ -27,7 +28,6 @@ from ai.backend.manager.models.specs.pagination import (
     CursorForwardPagination,
     OffsetPagination,
 )
-from ai.backend.manager.services.image.actions.search_images import SearchImagesActionResult
 
 READABLE = ImageID(uuid4())
 DENIED = ImageID(uuid4())
@@ -79,8 +79,8 @@ def processors(readable: ImageData, denial: GenericForbidden) -> MagicMock:
         )
     )
     processors.search_images.run = AsyncMock(
-        return_value=SearchImagesActionResult(
-            data=[], total_count=0, has_next_page=False, has_previous_page=False
+        return_value=BatchOpsResult[ImageData](
+            items=[], total_count=0, has_next_page=False, has_previous_page=False
         )
     )
     return processors
@@ -135,7 +135,7 @@ async def test_admin_search_pages_by_the_cursor_it_is_given(
 ) -> None:
     await adapter.admin_search(case.input)
 
-    pagination = processors.search_images.run.call_args.args[0].querier.pagination
+    pagination = processors.search_images.run.call_args.args[0].searcher.searcher.pagination
     assert isinstance(pagination, (CursorForwardPagination, CursorBackwardPagination))
     assert type(pagination) is case.pagination_type
     assert pagination.cursor_condition is not None
@@ -172,7 +172,7 @@ async def test_admin_search_pages_by_offset(
 ) -> None:
     await adapter.admin_search(case.input)
 
-    pagination = processors.search_images.run.call_args.args[0].querier.pagination
+    pagination = processors.search_images.run.call_args.args[0].searcher.searcher.pagination
     assert pagination == case.expected
 
 

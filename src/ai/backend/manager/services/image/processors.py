@@ -6,6 +6,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
@@ -71,7 +72,6 @@ from ai.backend.manager.services.image.actions.scan_image import (
 )
 from ai.backend.manager.services.image.actions.scoped_search import (
     ScopedSearchImagesAction,
-    ScopedSearchImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
@@ -79,7 +79,6 @@ from ai.backend.manager.services.image.actions.search_aliases import (
 )
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
-    SearchImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
@@ -153,10 +152,10 @@ class ImageProcessors:
     public_get_all_images: PublicActionProcessor[
         PublicGetAllImagesAction, PublicGetAllImagesActionResult
     ]
-    search_images: GlobalActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    search_images: GlobalActionProcessor[SearchImagesAction, BatchOpsResult[ImageData]]
     # What the DataLoader reads: checked per image.
     bulk_get: PartialBulkActionProcessor[BulkGetImagesAction, ImageData]
-    scoped_search: ScopeActionProcessor[ScopedSearchImagesAction, ScopedSearchImagesActionResult]
+    scoped_search: ScopeActionProcessor[ScopedSearchImagesAction, ScopedBatchOpsResult[ImageData]]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
     # What the DataLoader reads: checked per owning image.
     bulk_get_aliases: PartialBulkFieldActionProcessor[BulkGetImageAliasesAction, ImageAliasData]
@@ -182,9 +181,9 @@ class ImageProcessors:
             GetImageInstalledAgentsAction, service.get_image_installed_agents
         )
         self.forget_image = group.global_scope(ForgetImageAction, service.forget_image)
-        self.search_images = group.global_scope(SearchImagesAction, service.search_images)
+        self.search_images = group.global_searcher_ops(SearchImagesAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetImagesAction)
-        self.scoped_search = group.scope(ScopedSearchImagesAction, service.scoped_search_images)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchImagesAction)
 
         self.forget_image_by_id = group.single_entity(
             ForgetImageByIdAction, service.forget_image_by_id

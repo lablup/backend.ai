@@ -77,17 +77,9 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
-from ai.backend.manager.services.image.actions.scoped_search import (
-    ScopedSearchImagesAction,
-    ScopedSearchImagesActionResult,
-)
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
     SearchAliasesActionResult,
-)
-from ai.backend.manager.services.image.actions.search_images import (
-    SearchImagesAction,
-    SearchImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
@@ -422,32 +414,6 @@ class ImageService:
             action.image_canonical, action.architecture
         )
         return ClearImageCustomResourceLimitActionResult(image_data=image_data)
-
-    async def search_images(self, action: SearchImagesAction) -> SearchImagesActionResult:
-        """
-        Search images using a batch querier with conditions, pagination, and ordering.
-        """
-        result = await self._image_repository.search_images(action.querier)
-        return SearchImagesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def scoped_search_images(
-        self, action: ScopedSearchImagesAction
-    ) -> ScopedSearchImagesActionResult:
-        """Search images within the scopes the action names."""
-        result = await self._image_repository.search_images_in_scopes(
-            action.querier, action.operation_scopes()
-        )
-        return ScopedSearchImagesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def alias_image_by_id(self, action: AliasImageByIdAction) -> AliasImageByIdActionResult:
         """

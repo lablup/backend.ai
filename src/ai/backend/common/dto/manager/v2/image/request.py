@@ -11,10 +11,15 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    EnumFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.tristate.unset import UNSET, Unset
 
-from .types import ImageOrderField, ImageScope, ImageStatusType, OrderDirection
+from .types import ImageOrderField, ImageScope, ImageStatusType, ImageUsedBy, OrderDirection
 
 __all__ = (
     "AdminSearchImageAliasesInput",
@@ -33,6 +38,7 @@ __all__ = (
     "ImageOrderByInputDTO",
     "ImageScopeInputDTO",
     "ImageStatusFilterInputDTO",
+    "ImageUsedBy",
     "PurgeImageInput",
     "RescanImagesInput",
     "ScopedSearchImagesInput",
@@ -54,21 +60,8 @@ class ImageScopeInputDTO(BaseRequestModel):
     image_id: UUID = Field(description="UUID of the image to scope the query to.")
 
 
-class ImageStatusFilterInputDTO(BaseRequestModel):
+class ImageStatusFilterInputDTO(EnumFilter[ImageStatusType]):
     """Filter for image status."""
-
-    equals: ImageStatusType | None = Field(
-        default=None, description="Matches images with this exact status."
-    )
-    in_: list[ImageStatusType] | None = Field(
-        default=None, description="Matches images whose status is in this list."
-    )
-    not_equals: ImageStatusType | None = Field(
-        default=None, description="Excludes images with this exact status."
-    )
-    not_in: list[ImageStatusType] | None = Field(
-        default=None, description="Excludes images whose status is in this list."
-    )
 
 
 class ImageAliasNestedFilterInputDTO(BaseRequestModel):
@@ -208,6 +201,13 @@ class PurgeImageInput(BaseRequestModel):
 class AdminSearchImagesInput(BaseRequestModel):
     """Input for admin search of images with cursor and offset pagination."""
 
+    used_by: ImageUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; images the caller cannot read are left out."
+        ),
+    )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."
@@ -224,6 +224,13 @@ class ScopedSearchImagesInput(BaseRequestModel):
     """Input for searching the images the named scopes reach."""
 
     scope: ImageScope = Field(description="Scope (OR across all items).")
+    used_by: ImageUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; images the caller cannot read are left out."
+        ),
+    )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."

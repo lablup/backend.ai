@@ -20,7 +20,6 @@ from ai.backend.manager.data.image.types import (
     ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
-    ImageListResult,
     ImageStatus,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
@@ -31,7 +30,6 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.updaters import ImageUpdater
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
@@ -326,20 +324,6 @@ class ImageRepository:
         return await self._db_source.remove_image_and_aliases(image_id)
 
     @image_repository_resilience.apply()
-    async def search_images(self, querier: BatchQuerier) -> ImageListResult:
-        """
-        Search images using a batch querier with conditions, pagination, and ordering.
-        Returns ImageListResult with items and pagination info.
-        """
-        return await self._db_source.search_images(querier)
-
-    @image_repository_resilience.apply()
-    async def search_images_in_scopes(
-        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
-    ) -> ImageListResult:
-        """The search of :meth:`search_images`, restricted to the scopes (OR)."""
-        return await self._db_source.search_images_in_scopes(querier, scopes)
-
     @image_repository_resilience.apply()
     async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
         """

@@ -52,6 +52,7 @@ from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.image.creators import ImageCreator
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -244,7 +245,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.customized = _is_customized(update["labels"])
                         image_row.creator_id = _customized_owner_user_id(update["labels"])
                         image_row.is_local = is_local
-                        scanned_images.append(image_row.to_dataclass())
+                        scanned_images.append(ImageSearchableFields.own.to_data(image_row))
 
                         if image_row.status == ImageStatus.DELETED:
                             image_row.status = ImageStatus.ALIVE

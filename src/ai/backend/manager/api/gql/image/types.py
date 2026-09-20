@@ -18,6 +18,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     ContainerRegistryScopeInputDTO,
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageScope,
     ImageTagInfo,
+    ImageUsedBy,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
@@ -69,7 +71,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.models.image.conditions import ImageAliasConditions
+from ai.backend.manager.models.image.searchable_fields import ImageAliasSearchableFields
 
 # =============================================================================
 # Enums
@@ -322,7 +324,11 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-        base_conditions = [ImageAliasConditions.by_image_ids([ImageID(self.id)])]
+        base_conditions = [
+            ImageAliasSearchableFields.own.image_id.filter.in_(
+                UUIDInMatchSpec(values=[ImageID(self.id)], negated=False)
+            )
+        ]
         payload = await info.context.adapters.image.admin_search_image_aliases(
             AdminSearchImageAliasesInput(
                 filter=pydantic_filter,
@@ -419,7 +425,7 @@ class ImageV2ScopeGQL(PydanticInputMixin[ImageScopeInputDTO]):
         description=(
             "Scope for the scoped image query. Each list is OR'd internally and across "
             "lists, and every scope named is authorized before the read runs. `global` "
-            "names no scope and is authorized against none."
+            "is answered for at the public scope, which every account reaches."
         ),
         added_version=NEXT_RELEASE_VERSION,
     ),
@@ -444,6 +450,31 @@ class ImageSearchScopeGQL(PydanticInputMixin[ImageScope]):
         default=False,
         name="global",
         description="Include the images of every registry marked global.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Entities whose use narrows an image query; every id is AND-ed. The caller must "
+            "be able to read each listed entity, or the request is refused. Only images the "
+            "caller can read are returned, even when a listed entity uses others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ImageUsedBy",
+)
+class ImageUsedByGQL(PydanticInputMixin[ImageUsedBy]):
+    """The entities whose use of an image narrows the read."""
+
+    session: list[uuid.UUID] | None = gql_field(
+        default=None, description="Sessions whose kernels run the image."
+    )
+    deployment: list[uuid.UUID] | None = gql_field(
+        default=None,
+        description=(
+            "Deployments whose live replica groups name the image in their current revision."
+        ),
     )
 
 

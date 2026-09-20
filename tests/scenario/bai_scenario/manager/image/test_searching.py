@@ -7,6 +7,7 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.image.request import (
@@ -30,7 +31,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.models.image.conditions import ImageConditions
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -147,7 +148,15 @@ class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchI
     async def call(
         self, adapter: ImageAdapter, laid: ManyImagesAndACaller
     ) -> AdminSearchImagesPayload:
-        narrowing = [ImageConditions.by_registry_id(laid.registry.id)] if self.narrowed else None
+        narrowing = (
+            [
+                ImageSearchableFields.own.registry_id.filter.equals(
+                    UUIDEqualMatchSpec(value=laid.registry.id, negated=False)
+                )
+            ]
+            if self.narrowed
+            else None
+        )
         with ActingAs(laid.caller):
             return await adapter.admin_search_images_gql(
                 AdminSearchImagesInput(**self.paging.asked()), base_conditions=narrowing

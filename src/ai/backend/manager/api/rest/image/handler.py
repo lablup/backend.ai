@@ -26,6 +26,7 @@ from ai.backend.common.types import ImageID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.image_request import GetImagePathParam
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
@@ -53,10 +54,15 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search images with filters, orders, and pagination."""
-        querier = self._adapter.build_querier(body.parsed)
-        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
+        action_result = await self._image.search_images.run(
+            SearchImagesAction(
+                searcher=GlobalSearcher(
+                    used_by=[], searcher=self._adapter.build_searcher(body.parsed)
+                )
+            )
+        )
         resp = SearchImagesResponse(
-            items=[self._adapter.convert_to_dto(img) for img in action_result.data],
+            items=[self._adapter.convert_to_dto(img) for img in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
