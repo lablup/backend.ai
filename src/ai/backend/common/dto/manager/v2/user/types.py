@@ -52,13 +52,26 @@ class UserRole(StrEnum):
 class UserOrderField(StrEnum):
     """Fields available for ordering users."""
 
+    ENTITY_ID = "entity_id"
     CREATED_AT = "created_at"
     MODIFIED_AT = "modified_at"
     USERNAME = "username"
     EMAIL = "email"
+    FULL_NAME = "full_name"
+    DESCRIPTION = "description"
     STATUS = "status"
+    STATUS_INFO = "status_info"
     ROLE = "role"
     DOMAIN_NAME = "domain_name"
+    DOMAIN_ID = "domain_id"
+    INTEGRATION_NAME = "integration_name"
+    RESOURCE_POLICY = "resource_policy"
+    NEED_PASSWORD_CHANGE = "need_password_change"
+    TOTP_ACTIVATED = "totp_activated"
+    TOTP_ACTIVATED_AT = "totp_activated_at"
+    SUDO_SESSION_ENABLED = "sudo_session_enabled"
+    CONTAINER_UID = "container_uid"
+    CONTAINER_MAIN_GID = "container_main_gid"
     PROJECT_NAME = "project_name"
 
 

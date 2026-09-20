@@ -15,6 +15,7 @@ from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.user import KeyPairForbidden
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
@@ -51,7 +52,7 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -85,7 +86,7 @@ class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -155,4 +156,4 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)

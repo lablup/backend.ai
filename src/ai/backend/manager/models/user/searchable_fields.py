@@ -8,6 +8,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
@@ -17,7 +19,8 @@ from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
+from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.user.row import UserRow
 
 
@@ -144,12 +147,28 @@ class _UserOwnFields(RowDataConverter[UserRow, UserData]):
         )
 
 
-class UserSearchableFields:
-    """A user search reaches its own columns only.
+class _UserNestedFields:
+    """The keypairs the user owns, read under the user's own permission.
 
-    There is no ``nested``: a keypair carries its own permission type and its own
-    search, so it is not read under the user's. There is no ``linked``: no entity
-    records a use of a user in a foreign key column.
+    A keypair is the user's field row (``KeypairCreator`` is a
+    ``FieldCreator[UserID, ...]``), so one permission answers for the pair. Narrowing a
+    user search by keypair does not replace the keypair search, which lists the rows
+    themselves.
+    """
+
+    keypairs = NestedSearchableField(
+        KeyPairSearchableFields.own,
+        ToManyCorrelation(KeyPairRow, UserRow, KeyPairRow.user == UserRow.uuid),
+    )
+
+
+class UserSearchableFields:
+    """What a user search reaches.
+
+    There is no ``linked``. A column naming a user (``groups.creator_id``,
+    ``error_logs.user``, ``entity_shares.sharer_user_id``) records provenance or
+    ownership, not a use, so no entity answers a ``used_by``.
     """
 
     own = _UserOwnFields()
+    nested = _UserNestedFields

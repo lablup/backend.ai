@@ -32,6 +32,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
@@ -165,6 +166,58 @@ class TestUserSensitiveFields:
         field = UserSearchableFields.own.allowed_client_ip
         assert field.filter is None
         assert field.order is None
+
+
+class TestKeyPairOwnFields:
+    """The keypair declaration a user search reads its nested conditions from."""
+
+    def test_secret_key_declares_neither_slot(self) -> None:
+        field = KeyPairSearchableFields.own.secret_key
+        assert field.filter is None
+        assert field.order is None
+
+    def test_ssh_private_key_declares_neither_slot(self) -> None:
+        field = KeyPairSearchableFields.own.ssh_private_key
+        assert field.filter is None
+        assert field.order is None
+
+    def test_access_key_is_open(self) -> None:
+        field = KeyPairSearchableFields.own.access_key
+        assert field.filter is not None
+        assert field.order is not None
+
+    def test_resource_policy_name_filters_the_resource_policy_column(self) -> None:
+        spec = StringMatchSpec(value="default", case_insensitive=False, negated=False)
+        condition = KeyPairSearchableFields.own.resource_policy_name.filter.equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "resource_policy" in sql
+
+
+class TestUserNestedKeypairs:
+    """The keypairs a user owns, reached from the user row."""
+
+    def test_some_builds_an_exists_over_the_keypairs(self) -> None:
+        correlation = UserSearchableFields.nested.keypairs.correlation
+        condition = correlation.some([KeyPairSearchableFields.own.is_active.filter.equals(True)])
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "EXISTS" in sql
+        assert "keypairs" in sql
+        assert "is_active" in sql
+
+    def test_none_negates_the_exists(self) -> None:
+        correlation = UserSearchableFields.nested.keypairs.correlation
+        condition = correlation.none([KeyPairSearchableFields.own.is_active.filter.equals(True)])
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "NOT (EXISTS" in sql
+
+    def test_conditions_land_in_one_exists(self) -> None:
+        correlation = UserSearchableFields.nested.keypairs.correlation
+        condition = correlation.some([
+            KeyPairSearchableFields.own.is_active.filter.equals(True),
+            KeyPairSearchableFields.own.is_admin.filter.equals(False),
+        ])
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert sql.count("EXISTS") == 1
 
 
 class TestDeprecatedUserConditions:

@@ -18178,6 +18178,20 @@ input UserFairShareUserNestedFilter {
   isActive: Boolean = null
 }
 
+"""Added in 26.9.0. Filter users by conditions on the keypairs they own."""
+input UserKeypairNestedFilter {
+  """Matches users with at least one keypair satisfying all conditions."""
+  some: KeypairFilter = null
+
+  """
+  Matches users whose every keypair satisfies all conditions (also true when the user has no keypair).
+  """
+  every: KeypairFilter = null
+
+  """Matches users with no keypair satisfying all conditions."""
+  none: KeypairFilter = null
+}
+
 extend type UserNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -18623,6 +18637,9 @@ input UserV2Filter {
   statusInfo: StringFilter = null
   domainName: StringFilter = null
 
+  """Added in 26.9.0. Filter by domain ID."""
+  domainId: UUIDFilter = null
+
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
 
@@ -18649,6 +18666,15 @@ input UserV2Filter {
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
 
+  """Added in 26.9.0. Filter by last modification timestamp."""
+  modifiedAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by when TOTP two-factor auth was activated."""
+  totpActivatedAt: NullableDateTimeFilter = null
+
+  """Added in 26.9.0. Filter by conditions on the user's keypairs."""
+  keypairs: UserKeypairNestedFilter = null
+
   """
   Filter by the user's domain. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use the `domainName` filter, or look the domain up first.
   """
@@ -18672,15 +18698,29 @@ input UserV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name.
+Added in 26.2.0. Fields available for ordering user query results. Added in 26.9.0: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. Each value orders by the user column of the same name; ENTITY_ID orders by the user's own id and PROJECT_NAME folds the projects the user is on.
 """
 enum UserV2OrderField {
+  ENTITY_ID
   CREATED_AT
   MODIFIED_AT
   USERNAME
   EMAIL
+  FULL_NAME
+  DESCRIPTION
   STATUS
+  STATUS_INFO
+  ROLE
   DOMAIN_NAME
+  DOMAIN_ID
+  INTEGRATION_NAME
+  RESOURCE_POLICY
+  NEED_PASSWORD_CHANGE
+  TOTP_ACTIVATED
+  TOTP_ACTIVATED_AT
+  SUDO_SESSION_ENABLED
+  CONTAINER_UID
+  CONTAINER_MAIN_GID
   PROJECT_NAME @deprecated(reason: "Deprecated since 26.9.0. A user belongs to many projects, so this order folds them into a single name. Narrow the results with the `project` filter instead.")
 }
 
@@ -18690,6 +18730,9 @@ Added in 26.2.0. User's organizational context and permissions. Contains domain 
 type UserV2OrganizationInfo {
   """Name of the domain this user belongs to."""
   domainName: String
+
+  """Added in 26.9.0. ID of the domain this user belongs to."""
+  domainId: UUID
 
   """User's role determining access permissions. See UserRoleV2 enum."""
   role: UserRoleV2

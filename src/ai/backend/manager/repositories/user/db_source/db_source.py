@@ -66,6 +66,7 @@ from ai.backend.manager.models.keypair.row import (
     keypairs,
 )
 from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -957,7 +958,7 @@ class UserDBSource:
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(KeyPairRow)
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
+            items = [KeyPairSearchableFields.own.to_data(row.KeyPairRow) for row in result.rows]
             return SearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -975,7 +976,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {keypair_id} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:
         """Admin retrieves a single keypair by access key."""
@@ -989,7 +990,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_update_ssh_keypair(
         self,

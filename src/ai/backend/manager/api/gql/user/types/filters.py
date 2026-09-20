@@ -5,7 +5,11 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from ai.backend.common.dto.manager.v2.user.request import UserFilter, UserOrder
+from ai.backend.common.dto.manager.v2.user.request import (
+    KeypairNestedFilter,
+    UserFilter,
+    UserOrder,
+)
 from ai.backend.common.dto.manager.v2.user.types import (
     UserDomainFilter,
     UserProjectFilter,
@@ -17,6 +21,7 @@ from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntArrayFilter,
     IntFilter,
+    NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -28,6 +33,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.keypair.types.filters import KeypairFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
@@ -97,6 +103,31 @@ class UserProjectNestedFilterGQL(PydanticInputMixin[UserProjectFilter]):
     is_active: bool | None = None
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter users by conditions on the keypairs they own.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UserKeypairNestedFilter",
+)
+class UserKeypairNestedFilterGQL(PydanticInputMixin[KeypairNestedFilter]):
+    some: KeypairFilterGQL | None = gql_field(
+        description="Matches users with at least one keypair satisfying all conditions.",
+        default=None,
+    )
+    every: KeypairFilterGQL | None = gql_field(
+        description=(
+            "Matches users whose every keypair satisfies all conditions "
+            "(also true when the user has no keypair)."
+        ),
+        default=None,
+    )
+    none: KeypairFilterGQL | None = gql_field(
+        description="Matches users with no keypair satisfying all conditions.",
+        default=None,
+    )
+
+
 _NESTED_FILTER_DEPRECATION = (
     "Filter by the user's {subject}. Deprecated since "
     + NEXT_RELEASE_VERSION
@@ -140,6 +171,13 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
         default=None,
     )
     domain_name: StringFilter | None = None
+    domain_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by domain ID.",
+        ),
+        default=None,
+    )
     integration_name: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -198,6 +236,27 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
         default=None,
     )
     created_at: DateTimeFilter | None = None
+    modified_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by last modification timestamp.",
+        ),
+        default=None,
+    )
+    totp_activated_at: NullableDateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by when TOTP two-factor auth was activated.",
+        ),
+        default=None,
+    )
+    keypairs: UserKeypairNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by conditions on the user's keypairs.",
+        ),
+        default=None,
+    )
     domain: UserDomainNestedFilterGQL | None = gql_field(
         description=_NESTED_FILTER_DEPRECATION.format(
             subject="domain", instead="the `domainName` filter, or look the domain up first"
@@ -228,25 +287,37 @@ _PROJECT_NAME_ORDER_DEPRECATION = (
         added_version="26.2.0",
         description=(
             "Fields available for ordering user query results. "
-            "CREATED_AT: Order by creation timestamp. "
-            "MODIFIED_AT: Order by last modification timestamp. "
-            "USERNAME: Order by username alphabetically. "
-            "EMAIL: Order by email address alphabetically. "
-            "STATUS: Order by account status. "
-            "DOMAIN_NAME: Order by domain name (scalar subquery). "
-            "PROJECT_NAME: Order by project name."
+            f"Added in {NEXT_RELEASE_VERSION}: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, "
+            "ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, "
+            "TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. "
+            "Each value orders by the user column of the same name; ENTITY_ID orders by the "
+            "user's own id and PROJECT_NAME folds the projects the user is on."
         ),
     ),
     name="UserV2OrderField",
     deprecated_values={"PROJECT_NAME": _PROJECT_NAME_ORDER_DEPRECATION},
 )
 class UserOrderFieldGQL(StrEnum):
+    ENTITY_ID = "entity_id"
     CREATED_AT = "created_at"
     MODIFIED_AT = "modified_at"
     USERNAME = "username"
     EMAIL = "email"
+    FULL_NAME = "full_name"
+    DESCRIPTION = "description"
     STATUS = "status"
+    STATUS_INFO = "status_info"
+    ROLE = "role"
     DOMAIN_NAME = "domain_name"
+    DOMAIN_ID = "domain_id"
+    INTEGRATION_NAME = "integration_name"
+    RESOURCE_POLICY = "resource_policy"
+    NEED_PASSWORD_CHANGE = "need_password_change"
+    TOTP_ACTIVATED = "totp_activated"
+    TOTP_ACTIVATED_AT = "totp_activated_at"
+    SUDO_SESSION_ENABLED = "sudo_session_enabled"
+    CONTAINER_UID = "container_uid"
+    CONTAINER_MAIN_GID = "container_main_gid"
     PROJECT_NAME = "project_name"
 
 

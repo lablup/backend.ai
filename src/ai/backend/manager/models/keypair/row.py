@@ -18,7 +18,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
+from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -121,27 +121,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     user_row: Mapped[UserRow] = relationship(
         "UserRow", back_populates="keypairs", foreign_keys=[user]
     )
-
-    def to_data(self) -> KeyPairData:
-        return KeyPairData(
-            id=self.id,
-            user_id=self.user,
-            access_key=AccessKey(self.access_key),
-            secret_key=self.secret_key,
-            is_active=self.is_active,
-            is_default=self.is_default,
-            is_admin=self.is_admin,
-            created_at=self.created_at,
-            modified_at=self.updated_at,
-            resource_policy_name=self.resource_policy,
-            rate_limit=self.rate_limit,
-            ssh_public_key=self.ssh_public_key,
-            ssh_private_key=self.ssh_private_key,
-            dotfiles=self.dotfiles if self.dotfiles else b"\x90",
-            bootstrap_script=self.bootstrap_script,
-            last_used=self.last_used,
-            num_queries=self.num_queries,
-        )
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.

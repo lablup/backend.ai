@@ -15,9 +15,12 @@ from ai.backend.common.dto.manager.query import (
     ArrayFilter,
     DateTimeFilter,
     IntFilter,
+    NullableDateTimeFilter,
     StringFilter,
+    ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
     UserDomainFilter,
@@ -33,6 +36,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchUsersInput",
+    "KeypairNestedFilter",
     "BulkCreateUsersInput",
     "BulkPurgeUsersInput",
     "BulkPurgeUsersOptions",
@@ -307,6 +311,14 @@ class UpdateMyAllowedClientIPInput(BaseRequestModel):
     )
 
 
+class KeypairNestedFilter(ToManyFilter[KeypairFilter]):
+    """The `keypairs` field of a user filter.
+
+    Each quantifier matches one keypair at a time. To require two different keypairs,
+    combine two of these with the user filter's own `AND`.
+    """
+
+
 class UserFilter(BaseRequestModel):
     """Filter criteria for searching users."""
 
@@ -320,6 +332,7 @@ class UserFilter(BaseRequestModel):
         default=None, description="Filter by status info detail."
     )
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
+    domain_id: UUIDFilter | None = Field(default=None, description="Filter by domain ID.")
     integration_name: StringFilter | None = Field(
         default=None, description="Filter by external integration identifier."
     )
@@ -345,6 +358,15 @@ class UserFilter(BaseRequestModel):
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation timestamp."
+    )
+    modified_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by last modification timestamp."
+    )
+    totp_activated_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Filter by when TOTP two-factor auth was activated."
+    )
+    keypairs: KeypairNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the user's keypairs."
     )
     domain: UserDomainFilter | None = Field(
         default=None, description="Nested filter for the domain a user belongs to."

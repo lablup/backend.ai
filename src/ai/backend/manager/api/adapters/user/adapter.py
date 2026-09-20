@@ -102,10 +102,9 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
-from ai.backend.manager.models.keypair.orders import KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.creators import UserCreator
@@ -185,7 +184,7 @@ _USER_PAGINATION_SPEC = PaginationSpec(
 )
 
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeypairOrders.created_at(ascending=False),
+    forward_order=KeyPairSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=KeyPairRow.id,
 )
 
@@ -967,7 +966,7 @@ class UserAdapter(BaseAdapter):
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         if resource_policy_name is not None:
             conditions.append(
-                KeypairConditions.by_resource_policy_equals(
+                KeyPairSearchableFields.own.resource_policy_name.filter.equals(
                     StringMatchSpec(resource_policy_name, case_insensitive=False, negated=False)
                 )
             )
@@ -1002,108 +1001,61 @@ class UserAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _convert_keypair_filter(self, filter_req: KeypairFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+    def _convert_keypair_filter(self, f: KeypairFilter) -> list[QueryCondition]:
+        """Conditions matching a single keypair row.
 
-        if filter_req.is_active is not None:
-            conditions.append(KeypairConditions.by_is_active(filter_req.is_active))
-
-        if filter_req.is_admin is not None:
-            conditions.append(KeypairConditions.by_is_admin(filter_req.is_admin))
-
-        if filter_req.is_default is not None:
-            conditions.append(KeypairConditions.by_is_default(filter_req.is_default))
-
-        if filter_req.access_key is not None:
-            condition = self.convert_string_filter(
-                filter_req.access_key,
-                contains_factory=KeypairConditions.by_access_key_contains,
-                equals_factory=KeypairConditions.by_access_key_equals,
-                starts_with_factory=KeypairConditions.by_access_key_starts_with,
-                ends_with_factory=KeypairConditions.by_access_key_ends_with,
-                in_factory=KeypairConditions.by_access_key_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.resource_policy is not None:
-            condition = self.convert_string_filter(
-                filter_req.resource_policy,
-                contains_factory=KeypairConditions.by_resource_policy_contains,
-                equals_factory=KeypairConditions.by_resource_policy_equals,
-                starts_with_factory=KeypairConditions.by_resource_policy_starts_with,
-                ends_with_factory=KeypairConditions.by_resource_policy_ends_with,
-                in_factory=KeypairConditions.by_resource_policy_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.user_id is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.user_id,
-                equals_factory=KeypairConditions.by_user_id_equals,
-                in_factory=KeypairConditions.by_user_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.created_at is not None:
-            condition = filter_req.created_at.build_query_condition(
-                before_factory=KeypairConditions.by_created_at_before,
-                after_factory=KeypairConditions.by_created_at_after,
-                equals_factory=KeypairConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.last_used is not None:
-            condition = filter_req.last_used.build_query_condition(
-                before_factory=KeypairConditions.by_last_used_before,
-                after_factory=KeypairConditions.by_last_used_after,
-                equals_factory=KeypairConditions.by_last_used_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_keypair_filter(sub_filter))
-
-        if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
+        Used both by the keypair searches and, through ``keypairs``, to narrow a user
+        search; one instance narrows one row either way.
+        """
+        fields = KeyPairSearchableFields.own
+        conditions = [
+            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
+            *self.apply_bool_filter(f.is_admin, fields.is_admin.filter),
+            *self.apply_bool_filter(f.is_default, fields.is_default.filter),
+            *self.apply_string_filter(f.access_key, fields.access_key.filter),
+            *self.apply_string_filter(f.resource_policy, fields.resource_policy_name.filter),
+            *self.apply_uuid_filter(f.user_id, fields.user_id.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.last_used, fields.last_used.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_keypair_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_keypair_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_keypair_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
-        return [self._convert_keypair_order(o) for o in orders]
+        return [self._convert_keypair_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_keypair_order(order: KeypairOrderBy) -> QueryOrder:
+    def _convert_keypair_order(self, order: KeypairOrderBy) -> QueryOrder:
+        fields = KeyPairSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case KeypairOrderField.CREATED_AT:
-                return KeypairOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case KeypairOrderField.LAST_USED:
-                return KeypairOrders.last_used(ascending=ascending)
+                return fields.last_used.order.apply(ascending)
             case KeypairOrderField.ACCESS_KEY:
-                return KeypairOrders.access_key(ascending=ascending)
+                return fields.access_key.order.apply(ascending)
             case KeypairOrderField.IS_ACTIVE:
-                return KeypairOrders.is_active(ascending=ascending)
+                return fields.is_active.order.apply(ascending)
             case KeypairOrderField.IS_DEFAULT:
-                return KeypairOrders.is_default(ascending=ascending)
+                return fields.is_default.order.apply(ascending)
             case KeypairOrderField.RESOURCE_POLICY:
-                return KeypairOrders.resource_policy(ascending=ascending)
+                return fields.resource_policy_name.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     # ------------------------------------------------------------------ GQL filter/order helpers
 
@@ -1118,6 +1070,7 @@ class UserAdapter(BaseAdapter):
             *self.apply_enum_filter(f.status, fields.status.filter),
             *self.apply_string_filter(f.status_info, fields.status_info.filter),
             *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
+            *self.apply_uuid_filter(f.domain_id, fields.domain_id.filter),
             *self.apply_string_filter(f.integration_name, fields.integration_name.filter),
             *self.apply_string_filter(f.resource_policy, fields.resource_policy.filter),
             *self.apply_enum_filter(f.role, fields.role.filter),
@@ -1128,6 +1081,15 @@ class UserAdapter(BaseAdapter):
             *self.apply_int_filter(f.container_main_gid, fields.container_main_gid.filter),
             *self.apply_array_filter(f.container_gids, fields.container_gids.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.modified_at, fields.modified_at.filter),
+            *self.apply_to_many_filter(
+                f.keypairs,
+                UserSearchableFields.nested.keypairs.correlation,
+                self._convert_keypair_filter,
+            ),
+            *self.apply_nullable_datetime_filter(
+                f.totp_activated_at, fields.totp_activated_at.filter
+            ),
             *self._convert_domain_filter(f.domain),
             *self._convert_project_filter(f.project),
         ]
@@ -1199,6 +1161,8 @@ class UserAdapter(BaseAdapter):
         fields = UserSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
+            case UserOrderField.ENTITY_ID:
+                return fields.id.order.apply(ascending)
             case UserOrderField.CREATED_AT:
                 return fields.created_at.order.apply(ascending)
             case UserOrderField.MODIFIED_AT:
@@ -1207,12 +1171,36 @@ class UserAdapter(BaseAdapter):
                 return fields.username.order.apply(ascending)
             case UserOrderField.EMAIL:
                 return fields.email.order.apply(ascending)
+            case UserOrderField.FULL_NAME:
+                return fields.full_name.order.apply(ascending)
+            case UserOrderField.DESCRIPTION:
+                return fields.description.order.apply(ascending)
             case UserOrderField.STATUS:
                 return fields.status.order.apply(ascending)
+            case UserOrderField.STATUS_INFO:
+                return fields.status_info.order.apply(ascending)
             case UserOrderField.ROLE:
                 return fields.role.order.apply(ascending)
             case UserOrderField.DOMAIN_NAME:
                 return fields.domain_name.order.apply(ascending)
+            case UserOrderField.DOMAIN_ID:
+                return fields.domain_id.order.apply(ascending)
+            case UserOrderField.INTEGRATION_NAME:
+                return fields.integration_name.order.apply(ascending)
+            case UserOrderField.RESOURCE_POLICY:
+                return fields.resource_policy.order.apply(ascending)
+            case UserOrderField.NEED_PASSWORD_CHANGE:
+                return fields.need_password_change.order.apply(ascending)
+            case UserOrderField.TOTP_ACTIVATED:
+                return fields.totp_activated.order.apply(ascending)
+            case UserOrderField.TOTP_ACTIVATED_AT:
+                return fields.totp_activated_at.order.apply(ascending)
+            case UserOrderField.SUDO_SESSION_ENABLED:
+                return fields.sudo_session_enabled.order.apply(ascending)
+            case UserOrderField.CONTAINER_UID:
+                return fields.container_uid.order.apply(ascending)
+            case UserOrderField.CONTAINER_MAIN_GID:
+                return fields.container_main_gid.order.apply(ascending)
             case UserOrderField.PROJECT_NAME:
                 return DeprecatedUserOrders.by_project_name(ascending=ascending)
             case _:
@@ -1263,6 +1251,7 @@ class UserAdapter(BaseAdapter):
             ),
             organization=UserOrganizationInfo(
                 domain_name=data.domain_name,
+                domain_id=data.domain_id,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
                 main_access_key=main_access_key,
