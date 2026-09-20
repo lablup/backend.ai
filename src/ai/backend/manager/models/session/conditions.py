@@ -18,12 +18,9 @@ if TYPE_CHECKING:
         UUIDInMatchSpec,
     )
 
-from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
-from ai.backend.common.types import SessionId, SessionTypes
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -49,44 +46,6 @@ class SessionConditions:
     def by_statuses(statuses: Collection[SessionStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.status.in_(statuses)
-
-        return inner
-
-    @staticmethod
-    def by_started_at() -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.starts_at.isnot(None)
-
-        return inner
-
-    @staticmethod
-    def by_idle_check_candidates(
-        candidates: Collection[tuple[ScopeId, Collection[SessionTypes]]],
-    ) -> QueryCondition:
-        scope_columns = {
-            ResourceGroupEntityType(): SessionRow.resource_group_id,
-            ProjectEntityType(): SessionRow.group_id,
-            DomainEntityType(): SessionRow.domain_id,
-        }
-        candidate_conditions = []
-        for scope, target_session_types in candidates:
-            scope_column = scope_columns[scope.scope_type]
-            candidate_conditions.append(
-                sa.and_(
-                    scope_column == scope.scope_id,
-                    SessionRow.session_type.in_(target_session_types),
-                )
-            )
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(*candidate_conditions) if candidate_conditions else sa.false()
-
-        return inner
-
-    @staticmethod
-    def by_resource_group(resource_group: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.scaling_group_name == resource_group
 
         return inner
 
