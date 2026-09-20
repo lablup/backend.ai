@@ -17109,6 +17109,30 @@
             "default": null,
             "description": "Filter by domain name."
           },
+          "description": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project description."
+          },
+          "integration_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the external integration name."
+          },
           "type": {
             "anyOf": [
               {
@@ -17256,12 +17280,15 @@
       "ProjectOrderField": {
         "description": "Fields available for ordering projects.",
         "enum": [
+          "id",
           "name",
           "created_at",
           "modified_at",
           "is_active",
           "type",
           "domain_name",
+          "description",
+          "integration_name",
           "user_username",
           "user_email"
         ],

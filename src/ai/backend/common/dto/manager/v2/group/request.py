@@ -117,6 +117,12 @@ class ProjectFilter(BaseRequestModel):
     id: UUIDFilter | None = Field(default=None, description="Filter by project ID (UUID).")
     name: StringFilter | None = Field(default=None, description="Filter by group name.")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
+    description: StringFilter | None = Field(
+        default=None, description="Filter by project description."
+    )
+    integration_name: StringFilter | None = Field(
+        default=None, description="Filter by the external integration name."
+    )
     type: ProjectTypeFilter | None = Field(default=None, description="Filter by project type.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(

@@ -406,6 +406,8 @@ class ProjectAdapter(BaseAdapter):
             *self.apply_uuid_filter(filter.id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.domain_name, fields.domain_name.filter),
+            *self.apply_string_filter(filter.description, fields.description.filter),
+            *self.apply_string_filter(filter.integration_name, fields.integration_name.filter),
             *self._convert_type_filter(filter.type),
             *self.apply_bool_filter(filter.is_active, fields.is_active.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
@@ -542,6 +544,12 @@ class ProjectAdapter(BaseAdapter):
                 return fields.type.order.apply(ascending)
             case ProjectOrderField.DOMAIN_NAME:
                 return fields.domain_name.order.apply(ascending)
+            case ProjectOrderField.ID:
+                return fields.id.order.apply(ascending)
+            case ProjectOrderField.DESCRIPTION:
+                return fields.description.order.apply(ascending)
+            case ProjectOrderField.INTEGRATION_NAME:
+                return fields.integration_name.order.apply(ascending)
             case ProjectOrderField.USER_USERNAME:
                 return DeprecatedProjectOrders.by_user_username(ascending)
             case ProjectOrderField.USER_EMAIL:

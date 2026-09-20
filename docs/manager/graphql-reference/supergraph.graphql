@@ -16330,6 +16330,12 @@ input ProjectV2Filter
   id: UUIDFilter = null
   name: StringFilter = null
   domainName: StringFilter = null
+
+  """Added in 26.9.0. Filter by project description."""
+  description: StringFilter = null
+
+  """Added in 26.9.0. Filter by the external integration name."""
+  integrationName: StringFilter = null
   type: ProjectTypeV2EnumFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
@@ -16352,7 +16358,7 @@ input ProjectV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
+Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name. ID: Order by project ID. DESCRIPTION: Order by project description. INTEGRATION_NAME: Order by the external integration name. USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
 """
 enum ProjectV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -16363,6 +16369,9 @@ enum ProjectV2OrderField
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
   TYPE @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  ID @join__enumValue(graph: STRAWBERRY)
+  DESCRIPTION @join__enumValue(graph: STRAWBERRY)
+  INTEGRATION_NAME @join__enumValue(graph: STRAWBERRY)
   USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single username. Narrow the results with the `user` filter instead.")
   USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single email address. Narrow the results with the `user` filter instead.")
 }

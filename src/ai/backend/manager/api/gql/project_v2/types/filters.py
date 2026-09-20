@@ -20,6 +20,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_pydantic_input,
 )
@@ -87,6 +88,19 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
     id: UUIDFilter | None = None
     name: StringFilter | None = None
     domain_name: StringFilter | None = None
+    description: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by project description."
+        ),
+        default=None,
+    )
+    integration_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the external integration name.",
+        ),
+        default=None,
+    )
     type: ProjectTypeEnumFilter | None = None
     is_active: bool | None = None
     created_at: DateTimeFilter | None = None
@@ -114,7 +128,10 @@ _USER_ORDER_DEPRECATION_TEMPLATE = (
             "NAME: Order by project name alphabetically. "
             "IS_ACTIVE: Order by active status. "
             "TYPE: Order by project type. "
-            "DOMAIN_NAME: Order by domain name (scalar subquery). "
+            "DOMAIN_NAME: Order by domain name. "
+            "ID: Order by project ID. "
+            "DESCRIPTION: Order by project description. "
+            "INTEGRATION_NAME: Order by the external integration name. "
             "USER_USERNAME: Order by username. "
             "USER_EMAIL: Order by user email."
         ),
@@ -132,6 +149,9 @@ class ProjectV2OrderField(StrEnum):
     IS_ACTIVE = "is_active"
     TYPE = "type"
     DOMAIN_NAME = "domain_name"
+    ID = "id"
+    DESCRIPTION = "description"
+    INTEGRATION_NAME = "integration_name"
     USER_USERNAME = "user_username"
     USER_EMAIL = "user_email"
 

@@ -73,6 +73,7 @@ class _ProjectOwnFields(RowDataConverter[ProjectRow, ProjectData]):
         StringConditions(ProjectRow.resource_policy),
         ColumnOrder(ProjectRow.resource_policy),
     )
+    """Declared, not exposed: a foreign key whose column becomes an id."""
     type = SearchableField(
         ProjectRow.type,
         EnumConditions(ProjectRow.type, ProjectType),
