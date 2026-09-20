@@ -22,7 +22,6 @@ from .types import (
     RoleOrderField,
     RoleSource,
     RoleStatus,
-    ScopeOrderField,
 )
 
 __all__ = (
@@ -34,10 +33,7 @@ __all__ = (
     "RevokeRoleRequest",
     "RoleFilter",
     "RoleOrder",
-    "ScopeFilter",
-    "ScopeOrder",
     "SearchRolesRequest",
-    "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
     "StringFilter",
     "UpdateRoleRequest",
@@ -152,27 +148,3 @@ class CreatePermissionRequest(BaseRequestModel):
     role_id: UUID = Field(description="Role ID for the permission")
     entity_type: DeclaredEntityType = Field(description="Entity type for the permission")
     permission: PermissionBitDTO = Field(description="The operation bit the row holds")
-
-
-class ScopeFilter(BaseRequestModel):
-    """Filter for scopes."""
-
-    name: StringFilter | None = Field(default=None, description="Filter by name")
-
-
-class ScopeOrder(BaseRequestModel):
-    """Order specification for scopes."""
-
-    field: ScopeOrderField = Field(description="Field to order by")
-    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
-
-
-class SearchScopesRequest(BaseRequestModel):
-    """Request body for searching scopes with filters and pagination."""
-
-    filter: ScopeFilter | None = Field(default=None, description="Filter conditions")
-    order: list[ScopeOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(
-        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")

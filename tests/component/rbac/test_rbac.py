@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     RoleFilter,
     RoleOrder,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -31,7 +30,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     RevokeRoleResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -466,37 +464,6 @@ class TestScopeManagement:
         result = await admin_registry.rbac.get_scope_types()
         assert isinstance(result, GetScopeTypesResponse)
         assert len(result.items) > 0
-
-    async def test_admin_searches_scopes(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.rbac.search_scopes("domain", SearchScopesRequest())
-        assert isinstance(result, SearchScopesResponse)
-        assert result.pagination.total >= 1
-        assert len(result.items) >= 1
-
-    async def test_search_scopes_with_pagination(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Search scopes with pagination returns correct page."""
-        result = await admin_registry.rbac.search_scopes(
-            "domain",
-            SearchScopesRequest(limit=1, offset=0),
-        )
-
-        assert isinstance(result, SearchScopesResponse)
-        assert result.pagination.limit == 1
-        assert len(result.items) <= 1
-
-    async def test_regular_user_cannot_search_scopes(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Regular user cannot search scopes (admin-only operation)."""
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.search_scopes("domain", SearchScopesRequest())
 
 
 class TestEntityManagement:

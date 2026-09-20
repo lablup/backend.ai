@@ -3,7 +3,6 @@ from __future__ import annotations
 from .base import SchedulingHistoryAction
 from .global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
-    GlobalSearchReplicaGroupHistoryActionResult,
 )
 from .scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
@@ -45,7 +44,6 @@ __all__ = (
     "SearchKernelHistoryAction",
     "SearchDeploymentHistoryAction",
     "GlobalSearchReplicaGroupHistoryAction",
-    "GlobalSearchReplicaGroupHistoryActionResult",
     "SearchRouteHistoryAction",
     # Scoped actions (added in 26.2.0)
     "SearchSessionScopedHistoryAction",

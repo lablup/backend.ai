@@ -5,16 +5,13 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
-    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
@@ -28,29 +25,21 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationData,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.types import (
-    ScopeData,
-    ScopeListResult,
-)
 from ai.backend.manager.errors.permission import (
     PermissionNotFound,
     RoleAlreadyAssigned,
     RoleNotAssigned,
     RoleNotFound,
 )
-from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
@@ -233,29 +222,6 @@ class PermissionDBSource:
                 return None
             return result
 
-    async def search_roles(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleListResult:
-        """Searches roles with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(RoleRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.RoleRow.to_data() for row in result.rows]
-
-            return RoleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
@@ -275,31 +241,6 @@ class PermissionDBSource:
             items = [row.RoleRow.to_data() for row in result.rows]
 
             return RoleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: RolePermissionTarget | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(PermissionRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope] if scope is not None else (),
-            )
-
-            items = [row.PermissionRow.to_data() for row in result.rows]
-
-            return PermissionListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -344,93 +285,6 @@ class PermissionDBSource:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-    async def search_domain_scopes(
-        self,
-        querier: BatchQuerier,
-    ) -> ScopeListResult:
-        """Search all domains using BatchQuerier."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainRow.id, DomainRow.name)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                ScopeData(
-                    id=ScopeId(scope_type=DomainEntityType(), scope_id=str(row.id)),
-                    name=row.name,
-                )
-                for row in result.rows
-            ]
-
-            return ScopeListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_project_scopes(
-        self,
-        querier: BatchQuerier,
-    ) -> ScopeListResult:
-        """Search all projects using BatchQuerier."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow.id, ProjectRow.name)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                ScopeData(
-                    id=ScopeId(scope_type=ProjectEntityType(), scope_id=str(row.id)),
-                    name=row.name,
-                )
-                for row in result.rows
-            ]
-
-            return ScopeListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_user_scopes(
-        self,
-        querier: BatchQuerier,
-    ) -> ScopeListResult:
-        """Search all users using BatchQuerier."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserRow.uuid, UserRow.username, UserRow.email)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                ScopeData(
-                    id=ScopeId(scope_type=UserEntityType(), scope_id=str(row.uuid)),
-                    name=row.username if row.username is not None else row.email,
-                )
-                for row in result.rows
-            ]
-
-            return ScopeListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def bulk_assign_role(
         self,

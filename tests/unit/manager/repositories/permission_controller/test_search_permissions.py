@@ -1,5 +1,5 @@
 """
-Tests for PermissionControllerRepository permission search functionality.
+Tests for the global permission search through ``OpsRepository.global_search``.
 Tests the repository layer with real database operations.
 """
 
@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.agent import AgentRow
 
@@ -33,6 +34,7 @@ from ai.backend.manager.models.rbac_models.permission.orders import (
     ScopedPermissionOrders,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
@@ -40,12 +42,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
@@ -88,8 +89,8 @@ class TestSearchPermissions:
     def repository(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionControllerRepository:
-        return PermissionControllerRepository(db_with_rbac_tables)
+    ) -> OpsRepository[PermissionData]:
+        return OpsRepository[PermissionData](V2DBOpsProvider(db_with_rbac_tables))
 
     @pytest.fixture
     async def role_with_permissions(
@@ -130,10 +131,10 @@ class TestSearchPermissions:
 
     async def test_search_permissions_with_entity_type_filter(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[PermissionData],
         role_with_permissions: RoleWithPermissions,
     ) -> None:
-        querier = BatchQuerier(
+        searcher = RolePermissionSearcher(
             conditions=[
                 ScopedPermissionConditions.by_entity_type(VFolderEntityType()),
             ],
@@ -141,7 +142,7 @@ class TestSearchPermissions:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_permissions(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert result.total_count == 2
         for item in result.items:
@@ -149,16 +150,16 @@ class TestSearchPermissions:
 
     async def test_search_permissions_ordered_by_entity_type(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[PermissionData],
         role_with_permissions: RoleWithPermissions,
     ) -> None:
-        querier = BatchQuerier(
+        searcher = RolePermissionSearcher(
             conditions=[],
             orders=[ScopedPermissionOrders.entity_type(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_permissions(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         entity_types = [item.entity_type for item in result.items]
         assert entity_types == sorted(entity_types)

@@ -13,20 +13,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import (
-    Permission,
     RoleSource,
     role_scope_types,
 )
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     RoleData,
@@ -47,12 +44,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_role_detail im
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     PublicGetScopeTypesAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    GlobalSearchPermissionsAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_roles import (
-    GlobalSearchRolesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     GlobalSearchRoleAssignmentsAction,
@@ -157,87 +148,6 @@ class TestGetRoleDetail:
         assert result.role.name == "detail-role"
 
 
-class TestSearchRoles:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.search_roles = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self,
-        mock_repository: PermissionControllerRepository,
-        processor_registry: ProcessorRegistry[Any],
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            permission_check=MagicMock(),
-            action_registry=processor_registry,
-        )
-
-    async def test_search_roles_delegates_querier(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result = SearchResult(
-            items=[_make_role_data(name="role-1"), _make_role_data(name="role-2")],
-            total_count=2,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_roles.return_value = mock_result
-
-        querier = _make_querier()
-        action = GlobalSearchRolesAction(querier=querier)
-        result = await service.search_roles(action)
-
-        mock_repository.search_roles.assert_called_once_with(querier)
-        assert result.result.total_count == 2
-        assert len(result.result.items) == 2
-
-    async def test_search_roles_empty_result(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result: SearchResult[RoleData] = SearchResult(
-            items=[],
-            total_count=0,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_roles.return_value = mock_result
-
-        action = GlobalSearchRolesAction(querier=_make_querier())
-        result = await service.search_roles(action)
-
-        assert result.result.total_count == 0
-        assert len(result.result.items) == 0
-
-    async def test_search_roles_pagination(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result = SearchResult(
-            items=[_make_role_data()],
-            total_count=10,
-            has_next_page=True,
-            has_previous_page=True,
-        )
-        mock_repository.search_roles.return_value = mock_result
-
-        querier = _make_querier(limit=1, offset=5)
-        action = GlobalSearchRolesAction(querier=querier)
-        result = await service.search_roles(action)
-
-        assert result.result.total_count == 10
-        assert result.result.has_next_page is True
-        assert result.result.has_previous_page is True
-
-
 class TestSearchUsersAssignedToRole:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
@@ -306,72 +216,6 @@ class TestSearchUsersAssignedToRole:
 
         assert result.result.total_count == 0
         assert len(result.result.items) == 0
-
-
-class TestSearchPermissions:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.search_permissions = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self,
-        mock_repository: PermissionControllerRepository,
-        processor_registry: ProcessorRegistry[Any],
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            permission_check=MagicMock(),
-            action_registry=processor_registry,
-        )
-
-    async def test_search_permissions_delegates_querier(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        perm = PermissionData(
-            id=PermissionID(uuid.uuid4()),
-            role_id=RoleID(uuid.uuid4()),
-            entity_type=EntityType(UserEntityType()),
-            permission=Permission.READ,
-            created_at=datetime.now(UTC),
-        )
-        mock_result = SearchResult(
-            items=[perm],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_permissions.return_value = mock_result
-
-        querier = _make_querier()
-        action = GlobalSearchPermissionsAction(querier=querier)
-        result = await service.search_permissions(action)
-
-        mock_repository.search_permissions.assert_called_once_with(querier)
-        assert result.result.total_count == 1
-
-    async def test_search_permissions_pagination(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result: SearchResult[PermissionData] = SearchResult(
-            items=[],
-            total_count=50,
-            has_next_page=True,
-            has_previous_page=True,
-        )
-        mock_repository.search_permissions.return_value = mock_result
-
-        action = GlobalSearchPermissionsAction(querier=_make_querier(limit=10, offset=20))
-        result = await service.search_permissions(action)
-
-        assert result.result.has_next_page is True
-        assert result.result.has_previous_page is True
 
 
 class TestPermissionCatalog:

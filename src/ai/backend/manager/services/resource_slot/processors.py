@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.agent_resource import AgentResourceFieldType
+from ai.backend.common.data.entity.resource_allocation import ResourceAllocationFieldType
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -20,8 +24,16 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.agent.types import AgentData
-from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
+    ResourceAllocationData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.services.agent.actions.lookup_resource_owner import (
+    LookupAgentResourceOwnerAction,
+    LookupBulkAgentResourceOwnerAction,
+)
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
@@ -43,17 +55,19 @@ from ai.backend.manager.services.resource_slot.actions.get_project_resource_over
 from ai.backend.manager.services.resource_slot.actions.lookup import (
     LookupResourceSlotTypeAction,
 )
+from ai.backend.manager.services.resource_slot.actions.lookup_allocation_owner import (
+    LookupBulkResourceAllocationOwnerAction,
+    LookupResourceAllocationOwnerAction,
+)
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
     GlobalSearchAgentResourcesAction,
-    GlobalSearchAgentResourcesResult,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_allocations import (
     GlobalSearchResourceAllocationsAction,
-    GlobalSearchResourceAllocationsResult,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
     SearchResourceSlotTypesAction,
@@ -71,10 +85,10 @@ class ResourceSlotProcessors:
         GetKernelAllocationBySlotAction, GetKernelAllocationBySlotResult
     ]
     search_agent_resources: GlobalActionProcessor[
-        GlobalSearchAgentResourcesAction, GlobalSearchAgentResourcesResult
+        GlobalSearchAgentResourcesAction, BatchOpsResult[AgentResourceData]
     ]
     search_resource_allocations: GlobalActionProcessor[
-        GlobalSearchResourceAllocationsAction, GlobalSearchResourceAllocationsResult
+        GlobalSearchResourceAllocationsAction, BatchOpsResult[ResourceAllocationData]
     ]
     public_get_resource_slot_type: PublicSingleEntityActionProcessor[
         GetResourceSlotTypeAction, EntityOpsResult[ResourceSlotTypeData]
@@ -120,11 +134,23 @@ class ResourceSlotProcessors:
         self.get_kernel_allocation_by_slot = session.single_entity(
             GetKernelAllocationBySlotAction, service.get_kernel_allocation_by_slot
         )
-        self.search_agent_resources = agent.global_scope(
-            GlobalSearchAgentResourcesAction, service.search_agent_resources
+        agent_resources: LookupFieldGroup[AgentResourceData] = agent.field_group(
+            FieldGroupMeta(AgentResourceFieldType()),
+            AgentResourceData,
+            LookupAgentResourceOwnerAction,
+            LookupBulkAgentResourceOwnerAction,
         )
-        self.search_resource_allocations = session.global_scope(
-            GlobalSearchResourceAllocationsAction, service.search_resource_allocations
+        self.search_agent_resources = agent_resources.global_searcher_ops(
+            GlobalSearchAgentResourcesAction
+        )
+        resource_allocations: LookupFieldGroup[ResourceAllocationData] = session.field_group(
+            FieldGroupMeta(ResourceAllocationFieldType()),
+            ResourceAllocationData,
+            LookupResourceAllocationOwnerAction,
+            LookupBulkResourceAllocationOwnerAction,
+        )
+        self.search_resource_allocations = resource_allocations.global_searcher_ops(
+            GlobalSearchResourceAllocationsAction
         )
         self.public_get_resource_slot_type = slot_type.public_get_ops(GetResourceSlotTypeAction)
         self.public_lookup_resource_slot_type = slot_type.public_lookup_ops(

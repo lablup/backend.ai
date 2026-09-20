@@ -44,10 +44,12 @@ from ai.backend.manager.models.agent.orders import (
     resolve_order,
 )
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
@@ -233,7 +235,8 @@ class AgentAdapter(BaseAdapter):
         """Search agents (admin, no scope) with filters, orders, and pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AgentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_AGENT_PAGINATION_SPEC,
@@ -244,9 +247,23 @@ class AgentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._agent.search_agents.run(SearchAgentsAction(querier=querier))
+        action_result = await self._agent.search_agents.run(
+            SearchAgentsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        )
+        agent_uuids = [agent.uuid for agent in action_result.items]
+        resources = await self._load_resources(agent_uuids)
+        permissions = await self._load_permissions(agent_uuids)
         return AdminSearchAgentsPayload(
-            items=[self._data_to_dto(item) for item in action_result.agents],
+            items=[
+                self._data_to_dto(
+                    AgentDetailData(
+                        agent=agent,
+                        resources=resources.get(agent.id, []),
+                        permissions=permissions.get(agent.uuid, []),
+                    )
+                )
+                for agent in action_result.items
+            ],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

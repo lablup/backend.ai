@@ -78,11 +78,14 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.resource_slot.searchers import (
     AgentResourceSearcher,
+    ResourceAllocationSearcher,
     ResourceSlotTypeSearcher,
+    UnrankedAgentResourceSearcher,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
 from ai.backend.manager.services.agent.actions.scoped_search_resources import (
@@ -356,7 +359,16 @@ class ResourceSlotAdapter(BaseAdapter):
         querier = self._build_agent_resource_querier(input)
 
         action_result = await self._resource_slot.search_agent_resources.run(
-            GlobalSearchAgentResourcesAction(querier=querier)
+            GlobalSearchAgentResourcesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UnrankedAgentResourceSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         return AdminSearchAgentResourcesPayload(
@@ -477,7 +489,16 @@ class ResourceSlotAdapter(BaseAdapter):
         querier = self._build_resource_allocation_querier(input)
 
         action_result = await self._resource_slot.search_resource_allocations.run(
-            GlobalSearchResourceAllocationsAction(querier=querier)
+            GlobalSearchResourceAllocationsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourceAllocationSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         return AdminSearchResourceAllocationsPayload(

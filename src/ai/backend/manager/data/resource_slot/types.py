@@ -77,28 +77,12 @@ class AgentResourceData(FieldData):
 
 
 @dataclass(frozen=True)
-class AgentResourceSearchResult:
-    items: list[AgentResourceData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass(frozen=True)
 class ResourceAllocationData(FieldData):
     id: ResourceAllocationID
     kernel_id: uuid.UUID
     slot_name: str
     requested: Decimal
     used: Decimal | None
-
-
-@dataclass(frozen=True)
-class ResourceAllocationSearchResult:
-    items: list[ResourceAllocationData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
 
 
 @dataclass(frozen=True)

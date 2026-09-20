@@ -179,6 +179,7 @@ from ai.backend.manager.models.rbac_models.role.scopes import (
     HeldRoleTarget,
     RoleTarget,
 )
+from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
@@ -188,6 +189,7 @@ from ai.backend.manager.models.rbac_models.user_role.scopes import (
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
@@ -229,7 +231,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_role_permis
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     GlobalSearchRolesAction,
-    GlobalSearchRolesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
     SearchRolesInScopeAction,
@@ -568,10 +569,18 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
             base_conditions=base_conditions,
         )
-        action_result = await self._permission_controller.global_search_permissions.run(
-            GlobalSearchPermissionsAction(querier=querier)
+        raw = await self._permission_controller.global_search_permissions.run(
+            GlobalSearchPermissionsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=RolePermissionSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
-        raw = action_result.result
         return SearchResult(
             items=[self._permission_data_to_node(item) for item in raw.items],
             total_count=raw.total_count,
@@ -586,7 +595,8 @@ class RBACAdapter(BaseAdapter):
         """Search roles with cursor/offset pagination."""
         conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
         orders = self._convert_role_orders_gql(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            RoleSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_role_gql_pagination_spec(),
@@ -597,12 +607,9 @@ class RBACAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result: GlobalSearchRolesActionResult = (
-            await self._permission_controller.global_search_roles.run(
-                GlobalSearchRolesAction(querier=querier)
-            )
+        raw = await self._permission_controller.global_search_roles.run(
+            GlobalSearchRolesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
-        raw = action_result.result
         return SearchResult(
             items=[self._role_data_to_node(item) for item in raw.items],
             total_count=raw.total_count,

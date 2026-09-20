@@ -4,6 +4,7 @@ from ai.backend.common.data.entity.deployment_history import DeploymentHistoryFi
 from ai.backend.common.data.entity.kernel_scheduling_history import (
     KernelSchedulingHistoryFieldType,
 )
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryFieldType
 from ai.backend.common.data.entity.route_history import RouteHistoryFieldType
 from ai.backend.common.data.entity.session_scheduling_history import (
     SessionSchedulingHistoryFieldType,
@@ -18,6 +19,7 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
     ModelDeploymentData,
+    ReplicaGroupHistoryData,
     RouteHistoryData,
 )
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
@@ -37,17 +39,18 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_his
 from ai.backend.manager.services.scheduling_history.actions.lookup_owner import (
     LookupBulkDeploymentHistoryOwnerAction,
     LookupBulkKernelSchedulingHistoryOwnerAction,
+    LookupBulkReplicaGroupHistoryOwnerAction,
     LookupBulkRouteHistoryOwnerAction,
     LookupBulkSessionSchedulingHistoryOwnerAction,
     LookupDeploymentHistoryOwnerAction,
     LookupKernelSchedulingHistoryOwnerAction,
+    LookupReplicaGroupHistoryOwnerAction,
     LookupRouteHistoryOwnerAction,
     LookupSessionSchedulingHistoryOwnerAction,
 )
 
 from .actions import (
     GlobalSearchReplicaGroupHistoryAction,
-    GlobalSearchReplicaGroupHistoryActionResult,
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
     SearchDeploymentHistoryAction,
@@ -94,7 +97,7 @@ class SchedulingHistoryProcessors:
         SearchDeploymentHistoryAction, BatchOpsResult[DeploymentHistoryData]
     ]
     global_search_replica_group_history: GlobalActionProcessor[
-        GlobalSearchReplicaGroupHistoryAction, GlobalSearchReplicaGroupHistoryActionResult
+        GlobalSearchReplicaGroupHistoryAction, BatchOpsResult[ReplicaGroupHistoryData]
     ]
     search_route_history: GlobalActionProcessor[
         SearchRouteHistoryAction, BatchOpsResult[RouteHistoryData]
@@ -148,6 +151,14 @@ class SchedulingHistoryProcessors:
             LookupRouteHistoryOwnerAction,
             LookupBulkRouteHistoryOwnerAction,
         )
+        replica_group_histories: LookupFieldGroup[ReplicaGroupHistoryData] = (
+            replica_group.field_group(
+                FieldGroupMeta(ReplicaGroupHistoryFieldType()),
+                ReplicaGroupHistoryData,
+                LookupReplicaGroupHistoryOwnerAction,
+                LookupBulkReplicaGroupHistoryOwnerAction,
+            )
+        )
         self.bulk_get_session_histories = session_histories.partial_bulk_get_ops(
             BulkGetSessionHistoriesAction
         )
@@ -169,8 +180,8 @@ class SchedulingHistoryProcessors:
         self.search_deployment_history = deployment_histories.global_searcher_ops(
             SearchDeploymentHistoryAction
         )
-        self.global_search_replica_group_history = replica_group.global_scope(
-            GlobalSearchReplicaGroupHistoryAction, service.global_search_replica_group_history
+        self.global_search_replica_group_history = replica_group_histories.global_searcher_ops(
+            GlobalSearchReplicaGroupHistoryAction
         )
         self.search_route_history = route_histories.global_searcher_ops(SearchRouteHistoryAction)
 

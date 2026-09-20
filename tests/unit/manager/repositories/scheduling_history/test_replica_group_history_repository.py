@@ -8,7 +8,7 @@ real endpoint and replica groups rather than history rows alone.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 import pytest
@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     OrderDirection,
     ReplicaGroupHistoryOrderField,
@@ -33,7 +33,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -84,15 +83,6 @@ class _ReplicaGroupHistorySeed:
     @property
     def deployment_count(self) -> int:
         return self.target_count + self.sibling_count
-
-
-@dataclass(frozen=True)
-class _IdConditionCase:
-    """One id-axis condition and how many of the seeded rows it keeps."""
-
-    label: str
-    condition: Callable[[_ReplicaGroupHistorySeed], QueryCondition]
-    expected_count: Callable[[_ReplicaGroupHistorySeed], int]
 
 
 class TestReplicaGroupHistoryRepository:
@@ -313,144 +303,6 @@ class TestReplicaGroupHistoryRepository:
             target_scaling_count=target_scaling_count,
             sibling_count=sibling_count,
         )
-
-    async def test_admin_search_replica_group_history_spans_every_group(
-        self,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_history_seed: _ReplicaGroupHistorySeed,
-    ) -> None:
-        """Test that the unscoped admin search returns rows from every replica group"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await scheduling_history_repository.admin_search_replica_group_history(querier)
-
-        assert result.total_count == replica_group_history_seed.deployment_count
-        assert {item.replica_group_id for item in result.items} == {
-            replica_group_history_seed.replica_group_id,
-            replica_group_history_seed.sibling_replica_group_id,
-        }
-
-    async def test_admin_search_replica_group_history_pagination(
-        self,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_history_seed: _ReplicaGroupHistorySeed,
-    ) -> None:
-        """Test searching replica-group history with pagination"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await scheduling_history_repository.admin_search_replica_group_history(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == replica_group_history_seed.deployment_count
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
-
-    async def test_admin_search_replica_group_history_by_category(
-        self,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_history_seed: _ReplicaGroupHistorySeed,
-    ) -> None:
-        """Test searching replica-group history filtered by handler category"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[
-                ReplicaGroupHistoryConditions.by_category(ReplicaGroupHandlerCategory.SCALING)
-            ],
-            orders=[],
-        )
-        result = await scheduling_history_repository.admin_search_replica_group_history(querier)
-
-        assert result.total_count == replica_group_history_seed.target_scaling_count
-        assert all(item.category == ReplicaGroupHandlerCategory.SCALING for item in result.items)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _IdConditionCase(
-                label="replica_group_id-equals",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_replica_group_id_filter(
-                    UUIDEqualMatchSpec(value=seed.replica_group_id, negated=False)
-                ),
-                expected_count=lambda seed: seed.target_count,
-            ),
-            _IdConditionCase(
-                label="replica_group_id-not-equals",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_replica_group_id_filter(
-                    UUIDEqualMatchSpec(value=seed.replica_group_id, negated=True)
-                ),
-                expected_count=lambda seed: seed.sibling_count,
-            ),
-            _IdConditionCase(
-                label="replica_group_id-in",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_replica_group_id_in(
-                    UUIDInMatchSpec(
-                        values=[seed.replica_group_id, seed.sibling_replica_group_id],
-                        negated=False,
-                    )
-                ),
-                expected_count=lambda seed: seed.deployment_count,
-            ),
-            _IdConditionCase(
-                label="replica_group_id-not-in",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_replica_group_id_in(
-                    UUIDInMatchSpec(values=[seed.replica_group_id], negated=True)
-                ),
-                expected_count=lambda seed: seed.sibling_count,
-            ),
-            _IdConditionCase(
-                label="deployment_id-equals",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_deployment_id_filter(
-                    UUIDEqualMatchSpec(value=seed.deployment_id, negated=False)
-                ),
-                expected_count=lambda seed: seed.deployment_count,
-            ),
-            _IdConditionCase(
-                label="deployment_id-not-equals",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_deployment_id_filter(
-                    UUIDEqualMatchSpec(value=seed.deployment_id, negated=True)
-                ),
-                expected_count=lambda seed: 0,
-            ),
-            _IdConditionCase(
-                label="deployment_id-in",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_deployment_id_in(
-                    UUIDInMatchSpec(values=[seed.deployment_id], negated=False)
-                ),
-                expected_count=lambda seed: seed.deployment_count,
-            ),
-            _IdConditionCase(
-                label="deployment_id-not-in",
-                condition=lambda seed: ReplicaGroupHistoryConditions.by_deployment_id_in(
-                    UUIDInMatchSpec(values=[seed.deployment_id], negated=True)
-                ),
-                expected_count=lambda seed: 0,
-            ),
-        ],
-        ids=lambda case: case.label,
-    )
-    async def test_admin_search_replica_group_history_by_id_axis(
-        self,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_history_seed: _ReplicaGroupHistorySeed,
-        case: _IdConditionCase,
-    ) -> None:
-        """Test that both id axes of the admin filter select and negate as asked"""
-        seed = replica_group_history_seed
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[case.condition(seed)],
-            orders=[],
-        )
-        result = await scheduling_history_repository.admin_search_replica_group_history(querier)
-
-        assert result.total_count == case.expected_count(seed)
-        assert len(result.items) == case.expected_count(seed)
 
     async def test_scoped_search_returns_the_rows_within_the_deployment(
         self,

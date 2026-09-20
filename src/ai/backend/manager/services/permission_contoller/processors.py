@@ -11,6 +11,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
@@ -30,7 +31,6 @@ from .actions import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
     GlobalSearchRolesAction,
-    GlobalSearchRolesActionResult,
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
     SearchRolesInScopeAction,
@@ -65,15 +65,8 @@ from .actions.search_my_role_assignments import (
     ScopedSearchRoleAssignmentsAction,
     ScopedSearchRoleAssignmentsActionResult,
 )
-from .actions.search_permissions import (
-    GlobalSearchPermissionsAction,
-    GlobalSearchPermissionsActionResult,
-)
+from .actions.search_permissions import GlobalSearchPermissionsAction
 from .actions.search_role_permissions import SearchRolePermissionsAction
-from .actions.search_scopes import (
-    GlobalSearchScopesAction,
-    GlobalSearchScopesActionResult,
-)
 from .actions.search_users_assigned_to_role import (
     GlobalSearchRoleAssignmentsAction,
     GlobalSearchRoleAssignmentsActionResult,
@@ -91,9 +84,7 @@ class PermissionControllerProcessors:
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
     get_role_detail: SingleEntityActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
     bulk_get_roles: PartialBulkActionProcessor[BulkGetRolesAction, RoleData]
-    global_search_roles: GlobalActionProcessor[
-        GlobalSearchRolesAction, GlobalSearchRolesActionResult
-    ]
+    global_search_roles: GlobalActionProcessor[GlobalSearchRolesAction, BatchOpsResult[RoleData]]
     search_roles_in_scope: ScopeActionProcessor[
         SearchRolesInScopeAction, SearchRolesInScopeActionResult
     ]
@@ -112,9 +103,6 @@ class PermissionControllerProcessors:
     replace_role_permissions: SingleEntityActionProcessor[
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
     ]
-    global_search_scopes: GlobalActionProcessor[
-        GlobalSearchScopesAction, GlobalSearchScopesActionResult
-    ]
     public_get_scope_types: PublicActionProcessor[
         PublicGetScopeTypesAction, PublicGetScopeTypesActionResult
     ]
@@ -132,7 +120,7 @@ class PermissionControllerProcessors:
         SearchRolePermissionsAction, ScopedFieldsOpsResult[PermissionData]
     ]
     global_search_permissions: GlobalActionProcessor[
-        GlobalSearchPermissionsAction, GlobalSearchPermissionsActionResult
+        GlobalSearchPermissionsAction, BatchOpsResult[PermissionData]
     ]
     update_permission: SingleFieldActionProcessor[
         UpdatePermissionAction, EntityOpsResult[PermissionData]
@@ -155,9 +143,7 @@ class PermissionControllerProcessors:
             GetRoleDetailAction, service.get_role_detail
         )
         self.bulk_get_roles = role_group.partial_bulk_get_ops(BulkGetRolesAction)
-        self.global_search_roles = role_group.global_scope(
-            GlobalSearchRolesAction, service.search_roles
-        )
+        self.global_search_roles = role_group.global_searcher_ops(GlobalSearchRolesAction)
         self.search_roles_in_scope = role_group.scope(
             SearchRolesInScopeAction, service.search_roles_in_scope
         )
@@ -180,9 +166,6 @@ class PermissionControllerProcessors:
         self.replace_role_permissions = role_group.single_entity(
             ReplaceRolePermissionsAction, service.replace_role_permissions
         )
-        self.global_search_scopes = role_group.global_scope(
-            GlobalSearchScopesAction, service.search_scopes
-        )
         self.public_get_scope_types = role_group.public(
             PublicGetScopeTypesAction, service.get_scope_types
         )
@@ -199,8 +182,8 @@ class PermissionControllerProcessors:
         self.search_role_permissions = permissions.atomic_bulk_scoped_search_ops(
             SearchRolePermissionsAction
         )
-        self.global_search_permissions = role_group.global_scope(
-            GlobalSearchPermissionsAction, service.search_permissions
+        self.global_search_permissions = permissions.global_searcher_ops(
+            GlobalSearchPermissionsAction
         )
         self.update_permission = permissions.update_ops(UpdatePermissionAction)
         self.delete_permission = permissions.purge_ops(DeletePermissionAction)

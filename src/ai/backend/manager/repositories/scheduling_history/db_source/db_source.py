@@ -133,31 +133,6 @@ class SchedulingHistoryDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    # ========== Replica Group History (Admin) ==========
-
-    async def admin_search_replica_group_history(
-        self,
-        querier: BatchQuerier,
-    ) -> ReplicaGroupHistoryListResult:
-        """Search replica-group history with pagination (admin API)."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ReplicaGroupHistoryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.ReplicaGroupHistoryRow.to_data() for row in result.rows]
-
-            return ReplicaGroupHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     # ========== Replica Group History (Scoped) ==========
 
     async def scoped_search_replica_group_history(
