@@ -56,7 +56,7 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
@@ -79,7 +79,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectUpdater,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.models.user.conditions import UserConditions
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
@@ -484,45 +484,28 @@ class ProjectAdapter(BaseAdapter):
     def _convert_user_nested_filter(
         self, user_filter: ProjectUserFilter | None
     ) -> list[QueryCondition]:
-        """The member conditions, gathered into one EXISTS on the same enrolled user."""
+        """Deprecated. Every condition lands in one EXISTS over one enrolled member."""
         if user_filter is None:
             return []
-        raw_conditions: list[QueryCondition] = []
-        if user_filter.id is not None:
-            condition = self.convert_uuid_filter(
-                user_filter.id,
-                equals_factory=UserConditions.by_uuid_equals,
-                in_factory=UserConditions.by_uuid_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.username is not None:
-            condition = self.convert_string_filter(
-                user_filter.username,
-                contains_factory=UserConditions.by_username_contains,
-                equals_factory=UserConditions.by_username_equals,
-                starts_with_factory=UserConditions.by_username_starts_with,
-                ends_with_factory=UserConditions.by_username_ends_with,
-                in_factory=UserConditions.by_username_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.email is not None:
-            condition = self.convert_string_filter(
-                user_filter.email,
-                contains_factory=UserConditions.by_email_contains,
-                equals_factory=UserConditions.by_email_equals,
-                starts_with_factory=UserConditions.by_email_starts_with,
-                ends_with_factory=UserConditions.by_email_ends_with,
-                in_factory=UserConditions.by_email_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.is_active is not None:
-            raw_conditions.append(UserConditions.by_is_active(user_filter.is_active))
-        if not raw_conditions:
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(user_filter.id, fields.uuid.filter),
+            *self.apply_string_filter(user_filter.username, fields.username.filter),
+            *self.apply_string_filter(user_filter.email, fields.email.filter),
+            *self._convert_member_active_filter(user_filter.is_active),
+        ]
+        if not conditions:
             return []
-        return [DeprecatedProjectConditions.exists_user_combined(raw_conditions)]
+        return [DeprecatedProjectConditions.exists_user_combined(conditions)]
+
+    def _convert_member_active_filter(self, is_active: bool | None) -> list[QueryCondition]:
+        """Active means the member's account status is ACTIVE."""
+        if is_active is None:
+            return []
+        status = UserSearchableFields.own.status.filter
+        if is_active:
+            return [status.equals(UserStatus.ACTIVE)]
+        return [status.not_equals(UserStatus.ACTIVE)]
 
     def _convert_orders(self, order: list[ProjectOrder]) -> list[QueryOrder]:
         return [self._convert_order(o) for o in order]

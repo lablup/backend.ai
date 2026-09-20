@@ -52,7 +52,7 @@ from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.user.conditions import UserConditions
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -361,7 +361,7 @@ class TestGroupConditionsUserIdFilters:
         user_uuid = uuid.uuid4()
         spec = UUIDEqualMatchSpec(value=user_uuid, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_uuid_equals(spec)
+            UserSearchableFields.own.uuid.filter.equals(spec)
         ])
         sql = str(condition().compile())
         assert "EXISTS" in sql
@@ -372,7 +372,7 @@ class TestGroupConditionsUserIdFilters:
         user_uuid = uuid.uuid4()
         spec = UUIDEqualMatchSpec(value=user_uuid, negated=True)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_uuid_equals(spec)
+            UserSearchableFields.own.uuid.filter.equals(spec)
         ])
         sql = str(condition().compile())
         assert "EXISTS" in sql
@@ -382,7 +382,7 @@ class TestGroupConditionsUserIdFilters:
         user_uuids = [uuid.uuid4(), uuid.uuid4()]
         spec = UUIDInMatchSpec(values=user_uuids, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_uuid_in(spec)
+            UserSearchableFields.own.uuid.filter.in_(spec)
         ])
         sql = str(condition().compile())
         assert "EXISTS" in sql
@@ -394,7 +394,7 @@ class TestGroupConditionsUserIdFilters:
         user_uuids = [uuid.uuid4(), uuid.uuid4()]
         spec = UUIDInMatchSpec(values=user_uuids, negated=True)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_uuid_in(spec)
+            UserSearchableFields.own.uuid.filter.in_(spec)
         ])
         sql = str(condition().compile())
         assert "EXISTS" in sql
@@ -407,7 +407,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_username_contains_generates_exists(self) -> None:
         spec = StringMatchSpec(value="alice", case_insensitive=False, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_contains(spec)
+            UserSearchableFields.own.username.filter.contains(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -417,7 +417,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_username_contains_case_insensitive(self) -> None:
         spec = StringMatchSpec(value="alice", case_insensitive=True, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_contains(spec)
+            UserSearchableFields.own.username.filter.contains(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -426,7 +426,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_username_contains_negated(self) -> None:
         spec = StringMatchSpec(value="alice", case_insensitive=False, negated=True)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_contains(spec)
+            UserSearchableFields.own.username.filter.contains(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -435,7 +435,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_username_equals_generates_exists(self) -> None:
         spec = StringMatchSpec(value="alice", case_insensitive=False, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_equals(spec)
+            UserSearchableFields.own.username.filter.equals(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -444,7 +444,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_username_equals_case_insensitive(self) -> None:
         spec = StringMatchSpec(value="Alice", case_insensitive=True, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_equals(spec)
+            UserSearchableFields.own.username.filter.equals(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -453,7 +453,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_email_contains_generates_exists(self) -> None:
         spec = StringMatchSpec(value="@example", case_insensitive=False, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_email_contains(spec)
+            UserSearchableFields.own.email.filter.contains(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -462,7 +462,7 @@ class TestGroupConditionsUserNestedFilters:
     def test_by_user_email_equals_generates_exists(self) -> None:
         spec = StringMatchSpec(value="alice@example.com", case_insensitive=False, negated=False)
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_email_equals(spec)
+            UserSearchableFields.own.email.filter.equals(spec)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -470,7 +470,7 @@ class TestGroupConditionsUserNestedFilters:
 
     def test_by_user_is_active_true(self) -> None:
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_is_active(True)
+            UserSearchableFields.own.status.filter.equals(UserStatus.ACTIVE)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -478,7 +478,7 @@ class TestGroupConditionsUserNestedFilters:
 
     def test_by_user_is_active_false(self) -> None:
         condition = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_is_active(False)
+            UserSearchableFields.own.status.filter.not_equals(UserStatus.ACTIVE)
         ])
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
@@ -510,10 +510,10 @@ class TestGroupConditionsUserNestedFilters:
         spec_a = StringMatchSpec(value="alice", case_insensitive=False, negated=False)
         spec_b = StringMatchSpec(value="bob", case_insensitive=False, negated=False)
         cond_a = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_contains(spec_a)
+            UserSearchableFields.own.username.filter.contains(spec_a)
         ])
         cond_b = DeprecatedProjectConditions.exists_user_combined([
-            UserConditions.by_username_contains(spec_b)
+            UserSearchableFields.own.username.filter.contains(spec_b)
         ])
         sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
         sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
@@ -742,7 +742,7 @@ class TestGroupUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
-                    UserConditions.by_uuid_equals(spec)
+                    UserSearchableFields.own.uuid.filter.equals(spec)
                 ])
             ],
             orders=[],
@@ -764,7 +764,9 @@ class TestGroupUserNestedSearchIntegration:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
-                DeprecatedProjectConditions.exists_user_combined([UserConditions.by_uuid_in(spec)])
+                DeprecatedProjectConditions.exists_user_combined([
+                    UserSearchableFields.own.uuid.filter.in_(spec)
+                ])
             ],
             orders=[],
         )
@@ -783,7 +785,7 @@ class TestGroupUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
-                    UserConditions.by_username_contains(spec)
+                    UserSearchableFields.own.username.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -804,7 +806,7 @@ class TestGroupUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
-                    UserConditions.by_email_contains(spec)
+                    UserSearchableFields.own.email.filter.contains(spec)
                 ])
             ],
             orders=[],
@@ -824,7 +826,7 @@ class TestGroupUserNestedSearchIntegration:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
-                    UserConditions.by_is_active(True)
+                    UserSearchableFields.own.status.filter.equals(UserStatus.ACTIVE)
                 ])
             ],
             orders=[],
@@ -993,10 +995,10 @@ class TestGroupUserNestedSameMember:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
-                    UserConditions.by_username_contains(
+                    UserSearchableFields.own.username.filter.contains(
                         StringMatchSpec(value="carol", case_insensitive=False, negated=False)
                     ),
-                    UserConditions.by_email_contains(
+                    UserSearchableFields.own.email.filter.contains(
                         StringMatchSpec(value="carol@", case_insensitive=False, negated=False)
                     ),
                 ])
@@ -1018,10 +1020,10 @@ class TestGroupUserNestedSameMember:
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
-                    UserConditions.by_username_contains(
+                    UserSearchableFields.own.username.filter.contains(
                         StringMatchSpec(value="carol", case_insensitive=False, negated=False)
                     ),
-                    UserConditions.by_email_contains(
+                    UserSearchableFields.own.email.filter.contains(
                         StringMatchSpec(value="dave@", case_insensitive=False, negated=False)
                     ),
                 ])
