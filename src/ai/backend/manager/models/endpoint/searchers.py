@@ -13,6 +13,9 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
 )
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
 from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -72,7 +75,11 @@ class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
     def to_data(self, row: EndpointRow) -> ModelDeploymentData:
         data = DeploymentSearchableFields.own.to_data(row)
         current_revision_id = row.current_revision_id
-        policy = row.deployment_policy.to_data() if row.deployment_policy is not None else None
+        policy = (
+            DeploymentPolicySearchableFields.own.to_data(row.deployment_policy)
+            if row.deployment_policy is not None
+            else None
+        )
         return replace(
             data,
             current_revision_id=current_revision_id,

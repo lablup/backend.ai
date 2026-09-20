@@ -82,6 +82,9 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     StrEnumType,
 )
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 
 if TYPE_CHECKING:
@@ -689,7 +692,11 @@ class EndpointRow(Base):
             deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
             current_revision=revisions.to_data(current_row) if current_row else None,
             deploying_revision=revisions.to_data(deploying_row) if deploying_row else None,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=(
+                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
+                if self.deployment_policy is not None
+                else None
+            ),
         )
 
     def to_modern_deployment_info(self) -> DeploymentInfo:
@@ -703,7 +710,11 @@ class EndpointRow(Base):
             deploying_revision_id=self.deploying_revision_id,
             current_revision=None,
             deploying_revision=None,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=(
+                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
+                if self.deployment_policy is not None
+                else None
+            ),
         )
 
     def to_bare_deployment_info(self) -> DeploymentInfo:

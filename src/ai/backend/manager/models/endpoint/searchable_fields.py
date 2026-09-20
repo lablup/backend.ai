@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -40,6 +41,7 @@ from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.searchable_fields import (
     ReplicaGroupSearchableFields,
 )
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
@@ -53,6 +55,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
+from ai.backend.manager.models.specs.search.usage import UsageConditions
 
 
 class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
@@ -403,6 +406,19 @@ class _DeploymentNestedFields:
     )
 
 
+class _DeploymentLinkedEntities:
+    """How a deployment connects to other entities; the other entity's permission governs."""
+
+    resource_groups = UsageConditions[ResourceGroupID](
+        ToManyCorrelation(
+            ResourceGroupRow, EndpointRow, ResourceGroupRow.name == EndpointRow.resource_group
+        ),
+        ResourceGroupRow.id,
+    )
+    """Deployments a resource group runs."""
+
+
 class DeploymentSearchableFields:
     own = _DeploymentOwnFields()
     nested = _DeploymentNestedFields
+    linked = _DeploymentLinkedEntities

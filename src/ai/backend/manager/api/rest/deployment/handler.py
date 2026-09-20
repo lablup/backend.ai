@@ -329,7 +329,7 @@ class DeploymentAPIHandler:
 
         action_result = await self._deployment.search_revisions.run(
             SearchRevisionsAction(
-                deployment_id=DeploymentID(path.parsed.deployment_id), searcher=searcher
+                deployment_ids=[DeploymentID(path.parsed.deployment_id)], searcher=searcher
             )
         )
 

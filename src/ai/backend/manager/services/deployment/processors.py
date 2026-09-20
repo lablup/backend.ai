@@ -267,7 +267,7 @@ class DeploymentProcessors:
     get_revision_by_id: SingleFieldActionProcessor[
         GetRevisionByIdAction, EntityOpsResult[ModelRevisionData]
     ]
-    search_revisions: ScopeActionProcessor[
+    search_revisions: BulkActionProcessor[
         SearchRevisionsAction, ScopedFieldsOpsResult[ModelRevisionData]
     ]
     search_revision_resource_slots: SingleFieldActionProcessor[
@@ -291,7 +291,7 @@ class DeploymentProcessors:
     get_replica_by_id: SingleFieldActionProcessor[
         GetReplicaByIdAction, EntityOpsResult[ModelReplicaData]
     ]
-    search_replicas: ScopeActionProcessor[
+    search_replicas: BulkActionProcessor[
         SearchReplicasAction, ScopedFieldsOpsResult[ModelReplicaData]
     ]
 
@@ -328,7 +328,7 @@ class DeploymentProcessors:
     bulk_delete_access_tokens: PartialBulkFieldActionProcessor[
         BulkDeleteAccessTokensAction, ModelDeploymentAccessTokenData
     ]
-    search_access_tokens: ScopeActionProcessor[
+    search_access_tokens: BulkActionProcessor[
         SearchAccessTokensAction, ScopedFieldsOpsResult[ModelDeploymentAccessTokenData]
     ]
 
@@ -470,7 +470,7 @@ class DeploymentProcessors:
             AddModelRevisionAction, service.add_model_revision
         )
         self.get_revision_by_id = revisions.get_ops(GetRevisionByIdAction)
-        self.search_revisions = revisions.search_ops(SearchRevisionsAction)
+        self.search_revisions = revisions.atomic_bulk_scoped_search_ops(SearchRevisionsAction)
         self.search_revision_resource_slots = revisions.single_field(
             SearchRevisionResourceSlotsAction, service.search_revision_resource_slots
         )
@@ -490,7 +490,7 @@ class DeploymentProcessors:
 
         # Replica operations
         self.get_replica_by_id = replicas.get_ops(GetReplicaByIdAction)
-        self.search_replicas = replicas.search_ops(SearchReplicasAction)
+        self.search_replicas = replicas.atomic_bulk_scoped_search_ops(SearchReplicasAction)
 
         # Auto-scaling rules
         self.create_auto_scaling_rule = group.single_entity(
@@ -523,4 +523,6 @@ class DeploymentProcessors:
         self.bulk_delete_access_tokens = access_tokens.partial_bulk_field(
             BulkDeleteAccessTokensAction, service.bulk_delete_access_tokens
         )
-        self.search_access_tokens = access_tokens.search_ops(SearchAccessTokensAction)
+        self.search_access_tokens = access_tokens.atomic_bulk_scoped_search_ops(
+            SearchAccessTokensAction
+        )

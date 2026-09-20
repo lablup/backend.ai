@@ -30,6 +30,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
@@ -130,6 +131,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentScope,
     DeploymentStrategyInfoDTO,
+    DeploymentUsedBy,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
@@ -224,8 +226,10 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
 from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -263,6 +267,7 @@ from ai.backend.manager.models.resource_slot.orders import (
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher, RouteInfoSearcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
@@ -722,7 +727,10 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployments (admin, no scope)."""
         action_result = await self._deployment.global_search.run(
             GlobalSearchDeploymentsAction(
-                searcher=GlobalSearcher(used_by=[], searcher=self._build_deployment_searcher(input))
+                searcher=GlobalSearcher(
+                    used_by=self._used_by(input.used_by),
+                    searcher=self._build_deployment_searcher(input),
+                )
             )
         )
         return AdminSearchDeploymentsPayload(
@@ -731,6 +739,16 @@ class DeploymentAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    def _used_by(self, used_by: DeploymentUsedBy | None) -> list[UsedBy]:
+        """The uses the request named."""
+        if used_by is None:
+            return []
+        linked = DeploymentSearchableFields.linked
+        return [
+            linked.resource_groups.used_by(ResourceGroupID(entity_id))
+            for entity_id in used_by.resource_group or ()
+        ]
 
     def _scope_targets(self, scope: DeploymentScope) -> list[DeploymentTarget]:
         """The scope targets the request named, in the order the input lists them."""
@@ -755,7 +773,7 @@ class DeploymentAdapter(BaseAdapter):
             ScopedSearchDeploymentsAction(
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(input.scope),
-                    used_by=[],
+                    used_by=self._used_by(input.used_by),
                     searcher=self._build_scoped_deployment_searcher(input),
                 )
             )
@@ -779,7 +797,7 @@ class DeploymentAdapter(BaseAdapter):
             ScopedSearchDeploymentsAction(
                 searcher=ScopedSearcher(
                     scopes=[UserDeploymentTarget(user_id=UserID(user.user_id))],
-                    used_by=[],
+                    used_by=self._used_by(input.used_by),
                     searcher=self._build_deployment_searcher(input),
                 )
             )
@@ -801,7 +819,7 @@ class DeploymentAdapter(BaseAdapter):
             ScopedSearchDeploymentsAction(
                 searcher=ScopedSearcher(
                     scopes=[ProjectDeploymentTarget(project_id=ProjectID(project_id))],
-                    used_by=[],
+                    used_by=self._used_by(input.used_by),
                     searcher=self._build_deployment_searcher(input),
                 )
             )
@@ -1005,7 +1023,7 @@ class DeploymentAdapter(BaseAdapter):
         searcher = self._build_access_token_searcher(input)
         action_result = await self._deployment.search_access_tokens.run(
             SearchAccessTokensAction(
-                deployment_id=DeploymentID(scope.deployment_id), searcher=searcher
+                deployment_ids=[DeploymentID(scope.deployment_id)], searcher=searcher
             )
         )
         return SearchAccessTokensPayload(
@@ -1326,7 +1344,7 @@ class DeploymentAdapter(BaseAdapter):
         searcher = self._build_revision_searcher(input)
         action_result = await self._deployment.search_revisions.run(
             SearchRevisionsAction(
-                deployment_id=DeploymentID(scope.deployment_id), searcher=searcher
+                deployment_ids=[DeploymentID(scope.deployment_id)], searcher=searcher
             )
         )
         return AdminSearchRevisionsPayload(
@@ -1421,7 +1439,9 @@ class DeploymentAdapter(BaseAdapter):
         """Search replicas scoped to a specific deployment."""
         searcher = self._build_replica_searcher(input)
         action_result = await self._deployment.search_replicas.run(
-            SearchReplicasAction(deployment_id=DeploymentID(scope.deployment_id), searcher=searcher)
+            SearchReplicasAction(
+                deployment_ids=[DeploymentID(scope.deployment_id)], searcher=searcher
+            )
         )
         return SearchReplicasPayload(
             items=[self._replica_data_to_dto(item) for item in action_result.items],
@@ -1963,7 +1983,9 @@ class DeploymentAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         if input.filter and input.filter.deployment_id is not None:
             conditions.append(
-                DeploymentPolicyConditions.by_endpoint_ids([input.filter.deployment_id])
+                DeploymentPolicySearchableFields.own.endpoint.filter.equals(
+                    UUIDEqualMatchSpec(value=input.filter.deployment_id, negated=False)
+                )
             )
         return self._build_querier(
             conditions=conditions,

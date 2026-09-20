@@ -95,7 +95,7 @@ class ErrorLogHandler:
             )
         else:
             result = await self._error_log.scoped_search.run(
-                SearchErrorLogsAction(user_id=UserID(ctx.user_uuid), searcher=searcher)
+                SearchErrorLogsAction(user_ids=[UserID(ctx.user_uuid)], searcher=searcher)
             )
 
         is_admin = ctx.is_superadmin or ctx.is_admin
