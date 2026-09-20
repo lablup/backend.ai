@@ -11,7 +11,7 @@ turns NOT NULL. Its default stays true, so a registry created without the value 
 global.
 
 Revision ID: f1c47b92e3a6
-Revises: e7a3c1d95f42
+Revises: c4a71e0d5b38
 Create Date: 2026-09-21
 
 """
@@ -26,7 +26,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "f1c47b92e3a6"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "e7a3c1d95f42"
+down_revision = "c4a71e0d5b38"
 branch_labels = None
 depends_on = None
 
