@@ -12,7 +12,6 @@ from tabulate import tabulate
 
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging import BraceStyleAdapter
@@ -20,11 +19,15 @@ from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
 from ai.backend.manager.models.image.purgers import ImagePurger
-from ai.backend.manager.models.image.searchers import ImageSearcher
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.image.searchers import (
+    AliasedImageSearcher,
+    CanonicalImageSearcher,
+    ImageSearcher,
+    ReferenceImageSearcher,
+)
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
@@ -44,25 +47,11 @@ def _register_image_cli_orm_cluster() -> None:
 
 
 def _canonical_searcher(canonical: str, architecture: str) -> ImageSearcher:
-    return ImageSearcher(
-        pagination=OffsetPagination(limit=1),
-        conditions=[
-            ImageConditions.by_canonical_and_architecture(canonical, architecture),
-            ImageConditions.by_statuses([ImageStatus.ALIVE]),
-        ],
-        orders=ImageOrders.alive_then_oldest(),
-    )
+    return CanonicalImageSearcher(canonical, architecture, [ImageStatus.ALIVE])
 
 
 def _reference_searcher(reference: str, architecture: str) -> ImageSearcher:
-    return ImageSearcher(
-        pagination=OffsetPagination(limit=1),
-        conditions=[
-            ImageConditions.by_canonical_and_architecture_or_alias(reference, architecture),
-            ImageConditions.by_statuses([ImageStatus.ALIVE]),
-        ],
-        orders=ImageOrders.canonical_match_then_alive_then_oldest(reference, architecture),
-    )
+    return ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
 
 
 async def _first_image(
@@ -94,7 +83,9 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
                 result = await r.search_in_global(
                     ImageSearcher(
                         pagination=NoPagination(),
-                        conditions=[ImageConditions.by_statuses([ImageStatus.ALIVE])],
+                        conditions=[
+                            ImageSearchableFields.own.status.filter.in_([ImageStatus.ALIVE])
+                        ],
                     )
                 )
             items = result.items
@@ -288,16 +279,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
         try:
             image = await _first_image(
                 db,
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_alias_equals(
-                            StringMatchSpec(value=alias, case_insensitive=False, negated=False)
-                        ),
-                        ImageConditions.by_statuses([ImageStatus.ALIVE]),
-                    ],
-                    orders=ImageOrders.alive_then_oldest(),
-                ),
+                AliasedImageSearcher(alias, [ImageStatus.ALIVE]),
                 alias,
             )
             for key, value in validate_image_labels(image.labels.label_data).items():

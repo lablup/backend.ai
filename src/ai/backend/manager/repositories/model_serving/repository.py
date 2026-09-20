@@ -71,6 +71,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     LegacyEndpointUpdater,
 )
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import resource_groups
@@ -730,7 +731,7 @@ class ModelServingRepository:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
                 raise ImageNotFound(f"Image {image_id} not found")
-            return image_row.to_dataclass()
+            return ImageSearchableFields.own.to_data(image_row)
 
     @model_serving_repository_resilience.apply()
     async def modify_endpoint_fields(

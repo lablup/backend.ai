@@ -35,9 +35,10 @@ from ai.backend.manager.errors.kernel import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ReferenceImageSearcher,
+)
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import groups
@@ -53,7 +54,7 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -297,18 +298,7 @@ class SessionDBSource:
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:
         async with self._ops_provider.read_ops() as r:
             result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_canonical_and_architecture_or_alias(
-                            reference, architecture
-                        ),
-                        ImageConditions.by_statuses([ImageStatus.ALIVE]),
-                    ],
-                    orders=ImageOrders.canonical_match_then_alive_then_oldest(
-                        reference, architecture
-                    ),
-                )
+                ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
             )
         if not result.items:
             raise ImageNotFound(f"Unknown image reference: {reference} ({architecture})")
@@ -320,14 +310,7 @@ class SessionDBSource:
         statuses = [ImageStatus.ALIVE] if alive_only else [ImageStatus.ALIVE, ImageStatus.DELETED]
         async with self._ops_provider.read_ops() as r:
             result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_canonical_and_architecture(canonical, architecture),
-                        ImageConditions.by_statuses(statuses),
-                    ],
-                    orders=ImageOrders.alive_then_oldest(),
-                )
+                CanonicalImageSearcher(canonical, architecture, statuses)
             )
         if not result.items:
             raise ImageNotFound(f"Unknown image: {canonical} ({architecture})")

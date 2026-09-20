@@ -123,11 +123,12 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ImageSearcher,
+    ReferenceImageSearcher,
+)
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
@@ -327,24 +328,10 @@ class AgentRegistry:
         self._client_pool = ClientPool(tcp_client_session_factory)
 
     def _canonical_image_searcher(self, canonical: str, architecture: str) -> ImageSearcher:
-        return ImageSearcher(
-            pagination=OffsetPagination(limit=1),
-            conditions=[
-                ImageConditions.by_canonical_and_architecture(canonical, architecture),
-                ImageConditions.by_statuses([ImageStatus.ALIVE]),
-            ],
-            orders=ImageOrders.alive_then_oldest(),
-        )
+        return CanonicalImageSearcher(canonical, architecture, [ImageStatus.ALIVE])
 
     def _reference_image_searcher(self, reference: str, architecture: str) -> ImageSearcher:
-        return ImageSearcher(
-            pagination=OffsetPagination(limit=1),
-            conditions=[
-                ImageConditions.by_canonical_and_architecture_or_alias(reference, architecture),
-                ImageConditions.by_statuses([ImageStatus.ALIVE]),
-            ],
-            orders=ImageOrders.canonical_match_then_alive_then_oldest(reference, architecture),
-        )
+        return ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
 
     async def _first_image(self, searcher: ImageSearcher) -> ImageData:
         async with self._ops_provider.read_ops() as r:

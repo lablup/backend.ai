@@ -9451,7 +9451,7 @@ input ImageRefType
 }
 
 """
-Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` names no scope and is authorized against none.
+Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` is answered for at the public scope, which every account reaches.
 """
 input ImageSearchScope
   @join__type(graph: STRAWBERRY)
@@ -9489,6 +9489,21 @@ enum ImageType
   COMPUTE @join__enumValue(graph: GRAPHENE)
   SYSTEM @join__enumValue(graph: GRAPHENE)
   SERVICE @join__enumValue(graph: GRAPHENE)
+}
+
+"""
+Added in 26.9.0. Entities whose use narrows an image query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only images the caller can read are returned, even when a listed entity uses others.
+"""
+input ImageUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Sessions whose kernels run the image."""
+  session: [UUID!] = null
+
+  """
+  Deployments whose live replica groups name the image in their current revision.
+  """
+  deployment: [UUID!] = null
 }
 
 """
@@ -9582,6 +9597,9 @@ input ImageV2AliasFilter
 
   """Added in 26.4.0. Filter by image ID."""
   imageId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by alias row ID."""
+  fieldId: UUIDFilter = null
   AND: [ImageV2AliasFilter!] = null
   OR: [ImageV2AliasFilter!] = null
   NOT: [ImageV2AliasFilter!] = null
@@ -9602,6 +9620,7 @@ enum ImageV2AliasOrderField
   @join__type(graph: STRAWBERRY)
 {
   ALIAS @join__enumValue(graph: STRAWBERRY)
+  FIELD_ID @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -9646,6 +9665,36 @@ input ImageV2Filter
 
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by namespace/path within the registry."""
+  image: StringFilter = null
+
+  """Added in 26.9.0. Filter by registry hostname."""
+  registry: StringFilter = null
+
+  """Added in 26.9.0. Filter by project (namespace) within the registry."""
+  project: StringFilter = null
+
+  """Added in 26.9.0. Filter by image tag."""
+  tag: StringFilter = null
+
+  """Added in 26.9.0. Filter by image config digest."""
+  configDigest: StringFilter = null
+
+  """Added in 26.9.0. Filter by accelerator requirement string."""
+  accelerators: StringFilter = null
+
+  """Added in 26.9.0. Filter by image size in bytes."""
+  sizeBytes: IntFilter = null
+
+  """Added in 26.9.0. Filter by local-only status."""
+  isLocal: Boolean = null
+
+  """Added in 26.9.0. Filter by image type category."""
+  type: ImageV2TypeFilter = null
+
+  """Added in 26.9.0. Filter by creation datetime (before/after)."""
+  createdAt: DateTimeFilter = null
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
@@ -9732,6 +9781,19 @@ enum ImageV2OrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   LAST_USED @join__enumValue(graph: STRAWBERRY)
+  ENTITY_ID @join__enumValue(graph: STRAWBERRY)
+  IMAGE @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  TAG @join__enumValue(graph: STRAWBERRY)
+  REGISTRY @join__enumValue(graph: STRAWBERRY)
+  REGISTRY_ID @join__enumValue(graph: STRAWBERRY)
+  ARCHITECTURE @join__enumValue(graph: STRAWBERRY)
+  CONFIG_DIGEST @join__enumValue(graph: STRAWBERRY)
+  SIZE_BYTES @join__enumValue(graph: STRAWBERRY)
+  IS_LOCAL @join__enumValue(graph: STRAWBERRY)
+  TYPE @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  ACCELERATORS @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.2.0. Permission types for image operations."""
@@ -9821,6 +9883,34 @@ type ImageV2TagEntry
 {
   key: String!
   value: String!
+}
+
+"""Added in 26.9.0. Type category of an image."""
+enum ImageV2Type
+  @join__type(graph: STRAWBERRY)
+{
+  COMPUTE @join__enumValue(graph: STRAWBERRY)
+  SYSTEM @join__enumValue(graph: STRAWBERRY)
+  SERVICE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. Filter for the image type category with equality and membership operators.
+"""
+input ImageV2TypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches images of this exact type."""
+  equals: ImageV2Type = null
+
+  """Matches images whose type is in this list."""
+  in: [ImageV2Type!] = null
+
+  """Excludes images of this exact type."""
+  notEquals: ImageV2Type = null
+
+  """Excludes images whose type is in this list."""
+  notIn: [ImageV2Type!] = null
 }
 
 """
@@ -17219,12 +17309,40 @@ type Query
   """
   Added in 26.2.0. Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
+  adminImagesV2(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    """
+    usedBy: ImageUsedBy = null
+    filter: ImageV2Filter = null
+    orderBy: [ImageV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedImagesV2(scope: ImageSearchScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
+  scopedImagesV2(
+    scope: ImageSearchScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    """
+    usedBy: ImageUsedBy = null
+    filter: ImageV2Filter = null
+    orderBy: [ImageV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)

@@ -5,6 +5,7 @@ Common types for image DTO v2.
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import Field, model_validator
 
@@ -13,8 +14,10 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
+    "ImageAliasOrderField",
     "ImageLabelInfo",
     "ImageScope",
+    "ImageUsedBy",
     "ImageOrderField",
     "ImagePermissionType",
     "ImageResourceLimitGQLInfo",
@@ -47,6 +50,26 @@ class ImageOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
     LAST_USED = "last_used"
+    ENTITY_ID = "entity_id"
+    IMAGE = "image"
+    PROJECT = "project"
+    TAG = "tag"
+    REGISTRY = "registry"
+    REGISTRY_ID = "registry_id"
+    ARCHITECTURE = "architecture"
+    CONFIG_DIGEST = "config_digest"
+    SIZE_BYTES = "size_bytes"
+    IS_LOCAL = "is_local"
+    TYPE = "type"
+    STATUS = "status"
+    ACCELERATORS = "accelerators"
+
+
+class ImageAliasOrderField(StrEnum):
+    """Fields available for ordering image aliases."""
+
+    ALIAS = "alias"
+    FIELD_ID = "field_id"
 
 
 class ImageTagInfo(BaseResponseModel):
@@ -85,12 +108,28 @@ class ImagePermissionType(BaseResponseModel):
     value: str
 
 
+class ImageUsedBy(BaseRequestModel):
+    """Entities whose use narrows the images read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Images the caller cannot read
+    are left out even when a listed entity uses them.
+    """
+
+    session: list[UUID] | None = Field(
+        default=None, description="Sessions whose kernels run the image"
+    )
+    deployment: list[UUID] | None = Field(
+        default=None,
+        description="Deployments whose live replica groups name the image in their current revision",
+    )
+
+
 class ImageScope(BaseRequestModel):
     """Scope for the scoped image query.
 
-    Each list is OR'd internally and across lists. ``global_`` names no scope and is
-    authorized against none: a registry marked global shows its images to everyone.
-    Raises an error if every field is empty.
+    Each list is OR'd internally and across lists. ``global_`` is answered for at the
+    public scope, which every account reaches: a registry marked global shows its images
+    to everyone. Raises an error if every field is empty.
     """
 
     domain: list[UUIDScope] | None = Field(

@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus, ImageType
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -84,7 +85,7 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return row.to_dataclass()
+        return ImageSearchableFields.own.to_data(row)
 
 
 @dataclass

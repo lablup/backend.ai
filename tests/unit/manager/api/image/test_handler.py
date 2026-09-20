@@ -127,68 +127,68 @@ class TestImageAdapter:
     def setup_method(self) -> None:
         self.adapter = ImageAdapter()
 
-    # ----- build_querier -----
+    # ----- build_searcher -----
 
-    def test_build_querier_defaults(self) -> None:
-        """Build querier with default request should use default pagination."""
+    def test_build_searcher_defaults(self) -> None:
+        """Build searcher with default request should use default pagination."""
         request = SearchImagesRequest()
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 50
-        assert querier.pagination.offset == 0
-        assert querier.conditions == []
-        assert querier.orders == []
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 50
+        assert searcher.pagination.offset == 0
+        assert searcher.conditions == []
+        assert searcher.orders == []
 
-    def test_build_querier_with_pagination(self) -> None:
-        """Build querier with custom pagination."""
+    def test_build_searcher_with_pagination(self) -> None:
+        """Build searcher with custom pagination."""
         request = SearchImagesRequest(limit=100, offset=25)
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 100
-        assert querier.pagination.offset == 25
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 100
+        assert searcher.pagination.offset == 25
 
-    def test_build_querier_with_name_filter(self) -> None:
-        """Build querier with name filter should produce a condition."""
+    def test_build_searcher_with_name_filter(self) -> None:
+        """Build searcher with name filter should produce a condition."""
         request = SearchImagesRequest(filter=ImageFilter(name=StringFilter(contains="python")))
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_querier_with_architecture_filter(self) -> None:
-        """Build querier with architecture filter should produce a condition."""
+    def test_build_searcher_with_architecture_filter(self) -> None:
+        """Build searcher with architecture filter should produce a condition."""
         request = SearchImagesRequest(
             filter=ImageFilter(architecture=StringFilter(equals="x86_64"))
         )
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_querier_with_multiple_filters(self) -> None:
-        """Build querier with multiple filter fields should produce multiple conditions."""
+    def test_build_searcher_with_multiple_filters(self) -> None:
+        """Build searcher with multiple filter fields should produce multiple conditions."""
         request = SearchImagesRequest(
             filter=ImageFilter(
                 name=StringFilter(contains="python"),
                 architecture=StringFilter(equals="aarch64"),
             )
         )
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 2
+        assert len(searcher.conditions) == 2
 
-    def test_build_querier_with_case_insensitive_filter(self) -> None:
-        """Build querier with case-insensitive filter should produce a condition."""
+    def test_build_searcher_with_case_insensitive_filter(self) -> None:
+        """Build searcher with case-insensitive filter should produce a condition."""
         request = SearchImagesRequest(filter=ImageFilter(name=StringFilter(i_contains="Python")))
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        assert callable(querier.conditions[0])
+        assert len(searcher.conditions) == 1
+        assert callable(searcher.conditions[0])
 
-    def test_build_querier_with_order(self) -> None:
-        """Build querier with order should produce orders."""
+    def test_build_searcher_with_order(self) -> None:
+        """Build searcher with order should produce orders."""
         request = SearchImagesRequest(
             order=[
                 ImageOrder(
@@ -197,35 +197,35 @@ class TestImageAdapter:
                 )
             ]
         )
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
+        assert len(searcher.orders) == 1
 
-    def test_build_querier_with_multiple_orders(self) -> None:
-        """Build querier with multiple orders should produce multiple orders."""
+    def test_build_searcher_with_multiple_orders(self) -> None:
+        """Build searcher with multiple orders should produce multiple orders."""
         request = SearchImagesRequest(
             order=[
                 ImageOrder(field=ImageOrderField.NAME, direction=OrderDirection.ASC),
                 ImageOrder(field=ImageOrderField.CREATED_AT, direction=OrderDirection.DESC),
             ]
         )
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert len(querier.orders) == 2
+        assert len(searcher.orders) == 2
 
-    def test_build_querier_no_filter(self) -> None:
-        """Build querier with no filter should produce empty conditions."""
+    def test_build_searcher_no_filter(self) -> None:
+        """Build searcher with no filter should produce empty conditions."""
         request = SearchImagesRequest(filter=None)
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert querier.conditions == []
+        assert searcher.conditions == []
 
-    def test_build_querier_no_orders(self) -> None:
-        """Build querier with no orders should produce empty orders."""
+    def test_build_searcher_no_orders(self) -> None:
+        """Build searcher with no orders should produce empty orders."""
         request = SearchImagesRequest(order=None)
-        querier = self.adapter.build_querier(request)
+        searcher = self.adapter.build_searcher(request)
 
-        assert querier.orders == []
+        assert searcher.orders == []
 
     # ----- convert_to_dto -----
 
@@ -338,7 +338,7 @@ class TestImageAPIHandler:
             name="cr.backend.ai/stable/tensorflow:2.15",
         )
         result = MagicMock()
-        result.data = [image_1, image_2]
+        result.items = [image_1, image_2]
         result.total_count = 2
         result.has_next_page = False
         result.has_previous_page = False
@@ -434,7 +434,7 @@ class TestImageAPIHandler:
     ) -> None:
         """Search handler should call search_images processor."""
         await mock_processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(searcher=MagicMock())
         )
         mock_processors.image.search_images.wait_for_complete.assert_called_once()
 
@@ -444,10 +444,10 @@ class TestImageAPIHandler:
     ) -> None:
         """Search result should have correct total count."""
         result = await mock_processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(searcher=MagicMock())
         )
         assert result.total_count == 2
-        assert len(result.data) == 2
+        assert len(result.items) == 2
 
     async def test_search_images_converts_to_dto(
         self,
@@ -455,10 +455,10 @@ class TestImageAPIHandler:
     ) -> None:
         """Search result data should be convertible to DTOs."""
         result = await mock_processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(searcher=MagicMock())
         )
         adapter = ImageAdapter()
-        items = [adapter.convert_to_dto(img) for img in result.data]
+        items = [adapter.convert_to_dto(img) for img in result.items]
 
         assert len(items) == 2
         assert all(isinstance(dto, ImageDTO) for dto in items)
@@ -592,12 +592,12 @@ class TestImageAPIHandler:
         """Search with empty result should return empty data."""
         processors = MagicMock()
         result = MagicMock()
-        result.data = []
+        result.items = []
         result.total_count = 0
         processors.image.search_images.wait_for_complete = AsyncMock(return_value=result)
 
         search_result = await processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(searcher=MagicMock())
         )
-        assert search_result.data == []
+        assert search_result.items == []
         assert search_result.total_count == 0

@@ -12414,6 +12414,127 @@
             "default": null,
             "description": "Filter by container registry ID."
           },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by namespace/path within the registry."
+          },
+          "registry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by registry hostname."
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project (namespace) within the registry."
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image tag."
+          },
+          "config_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image config digest."
+          },
+          "accelerators": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by accelerator requirement string."
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image size in bytes."
+          },
+          "is_local": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by local-only status.",
+            "title": "Is Local"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageTypeFilterInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image type category."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation datetime (before/after)."
+          },
           "alias": {
             "anyOf": [
               {
@@ -12532,9 +12653,9 @@
               }
             ],
             "default": null,
-            "description": "Matches images with this exact status."
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -12547,7 +12668,7 @@
               }
             ],
             "default": null,
-            "description": "Matches images whose status is in this list.",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -12560,7 +12681,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes images with this exact status."
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -12575,7 +12696,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes images whose status is in this list.",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -12591,9 +12712,135 @@
         "title": "ImageStatusType",
         "type": "string"
       },
+      "ImageTypeEnum": {
+        "description": "Type category of an image.",
+        "enum": [
+          "compute",
+          "system",
+          "service"
+        ],
+        "title": "ImageTypeEnum",
+        "type": "string"
+      },
+      "ImageTypeFilterInputDTO": {
+        "description": "Filter for the image type category.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "ImageTypeFilterInputDTO",
+        "type": "object"
+      },
+      "ImageUsedBy": {
+        "description": "Entities whose use narrows the images read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Images the caller cannot read\nare left out even when a listed entity uses them.",
+        "properties": {
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions whose kernels run the image",
+            "title": "Session"
+          },
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose live replica groups name the image in their current revision",
+            "title": "Deployment"
+          }
+        },
+        "title": "ImageUsedBy",
+        "type": "object"
+      },
       "AdminSearchImagesInput": {
         "description": "Input for admin search of images with cursor and offset pagination.",
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -12705,7 +12952,7 @@
         "type": "object"
       },
       "ImageScope": {
-        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``global_`` names no scope and is\nauthorized against none: a registry marked global shows its images to everyone.\nRaises an error if every field is empty.",
+        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``global_`` is answered for at the\npublic scope, which every account reaches: a registry marked global shows its images\nto everyone. Raises an error if every field is empty.",
         "properties": {
           "domain": {
             "anyOf": [
@@ -12787,6 +13034,18 @@
           "scope": {
             "$ref": "#/components/schemas/ImageScope",
             "description": "Scope (OR across all items)."
+          },
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -12928,6 +13187,18 @@
             "default": null,
             "description": "Filter by image ID."
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by alias row ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -12984,9 +13255,8 @@
         "description": "Order specification for image alias queries.",
         "properties": {
           "field": {
-            "description": "Field to order by.",
-            "title": "Field",
-            "type": "string"
+            "$ref": "#/components/schemas/ImageAliasOrderField",
+            "description": "Field to order by."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -12999,6 +13269,15 @@
         ],
         "title": "ImageAliasOrderByInputDTO",
         "type": "object"
+      },
+      "ImageAliasOrderField": {
+        "description": "Fields available for ordering image aliases.",
+        "enum": [
+          "alias",
+          "field_id"
+        ],
+        "title": "ImageAliasOrderField",
+        "type": "string"
       },
       "AdminSearchImageAliasesInput": {
         "description": "Input for admin search of image aliases with cursor and offset pagination.",

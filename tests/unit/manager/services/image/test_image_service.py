@@ -28,7 +28,6 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
     ImageLabelsData,
-    ImageListResult,
     ImageResourcesData,
     RescanImagesResult,
     ResourceLimitInput,
@@ -41,9 +40,7 @@ from ai.backend.manager.errors.image import (
 from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -68,7 +65,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesKeyData,
 )
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
-from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
 )
@@ -876,97 +872,6 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
 
         with pytest.raises(ImageNotFound):
             await image_service.clear_image_custom_resource_limit(action)
-
-
-class TestSearchImages(ImageServiceBaseFixtures):
-    """Tests for ImageService.search_images"""
-
-    async def test_search_images_success(
-        self,
-        image_service: ImageService,
-        mock_image_repository: MagicMock,
-        image_data: ImageData,
-    ) -> None:
-        """Search images should return matching results."""
-        mock_image_repository.search_images = AsyncMock(
-            return_value=ImageListResult(
-                items=[image_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchImagesAction(querier=querier)
-
-        result = await image_service.search_images(action)
-
-        assert result.data == [image_data]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_image_repository.search_images.assert_called_once_with(querier)
-
-    async def test_search_images_empty_result(
-        self,
-        image_service: ImageService,
-        mock_image_repository: MagicMock,
-    ) -> None:
-        """Search images should return empty list when no results found."""
-        mock_image_repository.search_images = AsyncMock(
-            return_value=ImageListResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchImagesAction(querier=querier)
-
-        result = await image_service.search_images(action)
-
-        assert result.data == []
-        assert result.total_count == 0
-
-    async def test_search_images_with_pagination(
-        self,
-        image_service: ImageService,
-        mock_image_repository: MagicMock,
-        image_data: ImageData,
-    ) -> None:
-        """Search images should handle pagination correctly."""
-        mock_image_repository.search_images = AsyncMock(
-            return_value=ImageListResult(
-                items=[image_data],
-                total_count=25,
-                has_next_page=True,
-                has_previous_page=True,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchImagesAction(querier=querier)
-
-        result = await image_service.search_images(action)
-
-        assert result.total_count == 25
-        assert result.has_next_page is True
-        assert result.has_previous_page is True
 
 
 class TestAliasImageById(ImageServiceBaseFixtures):

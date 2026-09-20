@@ -18,6 +18,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     ContainerRegistryScopeInputDTO,
@@ -28,6 +29,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrderByInputDTO,
     ImageScopeInputDTO,
     ImageStatusFilterInputDTO,
+    ImageTypeFilterInputDTO,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     ImageAliasNode,
@@ -42,11 +44,13 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageScope,
     ImageTagInfo,
+    ImageUsedBy,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -69,7 +73,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.models.image.conditions import ImageAliasConditions
+from ai.backend.manager.models.image.searchable_fields import ImageAliasSearchableFields
 
 # =============================================================================
 # Enums
@@ -322,7 +326,11 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-        base_conditions = [ImageAliasConditions.by_image_ids([ImageID(self.id)])]
+        base_conditions = [
+            ImageAliasSearchableFields.own.image_id.filter.in_(
+                UUIDInMatchSpec(values=[ImageID(self.id)], negated=False)
+            )
+        ]
         payload = await info.context.adapters.image.admin_search_image_aliases(
             AdminSearchImageAliasesInput(
                 filter=pydantic_filter,
@@ -419,7 +427,7 @@ class ImageV2ScopeGQL(PydanticInputMixin[ImageScopeInputDTO]):
         description=(
             "Scope for the scoped image query. Each list is OR'd internally and across "
             "lists, and every scope named is authorized before the read runs. `global` "
-            "names no scope and is authorized against none."
+            "is answered for at the public scope, which every account reaches."
         ),
         added_version=NEXT_RELEASE_VERSION,
     ),
@@ -444,6 +452,31 @@ class ImageSearchScopeGQL(PydanticInputMixin[ImageScope]):
         default=False,
         name="global",
         description="Include the images of every registry marked global.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Entities whose use narrows an image query; every id is AND-ed. The caller must "
+            "be able to read each listed entity, or the request is refused. Only images the "
+            "caller can read are returned, even when a listed entity uses others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ImageUsedBy",
+)
+class ImageUsedByGQL(PydanticInputMixin[ImageUsedBy]):
+    """The entities whose use of an image narrows the read."""
+
+    session: list[uuid.UUID] | None = gql_field(
+        default=None, description="Sessions whose kernels run the image."
+    )
+    deployment: list[uuid.UUID] | None = gql_field(
+        default=None,
+        description=(
+            "Deployments whose live replica groups name the image in their current revision."
+        ),
     )
 
 
@@ -485,6 +518,41 @@ class ImageV2StatusFilterGQL(PydanticInputMixin[ImageStatusFilterInputDTO]):
     )
 
 
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Type category of an image.",
+    ),
+    name="ImageV2Type",
+)
+class ImageV2TypeGQL(enum.Enum):
+    COMPUTE = "compute"
+    SYSTEM = "system"
+    SERVICE = "service"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the image type category with equality and membership operators.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ImageV2TypeFilter",
+)
+class ImageV2TypeFilterGQL(PydanticInputMixin[ImageTypeFilterInputDTO]):
+    equals: ImageV2TypeGQL | None = gql_field(
+        description="Matches images of this exact type.", default=None
+    )
+    in_: list[ImageV2TypeGQL] | None = gql_field(
+        description="Matches images whose type is in this list.", name="in", default=None
+    )
+    not_equals: ImageV2TypeGQL | None = gql_field(
+        description="Excludes images of this exact type.", default=None
+    )
+    not_in: list[ImageV2TypeGQL] | None = gql_field(
+        description="Excludes images whose type is in this list.", default=None
+    )
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.",
@@ -502,6 +570,68 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     )
     registry_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.0", description="Filter by container registry ID."),
+        default=None,
+    )
+    image: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by namespace/path within the registry.",
+        ),
+        default=None,
+    )
+    registry: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by registry hostname."
+        ),
+        default=None,
+    )
+    project: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by project (namespace) within the registry.",
+        ),
+        default=None,
+    )
+    tag: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by image tag."),
+        default=None,
+    )
+    config_digest: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by image config digest."
+        ),
+        default=None,
+    )
+    accelerators: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by accelerator requirement string.",
+        ),
+        default=None,
+    )
+    size_bytes: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by image size in bytes."
+        ),
+        default=None,
+    )
+    is_local: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by local-only status."
+        ),
+        default=None,
+    )
+    type: ImageV2TypeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by image type category."
+        ),
+        default=None,
+    )
+    created_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by creation datetime (before/after).",
+        ),
         default=None,
     )
     alias: ImageAliasNestedFilterGQL | None = gql_added_field(
@@ -530,6 +660,19 @@ class ImageV2OrderFieldGQL(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
     LAST_USED = "last_used"
+    ENTITY_ID = "entity_id"
+    IMAGE = "image"
+    PROJECT = "project"
+    TAG = "tag"
+    REGISTRY = "registry"
+    REGISTRY_ID = "registry_id"
+    ARCHITECTURE = "architecture"
+    CONFIG_DIGEST = "config_digest"
+    SIZE_BYTES = "size_bytes"
+    IS_LOCAL = "is_local"
+    TYPE = "type"
+    STATUS = "status"
+    ACCELERATORS = "accelerators"
 
 
 @gql_pydantic_input(
@@ -579,6 +722,10 @@ class ImageV2AliasFilterGQL(PydanticInputMixin[ImageAliasFilterInputDTO], GQLFil
     image_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.0", description="Filter by image ID."), default=None
     )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by alias row ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -594,6 +741,7 @@ class ImageV2AliasFilterGQL(PydanticInputMixin[ImageAliasFilterInputDTO], GQLFil
 )
 class ImageV2AliasOrderFieldGQL(StrEnum):
     ALIAS = "alias"
+    FIELD_ID = "field_id"
 
 
 @gql_pydantic_input(

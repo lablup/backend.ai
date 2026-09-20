@@ -82,6 +82,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     StrEnumType,
 )
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -605,7 +606,7 @@ class EndpointRow(Base):
             id=self.id,
             name=self.name,
             image=(
-                current_rev.image_row.to_dataclass()
+                ImageSearchableFields.own.to_data(current_rev.image_row)
                 if current_rev is not None and current_rev.image_row is not None
                 else None
             ),

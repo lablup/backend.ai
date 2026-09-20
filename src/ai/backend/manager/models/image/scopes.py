@@ -178,15 +178,16 @@ class ContainerRegistryImageTarget(ImageTarget):
 
 
 @dataclass(frozen=True)
-class GlobalImageTarget(ScopeTarget):
+class GlobalImageTarget(ImageTarget):
     """The images every caller sees: those of a registry marked global.
 
-    The column is nullable, and a registry that leaves it unset is not global.
+    The column is nullable, and a registry that leaves it unset is not global. The read
+    is answered for at the public scope, where every account holds image READ.
     """
 
     @override
     def scope_id(self) -> EntityIdentifier:
-        return global_entity_id(GlobalEntityName.GLOBAL)
+        return global_entity_id(GlobalEntityName.PUBLIC)
 
     @override
     def to_condition(self) -> QueryCondition:

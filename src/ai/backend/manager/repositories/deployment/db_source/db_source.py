@@ -151,9 +151,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
     EndpointReplicaGroupUpdater,
 )
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.project import ProjectRow, groups
@@ -183,7 +181,6 @@ from ai.backend.manager.models.scheduling_history.updaters import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUserMountPolicyRow
@@ -409,18 +406,7 @@ class DeploymentDBSource:
         alias."""
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_canonical_and_architecture_or_alias(
-                            image.canonical, image.architecture
-                        ),
-                        ImageConditions.by_statuses([ImageStatus.ALIVE]),
-                    ],
-                    orders=ImageOrders.canonical_match_then_alive_then_oldest(
-                        image.canonical, image.architecture
-                    ),
-                )
+                ReferenceImageSearcher(image.canonical, image.architecture, [ImageStatus.ALIVE])
             )
         if not result.items:
             raise ImageNotFound(

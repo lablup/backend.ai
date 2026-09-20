@@ -48,10 +48,7 @@ from ai.backend.manager.data.image.types import (
     ImageData,
     ImageDataWithDetails,
     ImageIdentifier,
-    ImageLabelsData,
-    ImageResourcesData,
     ImageStatus,
-    ImageTagEntry,
     ImageType,
     KVPair,
     ResourceLimit,
@@ -468,38 +465,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         self._resources = resources
 
-    def to_dataclass(self) -> ImageData:
-        _, ptag_set = self.image_ref.tag_set
-        return ImageData(
-            id=self.id,
-            name=ImageCanonical(self.name),
-            project=self.project,
-            image=self.image,
-            created_at=self.created_at,
-            tag=self.tag,
-            registry=self.registry,
-            registry_id=self.registry_id,
-            architecture=self.architecture,
-            config_digest=self.trimmed_digest,
-            size_bytes=self.size_bytes,
-            is_local=self.is_local,
-            type=self.type,
-            accelerators=self.accelerators,
-            labels=ImageLabelsData(label_data=self.labels),
-            resources=ImageResourcesData(resources_data=self.resources),
-            resource_limits=[
-                ResourceLimit(
-                    key=str(k), min=v.get("min", Decimal(0)), max=v.get("max", Decimal("Infinity"))
-                )
-                for k, v in self.resources.items()
-            ],
-            tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
-            status=self.status,
-            customized=self.customized,
-            creator_id=self.creator_id,
-            last_used_at=self.last_used_at,
-        )
-
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
         version, ptag_set = self.image_ref.tag_set
         return ImageDataWithDetails(
@@ -573,9 +538,6 @@ class ImageAliasRow(Base):
     @classmethod
     def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
-
-    def to_dataclass(self) -> ImageAliasData:
-        return ImageAliasData(id=ImageAliasID(self.id), alias=self.alias or "")
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
