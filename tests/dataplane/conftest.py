@@ -361,6 +361,44 @@ def _build_collectors(
     return collectors
 
 
+#: How long a task left behind by a test gets to honour its cancellation before it is named.
+STRAY_TASK_GRACE_SEC = 30.0
+
+
+@pytest.fixture(autouse=True)
+async def no_stray_tasks(request: pytest.FixtureRequest) -> AsyncIterator[None]:
+    """Name a task that outlives its test and ignores cancellation, instead of hanging on it.
+
+    pytest-asyncio closes the test's loop by cancelling every task and waiting for all of them,
+    without a bound: a task that swallows the cancel keeps the whole run waiting, silently, until
+    someone kills it (measured twice: 8h43m, then 7h). This runs first at teardown, gives such a
+    task a bounded grace, and fails the test naming the coroutine and where it is parked -- the
+    loop close afterwards still hangs on it, but the log then says on what.
+    """
+    yield
+    me = asyncio.current_task()
+    stray = [t for t in asyncio.all_tasks() if t is not me and not t.done()]
+    if not stray:
+        return
+    for task in stray:
+        task.cancel()
+    _, still = await asyncio.wait(stray, timeout=STRAY_TASK_GRACE_SEC)
+    if not still:
+        return
+    lines = []
+    for task in still:
+        frames = task.get_stack(limit=3)
+        where = " <- ".join(
+            f"{f.f_code.co_filename}:{f.f_lineno} {f.f_code.co_name}" for f in frames
+        )
+        lines.append(f"  {task.get_name()}: {task.get_coro()!r}\n      at {where}")
+    pytest.fail(
+        f"{len(still)} task(s) ignored cancellation for {STRAY_TASK_GRACE_SEC}s after"
+        f" {request.node.nodeid}:\n" + "\n".join(lines),
+        pytrace=False,
+    )
+
+
 @pytest.fixture
 async def leak_guard(
     nodes: Sequence[Node],
