@@ -33,8 +33,8 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
     """Creator for a model card.
 
-    A card is its own scope and joins the model-store project it is registered in,
-    which is what the RBAC element reference used to say from the call site.
+    A card is its own scope and joins the model-store project it is registered in
+    and the user who created it.
     """
 
     name: str
@@ -61,7 +61,7 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
 
     @override
     def created_in(self, row: ModelCardRow) -> Collection[EntityIdentifier]:
-        return (ProjectID(self.project_id),)
+        return (ProjectID(row.project), UserID(row.creator))
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import (
@@ -266,6 +266,7 @@ class TestModelCardDelete:
                 resource_policy=test_user_resource_policy.name,
             )
             db_sess.add(user)
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user.uuid))
             await db_sess.flush()
         return user
 
