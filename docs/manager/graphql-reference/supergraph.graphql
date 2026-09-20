@@ -80,9 +80,11 @@ type AccessTokenEdge
 input AccessTokenFilter
   @join__type(graph: STRAWBERRY)
 {
-  token: StringFilter = null
   expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by access token ID."""
+  fieldId: UUIDFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
   NOT: [AccessTokenFilter!] = null
@@ -100,6 +102,8 @@ enum AccessTokenOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  FIELD_ID @join__enumValue(graph: STRAWBERRY)
+  EXPIRES_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -2158,6 +2162,23 @@ enum AutoScalingMetricSource
   PROMETHEUS @join__enumValue(graph: GRAPHENE) @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 26.9.0. Filter for the auto-scaling metric source."""
+input AutoScalingMetricSourceFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Metric sources to match."""
+  in: [AutoScalingMetricSource!] = null
+
+  """Exact metric source match."""
+  equals: AutoScalingMetricSource = null
+
+  """Excludes metric sources in the list."""
+  notIn: [AutoScalingMetricSource!] = null
+
+  """Excludes exact metric source match."""
+  notEquals: AutoScalingMetricSource = null
+}
+
 """Added in 25.19.0. An auto-scaling rule for a model deployment."""
 type AutoScalingRule implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -2235,6 +2256,36 @@ input AutoScalingRuleFilter
 {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: NullableDateTimeFilter = null
+
+  """Added in 26.9.0. Filter by rule ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by metric source."""
+  metricSource: AutoScalingMetricSourceFilter = null
+
+  """Added in 26.9.0. Filter by metric name."""
+  metricName: StringFilter = null
+
+  """Added in 26.9.0. Filter by the scale-down threshold."""
+  minThreshold: DecimalFilter = null
+
+  """Added in 26.9.0. Filter by the scale-up threshold."""
+  maxThreshold: DecimalFilter = null
+
+  """Added in 26.9.0. Filter by step size."""
+  stepSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the cooldown window."""
+  timeWindow: IntFilter = null
+
+  """Added in 26.9.0. Filter by the replica floor."""
+  minReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by the replica ceiling."""
+  maxReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by the Prometheus query preset."""
+  prometheusQueryPresetId: UUIDFilter = null
   AND: [AutoScalingRuleFilter!] = null
   OR: [AutoScalingRuleFilter!] = null
   NOT: [AutoScalingRuleFilter!] = null
@@ -2252,6 +2303,17 @@ enum AutoScalingRuleOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  FIELD_ID @join__enumValue(graph: STRAWBERRY)
+  METRIC_SOURCE @join__enumValue(graph: STRAWBERRY)
+  METRIC_NAME @join__enumValue(graph: STRAWBERRY)
+  MIN_THRESHOLD @join__enumValue(graph: STRAWBERRY)
+  MAX_THRESHOLD @join__enumValue(graph: STRAWBERRY)
+  STEP_SIZE @join__enumValue(graph: STRAWBERRY)
+  TIME_WINDOW @join__enumValue(graph: STRAWBERRY)
+  MIN_REPLICAS @join__enumValue(graph: STRAWBERRY)
+  MAX_REPLICAS @join__enumValue(graph: STRAWBERRY)
+  PROMETHEUS_QUERY_PRESET_ID @join__enumValue(graph: STRAWBERRY)
+  LAST_TRIGGERED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.8.0."""
@@ -5515,6 +5577,20 @@ scalar Decimal
   @join__type(graph: STRAWBERRY)
 
 """
+Added in 26.9.0. Filter for decimal fields supporting equality and comparison operations.
+"""
+input DecimalFilter
+  @join__type(graph: STRAWBERRY)
+{
+  equals: Decimal = null
+  notEquals: Decimal = null
+  greaterThan: Decimal = null
+  greaterThanOrEqual: Decimal = null
+  lessThan: Decimal = null
+  lessThanOrEqual: Decimal = null
+}
+
+"""
 Added in 26.4.4. A single (handler_name, options) entry response for session handler options.
 """
 type DefaultSessionHandlerOptionsEntryInfo
@@ -6340,6 +6416,15 @@ input DeploymentFilter
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.9.0. Filter by deployment ID."""
+  entityId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by the requested replica count."""
+  desiredReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by scaling state."""
+  scalingState: ScalingStateFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -6486,6 +6571,12 @@ enum DeploymentOrderField
   PROJECT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
   TAG @join__enumValue(graph: STRAWBERRY)
+  ENTITY_ID @join__enumValue(graph: STRAWBERRY)
+  DESIRED_REPLICAS @join__enumValue(graph: STRAWBERRY)
+  SCALING_STATE @join__enumValue(graph: STRAWBERRY)
+  CREATED_USER_ID @join__enumValue(graph: STRAWBERRY)
+  OPEN_TO_PUBLIC @join__enumValue(graph: STRAWBERRY)
+  ENDPOINT_URL @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
@@ -12194,6 +12285,27 @@ input ModelRevisionFilter
 
   """Added in 26.4.3. Filter by revision creation datetime."""
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by runtime variant ID."""
+  runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by revision ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by the model mount destination."""
+  modelMountDestination: StringFilter = null
+
+  """Added in 26.9.0. Filter by the subpath within the model vfolder."""
+  vfolderSubpath: StringFilter = null
+
+  """Added in 26.9.0. Filter by the model definition path."""
+  modelDefinitionPath: StringFilter = null
+
+  """Added in 26.9.0. Filter by cluster size."""
+  clusterSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the preset that produced the revision."""
+  revisionPresetId: UUIDFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
@@ -18262,6 +18374,18 @@ input ReplicaFilter
   """Added in 26.8.0. Filter by replica health status."""
   healthStatus: ReplicaHealthStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
+
+  """Added in 26.9.0. Filter by replica creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by replica ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by session ID."""
+  sessionId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by revision ID."""
+  revisionId: UUIDFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
@@ -18440,6 +18564,12 @@ enum ReplicaOrderField
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   ID @join__enumValue(graph: STRAWBERRY)
+  DEPLOYMENT_ID @join__enumValue(graph: STRAWBERRY)
+  SESSION_ID @join__enumValue(graph: STRAWBERRY)
+  REVISION_ID @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  TRAFFIC_STATUS @join__enumValue(graph: STRAWBERRY)
+  HEALTH_STATUS @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -20307,9 +20437,14 @@ type RouteEdge
 input RouteFilter
   @join__type(graph: STRAWBERRY)
 {
-  status: [RouteStatus!] = null
-  healthStatus: [RouteHealthStatus!] = null
-  trafficStatus: [RouteTrafficStatus!] = null
+  """Route lifecycle statuses to match."""
+  status: [RouteStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Route health statuses to match."""
+  healthStatus: [RouteHealthStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Route traffic statuses to match."""
+  trafficStatus: [RouteTrafficStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
@@ -21076,6 +21211,23 @@ enum ScalingState
 {
   STABLE @join__enumValue(graph: STRAWBERRY)
   SCALING @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.9.0. Filter for the deployment scaling state."""
+input ScalingStateFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Scaling states to match."""
+  in: [ScalingState!] = null
+
+  """Exact scaling state match."""
+  equals: ScalingState = null
+
+  """Excludes scaling states in the list."""
+  notIn: [ScalingState!] = null
+
+  """Excludes exact scaling state match."""
+  notEquals: ScalingState = null
 }
 
 """

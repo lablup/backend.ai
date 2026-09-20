@@ -6,6 +6,7 @@ Provides reusable conversion logic for common patterns.
 from __future__ import annotations
 
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any, final
 
 from ai.backend.common.data.filter_specs import (
@@ -17,8 +18,10 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.dto.manager.query import (
     ArrayFilter,
     DateTimeFilter,
+    DecimalFilter,
     EnumFilter,
     IntFilter,
+    NullableDateTimeFilter,
     StringFilter,
     ToManyFilter,
     UUIDFilter,
@@ -28,6 +31,7 @@ from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
+from ai.backend.manager.models.specs.conditions.number import DecimalConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
@@ -329,6 +333,19 @@ class BaseFilterAdapter:
         return []
 
     @final
+    def apply_nullable_datetime_filter(
+        self, datetime_filter: NullableDateTimeFilter | None, conditions: DateTimeConditions
+    ) -> list[QueryCondition]:
+        """Apply ``is_null`` first, then what ``apply_datetime_filter`` applies."""
+        if datetime_filter is None:
+            return []
+        if datetime_filter.is_null is not None:
+            if datetime_filter.is_null:
+                return [conditions.is_null()]
+            return [conditions.is_not_null()]
+        return self.apply_datetime_filter(datetime_filter, conditions)
+
+    @final
     def apply_int_filter(
         self, int_filter: IntFilter | None, conditions: IntConditions
     ) -> list[QueryCondition]:
@@ -342,6 +359,26 @@ class BaseFilterAdapter:
             (int_filter.greater_than_or_equal, conditions.greater_than_or_equal),
             (int_filter.less_than, conditions.less_than),
             (int_filter.less_than_or_equal, conditions.less_than_or_equal),
+        ]
+        for value, operation in operations:
+            if value is not None:
+                return [operation(value)]
+        return []
+
+    @final
+    def apply_decimal_filter(
+        self, decimal_filter: DecimalFilter | None, conditions: DecimalConditions
+    ) -> list[QueryCondition]:
+        """Apply the first comparison ``decimal_filter`` sets."""
+        if decimal_filter is None:
+            return []
+        operations: list[tuple[Decimal | None, Callable[[Decimal], QueryCondition]]] = [
+            (decimal_filter.equals, conditions.equals),
+            (decimal_filter.not_equals, conditions.not_equals),
+            (decimal_filter.greater_than, conditions.greater_than),
+            (decimal_filter.greater_than_or_equal, conditions.greater_than_or_equal),
+            (decimal_filter.less_than, conditions.less_than),
+            (decimal_filter.less_than_or_equal, conditions.less_than_or_equal),
         ]
         for value, operation in operations:
             if value is not None:

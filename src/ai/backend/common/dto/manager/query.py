@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
 from typing import TypeVar, override
 
@@ -26,6 +27,21 @@ class DateFilter(BaseRequestModel):
     after: date | None = Field(default=None, description="After this date (inclusive)")
     equals: date | None = Field(default=None, description="Exact date match")
     not_equals: date | None = Field(default=None, description="Not equal to this date")
+
+
+class DecimalFilter(BaseRequestModel):
+    """Filter for decimal fields supporting equality and comparison operations."""
+
+    equals: Decimal | None = Field(default=None, description="Exact decimal match")
+    not_equals: Decimal | None = Field(default=None, description="Not equal to this decimal")
+    greater_than: Decimal | None = Field(default=None, description="Greater than this decimal")
+    greater_than_or_equal: Decimal | None = Field(
+        default=None, description="Greater than or equal to this decimal"
+    )
+    less_than: Decimal | None = Field(default=None, description="Less than this decimal")
+    less_than_or_equal: Decimal | None = Field(
+        default=None, description="Less than or equal to this decimal"
+    )
 
 
 class IntFilter(BaseRequestModel):

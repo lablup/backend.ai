@@ -4772,27 +4772,89 @@
         "title": "DeploymentOrderField",
         "type": "string"
       },
+      "DeploymentScalingStateFilter": {
+        "description": "Filter for the deployment scaling state.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScalingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ScalingState"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScalingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ScalingState"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "DeploymentScalingStateFilter",
+        "type": "object"
+      },
       "DeploymentStatusFilter": {
         "description": "Filter for deployment status.",
         "properties": {
           "equals": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/ModelDeploymentStatus"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Exact status match",
-            "title": "Equals"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/ModelDeploymentStatus"
                 },
                 "type": "array"
               },
@@ -4801,27 +4863,26 @@
               }
             ],
             "default": null,
-            "description": "Status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/ModelDeploymentStatus"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Excludes exact status match",
-            "title": "Not Equals"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/ModelDeploymentStatus"
                 },
                 "type": "array"
               },
@@ -4830,12 +4891,109 @@
               }
             ],
             "default": null,
-            "description": "Status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
         "title": "DeploymentStatusFilter",
         "type": "object"
+      },
+      "IntFilter": {
+        "description": "Filter for integer fields supporting equality and comparison operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact integer match",
+            "title": "Equals"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equal to this integer",
+            "title": "Not Equals"
+          },
+          "greater_than": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than this integer",
+            "title": "Greater Than"
+          },
+          "greater_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than or equal to this integer",
+            "title": "Greater Than Or Equal"
+          },
+          "less_than": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than this integer",
+            "title": "Less Than"
+          },
+          "less_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than or equal to this integer",
+            "title": "Less Than Or Equal"
+          }
+        },
+        "title": "IntFilter",
+        "type": "object"
+      },
+      "ModelDeploymentStatus": {
+        "enum": [
+          "PENDING",
+          "SCALING",
+          "DEPLOYING",
+          "READY",
+          "STOPPING",
+          "STOPPED"
+        ],
+        "title": "ModelDeploymentStatus",
+        "type": "string"
       },
       "NullableDateTimeFilter": {
         "description": "Filter for nullable datetime fields.\n\nExtends DateTimeFilter with is_null support for columns that allow NULL values\n(e.g., last_triggered_at). Use DateTimeFilter for NOT NULL columns.",
@@ -4966,6 +5124,54 @@
             "default": null,
             "description": "Replica traffic status filter"
           },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Creation datetime filter"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by replica ID"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by session ID"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by revision ID"
+          },
           "AND": {
             "anyOf": [
               {
@@ -5031,7 +5237,7 @@
               }
             ],
             "default": null,
-            "description": "Exact health status match"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -5046,7 +5252,7 @@
               }
             ],
             "default": null,
-            "description": "Health status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -5059,7 +5265,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes exact health status match"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -5074,7 +5280,7 @@
               }
             ],
             "default": null,
-            "description": "Health status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -5082,7 +5288,7 @@
         "type": "object"
       },
       "ReplicaNestedFilter": {
-        "description": "Filter deployments by conditions on their replicas.",
+        "description": "The `replicas` field of a deployment filter.\n\nEach quantifier matches one replica at a time. To require two different replicas,\ncombine two of these with the deployment filter's own `AND`.",
         "properties": {
           "some": {
             "anyOf": [
@@ -5094,7 +5300,7 @@
               }
             ],
             "default": null,
-            "description": "Matches parents with at least one replica satisfying all conditions."
+            "description": "At least one related row matches."
           },
           "every": {
             "anyOf": [
@@ -5106,7 +5312,7 @@
               }
             ],
             "default": null,
-            "description": "Matches parents where every replica satisfies all conditions (also true when the parent has no replica)."
+            "description": "Every related row matches; true when there is none."
           },
           "none": {
             "anyOf": [
@@ -5118,7 +5324,7 @@
               }
             ],
             "default": null,
-            "description": "Matches parents with no replica satisfying all conditions."
+            "description": "No related row matches."
           }
         },
         "title": "ReplicaNestedFilter",
@@ -5137,7 +5343,7 @@
               }
             ],
             "default": null,
-            "description": "Exact status match"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -5152,7 +5358,7 @@
               }
             ],
             "default": null,
-            "description": "Status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -5165,7 +5371,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes exact status match"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -5180,7 +5386,7 @@
               }
             ],
             "default": null,
-            "description": "Status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -5200,7 +5406,7 @@
               }
             ],
             "default": null,
-            "description": "Exact traffic status match"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -5215,7 +5421,7 @@
               }
             ],
             "default": null,
-            "description": "Traffic status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -5228,7 +5434,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes exact traffic status match"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -5243,7 +5449,7 @@
               }
             ],
             "default": null,
-            "description": "Traffic status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -5280,6 +5486,15 @@
           "inactive"
         ],
         "title": "RouteTrafficStatus",
+        "type": "string"
+      },
+      "ScalingState": {
+        "description": "Whether an endpoint is currently adjusting its replica count.\n\nOrthogonal to :class:`EndpointLifecycle`: a healthy ``READY`` endpoint\nmay also be ``SCALING`` while the coordinator reconciles\n``desired_replica_count`` against the actual replica set. Scaling only\nhappens once ``current_revision_id`` is set — the check is enforced by\nthe handler gate, not by this enum.",
+        "enum": [
+          "stable",
+          "scaling"
+        ],
+        "title": "ScalingState",
         "type": "string"
       },
       "AdminSearchDeploymentsInput": {
@@ -5954,91 +6169,6 @@
         "title": "AddRevisionInput",
         "type": "object"
       },
-      "IntFilter": {
-        "description": "Filter for integer fields supporting equality and comparison operations.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact integer match",
-            "title": "Equals"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equal to this integer",
-            "title": "Not Equals"
-          },
-          "greater_than": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Greater than this integer",
-            "title": "Greater Than"
-          },
-          "greater_than_or_equal": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Greater than or equal to this integer",
-            "title": "Greater Than Or Equal"
-          },
-          "less_than": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Less than this integer",
-            "title": "Less Than"
-          },
-          "less_than_or_equal": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Less than or equal to this integer",
-            "title": "Less Than Or Equal"
-          }
-        },
-        "title": "IntFilter",
-        "type": "object"
-      },
       "RevisionFilter": {
         "description": "Filter for revisions.",
         "properties": {
@@ -6477,7 +6607,13 @@
         "description": "Fields available for ordering deployment replicas.",
         "enum": [
           "created_at",
-          "id"
+          "id",
+          "deployment_id",
+          "session_id",
+          "revision_id",
+          "status",
+          "traffic_status",
+          "health_status"
         ],
         "title": "ReplicaOrderField",
         "type": "string"
@@ -6875,18 +7011,6 @@
             "description": "Filter by deployment ID",
             "title": "Deployment Id"
           },
-          "token": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Token value filter"
-          },
           "expires_at": {
             "anyOf": [
               {
@@ -6910,6 +7034,18 @@
             ],
             "default": null,
             "description": "Creation datetime filter"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by access token ID"
           },
           "AND": {
             "anyOf": [
@@ -6983,7 +7119,9 @@
       "AccessTokenOrderField": {
         "description": "Fields available for ordering access tokens.",
         "enum": [
-          "created_at"
+          "created_at",
+          "field_id",
+          "expires_at"
         ],
         "title": "AccessTokenOrderField",
         "type": "string"
@@ -7267,6 +7405,69 @@
         "title": "CreateAutoScalingRuleInput",
         "type": "object"
       },
+      "AutoScalingMetricSourceFilter": {
+        "description": "Filter for the auto-scaling metric source.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoScalingMetricSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AutoScalingMetricSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoScalingMetricSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AutoScalingMetricSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "AutoScalingMetricSourceFilter",
+        "type": "object"
+      },
       "AutoScalingRuleFilter": {
         "description": "Filter for auto-scaling rules.",
         "properties": {
@@ -7338,6 +7539,115 @@
         ],
         "title": "AutoScalingRuleOrderField",
         "type": "string"
+      },
+      "DecimalFilter": {
+        "description": "Filter for decimal fields supporting equality and comparison operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact decimal match",
+            "title": "Equals"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equal to this decimal",
+            "title": "Not Equals"
+          },
+          "greater_than": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than this decimal",
+            "title": "Greater Than"
+          },
+          "greater_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than or equal to this decimal",
+            "title": "Greater Than Or Equal"
+          },
+          "less_than": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than this decimal",
+            "title": "Less Than"
+          },
+          "less_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than or equal to this decimal",
+            "title": "Less Than Or Equal"
+          }
+        },
+        "title": "DecimalFilter",
+        "type": "object"
       },
       "SearchAutoScalingRulesInput": {
         "description": "Input for searching auto-scaling rules.",
@@ -42321,18 +42631,6 @@
         ],
         "title": "CreateDeploymentRequest",
         "type": "object"
-      },
-      "ModelDeploymentStatus": {
-        "enum": [
-          "PENDING",
-          "SCALING",
-          "DEPLOYING",
-          "READY",
-          "STOPPING",
-          "STOPPED"
-        ],
-        "title": "ModelDeploymentStatus",
-        "type": "string"
       },
       "SearchDeploymentsRequest": {
         "description": "Request body for searching deployments with filters, orders, and pagination.",

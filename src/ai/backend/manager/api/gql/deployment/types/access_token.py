@@ -36,7 +36,11 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    OrderDirection,
+    UUIDFilter,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -58,10 +62,15 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 class AccessTokenFilter(PydanticInputMixin[AccessTokenFilterDTO]):
     """Filter for access tokens."""
 
-    token: StringFilter | None = None
     expires_at: DateTimeFilter | None = None
     created_at: DateTimeFilter | None = None
 
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by access token ID."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None

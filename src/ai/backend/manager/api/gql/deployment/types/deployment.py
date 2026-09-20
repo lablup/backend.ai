@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentOrder as DeploymentOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentScalingStateFilter as DeploymentScalingStateFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStatusFilter as DeploymentStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -109,6 +112,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntFilter,
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
@@ -794,6 +798,28 @@ class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the deployment scaling state.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ScalingStateFilter",
+)
+class ScalingStateFilterGQL(PydanticInputMixin[DeploymentScalingStateFilterDTO]):
+    in_: list[ScalingStateGQL] | None = gql_field(
+        description="Scaling states to match.", name="in", default=None
+    )
+    equals: ScalingStateGQL | None = gql_field(
+        description="Exact scaling state match.", default=None
+    )
+    not_in: list[ScalingStateGQL] | None = gql_field(
+        description="Excludes scaling states in the list.", name="notIn", default=None
+    )
+    not_equals: ScalingStateGQL | None = gql_field(
+        description="Excludes exact scaling state match.", name="notEquals", default=None
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="DeploymentFilter",
 )
@@ -848,6 +874,25 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by deployment ID."
+        ),
+        default=None,
+    )
+    desired_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the requested replica count.",
+        ),
+        default=None,
+    )
+    scaling_state: ScalingStateFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by scaling state."
         ),
         default=None,
     )

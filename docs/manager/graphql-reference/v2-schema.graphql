@@ -52,9 +52,11 @@ type AccessTokenEdge {
 
 """Added in 25.16.0. """
 input AccessTokenFilter {
-  token: StringFilter = null
   expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by access token ID."""
+  fieldId: UUIDFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
   NOT: [AccessTokenFilter!] = null
@@ -68,6 +70,8 @@ input AccessTokenOrderBy {
 
 enum AccessTokenOrderField {
   CREATED_AT
+  FIELD_ID
+  EXPIRES_AT
 }
 
 """
@@ -1583,6 +1587,21 @@ enum AutoScalingMetricSource {
   PROMETHEUS
 }
 
+"""Added in 26.9.0. Filter for the auto-scaling metric source."""
+input AutoScalingMetricSourceFilter {
+  """Metric sources to match."""
+  in: [AutoScalingMetricSource!] = null
+
+  """Exact metric source match."""
+  equals: AutoScalingMetricSource = null
+
+  """Excludes metric sources in the list."""
+  notIn: [AutoScalingMetricSource!] = null
+
+  """Excludes exact metric source match."""
+  notEquals: AutoScalingMetricSource = null
+}
+
 """Added in 25.19.0. An auto-scaling rule for a model deployment."""
 type AutoScalingRule implements Node {
   """The Globally Unique ID of this object"""
@@ -1651,6 +1670,36 @@ type AutoScalingRuleEdge {
 input AutoScalingRuleFilter {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: NullableDateTimeFilter = null
+
+  """Added in 26.9.0. Filter by rule ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by metric source."""
+  metricSource: AutoScalingMetricSourceFilter = null
+
+  """Added in 26.9.0. Filter by metric name."""
+  metricName: StringFilter = null
+
+  """Added in 26.9.0. Filter by the scale-down threshold."""
+  minThreshold: DecimalFilter = null
+
+  """Added in 26.9.0. Filter by the scale-up threshold."""
+  maxThreshold: DecimalFilter = null
+
+  """Added in 26.9.0. Filter by step size."""
+  stepSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the cooldown window."""
+  timeWindow: IntFilter = null
+
+  """Added in 26.9.0. Filter by the replica floor."""
+  minReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by the replica ceiling."""
+  maxReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by the Prometheus query preset."""
+  prometheusQueryPresetId: UUIDFilter = null
   AND: [AutoScalingRuleFilter!] = null
   OR: [AutoScalingRuleFilter!] = null
   NOT: [AutoScalingRuleFilter!] = null
@@ -1664,6 +1713,17 @@ input AutoScalingRuleOrderBy {
 
 enum AutoScalingRuleOrderField {
   CREATED_AT
+  FIELD_ID
+  METRIC_SOURCE
+  METRIC_NAME
+  MIN_THRESHOLD
+  MAX_THRESHOLD
+  STEP_SIZE
+  TIME_WINDOW
+  MIN_REPLICAS
+  MAX_REPLICAS
+  PROMETHEUS_QUERY_PRESET_ID
+  LAST_TRIGGERED_AT
 }
 
 """Added in 24.3.0. Background task event payload."""
@@ -3828,6 +3888,18 @@ input DateTimeFilter {
 scalar Decimal
 
 """
+Added in 26.9.0. Filter for decimal fields supporting equality and comparison operations.
+"""
+input DecimalFilter {
+  equals: Decimal = null
+  notEquals: Decimal = null
+  greaterThan: Decimal = null
+  greaterThanOrEqual: Decimal = null
+  lessThan: Decimal = null
+  lessThanOrEqual: Decimal = null
+}
+
+"""
 Added in 26.4.4. A single (handler_name, options) entry response for session handler options.
 """
 type DefaultSessionHandlerOptionsEntryInfo {
@@ -4486,6 +4558,15 @@ input DeploymentFilter {
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.9.0. Filter by deployment ID."""
+  entityId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by the requested replica count."""
+  desiredReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by scaling state."""
+  scalingState: ScalingStateFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -4607,6 +4688,12 @@ enum DeploymentOrderField {
   PROJECT
   RESOURCE_GROUP
   TAG
+  ENTITY_ID
+  DESIRED_REPLICAS
+  SCALING_STATE
+  CREATED_USER_ID
+  OPEN_TO_PUBLIC
+  ENDPOINT_URL
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
@@ -8680,6 +8767,27 @@ input ModelRevisionFilter {
 
   """Added in 26.4.3. Filter by revision creation datetime."""
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by runtime variant ID."""
+  runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by revision ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by the model mount destination."""
+  modelMountDestination: StringFilter = null
+
+  """Added in 26.9.0. Filter by the subpath within the model vfolder."""
+  vfolderSubpath: StringFilter = null
+
+  """Added in 26.9.0. Filter by the model definition path."""
+  modelDefinitionPath: StringFilter = null
+
+  """Added in 26.9.0. Filter by cluster size."""
+  clusterSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the preset that produced the revision."""
+  revisionPresetId: UUIDFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
@@ -13034,6 +13142,18 @@ input ReplicaFilter {
   """Added in 26.8.0. Filter by replica health status."""
   healthStatus: ReplicaHealthStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
+
+  """Added in 26.9.0. Filter by replica creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by replica ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by session ID."""
+  sessionId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by revision ID."""
+  revisionId: UUIDFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
@@ -13185,6 +13305,12 @@ input ReplicaOrderBy {
 enum ReplicaOrderField {
   CREATED_AT
   ID
+  DEPLOYMENT_ID
+  SESSION_ID
+  REVISION_ID
+  STATUS
+  TRAFFIC_STATUS
+  HEALTH_STATUS
 }
 
 """
@@ -14679,9 +14805,14 @@ type RouteEdge {
 
 """Added in 25.19.0. Filter for routes."""
 input RouteFilter {
-  status: [RouteStatus!] = null
-  healthStatus: [RouteHealthStatus!] = null
-  trafficStatus: [RouteTrafficStatus!] = null
+  """Route lifecycle statuses to match."""
+  status: [RouteStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Route health statuses to match."""
+  healthStatus: [RouteHealthStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Route traffic statuses to match."""
+  trafficStatus: [RouteTrafficStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
@@ -15261,6 +15392,21 @@ Added in 26.4.4. Replica scaling axis for a deployment, orthogonal to the lifecy
 enum ScalingState {
   STABLE
   SCALING
+}
+
+"""Added in 26.9.0. Filter for the deployment scaling state."""
+input ScalingStateFilter {
+  """Scaling states to match."""
+  in: [ScalingState!] = null
+
+  """Exact scaling state match."""
+  equals: ScalingState = null
+
+  """Excludes scaling states in the list."""
+  notIn: [ScalingState!] = null
+
+  """Excludes exact scaling state match."""
+  notEquals: ScalingState = null
 }
 
 """

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.deployment.types import ModelReplicaData, RouteInfo
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -22,7 +23,7 @@ class ModelReplicaSearcher(Searcher[RoutingRow, ModelReplicaData]):
 
     @override
     def to_data(self, row: RoutingRow) -> ModelReplicaData:
-        return row.to_replica_data()
+        return ReplicaSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -35,4 +36,4 @@ class RouteInfoSearcher(Searcher[RoutingRow, RouteInfo]):
 
     @override
     def to_data(self, row: RoutingRow) -> RouteInfo:
-        return row.to_route_info()
+        return ReplicaSearchableFields.own.to_route_info(row)

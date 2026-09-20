@@ -99,7 +99,6 @@ from ai.backend.manager.models.endpoint.updaters import (
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
@@ -1211,7 +1210,7 @@ class DeploymentRepository:
         """Search deployment ids using ``BatchQuerier``.
 
         Filter composition is moved to the call site via
-        :class:`DeploymentConditions` so the selection criteria
+        the deployment's searchable fields so the selection criteria
         (e.g. active-lifecycle filter) is explicit.
         """
         return await self._db_source.search_deployment_ids(querier=querier)
@@ -1538,31 +1537,15 @@ class DeploymentRepository:
         return await self._db_source.get_route(route_id)
 
     @deployment_repository_resilience.apply()
-    async def search_endpoints(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentInfoSearchResult:
-        """Search endpoints (modern, light: revision *ids* only)."""
-        return await self._db_source.search_endpoints(querier)
-
-    @deployment_repository_resilience.apply()
     async def search_legacy_endpoints(
         self,
         querier: BatchQuerier,
     ) -> DeploymentInfoSearchResult:
         """Search endpoints (legacy, full: includes the current/deploying
-        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        revision data). DO NOT USE in new code — the v2 surface reads through
+        ``DeploymentSearcher``.
         """
         return await self._db_source.search_legacy_endpoints(querier)
-
-    @deployment_repository_resilience.apply()
-    async def search_endpoints_in_scopes(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> DeploymentInfoSearchResult:
-        """The modern search of :meth:`search_endpoints`, restricted to the scopes (OR)."""
-        return await self._db_source.search_endpoints_in_scopes(querier, scopes)
 
     # ========== Access Token Operations ==========
 

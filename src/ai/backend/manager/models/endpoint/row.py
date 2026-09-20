@@ -38,7 +38,6 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -65,13 +64,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     DeploymentState,
-    ModelDeploymentAccessTokenData,
-    ModelDeploymentAutoScalingRuleData,
-    ModelDeploymentData,
-    ModelDeploymentMetadataInfo,
     ModelRevisionData,
     ReplicaData,
-    ReplicaStateData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -682,13 +676,18 @@ class EndpointRow(Base):
         (legacy REST v1 / engine read paths). The revision ids are derived from
         those rows, so no separate replica-group load is needed.
         """
+        from ai.backend.manager.models.deployment_revision.searchable_fields import (
+            ModelRevisionSearchableFields,
+        )
+
+        revisions = ModelRevisionSearchableFields.own
         current_row = self.current_revision_row
         deploying_row = self.deploying_revision_row
         return self._build_deployment_info(
             current_revision_id=DeploymentRevisionID(current_row.id) if current_row else None,
             deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
-            current_revision=current_row.to_data() if current_row else None,
-            deploying_revision=deploying_row.to_data() if deploying_row else None,
+            current_revision=revisions.to_data(current_row) if current_row else None,
+            deploying_revision=revisions.to_data(deploying_row) if deploying_row else None,
             policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
@@ -717,48 +716,6 @@ class EndpointRow(Base):
             deploying_revision_id=None,
             current_revision=None,
             deploying_revision=None,
-        )
-
-    def to_model_deployment_data(self) -> ModelDeploymentData:
-        """The v2 deployment projection read off this row's own columns.
-
-        ``current_revision_id`` and ``policy`` live on other rows and come back ``None``.
-        """
-        created_at = self.created_at
-        return ModelDeploymentData(
-            id=self.id,
-            metadata=ModelDeploymentMetadataInfo(
-                name=self.name,
-                status=ModelDeploymentStatus.from_lifecycle(self.lifecycle_stage),
-                tags=[self.tag] if self.tag else [],
-                project_id=self.project,
-                domain_name=self.domain,
-                resource_group_name=self.resource_group,
-                created_at=created_at,
-                updated_at=created_at,
-            ),
-            network_access=DeploymentNetworkData(
-                open_to_public=self.open_to_public if self.open_to_public is not None else False,
-                access_token_ids=None,
-                url=self.url,
-                preferred_domain_name=None,
-            ),
-            current_revision_id=None,
-            deploying_revision_id=self.deploying_revision_id,
-            revision_history_ids=[],
-            scaling_rule_ids=[],
-            replica_state=ReplicaStateData(
-                desired_replica_count=self.desired_replicas
-                if self.desired_replicas is not None
-                else self.replicas,
-                replica_ids=[],
-            ),
-            default_deployment_strategy=DeploymentStrategy.ROLLING,
-            created_user_id=self.created_user,
-            options=self.options,
-            scaling_state=self.scaling_state,
-            sub_step=self.sub_step,
-            primary_replica_group_id=self.primary_replica_group_id,
         )
 
     def _build_deployment_info(
@@ -941,14 +898,6 @@ class EndpointTokenRow(Base):
             created_at=self.created_at,
         )
 
-    def to_access_token_data(self) -> ModelDeploymentAccessTokenData:
-        return ModelDeploymentAccessTokenData(
-            id=self.id,
-            token=self.token,
-            expires_at=self.expires_at,
-            created_at=self.created_at,
-        )
-
 
 class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
@@ -1114,24 +1063,6 @@ class EndpointAutoScalingRuleRow(Base):
             min_replicas=creator.min_replicas,
             max_replicas=creator.max_replicas,
             prometheus_query_preset_id=creator.prometheus_query_preset_id,
-        )
-
-    def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
-        """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
-        return ModelDeploymentAutoScalingRuleData(
-            id=self.id,
-            model_deployment_id=self.endpoint,
-            metric_source=self.metric_source,
-            metric_name=self.metric_name,
-            min_threshold=self.min_threshold,
-            max_threshold=self.max_threshold,
-            step_size=self.step_size,
-            time_window=self.cooldown_seconds,
-            min_replicas=self.min_replicas,
-            max_replicas=self.max_replicas,
-            created_at=self.created_at,
-            last_triggered_at=self.last_triggered_at,
-            prometheus_query_preset_id=self.prometheus_query_preset_id,
         )
 
     def apply_model_deployment_modifier(

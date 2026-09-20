@@ -127,6 +127,9 @@ from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicy
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.searchable_fields import (
+    ModelRevisionSearchableFields,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import (
     DeploymentRevisionPresetRow,
 )
@@ -138,6 +141,10 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator
 from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
+from ai.backend.manager.models.endpoint.searchable_fields import (
+    AutoScalingRuleSearchableFields,
+    DeploymentAccessTokenSearchableFields,
+)
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentRolloutClearUpdater,
     DeploymentUpdater,
@@ -161,6 +168,7 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -172,7 +180,6 @@ from ai.backend.manager.models.scheduling_history.conditions import RouteHistory
 from ai.backend.manager.models.scheduling_history.updaters import (
     DeploymentHistoryAttemptUpdater,
 )
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
@@ -972,7 +979,7 @@ class DeploymentDBSource:
             row = EndpointAutoScalingRuleRow.from_model_deployment_creator(creator)
             db_sess.add(row)
             await db_sess.flush()
-            return row.to_model_deployment_data()
+            return AutoScalingRuleSearchableFields.own.to_data(row)
 
     async def update_model_deployment_autoscaling_rule(
         self,
@@ -992,7 +999,7 @@ class DeploymentDBSource:
 
             row.apply_model_deployment_modifier(modifier)
             await db_sess.flush()
-            return row.to_model_deployment_data()
+            return AutoScalingRuleSearchableFields.own.to_data(row)
 
     async def list_model_deployment_autoscaling_rules(
         self,
@@ -1005,7 +1012,7 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             rows = result.scalars().all()
-            return [row.to_model_deployment_data() for row in rows]
+            return [AutoScalingRuleSearchableFields.own.to_data(row) for row in rows]
 
     async def get_model_deployment_autoscaling_rule(
         self,
@@ -1020,7 +1027,7 @@ class DeploymentDBSource:
             row = result.scalar_one_or_none()
             if not row:
                 raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
-            return row.to_model_deployment_data()
+            return AutoScalingRuleSearchableFields.own.to_data(row)
 
     # Route operations
 
@@ -1144,7 +1151,9 @@ class DeploymentDBSource:
                 querier,
             )
 
-            items = [row.RoutingRow.to_route_info() for row in result.rows]
+            items = [
+                ReplicaSearchableFields.own.to_route_info(row.RoutingRow) for row in result.rows
+            ]
 
             return RouteSearchResult(
                 items=items,
@@ -1171,39 +1180,7 @@ class DeploymentDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 return None
-            return row.to_route_info()
-
-    async def search_endpoints(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentInfoSearchResult:
-        """Search endpoints (modern, light: revision *ids* only).
-
-        Loads the replica groups for the revision ids but not the full
-        revision rows. For the full revision data (REST v1) use
-        :meth:`search_legacy_endpoints`.
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.primary_replica_group_row),
-                selectinload(EndpointRow.target_replica_group_row),
-                selectinload(EndpointRow.deployment_policy),
-            )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.EndpointRow.to_modern_deployment_info() for row in result.rows]
-
-            return DeploymentInfoSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+            return ReplicaSearchableFields.own.to_route_info(row)
 
     async def search_legacy_endpoints(
         self,
@@ -1211,7 +1188,7 @@ class DeploymentDBSource:
     ) -> DeploymentInfoSearchResult:
         """Search endpoints (legacy, full: includes the current/deploying
         revision rows). DO NOT USE in new code — the REST v1 surface needs the
-        embedded revision; v2 uses :meth:`search_endpoints`.
+        embedded revision; the v2 surface reads through ``DeploymentSearcher``.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
@@ -1227,35 +1204,6 @@ class DeploymentDBSource:
             )
 
             items = [row.EndpointRow.to_deployment_info() for row in result.rows]
-
-            return DeploymentInfoSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_endpoints_in_scopes(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> DeploymentInfoSearchResult:
-        """The modern search of :meth:`search_endpoints`, restricted to the scopes (OR)."""
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.primary_replica_group_row),
-                selectinload(EndpointRow.target_replica_group_row),
-                selectinload(EndpointRow.deployment_policy),
-            )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=scopes,
-            )
-
-            items = [row.EndpointRow.to_modern_deployment_info() for row in result.rows]
 
             return DeploymentInfoSearchResult(
                 items=items,
@@ -1628,7 +1576,9 @@ class DeploymentDBSource:
             rows: Sequence[RoutingRow] = result.scalars().all()
             routes_by_deployment: defaultdict[DeploymentID, list[RouteInfo]] = defaultdict(list)
             for row in rows:
-                routes_by_deployment[row.endpoint].append(row.to_route_info())
+                routes_by_deployment[row.endpoint].append(
+                    ReplicaSearchableFields.own.to_route_info(row)
+                )
             return routes_by_deployment
 
     # Route operations
@@ -2400,7 +2350,7 @@ class DeploymentDBSource:
     async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:
         """Search deployment ids using ``BatchQuerier``.
 
-        The caller composes filter predicates via :class:`DeploymentConditions`,
+        The caller composes filter predicates from the deployment's searchable fields,
         so every call site shows the actual selection criteria (e.g. the
         ``active`` lifecycle filter used by the route sync loop) instead
         of hiding it behind a named method.
@@ -2674,7 +2624,7 @@ class DeploymentDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
-            return row.to_data()
+            return ModelRevisionSearchableFields.own.to_data(row)
 
     async def get_revision_by_route_id(
         self,
@@ -2703,7 +2653,7 @@ class DeploymentDBSource:
             row = revision_result.scalar_one_or_none()
             if row is None:
                 raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
-            return row.to_data()
+            return ModelRevisionSearchableFields.own.to_data(row)
 
     async def get_current_revision(
         self,
@@ -2743,7 +2693,7 @@ class DeploymentDBSource:
                 raise DeploymentRevisionNotFound(
                     f"Deployment revision {current_revision_id} not found"
                 )
-            return row.to_data()
+            return ModelRevisionSearchableFields.own.to_data(row)
 
     async def get_latest_revision(
         self,
@@ -2763,7 +2713,7 @@ class DeploymentDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             row = await self._fetch_latest_revision_row(db_sess, DeploymentID(endpoint_id))
-            return row.to_data()
+            return ModelRevisionSearchableFields.own.to_data(row)
 
     async def search_revisions(
         self,
@@ -2779,7 +2729,10 @@ class DeploymentDBSource:
                 querier,
             )
 
-            items = [row.DeploymentRevisionRow.to_data() for row in result.rows]
+            items = [
+                ModelRevisionSearchableFields.own.to_data(row.DeploymentRevisionRow)
+                for row in result.rows
+            ]
 
             return RevisionSearchResult(
                 items=items,
@@ -3068,7 +3021,10 @@ class DeploymentDBSource:
                 .returning(EndpointTokenRow)
             )
             result = await db_sess.execute(query)
-            return [row.to_access_token_data() for row in result.scalars().all()]
+            return [
+                DeploymentAccessTokenSearchableFields.own.to_data(row)
+                for row in result.scalars().all()
+            ]
 
     async def search_access_tokens(
         self,

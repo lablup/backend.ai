@@ -68,10 +68,8 @@ from ai.backend.manager.data.model_serving.types import ScalingState
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.services.deployment.actions.scoped_search import (
-    ScopedSearchDeploymentsActionResult,
-)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
 DENIED_TOKEN = DeploymentTokenID(uuid4())
@@ -173,6 +171,16 @@ class TestDeploymentSearchGates:
 
     @pytest.fixture
     def adapter(self, scope_gate: _RecordingScopeValidator) -> DeploymentAdapter:
+        read_ops = MagicMock()
+        read_ops.scoped_search = AsyncMock(
+            return_value=SearcherResult(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        )
+        ops_provider = MagicMock()
+        ops_provider.read_ops.return_value.__aenter__ = AsyncMock(return_value=read_ops)
+        ops_provider.read_ops.return_value.__aexit__ = AsyncMock(return_value=False)
+        repository: OpsRepository[Any] = OpsRepository(ops_provider)
         registry: ProcessorRegistry[Any] = ProcessorRegistry(
             ProcessorDependencies(
                 monitors=ActionMonitors(),
@@ -180,15 +188,10 @@ class TestDeploymentSearchGates:
                     scope=[scope_gate],
                     global_scope=[SuperAdminActionValidator()],
                 ),
-                repository=OpsRepository(MagicMock()),
+                repository=repository,
             )
         )
         service = MagicMock()
-        service.scoped_search_deployments = AsyncMock(
-            return_value=ScopedSearchDeploymentsActionResult(
-                data=[], total_count=0, has_next_page=False, has_previous_page=False
-            )
-        )
         processors = MagicMock()
         processors.deployment = DeploymentProcessors(
             registry.group(GroupMeta(DeploymentEntityType())), service

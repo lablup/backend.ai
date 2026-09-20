@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkRegisterRoutesRequest,
     BulkUnregisterRoutesRequest,
@@ -45,7 +46,7 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
-from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -700,12 +701,15 @@ class RouteExecutor:
 
         # Caller composes the filter so the conditions stay explicit at
         # the call site instead of hiding behind a flag-laden helper.
+        replica_fields = ReplicaSearchableFields.own
         route_querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
-                RouteConditions.by_endpoint_ids(endpoint_ids),
-                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
+                replica_fields.deployment_id.filter.in_(
+                    UUIDInMatchSpec(values=endpoint_ids, negated=False)
+                ),
+                replica_fields.status.filter.in_([RouteStatus.RUNNING]),
+                replica_fields.traffic_status.filter.equals(RouteTrafficStatus.ACTIVE),
             ],
         )
         connection_infos = await self._deployment_repo.fetch_route_connection_infos(

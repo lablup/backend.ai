@@ -49,6 +49,7 @@ Empty both slots for the values below. Do not leave equality either.
 | `users.allowed_client_ip` | Access control setting. An array, so it is impossible as well |
 | `sessions.callback_url`, `deployment_revisions.callback_url` | External callback address |
 | `sessions.bootstrap_script`, `sessions.startup_command` | User-written script |
+| `deployment_revisions.bootstrap_script`, `deployment_revisions.startup_command` | User-written script |
 
 - To narrow by ownership, use the owner identifier (`user_id`, `creator_id`) instead of the value.
 - A new column of the same kind as a row here gets a row of its own and empty slots.
@@ -69,6 +70,21 @@ Empty both slots for the values below. Do not leave equality either.
 - A to-many aggregate runs its subquery again for every outer row. Promote a folded value to a parent column (`Rows of other tables`).
 - **A value already exposed is not an exception but a migration target.** `UserV2OrderField.PROJECT_NAME`, `ProjectV2OrderField.USER_USERNAME` and `ProjectV2OrderField.USER_EMAIL` are MIN scalar subqueries and fall under this ban (exposed in 26.2.0). Mark them deprecated, remove them in the next release, and keep them working until then.
 - Opening a partial match by adding an index puts that index in the same change.
+
+## What the API exposes
+
+A filled slot is not an API surface by itself.
+
+- Expose a filter or an order only for a value a response carries. Nothing can populate
+  a filter for a value no read returns, so it is surface nobody can use.
+- Read that off the published schema (`docs/manager/graphql-reference/`), not off the
+  row: a column can be accepted by a create input and absent from the node.
+- A concept held back from the API stays unexposed although it is declared. The
+  declaration serves the internal callers and the day it is opened — `replica_groups` is
+  declared on the deployment and reaches no DTO.
+- A value the API reports through another shape is exposed under that shape or not at
+  all. One deployment status covers several lifecycle stages, so `lifecycle_stage`
+  carries a filter and no order.
 
 ## Conditions and orders
 
@@ -95,9 +111,31 @@ Empty both slots for the values below. Do not leave equality either.
 - Use conditions and orders built by a `Correlation` only inside a query whose FROM has `correlate_row`.
 - Do not name anything `Relation`. It collides with the link rows on the permission side (`specs/relation.py`, BEP-1075).
 
+### How deep a declaration nests
+
+Depth follows the permission axis, not the foreign keys.
+
+| Target | Depth | Why |
+|---|---|---|
+| The same owner's field rows | 2 | One permission answers for the whole chain |
+| Another entity | 0 | Its rows carry their own permission |
+| An entity wired `public_*_ops`, for a to-one order | 1 | Nothing is denied, so the correlation adds no permission axis |
+
+- A deployment reaches its revisions, replica groups, replicas, access tokens and
+  auto-scaling rules, and a replica group reaches the revision it points at. That chain,
+  `deployment -> replica_group -> revision`, is the deepest allowed. Do not add a third step.
+- The second step needs no foreign key. A replica group's `current_revision_id` has none,
+  and it is still the same deployment's field row.
+- A column naming another entity stays an identifier filter on the owning row:
+  `routings.session`, `routings.session_owner`, `routings.domain`, `routings.project`,
+  `endpoint_auto_scaling_rules.prometheus_query_preset_id`. A relation between two entities
+  is answered by `used_by`, which is where the second permission check belongs.
+- The public exception is read off the wiring, not asserted: `runtime_variants` is wired
+  `public_get_ops` / `public_search_ops`, so a revision may order by the variant's name.
+
 ## Other entities
 
-- Do not add nested filters on another entity's fields. Express a relation to another entity as a scope.
+- Do not add nested filters on another entity's fields (`How deep a declaration nests`). Express a relation to another entity as a scope.
 - Filter by another entity only through the identifier stored in the entity's own column (`creator_id`, `domain_name`, ...). To filter by its name or status, look the other entity up first and use its id.
 - Rows that carry their own permission type (entity share, ...) do not go in `nested`. They are handled as a scope in that entity's search.
 

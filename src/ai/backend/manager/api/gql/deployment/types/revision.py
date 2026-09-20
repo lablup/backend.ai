@@ -749,7 +749,48 @@ class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
         ),
         default=None,
     )
+    runtime_variant_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by runtime variant ID.",
+        ),
+        default=None,
+    )
 
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by revision ID."),
+        default=None,
+    )
+    model_mount_destination: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the model mount destination."
+        ),
+        default=None,
+    )
+    vfolder_subpath: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the subpath within the model vfolder.",
+        ),
+        default=None,
+    )
+    model_definition_path: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the model definition path."
+        ),
+        default=None,
+    )
+    cluster_size: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by cluster size."),
+        default=None,
+    )
+    revision_preset_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the preset that produced the revision.",
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None

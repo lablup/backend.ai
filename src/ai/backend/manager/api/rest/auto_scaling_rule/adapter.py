@@ -7,8 +7,10 @@ Also provides data-to-DTO conversion functions.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.auto_scaling_rule import (
     AutoScalingRuleDTO,
     AutoScalingRuleFilter,
@@ -22,8 +24,7 @@ from ai.backend.common.types import AutoScalingMetricSource
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
-from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
+from ai.backend.manager.models.endpoint.searchable_fields import AutoScalingRuleSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -115,40 +116,30 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: AutoScalingRuleFilter) -> list[QueryCondition]:
         """Convert auto-scaling rule filter to list of query conditions."""
+        fields = AutoScalingRuleSearchableFields.own
         conditions: list[QueryCondition] = []
-
         if filter.model_deployment_id is not None:
             conditions.append(
-                AutoScalingRuleConditions.by_deployment_id(filter.model_deployment_id)
+                fields.deployment_id.filter.equals(
+                    UUIDEqualMatchSpec(value=filter.model_deployment_id, negated=False)
+                )
             )
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=AutoScalingRuleConditions.by_created_at_before,
-                after_factory=AutoScalingRuleConditions.by_created_at_after,
-                equals_factory=AutoScalingRuleConditions.by_created_at_equals,
+        conditions.extend(self.apply_datetime_filter(filter.created_at, fields.created_at.filter))
+        conditions.extend(
+            self.apply_nullable_datetime_filter(
+                filter.last_triggered_at, fields.last_triggered_at.filter
             )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.last_triggered_at is not None:
-            condition = filter.last_triggered_at.build_query_condition(
-                before_factory=AutoScalingRuleConditions.by_last_triggered_at_before,
-                after_factory=AutoScalingRuleConditions.by_last_triggered_at_after,
-                equals_factory=AutoScalingRuleConditions.by_last_triggered_at_equals,
-                is_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_null,
-                is_not_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_not_null,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
+        )
         return conditions
 
     def _convert_order(self, order: AutoScalingRuleOrder) -> QueryOrder:
         """Convert auto-scaling rule order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
-
-        if order.field == AutoScalingRuleOrderField.CREATED_AT:
-            return AutoScalingRuleOrders.created_at(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
+        match order.field:
+            case AutoScalingRuleOrderField.CREATED_AT:
+                return AutoScalingRuleSearchableFields.own.created_at.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

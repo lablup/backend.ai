@@ -20,17 +20,9 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.model_deployment.types import (
-    ActivenessStatus,
-    LivenessStatus,
-    ReadinessStatus,
-)
-from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    ModelReplicaData,
     RouteHealthStatus,
-    RouteInfo,
     RouteStatus,
     RouteSubStatus,
     RouteTrafficStatus,
@@ -284,57 +276,5 @@ class RoutingRow(Base):
             health_status=self.health_status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
-            error_data=self.error_data or {},
-        )
-
-    def to_replica_data(self) -> ModelReplicaData:
-        readiness = self._readiness_status()
-        liveness = LivenessStatus(self.health_status.value)
-        return ModelReplicaData(
-            id=self.id,
-            deployment_id=self.endpoint,
-            revision_id=self.revision,
-            session_id=self.session,
-            readiness_status=readiness,
-            liveness_status=liveness,
-            activeness_status=self._activeness_status(readiness, liveness),
-            status=self.status,
-            traffic_status=self.traffic_status,
-            health_status=self.health_status,
-            detail=self.error_data or {},
-            created_at=self.created_at,
-        )
-
-    def _readiness_status(self) -> ReadinessStatus:
-        """The health status as readiness, which has no DEGRADED of its own."""
-        if self.health_status is RouteHealthStatus.DEGRADED:
-            return ReadinessStatus.UNHEALTHY
-        return ReadinessStatus(self.health_status.value)
-
-    def _activeness_status(
-        self, readiness: ReadinessStatus, liveness: LivenessStatus
-    ) -> ActivenessStatus:
-        """ACTIVE only when traffic is enabled and both health axes are HEALTHY."""
-        if self.traffic_status != RouteTrafficStatus.ACTIVE:
-            return ActivenessStatus.INACTIVE
-        if readiness != ReadinessStatus.HEALTHY:
-            return ActivenessStatus.INACTIVE
-        if liveness != LivenessStatus.HEALTHY:
-            return ActivenessStatus.INACTIVE
-        return ActivenessStatus.ACTIVE
-
-    def to_route_info(self) -> RouteInfo:
-        return RouteInfo(
-            route_id=self.id,
-            deployment_id=self.endpoint,
-            session_id=SessionId(self.session) if self.session else None,
-            status=self.status,
-            health_status=self.health_status,
-            traffic_ratio=self.traffic_ratio,
-            created_at=self.created_at,
-            revision_id=self.revision,
-            traffic_status=self.traffic_status,
-            health_check=self.health_check,
-            replica_group_id=self.replica_group_id,
             error_data=self.error_data or {},
         )

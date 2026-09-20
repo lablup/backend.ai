@@ -11,6 +11,10 @@ from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
+from ai.backend.manager.models.specs.conditions.number import (
+    DecimalConditions,
+    FloatConditions,
+)
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.base import SearchOrder
@@ -21,6 +25,8 @@ type FieldConditions = (
     | UUIDConditions
     | DateTimeConditions
     | IntConditions
+    | FloatConditions
+    | DecimalConditions
     | EnumConditions[Any]
     | BoolConditions
 )

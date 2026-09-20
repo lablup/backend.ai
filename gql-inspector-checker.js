@@ -1,3 +1,19 @@
+// Removals decided deliberately. graphql-inspector reports every removal as BREAKING,
+// so an element taken out on purpose needs an entry here naming why it went.
+// Drop an entry once the removal is on main: the base schema no longer carries the
+// element, so the change stops being reported.
+const ACCEPTED_REMOVALS = {
+  "AccessTokenFilter.token":
+    "The token value is the credential itself, so no search condition may take it: a partial match narrows the value one character at a time even when the response never carries it.",
+};
+
+const REMOVAL_CHANGES = [
+  "INPUT_FIELD_REMOVED",
+  "FIELD_REMOVED",
+  "TYPE_REMOVED",
+  "ENUM_VALUE_REMOVED",
+];
+
 module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
   const oldTypes = oldSchema.getTypeMap();
@@ -13,6 +29,13 @@ module.exports = (props) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
     const addNotationRegex = /Added in (\d{2}\.\d{1,2}\.\d{1})/;
+    const acceptedRemovalReason = ACCEPTED_REMOVALS[change.path];
+    if (REMOVAL_CHANGES.includes(change.type) && acceptedRemovalReason !== undefined) {
+      change.criticality.level = "DANGEROUS";
+      change.criticality.reason = acceptedRemovalReason;
+      change.message = `${change.message} (accepted: ${acceptedRemovalReason})`;
+      return change;
+    }
     if (
       [
         "FIELD_DEPRECATION_REASON_ADDED",

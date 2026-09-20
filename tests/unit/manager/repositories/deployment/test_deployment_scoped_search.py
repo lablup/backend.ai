@@ -1,11 +1,10 @@
-"""The project and user deployment scopes on the modern endpoint search."""
+"""The project and user deployment scopes on the generic deployment search."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -17,9 +16,10 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -38,6 +38,7 @@ from ai.backend.manager.models.endpoint.scopes import (
     ProjectDeploymentTarget,
     UserDeploymentTarget,
 )
+from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -56,15 +57,15 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
@@ -307,29 +308,27 @@ class TestDeploymentScopedSearch:
         )
 
     @pytest.fixture
-    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DeploymentRepository:
-        return DeploymentRepository(
-            db=db_with_cleanup,
-            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
-            storage_manager=AsyncMock(),
-            valkey_stat=AsyncMock(),
-            valkey_live=AsyncMock(),
-            valkey_schedule=AsyncMock(),
-            permission_check=AsyncMock(),
-        )
+    def repository(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> OpsRepository[ModelDeploymentData]:
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
-    def querier(self) -> BatchQuerier:
-        return BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+    def searcher(self) -> DeploymentSearcher:
+        return DeploymentSearcher(pagination=OffsetPagination(limit=10, offset=0))
 
     async def test_project_scope_returns_only_that_project(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [ProjectDeploymentTarget(project_id=test_data.project_a_id)]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         assert result.total_count == 2
@@ -339,30 +338,40 @@ class TestDeploymentScopedSearch:
 
     async def test_project_scope_reads_the_modern_info(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [ProjectDeploymentTarget(project_id=test_data.project_b_id)]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_b_id)],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         (item,) = result.items
-        assert isinstance(item, DeploymentInfo)
-        assert item.metadata.project == test_data.project_b_id
-        assert item.metadata.created_user == test_data.owner_id
-        assert item.state.lifecycle == EndpointLifecycle.CREATED
+        assert isinstance(item, ModelDeploymentData)
+        assert item.metadata.project_id == test_data.project_b_id
+        assert item.created_user_id == test_data.owner_id
+        assert item.metadata.status == ModelDeploymentStatus.from_lifecycle(
+            EndpointLifecycle.CREATED
+        )
         assert item.current_revision_id is None
         assert item.policy is None
 
     async def test_user_scope_returns_the_deployments_the_user_created(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentTarget(user_id=UserID(test_data.owner_id))]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[UserDeploymentTarget(user_id=UserID(test_data.owner_id))],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         assert result.total_count == 3
@@ -372,12 +381,16 @@ class TestDeploymentScopedSearch:
 
     async def test_user_scope_is_empty_for_a_user_who_created_none(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentTarget(user_id=UserID(test_data.other_user_id))]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[UserDeploymentTarget(user_id=UserID(test_data.other_user_id))],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         assert result.total_count == 0
@@ -385,22 +398,30 @@ class TestDeploymentScopedSearch:
 
     async def test_unknown_project_is_refused(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
         with pytest.raises(ProjectNotFound):
-            await repository.search_endpoints_in_scopes(
-                querier, [ProjectDeploymentTarget(project_id=uuid.uuid4())]
+            await repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[ProjectDeploymentTarget(project_id=uuid.uuid4())],
+                    used_by=[],
+                    searcher=searcher,
+                )
             )
 
     async def test_unknown_user_is_refused(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
         with pytest.raises(UserNotFound):
-            await repository.search_endpoints_in_scopes(
-                querier, [UserDeploymentTarget(user_id=UserID(uuid.uuid4()))]
+            await repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[UserDeploymentTarget(user_id=UserID(uuid.uuid4()))],
+                    used_by=[],
+                    searcher=searcher,
+                )
             )
