@@ -7,12 +7,13 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
@@ -127,7 +128,11 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         # Use search_sessions_with_kernels_and_user to get user info for session start
         querier = BatchQuerier(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids(session_ids)],
+            conditions=[
+                SessionSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=session_ids, negated=False)
+                )
+            ],
         )
         sessions_data = await self._repository.search_sessions_with_kernels_and_user(querier)
 

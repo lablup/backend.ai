@@ -24,6 +24,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -143,7 +144,7 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
 
     @override
     def to_data(self, row: SessionRow) -> SessionEntityData:
-        return row.to_entity_data()
+        return SessionSearchableFields.own.to_data(row)
 
 
 @dataclass(frozen=True)

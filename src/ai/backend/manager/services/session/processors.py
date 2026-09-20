@@ -325,7 +325,7 @@ class SessionProcessors:
         )
         self.global_search = group.global_searcher_ops(GlobalSearchSessionsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetSessionsAction)
-        self.scoped_search = group.scope_search_ops(ScopedSearchSessionsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchSessionsAction)
         self.terminate_sessions = group.partial_bulk(
             TerminateSessionsAction, service.terminate_sessions
         )

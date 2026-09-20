@@ -21,6 +21,7 @@ Declares what an entity search can filter and order by. A declaration holds SQL 
 - The filter DTO and the order-field enum decide what the API exposes. A declaration states only what is possible.
 - Attribute names match the filter DTO field, the data field and the field cap path.
 - Declarations are class attributes. Do not create module-level instances.
+- A declaration due for removal lives in `models/{entity}/deprecated_search.py`. A migrated entity keeps no `conditions.py` or `orders.py`.
 
 ## Slots left empty
 
@@ -45,7 +46,6 @@ Empty both slots for the values below. Do not leave equality either.
 | Column | Kind |
 |---|---|
 | `endpoint_tokens.token` | Plaintext token. `sa.String`, not `SecretColumn`, so the type alone does not catch it |
-| `sessions.access_key` | Access key |
 | `users.allowed_client_ip` | Access control setting. An array, so it is impossible as well |
 | `sessions.callback_url`, `deployment_revisions.callback_url` | External callback address |
 | `sessions.bootstrap_script`, `sessions.startup_command` | User-written script |

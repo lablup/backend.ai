@@ -30450,13 +30450,36 @@
             "description": "Shell script executed on container startup. Falls back to keypair setting.",
             "title": "Bootstrap Script"
           },
+          "tier": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scheduling tier (0-100).",
+            "title": "Tier"
+          },
           "priority": {
-            "default": 10,
-            "description": "Scheduling priority (0-100).",
-            "maximum": 100,
-            "minimum": 0,
-            "title": "Priority",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Scheduling tier (0-100). Renamed to `tier`.",
+            "title": "Priority"
           },
           "job_priority": {
             "default": 0,
@@ -30686,6 +30709,79 @@
         "title": "ComputeScheduleInput",
         "type": "object"
       },
+      "NetworkTypeEnum": {
+        "description": "Inter-container network types a session may use.",
+        "enum": [
+          "volatile",
+          "persistent",
+          "host"
+        ],
+        "title": "NetworkTypeEnum",
+        "type": "string"
+      },
+      "NetworkTypeFilter": {
+        "description": "Filter for session network type values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NetworkTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NetworkTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "NetworkTypeFilter",
+        "type": "object"
+      },
       "SessionFilter": {
         "description": "Filter criteria for session listing.",
         "properties": {
@@ -30778,6 +30874,225 @@
             "default": null,
             "description": "Filter by the labels on the entity"
           },
+          "creation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the id the creating request carried"
+          },
+          "session_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by session type"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the scheduling tier of the pending queue"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Filter by the scheduling tier of the pending queue. Renamed to `tier`"
+          },
+          "job_priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the preemption priority among the owner's sessions"
+          },
+          "is_preemptible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the session may be preempted",
+            "title": "Is Preemptible"
+          },
+          "cluster_size": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the number of kernels in the session"
+          },
+          "resource_group_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the resource group the session runs in"
+          },
+          "access_key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the access key the session was created with"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the user-supplied tag"
+          },
+          "use_host_network": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the session uses the host network",
+            "title": "Use Host Network"
+          },
+          "batch_timeout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the batch execution timeout in seconds"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the session started running"
+          },
+          "terminated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the session terminated"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionResultFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the session result"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the inter-container network type"
+          },
+          "network_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the network reference the session uses"
+          },
+          "replica_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the deployment replica the session serves"
+          },
           "AND": {
             "anyOf": [
               {
@@ -30851,10 +31166,104 @@
           "terminated_at",
           "status",
           "id",
-          "name"
+          "name",
+          "creation_id",
+          "session_type",
+          "priority",
+          "tier",
+          "job_priority",
+          "is_preemptible",
+          "cluster_size",
+          "resource_group_name",
+          "domain_name",
+          "project_id",
+          "user_id",
+          "access_key",
+          "tag",
+          "use_host_network",
+          "batch_timeout",
+          "starts_at",
+          "result",
+          "network_type",
+          "network_id",
+          "replica_id"
         ],
         "title": "SessionOrderField",
         "type": "string"
+      },
+      "SessionResultEnum": {
+        "description": "Session result values.",
+        "enum": [
+          "undefined",
+          "success",
+          "failure",
+          "cancelled"
+        ],
+        "title": "SessionResultEnum",
+        "type": "string"
+      },
+      "SessionResultFilter": {
+        "description": "Filter for session result values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionResultEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionResultEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionResultEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionResultEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SessionResultFilter",
+        "type": "object"
       },
       "SessionStatusEnum": {
         "description": "Full set of session lifecycle statuses for DTO filtering.",
@@ -30892,9 +31301,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -30907,6 +31317,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -30918,7 +31329,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -30933,15 +31345,126 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
         "title": "SessionStatusFilter",
         "type": "object"
       },
+      "SessionTypeEnum": {
+        "description": "Session types for DTO filtering.",
+        "enum": [
+          "interactive",
+          "batch",
+          "inference",
+          "system"
+        ],
+        "title": "SessionTypeEnum",
+        "type": "string"
+      },
+      "SessionTypeFilter": {
+        "description": "Filter for session type values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SessionTypeFilter",
+        "type": "object"
+      },
+      "SessionUsedBy": {
+        "description": "Entities whose use narrows the sessions read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Sessions the caller cannot read\nare left out even when a listed entity uses them.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose route rows the session serves as a replica",
+            "title": "Deployment"
+          }
+        },
+        "title": "SessionUsedBy",
+        "type": "object"
+      },
       "AdminSearchSessionsInput": {
         "description": "Input for admin search of sessions with cursor and offset pagination.",
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -31425,6 +31948,18 @@
           "scope": {
             "$ref": "#/components/schemas/SessionScope",
             "description": "Scope (OR across all items)."
+          },
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [

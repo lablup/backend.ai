@@ -3,7 +3,7 @@ name: search-field-declarations
 type: design-rationale
 description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why an unreadable using entity refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters
 scope: src/ai/backend/manager/models/specs/search
-keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, access_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by]
+keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, secret_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by]
 sources:
   - src/ai/backend/manager/models/specs/search
   - src/ai/backend/manager/models/specs/conditions
@@ -65,7 +65,8 @@ This package replaces the condition functions and order methods written by hand 
 
 - A filter reports whether a row satisfying the condition exists. Repeating `starts_with` one character at a time recovers the whole value. An order gives the same information.
 - So masking a value behind a field cap means nothing while its filter and order stay open. It is why caps check orders too.
-- Leaving equality alone as a compromise is not used. Tokens and access keys have a narrow candidate set, so repeated equality confirms them.
+- Leaving equality alone as a compromise is not used. A token has a narrow candidate set, so repeated equality confirms it.
+- An access key is an identifier the response already carries, and the credential is its pair `keypairs.secret_key`, a `SecretColumn`. A value the response ships has nothing for a repeated filter to recover, so it does not belong on this axis.
 - The rows of the table are the cases found in the survey. `endpoint_tokens.token` is `sa.String`, not `SecretColumn`, so the type axis does not catch it. `sessions.bootstrap_script` and `startup_command` are scripts the user wrote and can hold credentials verbatim.
 - `users.allowed_client_ip` is caught by the type axis as well, being an array. It is listed as sensitive too so that it stays closed if it ever stops being an array.
 

@@ -4346,10 +4346,10 @@ class ScheduleDBSource:
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_resource_group_id(resource_group_id),
-                    SessionConditions.by_statuses([SessionStatus.SCHEDULED]),
+                    fields.resource_group_id.filter.equals(resource_group_spec),
+                    fields.status.filter.in_([SessionStatus.SCHEDULED]),
                 ],
-                orders=[SessionOrders.created_at()],
+                orders=[fields.created_at.order.apply(ascending=True)],
             )
             result = await db_source.search_sessions_with_kernels(querier)
         """
@@ -4491,10 +4491,10 @@ class ScheduleDBSource:
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_resource_group_id(resource_group_id),
-                    SessionConditions.by_statuses([SessionStatus.PREPARED]),
+                    fields.resource_group_id.filter.equals(resource_group_spec),
+                    fields.status.filter.in_([SessionStatus.PREPARED]),
                 ],
-                orders=[SessionOrders.created_at()],
+                orders=[fields.created_at.order.apply(ascending=True)],
             )
             result = await db_source.search_sessions_with_kernels_and_user(querier)
         """
