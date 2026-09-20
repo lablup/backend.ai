@@ -43,6 +43,9 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.membership.validator.rbac import (
+    VirtualEntityMembershipActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
     VirtualEntityRelationActionRBACValidator,
 )
@@ -170,6 +173,7 @@ def action_registry(
         partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo),
         atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo),
         relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
+        membership=VirtualEntityMembershipActionRBACValidator(permission_repo, config_provider),
     )
     return ProcessorRegistry(
         ProcessorDependencies(

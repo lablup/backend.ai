@@ -47,6 +47,15 @@ from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionA
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
 )
+from ai.backend.manager.actions.v2.membership.monitor.audit_log import (
+    MembershipActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.prometheus import (
+    MembershipActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.reporter import (
+    MembershipActionReporterMonitor,
+)
 from ai.backend.manager.actions.v2.relation.monitor.audit_log import (
     RelationActionAuditLogMonitor,
 )
@@ -295,6 +304,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 RelationActionReporterMonitor(reporter_hub),
                 RelationActionPrometheusMonitor(),
                 RelationActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            membership=[
+                MembershipActionReporterMonitor(reporter_hub),
+                MembershipActionPrometheusMonitor(),
+                MembershipActionAuditLogMonitor(
                     audit_log_repository,
                     audit_log_policy,
                     client_ip_masking_repository,
