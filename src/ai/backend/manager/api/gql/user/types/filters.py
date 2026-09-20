@@ -97,6 +97,13 @@ class UserProjectNestedFilterGQL(PydanticInputMixin[UserProjectFilter]):
     is_active: bool | None = None
 
 
+_NESTED_FILTER_DEPRECATION = (
+    "Filter by the user's {subject}. Deprecated since "
+    + NEXT_RELEASE_VERSION
+    + ". The condition is evaluated on rows the caller may not be able to read. Use {instead}."
+)
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_name, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
@@ -191,8 +198,19 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
         default=None,
     )
     created_at: DateTimeFilter | None = None
-    domain: UserDomainNestedFilterGQL | None = None
-    project: UserProjectNestedFilterGQL | None = None
+    domain: UserDomainNestedFilterGQL | None = gql_field(
+        description=_NESTED_FILTER_DEPRECATION.format(
+            subject="domain", instead="the `domainName` filter, or look the domain up first"
+        ),
+        default=None,
+    )
+    project: UserProjectNestedFilterGQL | None = gql_field(
+        description=_NESTED_FILTER_DEPRECATION.format(
+            subject="projects",
+            instead="`projectUsersV2`, which reads the users of one project",
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
