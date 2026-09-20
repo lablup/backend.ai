@@ -19,12 +19,6 @@ class ProjectOrders:
     """Query orders for sorting groups/projects."""
 
     @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ProjectRow.id.asc()
-        return ProjectRow.id.desc()
-
-    @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ProjectRow.name.asc()
@@ -77,16 +71,6 @@ class ProjectOrders:
     @staticmethod
     def by_domain_name(ascending: bool = True) -> QueryOrder:
         subq = ProjectOrders._scalar_domain(DomainRow.name)
-        return subq.asc() if ascending else subq.desc()
-
-    @staticmethod
-    def by_domain_is_active(ascending: bool = True) -> QueryOrder:
-        subq = ProjectOrders._scalar_domain(DomainRow.is_active)
-        return subq.asc() if ascending else subq.desc()
-
-    @staticmethod
-    def by_domain_created_at(ascending: bool = True) -> QueryOrder:
-        subq = ProjectOrders._scalar_domain(DomainRow.created_at)
         return subq.asc() if ascending else subq.desc()
 
     # ==================== User Nested Orders ====================

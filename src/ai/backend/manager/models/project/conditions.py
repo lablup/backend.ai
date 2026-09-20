@@ -298,43 +298,11 @@ class ProjectConditions:
         return sa.exists(subq)
 
     @staticmethod
-    def by_domain_description_contains(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                cond = DomainRow.description.ilike(f"%{spec.value}%")
-            else:
-                cond = DomainRow.description.like(f"%{spec.value}%")
-            if spec.negated:
-                cond = sa.not_(cond)
-            return ProjectConditions._exists_domain(cond)
-
-        return inner
-
-    @staticmethod
-    def by_domain_description_equals(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                cond = sa.func.lower(DomainRow.description) == spec.value.lower()
-            else:
-                cond = DomainRow.description == spec.value
-            if spec.negated:
-                cond = sa.not_(cond)
-            return ProjectConditions._exists_domain(cond)
-
-        return inner
-
-    @staticmethod
     def by_domain_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectConditions._exists_domain(DomainRow.is_active == is_active)
 
         return inner
-
-    by_domain_description_in = staticmethod(
-        make_nested_string_in_factory(
-            DomainRow.description, lambda c: ProjectConditions._exists_domain(c)
-        )
-    )
 
     @staticmethod
     def exists_domain_combined(domain_conditions: list[QueryCondition]) -> QueryCondition:

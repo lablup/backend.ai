@@ -89,55 +89,6 @@ _WITH_TABLES: list[TableOrORM] = [
 class TestGroupConditionsDomainNestedFilters:
     """Tests for Domain nested filter conditions in ProjectConditions."""
 
-    def test_exists_domain_returns_callable(self) -> None:
-        spec = StringMatchSpec(value="test", case_insensitive=False, negated=False)
-        condition = ProjectConditions.by_domain_description_contains(spec)
-        assert callable(condition)
-
-    def test_by_domain_description_contains_generates_exists(self) -> None:
-        spec = StringMatchSpec(value="research", case_insensitive=False, negated=False)
-        condition = ProjectConditions.by_domain_description_contains(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "domains" in sql
-
-    def test_by_domain_description_contains_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="research", case_insensitive=True, negated=False)
-        condition = ProjectConditions.by_domain_description_contains(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        # Default dialect compiles ilike as lower(...) LIKE lower(...)
-        assert "lower" in sql
-
-    def test_by_domain_description_contains_negated(self) -> None:
-        spec = StringMatchSpec(value="research", case_insensitive=False, negated=True)
-        condition = ProjectConditions.by_domain_description_contains(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "NOT LIKE" in sql.upper()
-
-    def test_by_domain_description_equals_generates_exists(self) -> None:
-        spec = StringMatchSpec(value="exact", case_insensitive=False, negated=False)
-        condition = ProjectConditions.by_domain_description_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "domains" in sql
-
-    def test_by_domain_description_equals_case_insensitive(self) -> None:
-        spec = StringMatchSpec(value="Exact", case_insensitive=True, negated=False)
-        condition = ProjectConditions.by_domain_description_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        assert "lower" in sql
-
-    def test_by_domain_description_equals_negated(self) -> None:
-        spec = StringMatchSpec(value="exact", case_insensitive=False, negated=True)
-        condition = ProjectConditions.by_domain_description_equals(spec)
-        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "EXISTS" in sql
-        # sa.not_(col == val) compiles as col != val
-        assert "!=" in sql or "NOT" in sql.upper()
-
     def test_by_domain_is_active_true(self) -> None:
         condition = ProjectConditions.by_domain_is_active(True)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
@@ -149,17 +100,6 @@ class TestGroupConditionsDomainNestedFilters:
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
         assert "is_active" in sql
-
-    def test_closure_independence(self) -> None:
-        spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
-        spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
-        cond_a = ProjectConditions.by_domain_description_contains(spec_a)
-        cond_b = ProjectConditions.by_domain_description_contains(spec_b)
-        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
-        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
-        assert sql_a != sql_b
-        assert "alpha" in sql_a
-        assert "beta" in sql_b
 
     def test_exists_domain_combined_single_exists(self) -> None:
         """Combined helper wraps raw column conditions into single EXISTS."""
@@ -201,23 +141,6 @@ class TestGroupOrdersDomainNested:
         order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
         assert "domains" in order_str
         assert "SELECT" in order_str.upper()
-
-    def test_by_domain_is_active_ascending(self) -> None:
-        order = ProjectOrders.by_domain_is_active(ascending=True)
-        order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
-        assert "domains" in order_str
-        assert "is_active" in order_str
-
-    def test_by_domain_created_at_ascending(self) -> None:
-        order = ProjectOrders.by_domain_created_at(ascending=True)
-        order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
-        assert "domains" in order_str
-        assert "created_at" in order_str
-
-    def test_by_domain_created_at_descending(self) -> None:
-        order = ProjectOrders.by_domain_created_at(ascending=False)
-        order_str = str(order)
-        assert "DESC" in order_str or "desc" in order_str.lower()
 
     def test_scalar_subquery_returns_clause_element(self) -> None:
         order = ProjectOrders.by_domain_name(ascending=True)
@@ -322,38 +245,6 @@ class TestGroupNestedSearchIntegration:
         assert result.total_count == 1
         active_domain = [d for d, _ in two_domains_with_projects.items() if "active-dom" in d][0]
         assert result.items[0].id == two_domains_with_projects[active_domain][0]
-
-    async def test_search_projects_with_domain_description_contains_filter(
-        self,
-        group_db_source: ProjectDBSource,
-        two_domains_with_projects: dict[str, list[uuid.UUID]],
-    ) -> None:
-        """search_projects with by_domain_description_contains filters by domain description."""
-        spec = StringMatchSpec(value="Research", case_insensitive=True, negated=False)
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[ProjectConditions.by_domain_description_contains(spec)],
-            orders=[],
-        )
-        result = await group_db_source.search_projects(querier)
-
-        assert result.total_count == 1
-
-    async def test_search_projects_with_domain_description_negated_filter(
-        self,
-        group_db_source: ProjectDBSource,
-        two_domains_with_projects: dict[str, list[uuid.UUID]],
-    ) -> None:
-        """Negated domain description filter excludes matching projects."""
-        spec = StringMatchSpec(value="Research", case_insensitive=True, negated=True)
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=50, offset=0),
-            conditions=[ProjectConditions.by_domain_description_contains(spec)],
-            orders=[],
-        )
-        result = await group_db_source.search_projects(querier)
-
-        assert result.total_count == 1
 
     async def test_search_projects_ordered_by_domain_name(
         self,
