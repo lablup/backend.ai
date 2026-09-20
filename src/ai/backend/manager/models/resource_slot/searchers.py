@@ -7,8 +7,16 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.resource_slot.types import AgentResourceData, ResourceSlotTypeData
-from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
+    ResourceAllocationData,
+    ResourceSlotTypeData,
+)
+from ai.backend.manager.models.resource_slot.row import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -39,3 +47,35 @@ class AgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData]):
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
         return row.to_data()
+
+
+@dataclass
+class UnrankedAgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData]):
+    """Slot rows in the order the caller names, without the slot catalog's rank."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(AgentResourceRow)
+
+    @override
+    def to_data(self, row: AgentResourceRow) -> AgentResourceData:
+        return row.to_data()
+
+
+@dataclass
+class ResourceAllocationSearcher(Searcher[ResourceAllocationRow, ResourceAllocationData]):
+    """Resource allocation rows matching the conditions."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(ResourceAllocationRow)
+
+    @override
+    def to_data(self, row: ResourceAllocationRow) -> ResourceAllocationData:
+        return ResourceAllocationData(
+            id=row.id,
+            kernel_id=row.kernel_id,
+            slot_name=row.slot_name,
+            requested=row.requested,
+            used=row.used,
+        )

@@ -26,6 +26,7 @@ from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.resource_slot.types import AgentResourceData, ResourceAllocationData
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -48,11 +49,10 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
+from ai.backend.manager.services.ops.service import GlobalSearcherService
 from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
     SearchResourceSlotTypesAction,
 )
-from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.testutils.db import with_tables
 
 type _PageFetch = Callable[[str | None], Awaitable[tuple[list[uuid.UUID], bool]]]
@@ -218,9 +218,9 @@ class TestAgentResourcePagination:
 
     @pytest.fixture
     def adapter(self, database: ExtendedAsyncSAEngine) -> ResourceSlotAdapter:
-        service = ResourceSlotService(ResourceSlotRepository(database))
+        repository: OpsRepository[AgentResourceData] = OpsRepository(V2DBOpsProvider(database))
         processors = MagicMock()
-        processors.search_agent_resources.run = service.search_agent_resources
+        processors.search_agent_resources.run = GlobalSearcherService(repository).execute
         return ResourceSlotAdapter(resource_slot=processors, agent=MagicMock(), domain=MagicMock())
 
     async def test_forward_pages_visit_every_row_once(
@@ -388,9 +388,9 @@ class TestResourceAllocationPagination:
 
     @pytest.fixture
     def adapter(self, database: ExtendedAsyncSAEngine) -> ResourceSlotAdapter:
-        service = ResourceSlotService(ResourceSlotRepository(database))
+        repository: OpsRepository[ResourceAllocationData] = OpsRepository(V2DBOpsProvider(database))
         processors = MagicMock()
-        processors.search_resource_allocations.run = service.search_resource_allocations
+        processors.search_resource_allocations.run = GlobalSearcherService(repository).execute
         return ResourceSlotAdapter(resource_slot=processors, agent=MagicMock(), domain=MagicMock())
 
     async def test_forward_pages_visit_every_row_once(
