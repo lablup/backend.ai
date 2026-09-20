@@ -21,6 +21,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
@@ -209,6 +210,7 @@ class TestModelCardScanResourceRequirements:
                 resource_policy=test_user_resource_policy.name,
             )
             db_sess.add(user)
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user.uuid))
             await db_sess.flush()
         return user
 
@@ -336,6 +338,57 @@ class TestModelCardScanResourceRequirements:
         assert {(r.slot_name, r.min_quantity) for r in rows} == {
             ("cpu", Decimal("2")),
             ("mem", Decimal("4096")),
+        }
+
+    async def _owners(
+        self, db: ExtendedAsyncSAEngine, card_id: uuid.UUID
+    ) -> set[tuple[str, uuid.UUID]]:
+        """The (entity type, entity id) of every other entity holding an own edge to the card."""
+        scope = VirtualEntityRow.__table__.alias("scope")
+        node = VirtualEntityRow.__table__.alias("node")
+        async with db.begin_readonly_session() as sess:
+            rows = (
+                await sess.execute(
+                    sa.select(scope.c.entity_type, scope.c.entity_id)
+                    .select_from(EntityMembershipRow)
+                    .join(scope, scope.c.id == EntityMembershipRow.virtual_entity_id)
+                    .join(node, node.c.id == EntityMembershipRow.member_entity_id)
+                    .where(
+                        node.c.entity_id == card_id,
+                        scope.c.id != node.c.id,
+                        EntityMembershipRow.capped.is_(False),
+                    )
+                )
+            ).all()
+        return {(str(entity_type), entity_id) for entity_type, entity_id in rows}
+
+    async def test_scan_joins_the_project_and_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        test_domain: DomainRow,
+        test_user: UserRow,
+        test_group: ProjectRow,
+        test_vfolder: VFolderRow,
+    ) -> None:
+        spec = self._build_scan_spec(
+            name="scan-card-owned-by-both",
+            test_domain=test_domain,
+            test_user=test_user,
+            test_group=test_group,
+            test_vfolder=test_vfolder,
+            min_resource=[],
+        )
+
+        await db_source.bulk_upsert_scan([spec], existing_names=set())
+
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            card_id = (
+                await sess.execute(sa.select(ModelCardRow.id).where(ModelCardRow.name == spec.name))
+            ).scalar_one()
+        assert await self._owners(db_with_cleanup, card_id) == {
+            ("project", test_group.id),
+            ("user", test_user.uuid),
         }
 
     async def test_scan_is_idempotent(
