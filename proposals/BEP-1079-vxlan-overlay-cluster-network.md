@@ -38,10 +38,10 @@ container's network namespace.
 | Backend | agent | how the L2 domain is realized (`vxlan`, `bridge`) |
 | Runtime seam | agent | netns of a container, by PID |
 
-Docker is the only supported runtime in the initial implementation. It is the only agent discovery
-that supplies a container locator and publishes cluster-network capabilities. Containerd, enroot,
-and singularity remain planned until their discoveries implement both contracts. A member agent
-without a fresh, matching capability record is refused a CNI cluster-network session.
+Docker and containerd are the supported runtimes: each agent discovery supplies a container
+locator and publishes cluster-network capabilities. Enroot and singularity remain planned until
+their discoveries implement both contracts. A member agent without a fresh, matching capability
+record is refused a CNI cluster-network session.
 
 An agent joins a session by publishing a member record; it removes that record only once its
 teardown has completed, which is what the manager reads before it reuses an allocation.
@@ -178,7 +178,7 @@ and an operator can pin a backend with `forced_backend`.
 | Runtime backend | Swarm `overlay` | BEP-1079 `cni` |
 |-----------------|-----------------|----------------|
 | Docker | Supported | Supported |
-| containerd | Not supported | Planned |
+| containerd | Not supported | Supported |
 | enroot / singularity | Not supported | Planned |
 | Kubernetes | Out of scope | Out of scope |
 

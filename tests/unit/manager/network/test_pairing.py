@@ -58,8 +58,12 @@ class TestCniDriver:
         etcd = FakeEtcd({"agent-1": "docker"})
         await require_members_can_serve_driver(cast(AsyncEtcd, etcd), "cni", ["agent-1"])
 
-    async def test_a_containerd_agent_is_refused_until_implemented(self) -> None:
+    async def test_a_containerd_agent_is_accepted(self) -> None:
         etcd = FakeEtcd({"agent-1": "containerd"})
+        await require_members_can_serve_driver(cast(AsyncEtcd, etcd), "cni", ["agent-1"])
+
+    async def test_a_backend_with_no_cluster_network_is_refused(self) -> None:
+        etcd = FakeEtcd({"agent-1": "kubernetes"})
         with pytest.raises(NetworkBackendMismatch, match="cannot serve"):
             await require_members_can_serve_driver(cast(AsyncEtcd, etcd), "cni", ["agent-1"])
 
@@ -96,12 +100,14 @@ class TestTheDriverFollowsTheAgentsBackend:
     used to produce a session whose kernels silently could not reach each other.
     """
 
-    async def test_unsupported_backend_does_not_get_an_unimplemented_driver(self) -> None:
+    async def test_containerd_agents_get_cni_whatever_the_operator_configured(self) -> None:
+        # containerd speaks no Swarm: 'overlay' handed to it would put every kernel on a
+        # node-local bridge with nothing saying so. The one driver it implements is the answer.
         etcd = FakeEtcd({"a": "containerd", "b": "containerd"})
         driver = await resolve_driver_for_agents(
             cast(AsyncEtcd, etcd), ["a", "b"], configured_driver="overlay"
         )
-        assert driver == "overlay"
+        assert driver == "cni"
 
     async def test_docker_agents_get_overlay(self) -> None:
         etcd = FakeEtcd({"a": "docker"})
@@ -131,7 +137,7 @@ class TestTheDriverFollowsTheAgentsBackend:
     async def test_an_unsupported_backend_keeps_configured_driver_for_explicit_rejection(
         self,
     ) -> None:
-        etcd = FakeEtcd({"a": "containerd"})
+        etcd = FakeEtcd({"a": "kubernetes"})
         driver = await resolve_driver_for_agents(
             cast(AsyncEtcd, etcd), ["a"], configured_driver="overlay"
         )

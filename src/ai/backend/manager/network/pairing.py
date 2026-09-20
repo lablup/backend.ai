@@ -28,10 +28,11 @@ CAPS_FRESH_FOR_SEC = 600.0
 #: Maximum tolerated clock skew for capability records dated in the future.
 CAPS_CLOCK_SKEW_SEC = 60.0
 
-# Keep this list implementation-backed. Docker is currently the only agent discovery that exposes
-# a container locator and publishes cluster-network capabilities.
+# Keep this list implementation-backed: a backend is listed under a driver only once its agent
+# discovery exposes a container locator and publishes cluster-network capabilities. containerd
+# speaks no Swarm, so it serves only the BEP-1078 driver.
 DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
-    "cni": frozenset({"docker"}),
+    "cni": frozenset({"docker", "containerd"}),
     "overlay": frozenset({"docker"}),
 }
 # Docker defaults to the established Swarm overlay unless the operator explicitly selects CNI.

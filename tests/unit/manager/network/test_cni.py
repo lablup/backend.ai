@@ -922,15 +922,17 @@ class TestCreateNetwork:
 
 
 class TestMemberBackendCompat:
-    async def test_containerd_member_is_refused_until_runtime_seam_exists(self) -> None:
+    async def test_a_containerd_member_is_accepted(self) -> None:
+        # The containerd backend drives the same session network through its own runtime and
+        # locator, and publishes the same capability record.
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "containerd"
         _publish_caps(etcd, "a1", backend="containerd")
         plugin = _plugin_with(etcd)
-        with pytest.raises(NetworkBackendMismatch, match="cannot serve"):
-            await plugin.create_network(
-                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
-            )
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert info.options["backend"] == "vxlan"
 
     async def test_a_docker_member_is_accepted(self) -> None:
         # Docker serves the cni driver too: the vxlan device is moved into the container's netns
