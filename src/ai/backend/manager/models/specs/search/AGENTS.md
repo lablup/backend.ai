@@ -35,6 +35,7 @@ A slot is emptied for one of three reasons. Do not empty one for a reason that i
 | `SecretColumn` | None | None |
 | Derived field (no column behind it) | None | None |
 | `DecimalType` (stored as VARCHAR) | Numeric cast | Numeric cast |
+| To-many child (order) | Filter with some / every / none | None |
 
 ### Sensitive — it works, but the value leaks
 
@@ -62,8 +63,11 @@ Empty both slots for the values below. Do not leave equality either.
 | `sa.Text`, or N above 1024 | One that serves partial matches | All |
 | Order by the entity's own column | Either way | Order allowed |
 | Order by a to-one correlated column | Either way | `ToOneCorrelation.order` |
+| To-many aggregate (count, min, max) | Either way | None — filter and order alike |
 
 - There is one boundary, 1024, and the schema divides there: 1024 and below holds single-line values such as names, paths, URLs and descriptions, and anything larger is `sa.Text` or a `16 * 1024` script.
+- A to-many aggregate runs its subquery again for every outer row. Promote a folded value to a parent column (`Rows of other tables`).
+- **A value already exposed is not an exception but a migration target.** `UserV2OrderField.PROJECT_NAME`, `ProjectV2OrderField.USER_USERNAME` and `ProjectV2OrderField.USER_EMAIL` are MIN scalar subqueries and fall under this ban (exposed in 26.2.0). Mark them deprecated, remove them in the next release, and keep them working until then.
 - Opening a partial match by adding an index puts that index in the same change.
 
 ## Conditions and orders
@@ -77,6 +81,17 @@ Empty both slots for the values below. Do not leave equality either.
 
 - Declare fields of other tables as `nested`, not flattened. Conditions gathered into one EXISTS apply to the same row.
 - Use `ToManyCorrelation` (some / every / none) for to-many and `ToOneCorrelation` (has, order) for to-one.
+- **A to-many opens filters and declares no order.** `ToManyCorrelation` building conditions only, with no `order`, is that rule.
+
+| Shape | Asks | Filter | Order |
+|---|---|---|---|
+| some | Is there any child satisfying the condition | Open | Not open |
+| every / none | Do all children satisfy it / does none | Open | Not open |
+| aggregate | What is the children's count, min or max | Not open | Not open |
+| Child column value | — | Used as a condition inside the three shapes above | No such shape |
+
+- With several children it is undefined which row's value an order would take. A to-one is one row, so `ToOneCorrelation.order` is open.
+- To order by a value folded from the children, promote that value to a parent column and declare it as `own`. Do not turn a child condition into an order key.
 - Use conditions and orders built by a `Correlation` only inside a query whose FROM has `correlate_row`.
 - Do not name anything `Relation`. It collides with the link rows on the permission side (`specs/relation.py`, BEP-1075).
 

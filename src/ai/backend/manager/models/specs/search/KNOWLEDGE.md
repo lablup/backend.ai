@@ -1,9 +1,9 @@
 ---
 name: search-field-declarations
 type: design-rationale
-description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why an unreadable using entity refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters
+description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why an unreadable using entity refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters
 scope: src/ai/backend/manager/models/specs/search
-keywords: [endpoint_tokens.token, access_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by]
+keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, access_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by]
 sources:
   - src/ai/backend/manager/models/specs/search
   - src/ai/backend/manager/models/specs/conditions
@@ -14,6 +14,8 @@ sources:
   - src/ai/backend/manager/models/endpoint/row.py
   - src/ai/backend/manager/models/deployment_revision/row.py
   - src/ai/backend/manager/models/user/row.py
+  - src/ai/backend/manager/models/routing/row.py
+  - src/ai/backend/manager/api/gql_legacy/endpoint.py
   - src/ai/backend/manager/models/entity_label/searchable_fields.py
   - src/ai/backend/manager/models/scopes.py
   - src/ai/backend/manager/models/specs/searcher.py
@@ -73,6 +75,7 @@ This package replaces the condition functions and order methods written by hand 
 - The single boundary at 1024 comes from counting the schema. Declared lengths cluster at 16, 20, 32, 64, 128, 255, 256, 500, 512 and 1024, and the next one up is `16 * 1024`. Everything at 1024 or below is a single-line value — a name, a path, a URL, a description — and is what users actually search by partial match. Anything larger is `sa.Text` or a script.
 - A boundary at 256 would close partial matching on `endpoints.name` and `model_cards.name`, both 512. A rule that closes name search removes a feature rather than saving cost.
 - Two bands would leave 257 through 1023 with no rule, and columns do sit there (`endpoints.name`, `model_cards.name` and `groups.description` are all 512), so the boundary has to be single.
+- A to-many aggregate runs its subquery again for every outer row. `ToManyCorrelation` having no `order` is not an inability to express it but the decision not to open aggregates. A to-one is one row per outer row, so it stays open.
 - An index ships in the same change as the declaration. A partial match opened without one stays until the load shows up.
 
 ## Condition classes do not know filter DTOs
@@ -113,6 +116,58 @@ This package replaces the condition functions and order methods written by hand 
 
 - every is `NOT EXISTS(NOT P)`, so it is true when there are no children (BEP-1060).
 - A dangling field (labels) differs only in linking by `(entity_type, entity_id)` instead of a foreign key; it is the same to-many.
+
+## A to-many opens filters and declares no order
+
+| Shape | SQL | Filter | Order |
+|---|---|---|---|
+| some | `EXISTS(P)` | Open | Not open |
+| every / none | `NOT EXISTS(NOT P)` / `NOT EXISTS(P)` | Open | Not open |
+| aggregate | Correlated aggregate subquery | Not open | Not open |
+
+The reason the filters are open differs from the reason the orders are not.
+
+- some / every / none can stop at the first child that satisfies (or breaks) the condition, and the planner can rewrite them into a semi-join driven from the child's index. They do not touch every outer row.
+- An aggregate has no value until the children are read to the end, and that repeats once per outer row.
+- The same EXISTS used as an order has to produce a value for every row in the result, so it does not fold into a semi-join. A filter is cheap only as a filter.
+
+## Why a child condition does not become an order key
+
+- Ahead of cost: what is actually asked for is not a boolean. The request is not "the ones with a running child first" but "healthy first, then the ones in trouble".
+- `Endpoint.status` (`api/gql_legacy/endpoint.py`) is that request in code. No children is DEGRADED, no active children is UNHEALTHY, all HEALTHY is HEALTHY, all UNHEALTHY is UNHEALTHY, and the rest is DEGRADED. Five values woven from four predicates.
+- Opening a boolean order does not produce that sequence. What would be opened is not what is asked for, so opening it leaves the request standing.
+- The value is currently folded in Python after loading every child row. The answer is not to open the order but to have the server keep the value as a column. It then becomes an `own` field, filter and order open together, and an index reaches it. That is a schema change and stays separate work.
+- `endpoints.replicas` is the desired count, not the number of live children. A folded value promoted to a column says in its name what it counted.
+
+## A to-many order already exposed leaves through deprecation
+
+| Exposed value | Implementation | Exposed in |
+|---|---|---|
+| `UserV2OrderField.PROJECT_NAME` | `UserOrders.by_project_name` — `MIN(projects.name)` scalar subquery | 26.2.0 |
+| `ProjectV2OrderField.USER_USERNAME` | `ProjectOrders.by_user_username` — `MIN(users.username)` | 26.2.0 |
+| `ProjectV2OrderField.USER_EMAIL` | `ProjectOrders.by_user_email` — `MIN(users.email)` | 26.2.0 |
+
+- All three fold M:N children with `MIN` to order by them. That is the shape being banned.
+- The rule is not loosened to fit them. What already shipped is a migration target, not a counterexample to the rule.
+- Deleting an exposed order field outright breaks the queries of clients already using it. Mark it deprecated, remove it in the next release, and keep it working until then.
+- This is why the rule is written down first. Without it, a fourth and a fifth arrive the same way.
+
+## Other services open a to-many order no further than aggregates
+
+This is about child rows an entity owns. Filters reaching into another entity are in `How other services open relational filters`.
+
+| Service | Opens for a to-many order | Predicate order |
+|---|---|---|
+| Hasura | Aggregates only — "array relationships only supporting aggregates for sorting" | None |
+| Prisma | `_count` alone | None |
+| Hasura ndc-spec | `OrderByTarget: aggregate`, split out behind the `relationships.order_by_aggregate` capability | None |
+| OData | `$orderby` takes a field path or a sortable function. The `any` / `all` lambdas are for `$filter` | None |
+| Elasticsearch | Opens child column ordering, but requires `mode` (min/max/avg/sum) and a restated `nested_filter` | None |
+| GitHub | A precounted counter behind a named enum value (`STARGAZERS`, `COMMENTS`) | None |
+
+- Even the services that decided to give a to-many order fold it into an aggregate in the end. Elasticsearch is the one case that orders by a child column, and it requires a `mode` to fold the several children into one.
+- Taking a condition as an order key exists nowhere. Prisma's tracker carries requests for child column ordering and for ordering by a filtered count, but none for ordering by a predicate.
+- This package closes the aggregate as well and sends it to a parent column, the way GitHub opens a counter.
 
 ## No nested filters into other entities, because nothing checks permission there
 
