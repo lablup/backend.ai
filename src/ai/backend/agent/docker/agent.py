@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import contextlib
 import logging
 import os
-import re
 import secrets
 import shutil
 import signal
@@ -66,6 +64,8 @@ from ai.backend.agent.errors import (
 from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
+from ai.backend.agent.health.docker import DockerHealthChecker
+from ai.backend.agent.image_distro import libc_probe_commands, parse_distro_from_ldd_output
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (
     KernelRecoveryDataAdapter,
@@ -83,20 +83,12 @@ from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
     DockerKernelRegistryRecovery,
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ai.backend.agent.network.caps import (
-    probe_caps,
-    publish_caps,
-    publish_vtep,
-    withdraw_caps,
-    withdraw_vtep,
-)
 from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.network.identity import NetworkIdentity
 from ai.backend.agent.network.port_forward import (
-    PortForwarder,
     PortPublisher,
     forwards_for,
 )
-from ai.backend.agent.network.privnet.client import PrivNetPortForwarder
 from ai.backend.agent.network.session_network import SessionNetwork
 from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.plugin.network import (
@@ -117,6 +109,7 @@ from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesy
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
+    ContainerNetns,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -132,7 +125,6 @@ from ai.backend.agent.utils import (
     host_pid_to_container_pid,
     update_nested_dict,
 )
-from ai.backend.common.arch import arch_name_aliases
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
     CgroupController,
@@ -154,6 +146,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.files import AsyncFileWriter
+from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -163,6 +156,7 @@ from ai.backend.common.network.keys import cluster_driver_key
 from ai.backend.common.network.types import SessionNetMeta
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    PID,
     AgentId,
     AutoPullBehavior,
     BinarySize,
@@ -192,6 +186,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
 from .gate import apply_gate, release_gate, stage_gate, wait_gated_pid
+from .intrinsic import fetch_api_stats
 from .kernel import DockerKernel
 from .session_network import (
     NO_NETWORK_MODE,
@@ -206,16 +201,8 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-#: How often the published network capabilities are refreshed. Their readiness half is a
-#: question that does not stay answered -- the privileged helper can die long after startup.
-_NETWORK_IDENTITY_REFRESH_SEC = 60.0
 eof_sentinel = Sentinel.TOKEN
 
-LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
-LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
-# Printed when the C library itself is executed (images without ldd), e.g.
-# "GNU C Library (Debian GLIBC 2.41-12+deb13u3) stable release version 2.41."
-LIBC_BANNER_GLIBC_REGEX = re.compile(r"^GNU C Library .*release version (\d+\.\d+)")
 # Upper bound for one libc probe container (start, run, exit). The probe executes paths
 # from an untrusted image, so a hang must not stall session creation.
 _LIBC_PROBE_TIMEOUT_SEC: Final[float] = 30.0
@@ -246,16 +233,6 @@ _TRACKED_CGROUP_CONTROLLERS: Final[tuple[CgroupController, ...]] = (
     CgroupController.MEMORY,
     CgroupController.BLKIO,
 )
-
-known_glibc_distros: Final[dict[float, str]] = {
-    2.17: "centos7.6",
-    2.27: "ubuntu18.04",
-    2.28: "centos8.0",
-    2.31: "ubuntu20.04",
-    2.34: "centos9.0",
-    2.35: "ubuntu22.04",
-    2.39: "ubuntu24.04",
-}
 
 
 class LogDriverOptions(BaseModel):
@@ -304,49 +281,6 @@ def _is_libc_probe_exec_failure(e: DockerError) -> bool:
         return True
     message = str(e.message).lower()
     return any(marker in message for marker in _LIBC_PROBE_EXEC_FAILURE_MARKERS)
-
-
-def _distro_for_glibc_version(version: float) -> str:
-    if version in known_glibc_distros:
-        return known_glibc_distros[version]
-    for idx, known_version in enumerate(known_glibc_distros.keys()):
-        if version < known_version:
-            return list(known_glibc_distros.values())[max(idx - 1, 0)]
-    return list(known_glibc_distros.values())[-1]
-
-
-def _parse_distro_from_ldd_output(log_chunks: Sequence[str]) -> str | None:
-    """
-    Resolve the distro from the output of ``ldd --version`` or of the C library run directly.
-    """
-    for line in "".join(log_chunks).splitlines():
-        stripped_line = line.strip()
-        if m := LDD_GLIBC_REGEX.search(stripped_line):
-            return _distro_for_glibc_version(float(m.group(1)))
-        if m := LIBC_BANNER_GLIBC_REGEX.search(stripped_line):
-            return _distro_for_glibc_version(float(m.group(1)))
-        if LDD_MUSL_REGEX.search(stripped_line):
-            return "alpine3.8"
-    return None
-
-
-def _libc_probe_commands(arch: str) -> list[list[str]]:
-    """
-    Commands tried in order to learn an image's C library. ``ldd`` is authoritative and comes
-    first so images that have it keep the existing probe; the rest execute the library itself
-    for images without ldd and are best-effort (a musl image carrying a glibc compat layer would
-    answer as glibc). The library paths use the Linux spelling of the architecture.
-    """
-    arch = arch_name_aliases.get(arch.lower(), arch.lower())
-    return [
-        ["ldd", "--version"],
-        [f"/lib/{arch}-linux-gnu/libc.so.6"],
-        ["/lib64/libc.so.6"],
-        ["/usr/lib64/libc.so.6"],
-        ["/usr/lib/libc.so.6"],
-        ["/lib/libc.so.6"],
-        [f"/lib/ld-musl-{arch}.so.1"],
-    ]
 
 
 deeplearning_image_keys = {
@@ -464,27 +398,6 @@ class DockerPurgeImageReq:
 _REPL_IN_PORT: Final = 2000
 _REPL_OUT_PORT: Final = 2001
 _REPL_PORTS: Final = frozenset({_REPL_IN_PORT, _REPL_OUT_PORT})
-
-
-def _port_publisher(session_network: SessionNetwork) -> PortPublisher:
-    """Who installs the host-port DNAT for a session-networked kernel.
-
-    It is an iptables (CAP_NET_ADMIN) op, so it belongs to whoever owns the host's networking: this
-    agent when it runs privileged, the privnet when privilege is separated. Doing it here under a
-    privnet is not a degraded path but a failure -- the agent holds no capability and iptables
-    refuses with "you must be root", which is a kernel that never reaches RUNNING. Same choice the
-    containerd agent makes; see ContainerdAgent.__ainit__.
-    """
-    # The session network's own client, not a fresh one on the same socket. That object is where
-    # each session's incarnation is bound, and it is what stamps every request with it; a client
-    # built here carries none, so a PUBLISH or UNPUBLISH delayed across a teardown and a rebuild
-    # would reach the rules of the session that replaced the one it was issued for. And it is the
-    # one place that knows whether this agent uses a helper at all -- the configured socket is
-    # not consulted here, because under the Swarm driver it is configured and not used.
-    client = session_network.privnet_client
-    if client is None:
-        return PortForwarder()
-    return PrivNetPortForwarder(client, session_network.session_of)
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
@@ -961,7 +874,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if cp not in _REPL_PORTS
         ]
         if forwards:
-            await _port_publisher(self._session_network).install(
+            await self._session_network.port_publisher().install(
                 forwards_for(
                     cid,
                     self._container_ip,
@@ -1943,10 +1856,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     #: The address peers program into their FDB. None means this node cannot anchor a tunnel, and
     #: ensure_session refuses a vxlan session outright rather than publishing an unreachable VTEP.
     _vtep_ip: str | None
-    #: The raw configured address the VTEP was validated from, kept for the startup diagnostic.
-    _host_ip: str
-    #: Refreshes the published capabilities, so readiness does not go stale.
-    _network_identity_task: asyncio.Task[None] | None
+    #: This node's advertised VTEP and capabilities, published while it serves.
+    _network_identity: NetworkIdentity
     #: The privileged network helper this agent uses, or None: the configured socket, unless the
     #: cluster's driver is Docker Swarm -- see `effective_privnet_socket`.
     _privnet_socket: str | None
@@ -2069,8 +1980,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # membership record.
         container_cfg = self.local_config.container
         host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
-        self._host_ip = host_ip
-        self._network_identity_task = None
         configured_socket = self.local_config.agent.network_privnet_socket
         cluster_driver = await self.etcd.get(cluster_driver_key(), scope=ConfigScopes.GLOBAL)
         self._privnet_socket = effective_privnet_socket(configured_socket, cluster_driver)
@@ -2087,17 +1996,28 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # serves with. The vxlan device is created on this uplink for the life of the process, so
         # an address that stays valid while moving to another NIC -- a failover, a re-cabling --
         # leaves the node probing one interface and building on another.
-        self._serving_uplink = uplink_for_ip(self._vtep_ip or host_ip)
+        serving_uplink = uplink_for_ip(self._vtep_ip or host_ip)
         self._session_network = build_docker_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=host_ip,
-            uplink=self._serving_uplink,
+            uplink=serving_uplink,
             privnet_socket=self._privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
             agent_state_dir=self.local_config.agent.var_base_path,
             vtep_ip=self._vtep_ip,
             configured_dns=tuple(container_cfg.dns or ()),
+        )
+        self._network_identity = NetworkIdentity(
+            self.etcd,
+            agent_id=str(self.id),
+            backend=str(self.local_config.agent.backend),
+            boot_id=self._boot_id,
+            session_network=self._session_network,
+            host_ip=host_ip,
+            serving_uplink=serving_uplink,
+            privnet_socket=self._privnet_socket,
+            vtep_ip=self._vtep_ip,
         )
         await self._session_network.open()
         # Rebuild what a restart emptied, BEFORE anything can ask the session network a question.
@@ -2178,27 +2098,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # session, and the node cannot serve one until its RPC transport is up -- which happens
         # after every `__ainit__` has returned. `start_serving` is where it goes.
 
-    async def _withdraw_network_identity(self) -> None:
-        """Stop advertising this node, and make sure nothing puts the advert back.
-
-        Three steps, in this order, because two is not enough. Deleting first shuts the door at
-        once -- while the advert stands a manager may still place work here, and the freshness
-        window would let it for ten minutes after this process is gone. But a refresh already
-        running can finish its publish AFTER that delete and put a fresh advert back over a node
-        that is shutting down. So the publisher is stopped and waited for, and only then is the
-        advert taken away for good.
-        """
-        for step in ("first", "final"):
-            try:
-                await withdraw_caps(self.etcd, str(self.id), self._boot_id)
-            except Exception:
-                log.exception("could not withdraw this agent's network capabilities ({})", step)
-            if step == "first" and self._network_identity_task is not None:
-                self._network_identity_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await self._network_identity_task
-                self._network_identity_task = None
-
     @override
     async def start_serving(self) -> None:
         """Announce the node, and only then advertise what it can serve.
@@ -2213,118 +2112,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             # Nothing reads the advert under the Swarm driver, and probing what this node could
             # serve would only report, every minute, an overlay it will never be asked for.
             return
-        await self._publish_network_identity()
-        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
+        await self._network_identity.start()
 
     @override
     async def stop_serving(self) -> None:
-        await self._withdraw_network_identity()
+        await self._network_identity.stop()
         await super().stop_serving()
-
-    async def _publish_network_identity_forever(self) -> None:
-        """Keep this node's advertised capabilities honest while it runs.
-
-        Published once at startup, they answer a question that does not stay answered: the
-        privileged helper can die an hour later, and the node goes on advertising `vxlan` while
-        nothing on it can build a device. The VTEP does not change, so this is about readiness.
-        """
-        while True:
-            await asyncio.sleep(_NETWORK_IDENTITY_REFRESH_SEC)
-            try:
-                await self._publish_network_identity()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("could not refresh this agent's network capabilities")
-
-    async def _publish_network_identity(self) -> None:
-        """Advertise this node's overlay identity: its capabilities and its VTEP (BEP-1079).
-
-        The VTEP lets the manager pre-seed session membership, which is what removes the
-        peer-publish race for a multi-node overlay. See `network/caps.py`.
-        """
-        # What this node advertises is what it can actually SERVE, and that is fixed for the life
-        # of the process: the session network and the vxlan backend hold the endpoint they were
-        # built with, and every session already up was built on it. So the host is asked afresh
-        # each time -- an address can go while this process runs, a link drops, DHCP hands out
-        # another -- but the answer only ever decides whether to keep advertising, never what to
-        # advertise. Republishing a recomputed address would have said "ready" on a node whose
-        # serving path refuses the session, and refreshing the cached one kept the timestamp
-        # moving on an advert that had stopped being true. Both are the same mistake: the advert
-        # has to be about the serving state, not about the host.
-        serving = self._session_network.serving_vtep
-        live = usable_vtep(self._host_ip)
-        # BOTH halves of the serving identity. The address alone is not it: the same address can
-        # move to another NIC and stay perfectly usable, while the vxlan device goes on being
-        # created on the interface this process started with -- so the node would probe the new
-        # NIC, advertise it healthy, and build the tunnel on the old one. That fails outright if
-        # the old NIC is gone and blackholes silently if it is merely no longer the path.
-        uplink = uplink_for_ip(live) if live is not None else None
-        intact = live == serving and uplink == self._serving_uplink
-        self._vtep_ip = serving if intact else None
-        if not intact:
-            log.warning(
-                "this node's overlay identity has moved (serving {!r} on {!r}, host now holds"
-                " {!r} on {!r}); withdrawing from multi-node overlay work until this agent is"
-                " restarted",
-                serving,
-                self._serving_uplink,
-                live,
-                uplink,
-            )
-        # The VTEP key first, then the capabilities. The capability record is what ADMITS this
-        # node to a session, so it is written last of everything this refresh does: anything that
-        # can still fail after it has landed can leave a fresh advert standing over an agent whose
-        # start never finished, and the manager has no way to tell.
-        if self._vtep_ip is not None:
-            await publish_vtep(self.etcd, str(self.id), self._vtep_ip, self._boot_id)
-        else:
-            # Retract, not merely skip: the key is durable, so an address published on an earlier
-            # boot would otherwise keep being pre-seeded into peers' FDBs long after this node
-            # stopped holding it -- by which time it may belong to a different host entirely.
-            await withdraw_vtep(self.etcd, str(self.id), self._boot_id)
-            log.warning(
-                "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable"
-                " unicast IPv4 address held by an interface of this host that is up. Single-node"
-                " sessions work; a multi-node overlay (vxlan) session scheduled here will be"
-                " refused until it is set.",
-                self._host_ip,
-            )
-        # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
-        # failure to describe the uplink must not stop the agent from serving kernels.
-        try:
-            caps = await probe_caps(
-                # The interface sessions are served on, not the one the address is on now: a probe
-                # of the wrong NIC describes a path this node will not use.
-                self._serving_uplink,
-                privnet_socket=self._privnet_socket,
-                # Retried here rather than on a loop of its own: this already runs on a timer,
-                # and the answer it publishes is exactly what the retry changes.
-                recovery_problems=await self._session_network.retry_recovery_fail_close(),
-            )
-            await publish_caps(
-                self.etcd,
-                str(self.id),
-                caps,
-                backend=str(self.local_config.agent.backend),
-                vtep_ip=self._vtep_ip,
-                boot_id=self._boot_id,
-            )
-            for problem in caps.readiness:
-                # Once at startup, where an operator can act on it -- rather than at the first
-                # session scheduled here, which fails on one node with the reason buried in a
-                # create-time traceback.
-                log.warning("overlay readiness: {}", problem)
-        except Exception:
-            # An advert this node could not renew must not stand: it is what a manager reads to
-            # place work here, and leaving the last one behind is how a node that has stopped
-            # being able to say anything keeps being chosen.
-            # Withdrawn, not raised. A node that cannot describe its uplink can still serve
-            # single-node sessions, and refusing to start would take it out entirely over a
-            # diagnostic. With no advert standing it is simply not admitted to a cluster-network
-            # session, which is the answer that matters.
-            log.exception("could not publish this agent's network capabilities; withdrawing")
-            await withdraw_caps(self.etcd, str(self.id), self._boot_id)
 
     @override
     async def not_serving_reason(self) -> str | None:
@@ -2342,7 +2135,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
-        await self._withdraw_network_identity()
+        await self._network_identity.stop()
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()
@@ -2407,6 +2200,48 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return cast(str, self.docker_info["CgroupVersion"])
 
     @override
+    def get_liveness_health_checkers(self) -> list[ServiceHealthChecker]:
+        return [DockerHealthChecker(docker=self.docker)]
+
+    @override
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        # The daemon knows the init PID while the container runs, and keeps the namespace pinned
+        # at the sandbox key once it has stopped.
+        data = await DockerContainer(self.docker, id=container_id).show()
+        pid = int(data.get("State", {}).get("Pid", 0)) or None
+        sandbox_key = data.get("NetworkSettings", {}).get("SandboxKey", "")
+        return ContainerNetns(pid=pid, path=Path(sandbox_key) if sandbox_key else None)
+
+    @override
+    async def fetch_container_api_stats(self, container_id: str) -> dict[str, Any] | None:
+        return await fetch_api_stats(DockerContainer(self.docker, id=container_id))
+
+    @override
+    async def enumerate_container_pids(self, container_id: ContainerId) -> Sequence[PID]:
+        try:
+            result = await self.docker._query_json(f"containers/{container_id}/top", method="GET")
+            procs = result["Processes"]
+        except (KeyError, DockerError):
+            log.debug("enumerate_container_pids(): cannot find container {}", container_id)
+            return []
+        pids: list[PID] = []
+        for proc in procs:
+            try:
+                pids.append(PID(int(proc[1])))
+            except (ValueError, IndexError):
+                log.debug("enumerate_container_pids(): cannot parse a PID from {}", proc)
+        return pids
+
+    @override
+    async def container_storage_root(self) -> str | None:
+        try:
+            docker_info = await self.docker.system.info()
+        except DockerError:
+            return None
+        graph_root: str | None = docker_info.get("DockerRootDir")
+        return graph_root or None
+
+    @override
     async def extract_image_command(self, image: str) -> list[str] | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
@@ -2423,7 +2258,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @override
     def port_publisher(self) -> PortPublisher:
         """This backend does publish host ports, so its rules are the reclaim's to collect."""
-        return _port_publisher(self._session_network)
+        return self._session_network.port_publisher()
 
     @override
     async def enumerate_containers(
@@ -2501,12 +2336,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         any other daemon error is raised as-is so host problems are not reported as image ones.
         """
         tried: list[str] = []
-        for cmd in _libc_probe_commands(arch):
+        for cmd in libc_probe_commands(arch):
             tried.append(" ".join(cmd))
             output = await self._run_libc_probe(docker, image_name, cmd)
             if output is None:
                 continue
-            distro = _parse_distro_from_ldd_output(output)
+            distro = parse_distro_from_ldd_output(output)
             if distro is not None:
                 return distro
         raise UnsupportedBaseDistroError(
@@ -3010,7 +2845,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # reclaims them, and a host port still pointing at a dead container's address is
                 # handed straight to whichever kernel draws that port next.
                 try:
-                    await _port_publisher(self._session_network).remove_container(str(container_id))
+                    await self._session_network.port_publisher().remove_container(str(container_id))
                 except Exception:
                     log.warning(
                         "could not remove the published ports of container {}", container_id

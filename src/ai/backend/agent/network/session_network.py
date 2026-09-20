@@ -40,6 +40,7 @@ from ai.backend.agent.network.orchestrator import (
     ContainerdKernelOrchestrator,
     LaunchResult,
 )
+from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher
 from ai.backend.agent.network.privnet.resolver import (
     ClusterDNSServer,
     ClusterResolver,
@@ -1160,6 +1161,26 @@ class SessionNetwork:
         stale incarnation's, and which it is therefore right to refuse.
         """
         return self._privnet_client
+
+    def port_publisher(self) -> PortPublisher:
+        """Who installs the host-port DNAT for a session-networked kernel.
+
+        It is an iptables (CAP_NET_ADMIN) op, so it belongs to whoever owns the host's networking:
+        the agent when it runs privileged, the privnet when privilege is separated. Doing it in the
+        agent under a privnet is not a degraded path but a failure -- the agent holds no capability
+        and iptables refuses -- which is a kernel that never reaches RUNNING.
+
+        Built on this object's own client, not a fresh one on the same socket: that client is where
+        each session's incarnation is bound and what stamps every request with it, so a PUBLISH or
+        UNPUBLISH delayed across a teardown and a rebuild cannot reach the rules of the session
+        that replaced the one it was issued for. And it is the one place that knows whether this
+        agent uses a helper at all.
+        """
+        from ai.backend.agent.network.privnet.client import PrivNetPortForwarder
+
+        if self._privnet_client is None:
+            return PortForwarder()
+        return PrivNetPortForwarder(self._privnet_client, self.session_of)
 
     def session_of(self, container_id: str) -> str | None:
         """The session a live container belongs to, from the attach record (rebuilt by `recover`

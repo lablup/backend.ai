@@ -15,8 +15,9 @@ import pytest
 from aiodocker.exceptions import DockerError
 from pytest_mock import MockerFixture
 
-from ai.backend.agent.docker.agent import DockerAgent, _libc_probe_commands
+from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.errors import UnsupportedBaseDistroError
+from ai.backend.agent.image_distro import libc_probe_commands
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
 LDD_OUTPUT = ["ldd (Ubuntu GLIBC 2.35-0ubuntu3.4) 2.35\n"]
@@ -280,7 +281,7 @@ class TestResolveImageDistroWithoutLdd:
         ):
             await agent.resolve_image_distro(image)
 
-        assert fake.created_commands == [tuple(c) for c in _libc_probe_commands("x86_64")]
+        assert fake.created_commands == [tuple(c) for c in libc_probe_commands("x86_64")]
         assert fake.deleted == fake.created_commands
         set_image_distro = agent.valkey_stat_client.set_image_distro
         assert isinstance(set_image_distro, AsyncMock)

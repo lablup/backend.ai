@@ -93,7 +93,7 @@ from ai.backend.agent.tasks import (
 )
 from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
-from ai.backend.common.cgroup import CgroupController
+from ai.backend.common.cgroup import CgroupController, CgroupResolutionFailed
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -186,6 +186,7 @@ from ai.backend.common.exception import (
     ConfigurationError,
     VolumeMountFailed,
 )
+from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -204,6 +205,7 @@ from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
+    PID,
     AbuseReportValue,
     AgentId,
     AutoPullBehavior,
@@ -287,6 +289,7 @@ from .stats import StatContext, StatModes
 from .types import (
     Container,
     ContainerLifecycleEvent,
+    ContainerNetns,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -675,6 +678,8 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         dotfile_extractor_path = self.resolve_krunner_filepath("runner/extract_dotfiles.py")
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
 
+        # The PID-1 reaper a runtime without its own init (containerd) runs the kernel under.
+        init_path = self.resolve_krunner_filepath("runner/init.py")
         fantompass_path = self.resolve_krunner_filepath("runner/fantompass.py")
         hash_phrase_path = self.resolve_krunner_filepath("runner/hash_phrase.py")
         words_json_path = self.resolve_krunner_filepath("runner/words.json")
@@ -685,6 +690,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
 
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
+        _mount(MountTypes.BIND, init_path, "/opt/kernel/init.py")
         _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
         _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
@@ -960,9 +966,7 @@ class AbstractAgent[
         self.stat_ctx = StatContext(
             self,
             local_config,
-            mode=StatModes(local_config.container.stats_type.value)
-            if local_config.container.stats_type
-            else None,
+            mode=self._resolve_stat_mode(local_config),
         )
         self._local_cron = None
         self._announcing = True
@@ -2171,6 +2175,49 @@ class AbstractAgent[
     @abstractmethod
     def get_cgroup_version(self) -> str:
         raise NotImplementedError
+
+    def _resolve_stat_mode(self, local_config: AgentUnifiedConfig) -> StatModes | None:
+        """Where container statistics are read from. The configured mode, unless the backend has
+        no daemon to answer the `docker` one and must read the cgroup filesystem regardless."""
+        stats_type = local_config.container.stats_type
+        return StatModes(stats_type.value) if stats_type else None
+
+    def get_liveness_health_checkers(self) -> list[ServiceHealthChecker]:
+        """The liveness probes this backend contributes (its container-runtime daemon, typically),
+        so the server never branches on the backend to register them."""
+        return []
+
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        """Where the intrinsic plugins read a container's network counters from; None when the
+        backend cannot say. Docker answers from the daemon, containerd from the task's PID."""
+        return None
+
+    async def fetch_container_api_stats(self, container_id: str) -> dict[str, Any] | None:
+        """One sample from the runtime's own stats API (`StatModes.DOCKER`). Only a backend with
+        such an API answers; the cgroup path needs none."""
+        return None
+
+    async def container_storage_root(self) -> str | None:
+        """The runtime's image/snapshot root, so node disk statistics skip its mounts."""
+        return None
+
+    async def enumerate_container_pids(self, container_id: ContainerId) -> Sequence[PID]:
+        """The host PIDs running in a container, for the per-process statistics.
+
+        Read from the container's cgroup, which every runtime places its processes in; a backend
+        with a better source (Docker's `top`) overrides this.
+        """
+        try:
+            cgroup_path = await self.get_cgroup_path(CgroupController.CPUACCT, container_id)
+            procs = (cgroup_path / "cgroup.procs").read_text()
+        except (OSError, CgroupResolutionFailed) as e:
+            log.debug(
+                "enumerate_container_pids(): cannot read the cgroup of container {}: {!r}",
+                container_id,
+                e,
+            )
+            return []
+        return [PID(int(line)) for line in procs.split() if line.isdigit()]
 
     def update_slots(self, updated_slots: Mapping[SlotName, Decimal]) -> None:
         self.slots = updated_slots

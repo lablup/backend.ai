@@ -22,8 +22,8 @@ from ai.backend.agent.docker.agent import (
     DockerKernelCreationContext,
     LogDriverOptions,
     _build_log_config,
-    _parse_distro_from_ldd_output,
 )
+from ai.backend.agent.image_distro import parse_distro_from_ldd_output
 
 LDD_PRELOAD_ERROR_LINES = "\n".join([
     "ERROR: ld.so: object '/opt/kernel/libbaihook.so' from LD_PRELOAD cannot be preloaded"
@@ -137,7 +137,7 @@ class TestParseDistroFromLddOutput:
         ],
     )
     def test_detects_distro_from_libc_banner(self, output: str, expected: str) -> None:
-        assert _parse_distro_from_ldd_output([output]) == expected
+        assert parse_distro_from_ldd_output([output]) == expected
 
     @pytest.mark.parametrize(
         "chunk_size",
@@ -150,7 +150,7 @@ class TestParseDistroFromLddOutput:
             LDD_GLIBC_TRAILER,
         ])
         chunks = [output[i : i + chunk_size] for i in range(0, len(output), chunk_size)]
-        assert _parse_distro_from_ldd_output(chunks) == "ubuntu24.04"
+        assert parse_distro_from_ldd_output(chunks) == "ubuntu24.04"
 
     @pytest.mark.parametrize(
         "output",
@@ -164,7 +164,7 @@ class TestParseDistroFromLddOutput:
         ],
     )
     def test_returns_none_without_libc_banner(self, output: str) -> None:
-        assert _parse_distro_from_ldd_output([output]) is None
+        assert parse_distro_from_ldd_output([output]) is None
 
 
 @pytest.fixture

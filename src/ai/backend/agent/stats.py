@@ -23,7 +23,6 @@ from typing import (
     override,
 )
 
-import aiodocker
 import attrs
 
 from ai.backend.common import msgpack
@@ -864,33 +863,6 @@ class StatContext:
             ):
                 await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
 
-    async def _get_processes(
-        self, container_id: ContainerId, docker: aiodocker.Docker
-    ) -> list[PID]:
-        """
-        Get the list of PIDs for the given container ID.
-        """
-        return_val: list[PID] = []
-        try:
-            result = await docker._query_json(f"containers/{container_id}/top", method="GET")
-            procs = result["Processes"]
-        except (KeyError, aiodocker.exceptions.DockerError):
-            log.debug(
-                "collect_per_container_process_stat(): cannot find container {}", container_id
-            )
-            return return_val
-
-        for proc in procs:
-            try:
-                return_val.append(PID(int(proc[1])))
-            except (ValueError, KeyError):
-                log.debug(
-                    "collect_per_container_process_stat(): cannot parse PID from {}",
-                    proc,
-                )
-                continue
-        return return_val
-
     async def collect_per_container_process_stat(
         self,
         container_ids: Sequence[ContainerId],
@@ -920,11 +892,11 @@ class StatContext:
         with self._stage_observer.measure_stage(
             stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
         ):
-            async with aiodocker.Docker() as docker:
-                for cid in container_ids:
-                    active_pids = await self._get_processes(cid, docker)
-                    for pid_ in active_pids:
-                        pid_map[pid_] = cid
+            # Through the backend: Docker answers from the daemon's `top`, the others from the
+            # container's cgroup, so this works on a node with no Docker daemon.
+            for cid in container_ids:
+                for pid_ in await self.agent.enumerate_container_pids(cid):
+                    pid_map[pid_] = cid
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
