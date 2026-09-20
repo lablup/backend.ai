@@ -96,11 +96,15 @@ A filled slot is not an API surface by itself.
 ## Rows of other tables
 
 - Declare fields of other tables as `nested`, not flattened. Conditions gathered into one EXISTS apply to the same row.
-- Use `ToManyCorrelation` (some / every / none) for to-many and `ToOneCorrelation` (has, order) for to-one.
+- Use `ToManyCorrelation` (exists / not_exists / some / every / none) for to-many and
+  `ToOneCorrelation` (exists, has, order) for to-one.
+- A matching mode takes the conditions one related row must meet and refuses an empty list.
+  Whether a related row is there at all is `exists` / `not_exists`, which take no condition.
 - **A to-many opens filters and declares no order.** `ToManyCorrelation` building conditions only, with no `order`, is that rule.
 
 | Shape | Asks | Filter | Order |
 |---|---|---|---|
+| exists / not_exists | Is there any child at all | Open | Not open |
 | some | Is there any child satisfying the condition | Open | Not open |
 | every / none | Do all children satisfy it / does none | Open | Not open |
 | aggregate | What is the children's count, min or max | Not open | Not open |
