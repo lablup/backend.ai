@@ -100,7 +100,7 @@ from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.domain.conditions import DomainConditions
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
@@ -1114,20 +1114,11 @@ class UserAdapter(BaseAdapter):
         """Deprecated. Every condition lands in one EXISTS over the user's domain."""
         if f is None:
             return []
-        conditions: list[QueryCondition] = []
-        if f.name is not None:
-            condition = self.convert_string_filter(
-                f.name,
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.is_active is not None:
-            conditions.append(DomainConditions.by_is_active(f.is_active))
+        fields = DomainSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
+        ]
         if not conditions:
             return []
         return [DeprecatedUserConditions.exists_domain_combined(conditions)]
