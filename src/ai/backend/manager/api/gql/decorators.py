@@ -23,7 +23,7 @@ Decorator roles:
 from __future__ import annotations
 
 import enum
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeVar, cast, dataclass_transform, overload
 
 import strawberry
@@ -34,6 +34,7 @@ from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFrom
 from strawberry.relay import Connection, Edge
 from strawberry.schema_directives import OneOf
 from strawberry.types.base import get_object_definition
+from strawberry.types.enum import StrawberryEnumDefinition
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
@@ -309,12 +310,35 @@ def gql_root_field(
     )
 
 
+def _apply_deprecated_values(
+    enum_cls: type[enum.Enum],
+    deprecated_values: Mapping[str, str],
+) -> None:
+    """Attach a deprecation reason to individual members of a processed enum.
+
+    ``strawberry.enum_value`` cannot be used on ``StrEnum`` members, whose values
+    must be strings, so the reasons are written onto the enum definition instead.
+    """
+    definition = cast(StrawberryEnumDefinition, enum_cls.__strawberry_definition__)  # type: ignore[attr-defined]
+    known_names = {value.name for value in definition.values}
+    unknown_names = set(deprecated_values) - known_names
+    if unknown_names:
+        raise ValueError(
+            f"{enum_cls.__name__} has no member(s) {sorted(unknown_names)} to deprecate"
+        )
+    for value in definition.values:
+        reason = deprecated_values.get(value.name)
+        if reason is not None:
+            value.deprecation_reason = reason
+
+
 @overload
 def gql_enum[T_enum: enum.Enum](
     meta: BackendAIGQLMeta,
     enum_cls: type[T_enum],
     *,
     name: str | None = ...,
+    deprecated_values: Mapping[str, str] | None = ...,
 ) -> type[T_enum]: ...
 
 
@@ -324,6 +348,7 @@ def gql_enum[T_enum: enum.Enum](
     enum_cls: None = ...,
     *,
     name: str | None = ...,
+    deprecated_values: Mapping[str, str] | None = ...,
 ) -> Callable[[type[T_enum]], type[T_enum]]: ...
 
 
@@ -332,8 +357,12 @@ def gql_enum(
     enum_cls: type[enum.Enum] | None = None,
     *,
     name: str | None = None,
+    deprecated_values: Mapping[str, str] | None = None,
 ) -> Any:
     """Enum type with version metadata.
+
+    ``deprecated_values`` maps a member name to its deprecation reason, which must
+    carry a version in the ``Deprecated since XX.X.X.`` form.
 
     Can be used as a decorator or as a function call for DTO wrapping::
 
@@ -345,13 +374,19 @@ def gql_enum(
         StatusGQL = gql_enum(BackendAIGQLMeta(...), StatusDTO, name="Status")
     """
     description = _build_description(meta)
-    if enum_cls is not None:
+
+    def process(cls: type[enum.Enum]) -> type[enum.Enum]:
         if name is not None:
-            return strawberry.enum(enum_cls, description=description, name=name)
-        return strawberry.enum(enum_cls, description=description)
-    if name is not None:
-        return strawberry.enum(description=description, name=name)
-    return strawberry.enum(description=description)
+            processed = strawberry.enum(cls, description=description, name=name)
+        else:
+            processed = strawberry.enum(cls, description=description)
+        if deprecated_values:
+            _apply_deprecated_values(processed, deprecated_values)
+        return processed
+
+    if enum_cls is not None:
+        return process(enum_cls)
+    return process
 
 
 _ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])

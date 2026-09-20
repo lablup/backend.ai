@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntArrayFilter,
@@ -197,6 +198,13 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     NOT: list[Self] | None = None
 
 
+_PROJECT_NAME_ORDER_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A user belongs to many projects, so this"
+    " order folds them into a single name. Narrow the results with the `project` filter"
+    " instead."
+)
+
+
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.2.0",
@@ -208,10 +216,11 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
             "EMAIL: Order by email address alphabetically. "
             "STATUS: Order by account status. "
             "DOMAIN_NAME: Order by domain name (scalar subquery). "
-            "PROJECT_NAME: Order by project name (MIN aggregation)."
+            "PROJECT_NAME: Order by project name."
         ),
     ),
     name="UserV2OrderField",
+    deprecated_values={"PROJECT_NAME": _PROJECT_NAME_ORDER_DEPRECATION},
 )
 class UserOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
