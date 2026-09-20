@@ -12,6 +12,7 @@ from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
+from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsedBy
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -40,7 +41,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
-from ai.backend.manager.models.model_card.scopes import VFolderModelCardTarget
 
 from .nested import (
     VFolderAccessControlInfoGQL,
@@ -132,7 +132,13 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Model cards backed by this vfolder.",
-        )
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="a model card search narrowed by `usedBy: { vfolder }`",
+        ),
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use a model card search narrowed by "
+            "`usedBy: { vfolder }`."
+        ),
     )  # type: ignore[misc]
     async def model_cards(
         self,
@@ -146,9 +152,9 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ModelCardV2Connection | None:
-        result = await info.context.adapters.model_card.search_by_vfolder(
-            scope=VFolderModelCardTarget(vfolder_id=VFolderUUID(UUID(self.id))),
-            input=SearchModelCardsInput(
+        result = await info.context.adapters.model_card.admin_search(
+            SearchModelCardsInput(
+                used_by=ModelCardUsedBy(vfolder=[VFolderUUID(UUID(self.id))]),
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
                 first=first,

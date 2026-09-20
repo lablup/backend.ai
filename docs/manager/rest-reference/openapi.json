@@ -27046,7 +27046,8 @@
               }
             ],
             "default": null,
-            "description": "Filter by the storage host backing the model card's VFolder. Evaluated as an EXISTS subquery joining the model VFolder's host column."
+            "deprecated": true,
+            "description": "Filter by the storage host backing the model card's VFolder. Deprecated: search vfolders by host first, then pass their ids as `used_by.vfolder`."
           },
           "AND": {
             "anyOf": [
@@ -27121,8 +27122,44 @@
         "title": "ModelCardOrderField",
         "type": "string"
       },
+      "ModelCardUsedBy": {
+        "description": "Entities whose use narrows the model cards read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Model cards the caller cannot\nread are left out even when a listed entity uses them.",
+        "properties": {
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VFolders the model card is built on",
+            "title": "Vfolder"
+          }
+        },
+        "title": "ModelCardUsedBy",
+        "type": "object"
+      },
       "SearchModelCardsInput": {
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -27290,6 +27327,18 @@
           "scope": {
             "$ref": "#/components/schemas/ModelCardScope",
             "description": "Scope (OR across all items)."
+          },
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [

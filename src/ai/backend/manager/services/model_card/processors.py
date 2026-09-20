@@ -89,7 +89,7 @@ class ModelCardProcessors:
         self.bulk_delete = group.partial_bulk(BulkDeleteModelCardAction, service.bulk_delete)
         self.get = group.single_get_ops(GetModelCardAction)
         self.global_search = group.global_searcher_ops(GlobalSearchModelCardsAction)
-        self.scoped_search = group.scope_search_ops(ScopedSearchModelCardsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchModelCardsAction)
         self.scan = group.global_scope(ScanProjectModelCardsAction, service.scan)
         self.available_presets = group.global_scope(
             AvailablePresetsAction, service.available_presets

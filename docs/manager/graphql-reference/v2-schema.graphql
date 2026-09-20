@@ -8046,6 +8046,14 @@ input ModelCardScope {
 }
 
 """
+Added in 26.9.0. Entities whose use narrows a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity uses others.
+"""
+input ModelCardUsedBy {
+  """VFolders the model card is built on."""
+  vfolder: [UUID!] = null
+}
+
+"""
 Added in 26.4.2. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
 """
 type ModelCardV2 implements Node {
@@ -8159,7 +8167,7 @@ input ModelCardV2Filter {
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
   """
-  storageHost: StringFilter = null
+  storageHost: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. Search vfolders by host first, then pass their ids as `usedBy.vfolder`.")
 
   """Combine nested filters with logical AND."""
   AND: [ModelCardV2Filter!] = null
@@ -12588,15 +12596,58 @@ type Query {
   deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset
 
   """Added in 26.4.2. Search all model cards (superadmin only)."""
-  adminModelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  adminModelCardsV2(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usedBy: ModelCardUsedBy = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
 
   """Added in 26.4.2. Search model cards within a MODEL_STORE project."""
-  projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  projectModelCardsV2(
+    scope: ProjectModelCardV2Scope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usedBy: ModelCardUsedBy = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
 
   """
   Added in 26.9.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedModelCardsV2(scope: ModelCardScope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  scopedModelCardsV2(
+    scope: ModelCardScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usedBy: ModelCardUsedBy = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
 
   """Added in 26.4.2. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
@@ -19118,8 +19169,10 @@ type VFolder implements Node {
   """
   usage: VFolderUsageInfo
 
-  """Added in 26.4.4. Model cards backed by this vfolder."""
-  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  """
+  Added in 26.4.4. Model cards backed by this vfolder. Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.
+  """
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @deprecated(reason: "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.")
 
   """Added in 26.9.0. The labels on this vfolder."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection

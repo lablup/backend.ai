@@ -34,6 +34,9 @@ from ai.backend.manager.models.model_card.creators import (
     ModelCardResourceRequirementCreator,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardResourceRequirementSearchableFields,
+)
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
@@ -387,7 +390,7 @@ class TestModelCardCreatorResourceRequirements:
                 .scalars()
                 .all()
             )
-        return [row.to_data() for row in rows]
+        return [ModelCardResourceRequirementSearchableFields.own.to_data(row) for row in rows]
 
     async def test_resource_requirements_persisted_in_db(
         self,

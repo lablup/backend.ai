@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
@@ -9,7 +10,10 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
@@ -46,10 +50,12 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
     ModelCardScope,
+    ModelCardUsedBy,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import MountPermission
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
@@ -73,9 +79,7 @@ from ai.backend.manager.data.model_card.types import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
-from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.scopes import (
@@ -83,15 +87,16 @@ from ai.backend.manager.models.model_card.scopes import (
     ModelCardTarget,
     ProjectModelCardTarget,
     UserModelCardTarget,
-    VFolderModelCardTarget,
 )
+from ai.backend.manager.models.model_card.searchable_fields import ModelCardSearchableFields
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
     ModelCardSearcher,
 )
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.model_card.actions.available_presets import (
@@ -152,11 +157,10 @@ def _build_policy_from_strategy_input(
     )
 
 
-def _model_card_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=ModelCardOrders.created_at(ascending=False),
-        cursor_column=ModelCardRow.id,
-    )
+_MODEL_CARD_PAGINATION_SPEC = PaginationSpec(
+    forward_order=ModelCardSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=ModelCardRow.id,
+)
 
 
 def _entries_to_requirements(
@@ -186,29 +190,15 @@ class ModelCardAdapter(BaseAdapter):
         self,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        searcher = self._build_searcher(
-            ModelCardSearcher,
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_model_card_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
         result = await self._model_card.global_search.run(
-            GlobalSearchModelCardsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+            GlobalSearchModelCardsAction(
+                searcher=GlobalSearcher(
+                    used_by=self._used_by(input.used_by),
+                    searcher=self._build_model_card_searcher(input),
+                )
+            )
         )
-        return SearchModelCardsPayload(
-            items=await self._nodes_with_min_resources(result.items),
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return await self._payload(result)
 
     def _scope_targets(self, scope: ModelCardScope) -> list[ModelCardTarget]:
         """The scope targets the request named, in the order the input lists them."""
@@ -224,90 +214,58 @@ class ModelCardAdapter(BaseAdapter):
         )
         return targets
 
+    def _used_by(self, used_by: ModelCardUsedBy | None) -> list[UsedBy]:
+        """The uses the request named."""
+        if used_by is None:
+            return []
+        linked = ModelCardSearchableFields.linked
+        return [
+            linked.vfolders.used_by(VFolderUUID(entity_id)) for entity_id in used_by.vfolder or ()
+        ]
+
+    def _scoped_search_action(
+        self,
+        targets: Sequence[ModelCardTarget],
+        input: ScopedSearchModelCardsInput | SearchModelCardsInput,
+    ) -> ScopedSearchModelCardsAction:
+        return ScopedSearchModelCardsAction(
+            searcher=ScopedSearcher(
+                scopes=targets,
+                used_by=self._used_by(input.used_by),
+                searcher=self._build_model_card_searcher(input),
+            )
+        )
+
     async def scoped_search(
         self,
         input: ScopedSearchModelCardsInput,
     ) -> SearchModelCardsPayload:
         """Search the model cards the named scopes reach, combined with OR."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        searcher = self._build_searcher(
-            ModelCardSearcher,
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_model_card_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
         result = await self._model_card.scoped_search.run(
-            ScopedSearchModelCardsAction(
-                targets=self._scope_targets(input.scope),
-                searcher=searcher,
-            )
+            self._scoped_search_action(self._scope_targets(input.scope), input)
         )
-        return SearchModelCardsPayload(
-            items=await self._nodes_with_min_resources(result.items),
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return await self._payload(result)
 
     async def project_search(
         self,
         project_id: UUID,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        searcher = self._build_searcher(
-            ModelCardSearcher,
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_model_card_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
         result = await self._model_card.scoped_search.run(
-            ScopedSearchModelCardsAction(
-                targets=[ProjectModelCardTarget(project_id=ProjectID(project_id))],
-                searcher=searcher,
+            self._scoped_search_action(
+                [ProjectModelCardTarget(project_id=ProjectID(project_id))], input
             )
         )
-        return SearchModelCardsPayload(
-            items=await self._nodes_with_min_resources(result.items),
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return await self._payload(result)
 
-    async def search_by_vfolder(
-        self,
-        scope: VFolderModelCardTarget,
-        input: SearchModelCardsInput,
-    ) -> SearchModelCardsPayload:
-        """Search model cards backed by a specific VFolder.
-
-        Used by the ``VFolderGQL.model_cards`` nested resolver. Access is
-        delegated to the parent VFolder resolver — the caller must already
-        have permission to resolve the VFolder.
-        """
-        conditions = [scope.to_condition()]
-        if input.filter:
-            conditions.extend(self._convert_filter(input.filter))
-        orders = self._convert_orders(input.order) if input.order else []
-        searcher = self._build_searcher(
+    def _build_model_card_searcher(
+        self, input: ScopedSearchModelCardsInput | SearchModelCardsInput
+    ) -> ModelCardSearcher:
+        return self._build_searcher(
             ModelCardSearcher,
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_model_card_pagination_spec(),
+            conditions=self._convert_filter(input.filter) if input.filter else [],
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_MODEL_CARD_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
             last=input.last,
@@ -315,9 +273,8 @@ class ModelCardAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._model_card.global_search.run(
-            GlobalSearchModelCardsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
-        )
+
+    async def _payload(self, result: BatchOpsResult[ModelCardData]) -> SearchModelCardsPayload:
         return SearchModelCardsPayload(
             items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
@@ -552,76 +509,59 @@ class ModelCardAdapter(BaseAdapter):
         )
         return result.data
 
-    def _convert_filter(self, filter_: ModelCardFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.domain_name is not None:
-            cond = self.convert_string_filter(
-                filter_.domain_name,
-                contains_factory=ModelCardConditions.by_domain_contains,
-                equals_factory=ModelCardConditions.by_domain_equals,
-                starts_with_factory=ModelCardConditions.by_domain_starts_with,
-                ends_with_factory=ModelCardConditions.by_domain_ends_with,
-                in_factory=ModelCardConditions.by_domain_in,
-            )
-            if cond:
-                conditions.append(cond)
-        if filter_.project_id is not None:
-            cond = self.convert_uuid_filter(
-                filter_.project_id,
-                equals_factory=ModelCardConditions.by_project_equals,
-                in_factory=ModelCardConditions.by_project_in,
-            )
-            if cond:
-                conditions.append(cond)
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=ModelCardConditions.by_name_contains,
-                equals_factory=ModelCardConditions.by_name_equals,
-                starts_with_factory=ModelCardConditions.by_name_starts_with,
-                ends_with_factory=ModelCardConditions.by_name_ends_with,
-                in_factory=ModelCardConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
-        if filter_.storage_host:
-            cond = self.convert_string_filter(
-                filter_.storage_host,
-                contains_factory=ModelCardConditions.by_storage_host_contains,
-                equals_factory=ModelCardConditions.by_storage_host_equals,
-                starts_with_factory=ModelCardConditions.by_storage_host_starts_with,
-                ends_with_factory=ModelCardConditions.by_storage_host_ends_with,
-                in_factory=ModelCardConditions.by_storage_host_in,
-            )
-            if cond:
-                conditions.append(cond)
-        if filter_.AND:
-            for sub in filter_.AND:
+    def _convert_filter(self, f: ModelCardFilter) -> list[QueryCondition]:
+        fields = ModelCardSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_string_filter(f.domain_name, fields.domain.filter),
+            *self.apply_uuid_filter(f.project_id, fields.project_id.filter),
+            *self._storage_host_conditions(f.storage_host),
+        ]
+        if f.AND:
+            for sub in f.AND:
                 conditions.extend(self._convert_filter(sub))
-        if filter_.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
-        if filter_.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
+    def _storage_host_conditions(self, host: StringFilter | None) -> list[QueryCondition]:
+        """The host of the vfolder the card is built on.
+
+        Deprecated: a vfolder is another entity, so the caller's permission on it is not
+        checked here. Callers move to a vfolder search by host followed by
+        ``used_by: { vfolder }``.
+        """
+        if host is None:
+            return []
+        vfolder = ModelCardSearchableFields.nested.vfolder
+        matches = self.apply_string_filter(host, vfolder.fields.host.filter)
+        if not matches:
+            return []
+        return [vfolder.correlation.has(matches)]
+
     def _convert_orders(self, orders: list[ModelCardOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for order in orders:
-            ascending = order.direction.value == "ASC"
-            match order.field:
-                case ModelCardOrderField.NAME:
-                    result.append(ModelCardOrders.name(ascending))
-                case ModelCardOrderField.CREATED_AT:
-                    result.append(ModelCardOrders.created_at(ascending))
-        return result
+        return [self._convert_order(order) for order in orders]
+
+    def _convert_order(self, order: ModelCardOrder) -> QueryOrder:
+        fields = ModelCardSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ModelCardOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case ModelCardOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     async def _nodes_with_min_resources(
         self, cards: Sequence[ModelCardData]

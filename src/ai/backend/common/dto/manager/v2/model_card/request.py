@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
     ModelCardScope,
+    ModelCardUsedBy,
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -114,8 +115,10 @@ class ModelCardFilter(BaseRequestModel):
         default=None,
         description=(
             "Filter by the storage host backing the model card's VFolder. "
-            "Evaluated as an EXISTS subquery joining the model VFolder's host column."
+            "Deprecated: search vfolders by host first, then pass their ids as "
+            "`used_by.vfolder`."
         ),
+        deprecated=True,
     )
     AND: list[ModelCardFilter] | None = Field(default=None)
     OR: list[ModelCardFilter] | None = Field(default=None)
@@ -134,6 +137,13 @@ class ScopedSearchModelCardsInput(BaseRequestModel):
     """Input for searching the model cards the named scopes reach."""
 
     scope: ModelCardScope = Field(description="Scope (OR across all items).")
+    used_by: ModelCardUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; model cards the caller cannot read are left out."
+        ),
+    )
     filter: ModelCardFilter | None = Field(default=None)
     order: list[ModelCardOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)
@@ -145,6 +155,13 @@ class ScopedSearchModelCardsInput(BaseRequestModel):
 
 
 class SearchModelCardsInput(BaseRequestModel):
+    used_by: ModelCardUsedBy | None = Field(
+        default=None,
+        description=(
+            "Entities whose use narrows the result. Each listed entity must be readable by "
+            "the caller; model cards the caller cannot read are left out."
+        ),
+    )
     filter: ModelCardFilter | None = Field(default=None)
     order: list[ModelCardOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)

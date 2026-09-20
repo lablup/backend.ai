@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.model_card import ModelCardEntityType, ModelC
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -34,7 +33,6 @@ __all__ = (
     "ModelCardTarget",
     "ProjectModelCardTarget",
     "UserModelCardTarget",
-    "VFolderModelCardTarget",
 )
 
 
@@ -166,32 +164,3 @@ class ProjectModelCardTarget(ModelCardTarget):
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
-
-
-@dataclass(frozen=True)
-class VFolderModelCardTarget(ScopeTarget):
-    """Scope for searching model cards backed by a specific VFolder.
-
-    Access is delegated to the parent VFolder resolver — if the caller
-    can resolve the VFolder, they may see model cards backed by it.
-    """
-
-    vfolder_id: VFolderUUID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.vfolder_id
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        vfolder_id = self.vfolder_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.vfolder == vfolder_id
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
-        return ()

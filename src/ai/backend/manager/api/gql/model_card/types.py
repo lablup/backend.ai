@@ -77,6 +77,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardScope,
+    ModelCardUsedBy,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
@@ -403,6 +404,10 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
             "Filter by the storage host backing the model card's VFolder. "
             "Matches via an EXISTS subquery against the VFolder host column."
         ),
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Search vfolders by host first, then pass their "
+            "ids as `usedBy.vfolder`."
+        ),
     )
     AND: list[Self] | None = gql_field(
         default=None, description="Combine nested filters with logical AND."
@@ -652,4 +657,23 @@ class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
             description="Users whose model cards are being read.",
         ),
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Entities whose use narrows a model card query; every id is AND-ed. The caller "
+            "must be able to read each listed entity, or the request is refused. Only model "
+            "cards the caller can read are returned, even when a listed entity uses others."
+        ),
+    ),
+    name="ModelCardUsedBy",
+)
+class ModelCardUsedByGQL(PydanticInputMixin[ModelCardUsedBy]):
+    """The entities whose use of a model card narrows the read."""
+
+    vfolder: list[UUID] | None = gql_field(
+        default=None, description="VFolders the model card is built on."
     )
