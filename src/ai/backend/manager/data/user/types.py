@@ -104,7 +104,8 @@ class UserData(EntityData):
     @classmethod
     def from_row(cls, row: Any) -> Self:
         """
-        Deprecated: Use `UserRow.to_data()` method instead.
+        Deprecated: use `UserSearchableFields.own.to_data()`. Kept for the alembic
+        migrations, which read rows the ORM mapper is not available for.
         """
         return cls(
             id=row.uuid,

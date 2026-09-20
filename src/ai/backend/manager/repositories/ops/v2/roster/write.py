@@ -32,6 +32,7 @@ from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
@@ -86,7 +87,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             await self._bulk_insert_ignore_conflicts([
                 UserRoleRow(user_id=row.uuid, role_id=role_id) for row in rows
             ])
-        return [row.to_data() for row in rows]
+        return [UserSearchableFields.own.to_data(row) for row in rows]
 
     async def leave_member(self, project_id: ProjectID, user_id: UserID) -> None:
         """Take one user off the project's roster. Silent where they were not on it."""
@@ -126,7 +127,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             for uid in existing - joined
         ]
         return RosterLeaveResult(
-            members=[row.to_data() for row in joined_rows],
+            members=[UserSearchableFields.own.to_data(row) for row in joined_rows],
             failures=failures,
         )
 

@@ -55,6 +55,7 @@ from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -145,7 +146,7 @@ class SessionDBSource:
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return user.to_data()
+            return UserSearchableFields.own.to_data(user)
 
     async def get_session_validated(
         self,
