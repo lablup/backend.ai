@@ -16,12 +16,6 @@ class ModelCardOrders:
         return ModelCardRow.name.desc()
 
     @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ModelCardRow.id.asc()
-        return ModelCardRow.id.desc()
-
-    @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ModelCardRow.created_at.asc()

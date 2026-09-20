@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection
-from uuid import UUID
-
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -26,27 +22,6 @@ __all__ = ("ModelCardConditions",)
 
 class ModelCardConditions:
     @staticmethod
-    def by_vfolder_ids(vfolder_ids: Collection[VFolderUUID]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.vfolder.in_(vfolder_ids)
-
-        return inner
-
-    @staticmethod
-    def by_domain(domain_name: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.domain == domain_name
-
-        return inner
-
-    @staticmethod
-    def by_project(project_id: UUID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.project == project_id
-
-        return inner
-
-    @staticmethod
     def by_project_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             condition = ModelCardRow.project == spec.value
@@ -63,13 +38,6 @@ class ModelCardConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
-
-        return inner
-
-    @staticmethod
-    def by_creator(creator_id: UUID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.creator == creator_id
 
         return inner
 
