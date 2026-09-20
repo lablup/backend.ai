@@ -11584,6 +11584,16 @@ input ModelCardScope
 }
 
 """
+Added in 26.9.0. Entities whose use narrows a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity uses others.
+"""
+input ModelCardUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """VFolders the model card is built on."""
+  vfolder: [UUID!] = null
+}
+
+"""
 Added in 26.4.2. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
 """
 type ModelCardV2 implements Node
@@ -11696,8 +11706,14 @@ type ModelCardV2Edge
 input ModelCardV2Filter
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.9.0. Filter by model card ID."""
+  entityId: UUIDFilter = null
+
   """Name filter."""
   name: StringFilter = null
+
+  """Added in 26.9.0. Filter by the VFolder holding the model."""
+  vfolderId: UUIDFilter = null
 
   """Domain filter."""
   domainName: StringFilter = null
@@ -11705,10 +11721,50 @@ input ModelCardV2Filter
   """Project filter."""
   projectId: UUIDFilter = null
 
+  """Added in 26.9.0. Filter by the user who created the model card."""
+  creatorId: UUIDFilter = null
+
+  """Added in 26.9.0. Author filter."""
+  author: StringFilter = null
+
+  """Added in 26.9.0. Title filter."""
+  title: StringFilter = null
+
+  """Added in 26.9.0. Model version filter."""
+  modelVersion: StringFilter = null
+
+  """Added in 26.9.0. Task filter."""
+  task: StringFilter = null
+
+  """Added in 26.9.0. Category filter."""
+  category: StringFilter = null
+
+  """Added in 26.9.0. Architecture filter."""
+  architecture: StringFilter = null
+
+  """Added in 26.9.0. License filter."""
+  license: StringFilter = null
+
+  """
+  Added in 26.9.0. Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison.
+  """
+  accessLevel: StringFilter = null
+
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
   """
-  storageHost: StringFilter = null
+  storageHost: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. Search vfolders by host first, then pass their ids as `usedBy.vfolder`.")
+
+  """Added in 26.9.0. Creation datetime filter."""
+  createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Update datetime filter."""
+  updatedAt: NullableDateTimeFilter = null
+
+  """
+  Added in 26.9.0. Filter by conditions on the minimum resource requirements.
+  """
+  minResource: ModelCardV2ResourceRequirementNestedFilter = null
 
   """Combine nested filters with logical AND."""
   AND: [ModelCardV2Filter!] = null
@@ -11780,8 +11836,53 @@ input ModelCardV2OrderBy
 enum ModelCardV2OrderField
   @join__type(graph: STRAWBERRY)
 {
+  ENTITY_ID @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  VFOLDER_ID @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  PROJECT_ID @join__enumValue(graph: STRAWBERRY)
+  CREATOR_ID @join__enumValue(graph: STRAWBERRY)
+  AUTHOR @join__enumValue(graph: STRAWBERRY)
+  TITLE @join__enumValue(graph: STRAWBERRY)
+  MODEL_VERSION @join__enumValue(graph: STRAWBERRY)
+  TASK @join__enumValue(graph: STRAWBERRY)
+  CATEGORY @join__enumValue(graph: STRAWBERRY)
+  ARCHITECTURE @join__enumValue(graph: STRAWBERRY)
+  LICENSE @join__enumValue(graph: STRAWBERRY)
+  ACCESS_LEVEL @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. Filter for one minimum resource requirement of a model card.
+"""
+input ModelCardV2ResourceRequirementFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource slot name filter."""
+  slotName: StringFilter = null
+
+  """Minimum quantity filter."""
+  minQuantity: DecimalFilter = null
+}
+
+"""
+Added in 26.9.0. Filter model cards by conditions on their minimum resource requirements.
+"""
+input ModelCardV2ResourceRequirementNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches cards with at least one requirement satisfying all conditions."""
+  some: ModelCardV2ResourceRequirementFilter = null
+
+  """
+  Matches cards where every requirement satisfies all conditions (also true when the card has none).
+  """
+  every: ModelCardV2ResourceRequirementFilter = null
+
+  """Matches cards with no requirement satisfying all conditions."""
+  none: ModelCardV2ResourceRequirementFilter = null
 }
 
 """
@@ -17933,15 +18034,58 @@ type Query
   deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search all model cards (superadmin only)."""
-  adminModelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @join__field(graph: STRAWBERRY)
+  adminModelCardsV2(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usedBy: ModelCardUsedBy = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search model cards within a MODEL_STORE project."""
-  projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @join__field(graph: STRAWBERRY)
+  projectModelCardsV2(
+    scope: ProjectModelCardV2Scope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usedBy: ModelCardUsedBy = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedModelCardsV2(scope: ModelCardScope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @join__field(graph: STRAWBERRY)
+  scopedModelCardsV2(
+    scope: ModelCardScope!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usedBy: ModelCardUsedBy = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2 @join__field(graph: STRAWBERRY)
@@ -25984,8 +26128,10 @@ type VFolder implements Node
   """
   usage: VFolderUsageInfo
 
-  """Added in 26.4.4. Model cards backed by this vfolder."""
-  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  """
+  Added in 26.4.4. Model cards backed by this vfolder. Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.
+  """
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @deprecated(reason: "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.")
 
   """Added in 26.9.0. The labels on this vfolder."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection

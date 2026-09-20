@@ -399,7 +399,7 @@ CASES: list[ConnectionCase] = [
         items=_model_cards(),
         payload_type=SearchModelCardsPayload,
         adapter_owner="model_card",
-        adapter_method="search_by_vfolder",
+        adapter_method="admin_search",
         call=lambda info, first, after: VFolderGQL.model_cards(
             SimpleNamespace(id=str(uuid.uuid4())), info, first=first, after=after
         ),
