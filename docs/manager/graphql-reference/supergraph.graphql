@@ -16147,7 +16147,7 @@ input ProjectV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
+Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
 """
 enum ProjectV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -16158,8 +16158,8 @@ enum ProjectV2OrderField
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
   TYPE @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
-  USER_USERNAME @join__enumValue(graph: STRAWBERRY)
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single username. Narrow the results with the `user` filter instead.")
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single email address. Narrow the results with the `user` filter instead.")
 }
 
 """
@@ -25193,7 +25193,7 @@ input UserV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name (MIN aggregation).
+Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name.
 """
 enum UserV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -25204,7 +25204,7 @@ enum UserV2OrderField
   EMAIL @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
-  PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A user belongs to many projects, so this order folds them into a single name. Narrow the results with the `project` filter instead.")
 }
 
 """

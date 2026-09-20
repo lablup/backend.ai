@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -97,6 +98,12 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
     NOT: list[Self] | None = None
 
 
+_USER_ORDER_DEPRECATION_TEMPLATE = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A project holds many users, so this order"
+    " folds them into a single {subject}. Narrow the results with the `user` filter instead."
+)
+
+
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.2.0",
@@ -108,11 +115,15 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
             "IS_ACTIVE: Order by active status. "
             "TYPE: Order by project type. "
             "DOMAIN_NAME: Order by domain name (scalar subquery). "
-            "USER_USERNAME: Order by username (MIN aggregation). "
-            "USER_EMAIL: Order by user email (MIN aggregation)."
+            "USER_USERNAME: Order by username. "
+            "USER_EMAIL: Order by user email."
         ),
     ),
     name="ProjectV2OrderField",
+    deprecated_values={
+        "USER_USERNAME": _USER_ORDER_DEPRECATION_TEMPLATE.format(subject="username"),
+        "USER_EMAIL": _USER_ORDER_DEPRECATION_TEMPLATE.format(subject="email address"),
+    },
 )
 class ProjectV2OrderField(StrEnum):
     CREATED_AT = "created_at"
