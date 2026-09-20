@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from uuid import UUID
@@ -25,11 +26,13 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.dto.manager.query import ArrayFilter as ArrayFilterDTO
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
+from ai.backend.common.dto.manager.query import DecimalFilter as DecimalFilterDTO
 from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -262,6 +265,22 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
     greater_than_or_equal: int | None = None
     less_than: int | None = None
     less_than_or_equal: int | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for decimal fields supporting equality and comparison operations.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="DecimalFilter",
+)
+class DecimalFilter(PydanticInputMixin[DecimalFilterDTO]):
+    equals: Decimal | None = None
+    not_equals: Decimal | None = None
+    greater_than: Decimal | None = None
+    greater_than_or_equal: Decimal | None = None
+    less_than: Decimal | None = None
+    less_than_or_equal: Decimal | None = None
 
 
 @gql_pydantic_input(

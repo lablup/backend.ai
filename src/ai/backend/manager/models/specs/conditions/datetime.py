@@ -35,3 +35,15 @@ class DateTimeConditions:
             return self._column > value
 
         return inner
+
+    def is_null(self) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return self._column.is_(None)
+
+        return inner
+
+    def is_not_null(self) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return self._column.isnot(None)
+
+        return inner
