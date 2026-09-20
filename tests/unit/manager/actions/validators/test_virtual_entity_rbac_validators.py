@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
-from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
@@ -44,7 +44,6 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualEntityScopeActionRBACValidator,
 )
-from ai.backend.manager.actions.v2.scope.validator.used_by import VirtualEntityUsedByRBACValidator
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.trigger import (
     SingleEntityActionTriggerMeta,
@@ -53,6 +52,11 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
+from ai.backend.manager.data.permission.virtual_entity import (
+    GovernCheckKey,
+    OwnCheckKey,
+    PermissionCheckResult,
+)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -833,8 +837,11 @@ class TestVirtualEntityScopeActionRBACValidator:
 async def user_with_vfolder_read_at_project(
     db_with_rbac_tables: ExtendedAsyncSAEngine,
 ) -> UserData:
-    """VFOLDER:READ granted at the project scope, which owns ``_VFOLDER_ID``."""
-    return await _seed_granted_user(
+    """VFOLDER:READ granted at the project scope, which owns itself and ``_VFOLDER_ID``.
+
+    The scope check reads the project as an entity, so its virtual entity owns it too.
+    """
+    user = await _seed_granted_user(
         db_with_rbac_tables,
         owner_scope_type="project",
         owner_scope_id=_PROJECT_ID,
@@ -844,13 +851,11 @@ async def user_with_vfolder_read_at_project(
         perm_entity_type=VFolderEntityType(),
         operation=Permission.READ,
     )
-
-
-@pytest.fixture
-def used_by_validator(
-    repository: RbacPermissionCheckRepository,
-) -> VirtualEntityUsedByRBACValidator:
-    return VirtualEntityUsedByRBACValidator(repository, _make_config_provider())
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        project_node_id = await _node_id(db_sess, EntityType("project"), _PROJECT_ID)
+        await VirtualEntitySeeder().cap_edge(db_sess, project_node_id, project_node_id, None)
+        await db_sess.flush()
+    return user
 
 
 @pytest.fixture
@@ -864,20 +869,22 @@ def unreadable_used_by_action() -> _VfolderSearchUsedByAction:
     return _used_by_action([_VfolderID(_VFOLDER_ID), _VfolderID(uuid.uuid4())])
 
 
-class TestVirtualEntityUsedByRBACValidator:
+class TestScopeActionUsedByCheck:
+    """The own READ check the scope validator runs on a scoped search's uses."""
+
     async def test_readable_used_by_passes(
         self,
-        used_by_validator: VirtualEntityUsedByRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         readable_used_by_action: _VfolderSearchUsedByAction,
         trigger_meta: ActionTriggerMeta,
         user_with_vfolder_read_at_project: UserData,
     ) -> None:
         with with_user(user_with_vfolder_read_at_project):
-            await used_by_validator.validate(readable_used_by_action, trigger_meta)
+            await scope_validator.validate(readable_used_by_action, trigger_meta)
 
     async def test_unreadable_used_by_among_targets_raises(
         self,
-        used_by_validator: VirtualEntityUsedByRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         unreadable_used_by_action: _VfolderSearchUsedByAction,
         trigger_meta: ActionTriggerMeta,
         user_with_vfolder_read_at_project: UserData,
@@ -885,25 +892,50 @@ class TestVirtualEntityUsedByRBACValidator:
         # One used-by entity is not readable, so the whole read is refused.
         with with_user(user_with_vfolder_read_at_project):
             with pytest.raises(NotEnoughPermission):
-                await used_by_validator.validate(unreadable_used_by_action, trigger_meta)
+                await scope_validator.validate(unreadable_used_by_action, trigger_meta)
 
     async def test_superadmin_bypasses_check(
         self,
-        used_by_validator: VirtualEntityUsedByRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         unreadable_used_by_action: _VfolderSearchUsedByAction,
         trigger_meta: ActionTriggerMeta,
         superadmin_user: UserData,
     ) -> None:
         with with_user(superadmin_user):
-            await used_by_validator.validate(unreadable_used_by_action, trigger_meta)
+            await scope_validator.validate(unreadable_used_by_action, trigger_meta)
 
-    async def test_no_used_by_skips_check(
+    async def test_no_used_by_leaves_the_scope_check_alone(
         self,
-        used_by_validator: VirtualEntityUsedByRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_read_at_project: UserData,
     ) -> None:
-        # Short-circuits before the user-context lookup, so no user is set.
-        await used_by_validator.validate(_used_by_action([]), trigger_meta)
+        with with_user(user_with_vfolder_read_at_project):
+            await scope_validator.validate(_used_by_action([]), trigger_meta)
+
+    async def test_both_checks_are_answered_in_one_read(
+        self,
+        readable_used_by_action: _VfolderSearchUsedByAction,
+        trigger_meta: ActionTriggerMeta,
+        regular_user_without_permission: UserData,
+    ) -> None:
+        async def granted(
+            govern_keys: Sequence[GovernCheckKey], own_keys: Sequence[OwnCheckKey]
+        ) -> PermissionCheckResult:
+            return PermissionCheckResult(
+                governed=dict.fromkeys(govern_keys, Permission.full()),
+                owned=dict.fromkeys(own_keys, Permission.full()),
+            )
+
+        repository = MagicMock(spec=RbacPermissionCheckRepository)
+        repository.checked_permissions.side_effect = granted
+        validator = VirtualEntityScopeActionRBACValidator(repository, _make_config_provider())
+        with with_user(regular_user_without_permission):
+            await validator.validate(readable_used_by_action, trigger_meta)
+        repository.checked_permissions.assert_awaited_once()
+        govern_keys, own_keys = repository.checked_permissions.await_args.args
+        assert [key.scope for key in govern_keys] == [ProjectID(_PROJECT_ID)]
+        assert [key.entity for key in own_keys] == [_VfolderID(_VFOLDER_ID)]
 
 
 class TestVirtualEntitySingleEntityActionRBACValidator:
