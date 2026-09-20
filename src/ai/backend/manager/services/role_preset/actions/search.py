@@ -5,17 +5,14 @@ from typing import override
 
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.role_preset.searchers import RolePresetSearcher
 
 
-@dataclass
-class SearchRolePresetsAction(SearchGlobalOpsAction[RolePresetRow, RolePresetData]):
+@dataclass(frozen=True)
+class SearchRolePresetsAction(GlobalSearcherOpsAction[RolePresetRow, RolePresetData]):
     """Page through the role preset catalog."""
-
-    searcher: RolePresetSearcher
 
     @override
     @classmethod
@@ -26,7 +23,3 @@ class SearchRolePresetsAction(SearchGlobalOpsAction[RolePresetRow, RolePresetDat
     @classmethod
     def action_name(cls) -> str:
         return "search_role_presets"
-
-    @override
-    def to_searcher(self) -> RolePresetSearcher:
-        return self.searcher

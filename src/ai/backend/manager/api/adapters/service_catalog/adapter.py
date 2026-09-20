@@ -32,6 +32,7 @@ from ai.backend.manager.models.service_catalog.orders import (
 )
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
@@ -69,7 +70,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         searcher = self.build_searcher(input)
 
         action_result = await self._service_catalog.global_search_service_catalogs.run(
-            SearchServiceCatalogsAction(searcher=searcher)
+            SearchServiceCatalogsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchServiceCatalogsPayload(

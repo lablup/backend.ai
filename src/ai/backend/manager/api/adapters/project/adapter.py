@@ -74,6 +74,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
@@ -177,7 +178,7 @@ class ProjectAdapter(BaseAdapter):
         )
 
         result = await self._project.global_search.run(
-            GlobalSearchProjectsAction(searcher=searcher)
+            GlobalSearchProjectsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchGroupsPayload(

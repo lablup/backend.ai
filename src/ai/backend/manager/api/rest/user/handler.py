@@ -39,6 +39,7 @@ from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
@@ -171,7 +172,7 @@ class UserHandler:
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._user.global_search.run(
-            GlobalSearchUsersAction(searcher=searcher)
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         resp = SearchUsersResponse(

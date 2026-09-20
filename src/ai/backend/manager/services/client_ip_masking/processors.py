@@ -30,6 +30,6 @@ class ClientIPMaskingProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[ClientIPMaskingPolicyData]) -> None:
-        self.global_search = group.global_search_ops(SearchClientIPMaskingPoliciesAction)
+        self.global_search = group.global_searcher_ops(SearchClientIPMaskingPoliciesAction)
         self.global_upsert = group.global_upsert_ops(UpsertClientIPMaskingPolicyAction)
         self.purge = group.entity_purge_ops(PurgeClientIPMaskingPolicyAction)

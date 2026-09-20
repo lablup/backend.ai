@@ -38,6 +38,7 @@ from ai.backend.manager.dto.domain_request import (
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
 from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
@@ -129,7 +130,7 @@ class DomainHandler:
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._domain.global_search.run(
-            GlobalSearchDomainsAction(searcher=searcher)
+            GlobalSearchDomainsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         resp = SearchDomainsResponse(

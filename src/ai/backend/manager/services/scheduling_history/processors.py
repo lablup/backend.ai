@@ -13,6 +13,7 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
@@ -50,19 +51,15 @@ from .actions import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
     SearchDeploymentHistoryAction,
-    SearchDeploymentHistoryActionResult,
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
     SearchKernelHistoryAction,
-    SearchKernelHistoryActionResult,
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
     SearchRouteHistoryAction,
-    SearchRouteHistoryActionResult,
     SearchRouteScopedHistoryAction,
     SearchRouteScopedHistoryActionResult,
     SearchSessionHistoryAction,
-    SearchSessionHistoryActionResult,
     SearchSessionScopedHistoryAction,
     SearchSessionScopedHistoryActionResult,
 )
@@ -88,19 +85,19 @@ class SchedulingHistoryProcessors:
 
     # Admin processors
     search_session_history: GlobalActionProcessor[
-        SearchSessionHistoryAction, SearchSessionHistoryActionResult
+        SearchSessionHistoryAction, BatchOpsResult[SessionSchedulingHistoryData]
     ]
     search_kernel_history: GlobalActionProcessor[
-        SearchKernelHistoryAction, SearchKernelHistoryActionResult
+        SearchKernelHistoryAction, BatchOpsResult[KernelSchedulingHistoryData]
     ]
     search_deployment_history: GlobalActionProcessor[
-        SearchDeploymentHistoryAction, SearchDeploymentHistoryActionResult
+        SearchDeploymentHistoryAction, BatchOpsResult[DeploymentHistoryData]
     ]
     global_search_replica_group_history: GlobalActionProcessor[
         GlobalSearchReplicaGroupHistoryAction, GlobalSearchReplicaGroupHistoryActionResult
     ]
     search_route_history: GlobalActionProcessor[
-        SearchRouteHistoryAction, SearchRouteHistoryActionResult
+        SearchRouteHistoryAction, BatchOpsResult[RouteHistoryData]
     ]
 
     # Scoped processors (added in 26.2.0)
@@ -165,21 +162,17 @@ class SchedulingHistoryProcessors:
         )
 
         # Admin processors
-        self.search_session_history = session.global_scope(
-            SearchSessionHistoryAction, service.search_session_history
+        self.search_session_history = session_histories.global_searcher_ops(
+            SearchSessionHistoryAction
         )
-        self.search_kernel_history = session.global_scope(
-            SearchKernelHistoryAction, service.search_kernel_history
-        )
-        self.search_deployment_history = deployment.global_scope(
-            SearchDeploymentHistoryAction, service.search_deployment_history
+        self.search_kernel_history = kernel_histories.global_searcher_ops(SearchKernelHistoryAction)
+        self.search_deployment_history = deployment_histories.global_searcher_ops(
+            SearchDeploymentHistoryAction
         )
         self.global_search_replica_group_history = replica_group.global_scope(
             GlobalSearchReplicaGroupHistoryAction, service.global_search_replica_group_history
         )
-        self.search_route_history = deployment.global_scope(
-            SearchRouteHistoryAction, service.search_route_history
-        )
+        self.search_route_history = route_histories.global_searcher_ops(SearchRouteHistoryAction)
 
         # Scoped processors (added in 26.2.0)
         self.search_session_scoped_history = session.scope(

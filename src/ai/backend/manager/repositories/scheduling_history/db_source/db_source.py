@@ -56,31 +56,6 @@ class SchedulingHistoryDBSource:
 
     # ========== Session History (Admin) ==========
 
-    async def search_session_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionSchedulingHistoryListResult:
-        """Search session scheduling history with pagination (admin API)."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionSchedulingHistoryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.SessionSchedulingHistoryRow.to_data() for row in result.rows]
-
-            return SessionSchedulingHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ========== Session History (Scoped) ==========
-
     async def search_session_scoped_history(
         self,
         querier: BatchQuerier,
@@ -102,31 +77,6 @@ class SchedulingHistoryDBSource:
             )
 
     # ========== Kernel History (Admin) ==========
-
-    async def search_kernel_history(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelSchedulingHistoryListResult:
-        """Search kernel scheduling history with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelSchedulingHistoryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
-
-            return KernelSchedulingHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ========== Kernel History (Scoped) ==========
 
     async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
         """Return the id of the session owning ``kernel_id``.
@@ -162,31 +112,6 @@ class SchedulingHistoryDBSource:
             )
 
     # ========== Deployment History (Admin) ==========
-
-    async def search_deployment_history(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentHistoryListResult:
-        """Search deployment history with pagination (admin API)."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DeploymentHistoryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.DeploymentHistoryRow.to_data() for row in result.rows]
-
-            return DeploymentHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ========== Deployment History (Scoped) ==========
 
     async def search_deployment_scoped_history(
         self,
@@ -256,31 +181,6 @@ class SchedulingHistoryDBSource:
             )
 
     # ========== Route History (Admin) ==========
-
-    async def search_route_history(
-        self,
-        querier: BatchQuerier,
-    ) -> RouteHistoryListResult:
-        """Search route history with pagination (admin API)."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(RouteHistoryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.RouteHistoryRow.to_data() for row in result.rows]
-
-            return RouteHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ========== Route History (Scoped) ==========
 
     async def search_route_scoped_history(
         self,

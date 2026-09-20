@@ -65,7 +65,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
-    AdminSearchKeypairsActionResult,
     GetDefaultKeypairsAction,
     GetKeypairAction,
     GetKeypairActionResult,
@@ -162,7 +161,7 @@ class UserProcessors:
         AdminCreateKeypairAction, AdminCreateKeypairActionResult
     ]
     admin_search_keypairs: GlobalActionProcessor[
-        AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
+        AdminSearchKeypairsAction, BatchOpsResult[KeyPairData]
     ]
     admin_register_ssh_keypair: SingleEntityActionProcessor[
         AdminRegisterSSHKeypairAction, AdminRegisterSSHKeypairActionResult
@@ -197,7 +196,7 @@ class UserProcessors:
         self.lookup = group.public_lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetUsersAction)
-        self.global_search = group.global_search_ops(GlobalSearchUsersAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchUsersAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchUsersAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
@@ -232,9 +231,6 @@ class UserProcessors:
         self.admin_create_keypair = group.single_entity(
             AdminCreateKeypairAction, user_service.admin_create_keypair
         )
-        self.admin_search_keypairs = group.global_scope(
-            AdminSearchKeypairsAction, user_service.admin_search_keypairs
-        )
         self.admin_register_ssh_keypair = group.single_entity(
             AdminRegisterSSHKeypairAction, user_service.admin_register_ssh_keypair
         )
@@ -265,6 +261,9 @@ class UserProcessors:
             KeyPairData,
             LookupKeypairOwnerAction,
             LookupBulkKeypairOwnerAction,
+        )
+        self.admin_search_keypairs = self.keypair_group.global_searcher_ops(
+            AdminSearchKeypairsAction
         )
         self.get_default_keypairs = self.keypair_group.atomic_bulk_get_ops(GetDefaultKeypairsAction)
         self.lookup_keypair = group.key_field_lookup_ops(LookupKeypairByAccessKeyAction)

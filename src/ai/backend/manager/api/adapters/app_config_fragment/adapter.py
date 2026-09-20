@@ -62,6 +62,7 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -282,7 +283,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._app_config.fragment_admin_search.run(
-            AdminSearchAppConfigFragmentAction(searcher=searcher)
+            AdminSearchAppConfigFragmentAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.items],

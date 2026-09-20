@@ -95,12 +95,12 @@ class NotificationProcessors:
         self.update_channel = channel_group.single_update_ops(UpdateChannelAction)
         self.purge_channel = channel_group.entity_purge_ops(PurgeChannelAction)
         self.get_channel = channel_group.single_get_ops(GetChannelAction)
-        self.search_channels = channel_group.global_search_ops(SearchChannelsAction)
+        self.search_channels = channel_group.global_searcher_ops(SearchChannelsAction)
         self.create_rule = rule_group.global_create_ops(CreateRuleAction)
         self.update_rule = rule_group.single_update_ops(UpdateRuleAction)
         self.purge_rule = rule_group.entity_purge_ops(PurgeRuleAction)
         self.get_rule = rule_group.single_get_ops(GetRuleAction)
-        self.search_rules = rule_group.global_search_ops(SearchRulesAction)
+        self.search_rules = rule_group.global_searcher_ops(SearchRulesAction)
         self.validate_channel = channel_group.single_entity(
             ValidateChannelAction, service.validate_channel
         )

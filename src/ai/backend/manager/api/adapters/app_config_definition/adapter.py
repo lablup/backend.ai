@@ -39,6 +39,7 @@ from ai.backend.manager.models.app_config_definition.searchers import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.app_config.actions.definition.admin_search import (
     AdminSearchAppConfigDefinitionsAction,
 )
@@ -129,7 +130,9 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._app_config.definition_global_search.run(
-            AdminSearchAppConfigDefinitionsAction(searcher=searcher)
+            AdminSearchAppConfigDefinitionsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchAppConfigDefinitionsPayload(
             items=[self._data_to_node(item) for item in action_result.items],

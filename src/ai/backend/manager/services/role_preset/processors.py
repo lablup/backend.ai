@@ -92,7 +92,7 @@ class RolePresetProcessors:
     ) -> None:
         self.create = preset_group.global_scope(CreateRolePresetAction, service.create)
         self.get = preset_group.single_get_ops(GetRolePresetAction)
-        self.search = preset_group.global_search_ops(SearchRolePresetsAction)
+        self.search = preset_group.global_searcher_ops(SearchRolePresetsAction)
         self.update = preset_group.single_entity(UpdateRolePresetAction, service.update)
         self.bulk_delete = preset_group.partial_bulk_delete_ops(BulkDeleteRolePresetsAction)
         self.bulk_restore = preset_group.partial_bulk_restore_ops(BulkRestoreRolePresetsAction)

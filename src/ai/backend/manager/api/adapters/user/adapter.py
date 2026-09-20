@@ -175,6 +175,8 @@ if TYPE_CHECKING:
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
+from ai.backend.manager.models.keypair.searchers import KeyPairSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -252,7 +254,9 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
+        result = await self._user.global_search.run(
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        )
         return AdminSearchUsersPayload(
             items=await self._user_nodes(result.items),
             total_count=result.total_count,
@@ -334,7 +338,9 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users with no scope restriction (admin only)."""
         searcher = self._build_search_searcher(input)
-        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
+        result = await self._user.global_search.run(
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        )
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
@@ -463,7 +469,9 @@ class UserAdapter(BaseAdapter):
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
         searcher.conditions = [*searcher.conditions, UserConditions.by_role_id(role_id)]
-        result = await self._user.global_search.run(GlobalSearchUsersAction(searcher=searcher))
+        result = await self._user.global_search.run(
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        )
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
@@ -926,12 +934,21 @@ class UserAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._user.admin_search_keypairs.run(
-            AdminSearchKeypairsAction(querier=querier)
+            AdminSearchKeypairsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=KeyPairSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchKeypairsPayload(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            items=[self._keypair_data_to_node(item) for item in action_result.items],
             pagination=PaginationInfo(
-                total=action_result.result.total_count,
+                total=action_result.total_count,
                 offset=input.offset or 0,
                 limit=input.limit,
             ),
@@ -968,13 +985,22 @@ class UserAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._user.admin_search_keypairs.run(
-            AdminSearchKeypairsAction(querier=querier)
+            AdminSearchKeypairsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=KeyPairSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     def _convert_keypair_filter(self, filter_req: KeypairFilter) -> list[QueryCondition]:

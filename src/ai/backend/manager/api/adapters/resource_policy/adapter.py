@@ -112,6 +112,7 @@ from ai.backend.manager.models.resource_policy.updaters import (
     UserResourcePolicyUpdater,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
@@ -242,7 +243,9 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._keypair_resource_policy.global_search.run(
-            GlobalSearchKeypairResourcePoliciesAction(searcher=searcher)
+            GlobalSearchKeypairResourcePoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         items = [self._keypair_policy_data_to_node(d) for d in result.items]
         return SearchKeypairResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -365,7 +368,9 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._user_resource_policy.global_search.run(
-            GlobalSearchUserResourcePoliciesAction(searcher=searcher)
+            GlobalSearchUserResourcePoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         items = [self._user_policy_data_to_node(d) for d in result.items]
         return SearchUserResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -468,7 +473,9 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project_resource_policy.global_search.run(
-            SearchProjectResourcePoliciesAction(searcher=searcher)
+            SearchProjectResourcePoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         items = [self._project_policy_data_to_node(d) for d in result.items]
         return SearchProjectResourcePoliciesPayload(items=items, total_count=result.total_count)

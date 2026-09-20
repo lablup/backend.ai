@@ -4,21 +4,16 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.resource_usage_history.types import UserUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import UserUsageBucketRow
-from ai.backend.manager.models.resource_usage_history.searchers import (
-    UserUsageBucketSearcher,
-)
 
 
-@dataclass
+@dataclass(frozen=True)
 class GlobalSearchUserUsageBucketsAction(
-    SearchGlobalOpsAction[UserUsageBucketRow, UserUsageBucketData]
+    GlobalSearcherOpsAction[UserUsageBucketRow, UserUsageBucketData]
 ):
     """Super-admin path: page through every user usage bucket."""
-
-    searcher: UserUsageBucketSearcher
 
     @override
     @classmethod
@@ -29,7 +24,3 @@ class GlobalSearchUserUsageBucketsAction(
     @classmethod
     def action_name(cls) -> str:
         return "global_search_user_usage_buckets"
-
-    @override
-    def to_searcher(self) -> UserUsageBucketSearcher:
-        return self.searcher

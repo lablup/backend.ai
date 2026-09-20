@@ -67,6 +67,7 @@ from ai.backend.manager.models.resource_usage_history.searchers import (
     UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
@@ -169,10 +170,13 @@ class ResourceUsageAdapter(BaseAdapter):
         orders = [DomainUsageBucketOrders.by_period_start(ascending=False)]
         action_result = await self._resource_usage.global_search_domain_usage_buckets.run(
             GlobalSearchDomainUsageBucketsAction(
-                searcher=DomainUsageBucketSearcher(
-                    pagination=pagination,
-                    conditions=conditions,
-                    orders=orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DomainUsageBucketSearcher(
+                        pagination=pagination,
+                        conditions=conditions,
+                        orders=orders,
+                    ),
                 )
             )
         )
@@ -206,10 +210,13 @@ class ResourceUsageAdapter(BaseAdapter):
         orders = [ProjectUsageBucketOrders.by_period_start(ascending=False)]
         action_result = await self._resource_usage.global_search_project_usage_buckets.run(
             GlobalSearchProjectUsageBucketsAction(
-                searcher=ProjectUsageBucketSearcher(
-                    pagination=pagination,
-                    conditions=conditions,
-                    orders=orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=pagination,
+                        conditions=conditions,
+                        orders=orders,
+                    ),
                 )
             )
         )
@@ -249,10 +256,13 @@ class ResourceUsageAdapter(BaseAdapter):
         orders = [UserUsageBucketOrders.by_period_start(ascending=False)]
         action_result = await self._resource_usage.global_search_user_usage_buckets.run(
             GlobalSearchUserUsageBucketsAction(
-                searcher=UserUsageBucketSearcher(
-                    pagination=pagination,
-                    conditions=conditions,
-                    orders=orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UserUsageBucketSearcher(
+                        pagination=pagination,
+                        conditions=conditions,
+                        orders=orders,
+                    ),
                 )
             )
         )
@@ -563,10 +573,13 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.global_search_domain_usage_buckets.run(
             GlobalSearchDomainUsageBucketsAction(
-                searcher=DomainUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DomainUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -604,10 +617,13 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.global_search_project_usage_buckets.run(
             GlobalSearchProjectUsageBucketsAction(
-                searcher=ProjectUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -645,10 +661,13 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.global_search_user_usage_buckets.run(
             GlobalSearchUserUsageBucketsAction(
-                searcher=UserUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UserUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -688,10 +707,13 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.global_search_project_usage_buckets.run(
             GlobalSearchProjectUsageBucketsAction(
-                searcher=ProjectUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -731,10 +753,13 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._resource_usage.global_search_user_usage_buckets.run(
             GlobalSearchUserUsageBucketsAction(
-                searcher=UserUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UserUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )

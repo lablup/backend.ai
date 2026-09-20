@@ -28,7 +28,6 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
-    ResourcePresetSearchResult,
 )
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
@@ -56,7 +55,6 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.types import (
     add_quantities,
@@ -209,22 +207,6 @@ class ResourcePresetDBSource:
             )
             rows = (await session.execute(stmt)).all()
         return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
-
-    async def search_presets(
-        self,
-        querier: BatchQuerier,
-    ) -> ResourcePresetSearchResult:
-        """Search resource presets with filtering, ordering, and pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ResourcePresetRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ResourcePresetRow.to_dataclass() for row in result.rows]
-            return ResourcePresetSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def check_presets_data(
         self,

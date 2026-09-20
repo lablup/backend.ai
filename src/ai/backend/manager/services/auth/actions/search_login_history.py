@@ -5,8 +5,8 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.ops.base import (
+    GlobalSearcherOpsAction,
     OperationScopeOpsAction,
-    SearchGlobalOpsAction,
 )
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
@@ -16,10 +16,8 @@ from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass(frozen=True)
-class GlobalSearchLoginHistoryAction(SearchGlobalOpsAction[LoginHistoryRow, LoginHistoryData]):
+class GlobalSearchLoginHistoryAction(GlobalSearcherOpsAction[LoginHistoryRow, LoginHistoryData]):
     """Page through the login attempts of every user."""
-
-    searcher: LoginHistorySearcher
 
     @override
     @classmethod
@@ -30,10 +28,6 @@ class GlobalSearchLoginHistoryAction(SearchGlobalOpsAction[LoginHistoryRow, Logi
     @classmethod
     def action_name(cls) -> str:
         return "global_search_login_history"
-
-    @override
-    def to_searcher(self) -> LoginHistorySearcher:
-        return self.searcher
 
 
 @dataclass(frozen=True)

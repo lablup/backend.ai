@@ -67,15 +67,6 @@ class SchedulingHistoryRepository:
     # ========== Session History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_session_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionSchedulingHistoryListResult:
-        """Search session scheduling history with pagination (admin API)."""
-        return await self._db_source.search_session_history(querier)
-
-    # ========== Session History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def search_session_scoped_history(
         self,
@@ -88,15 +79,6 @@ class SchedulingHistoryRepository:
     # ========== Kernel History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_kernel_history(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelSchedulingHistoryListResult:
-        """Search kernel scheduling history with pagination."""
-        return await self._db_source.search_kernel_history(querier)
-
-    # ========== Kernel History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
         """Return the id of the session owning ``kernel_id``.
@@ -117,15 +99,6 @@ class SchedulingHistoryRepository:
     # ========== Deployment History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_deployment_history(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentHistoryListResult:
-        """Search deployment history with pagination (admin API)."""
-        return await self._db_source.search_deployment_history(querier)
-
-    # ========== Deployment History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def search_deployment_scoped_history(
         self,
@@ -159,15 +132,6 @@ class SchedulingHistoryRepository:
     # ========== Route History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_route_history(
-        self,
-        querier: BatchQuerier,
-    ) -> RouteHistoryListResult:
-        """Search route history with pagination (admin API)."""
-        return await self._db_source.search_route_history(querier)
-
-    # ========== Route History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def search_route_scoped_history(
         self,

@@ -110,7 +110,7 @@ from ai.backend.manager.models.resource_group.scopes import (
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
@@ -323,10 +323,19 @@ class ResourceGroupAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(querier=querier)
+            SearchResourceGroupsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourceGroupSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return ResourceGroupSearchPayload(
-            items=[self._data_to_detail_node(sg) for sg in action_result.resource_groups],
+            items=[self._data_to_detail_node(sg) for sg in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -552,16 +561,20 @@ class ResourceGroupAdapter(BaseAdapter):
             case_insensitive=False,
             negated=False,
         )
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ResourceGroupConditions.by_name_equals(name_spec)],
-        )
         search_result = await self._resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(querier=querier)
+            SearchResourceGroupsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourceGroupSearcher(
+                        pagination=NoPagination(),
+                        conditions=[ResourceGroupConditions.by_name_equals(name_spec)],
+                    ),
+                )
+            )
         )
-        if not search_result.resource_groups:
+        if not search_result.items:
             raise ResourceGroupNotFound(resource_group)
-        sg_data = search_result.resource_groups[0]
+        sg_data = search_result.items[0]
 
         resource_info = await self.get_resource_info(resource_group)
         capacity = resource_info.capacity

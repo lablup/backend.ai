@@ -75,13 +75,14 @@ from ai.backend.manager.models.fair_share.scopes import (
     UserFairShareTarget,
 )
 from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
+from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
     ProjectUsageBucketSearcher,
     UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
     BulkUpsertProjectFairShareWeightAction,
@@ -304,10 +305,13 @@ class FairShareAPIHandler:
 
         action_result = await self._resource_usage.global_search_domain_usage_buckets.run(
             GlobalSearchDomainUsageBucketsAction(
-                searcher=DomainUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DomainUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -335,10 +339,13 @@ class FairShareAPIHandler:
 
         action_result = await self._resource_usage.global_search_project_usage_buckets.run(
             GlobalSearchProjectUsageBucketsAction(
-                searcher=ProjectUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -366,10 +373,13 @@ class FairShareAPIHandler:
 
         action_result = await self._resource_usage.global_search_user_usage_buckets.run(
             GlobalSearchUserUsageBucketsAction(
-                searcher=UserUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UserUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -415,10 +425,13 @@ class FairShareAPIHandler:
 
         action_result = await self._resource_usage.global_search_domain_usage_buckets.run(
             GlobalSearchDomainUsageBucketsAction(
-                searcher=DomainUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DomainUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -472,10 +485,13 @@ class FairShareAPIHandler:
 
         action_result = await self._resource_usage.global_search_project_usage_buckets.run(
             GlobalSearchProjectUsageBucketsAction(
-                searcher=ProjectUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -535,10 +551,13 @@ class FairShareAPIHandler:
 
         action_result = await self._resource_usage.global_search_user_usage_buckets.run(
             GlobalSearchUserUsageBucketsAction(
-                searcher=UserUsageBucketSearcher(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UserUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
                 )
             )
         )
@@ -897,20 +916,24 @@ class FairShareAPIHandler:
             case_insensitive=False,
             negated=False,
         )
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ResourceGroupConditions.by_name_equals(name_spec)],
-        )
         search_result = await self._resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(querier=querier)
+            SearchResourceGroupsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourceGroupSearcher(
+                        pagination=NoPagination(),
+                        conditions=[ResourceGroupConditions.by_name_equals(name_spec)],
+                    ),
+                )
+            )
         )
 
-        if not search_result.resource_groups:
+        if not search_result.items:
             raise web.HTTPNotFound(
                 reason=f"Resource group '{path.parsed.resource_group}' not found"
             )
 
-        resource_group = search_result.resource_groups[0]
+        resource_group = search_result.items[0]
 
         resp = GetResourceGroupFairShareSpecResponse(
             resource_group=resource_group.name,
@@ -925,12 +948,13 @@ class FairShareAPIHandler:
     ) -> APIResponse:
         """Search all resource groups with their fair share specs."""
 
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[],
-        )
         search_result = await self._resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(querier=querier)
+            SearchResourceGroupsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourceGroupSearcher(pagination=NoPagination()),
+                )
+            )
         )
 
         items = [
@@ -940,7 +964,7 @@ class FairShareAPIHandler:
                     sg.fair_share_spec
                 ),
             )
-            for sg in search_result.resource_groups
+            for sg in search_result.items
         ]
 
         resp = SearchResourceGroupFairShareSpecsResponse(

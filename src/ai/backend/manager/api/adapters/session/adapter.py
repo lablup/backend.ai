@@ -140,6 +140,7 @@ from ai.backend.manager.models.session.scopes import (
     UserSessionTarget,
 )
 from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
@@ -618,7 +619,9 @@ class SessionAdapter(BaseAdapter):
     ) -> AdminSearchSessionsPayload:
         """Search sessions (admin, no scope) with filters, orders, and pagination."""
         action_result = await self._session.global_search.run(
-            GlobalSearchSessionsAction(searcher=self._build_session_searcher(input))
+            GlobalSearchSessionsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=self._build_session_searcher(input))
+            )
         )
 
         return AdminSearchSessionsPayload(
@@ -652,7 +655,7 @@ class SessionAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._session.global_search.run(
-            GlobalSearchSessionsAction(searcher=searcher)
+            GlobalSearchSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchSessionsPayload(
@@ -881,7 +884,9 @@ class SessionAdapter(BaseAdapter):
     ) -> AdminSearchKernelsPayload:
         """Search kernels (admin, no scope) with filters, orders, and pagination."""
         action_result = await self._session.global_search_kernels.run(
-            GlobalSearchKernelsAction(searcher=self._build_kernel_searcher(input))
+            GlobalSearchKernelsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=self._build_kernel_searcher(input))
+            )
         )
 
         return AdminSearchKernelsPayload(
@@ -899,8 +904,11 @@ class SessionAdapter(BaseAdapter):
         """Search the kernels on a specific agent (superadmin)."""
         action_result = await self._session.global_search_kernels.run(
             GlobalSearchKernelsAction(
-                searcher=self._build_kernel_searcher(
-                    input, base_condition=KernelConditions.by_agent_id(agent_id)
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=self._build_kernel_searcher(
+                        input, base_condition=KernelConditions.by_agent_id(agent_id)
+                    ),
                 )
             )
         )

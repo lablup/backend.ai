@@ -34,6 +34,8 @@ from ai.backend.manager.dto.auto_scaling_rule_request import (
     UpdateAutoScalingRulePathParam,
 )
 from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.models.endpoint.searchers import AutoScalingRuleSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
 )
@@ -133,11 +135,20 @@ class AutoScalingRuleHandler:
         querier = self._adapter.build_querier(body.parsed)
 
         action_result = await self._deployment.search_auto_scaling_rules.run(
-            SearchAutoScalingRulesAction(querier=querier)
+            SearchAutoScalingRulesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=AutoScalingRuleSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         resp = SearchAutoScalingRulesResponse(
-            auto_scaling_rules=[self._adapter.convert_to_dto(rule) for rule in action_result.data],
+            auto_scaling_rules=[self._adapter.convert_to_dto(rule) for rule in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,

@@ -5,17 +5,14 @@ from typing import override
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 
 
-@dataclass
-class ListObjectStorageAction(SearchGlobalOpsAction[ObjectStorageRow, ObjectStorageData]):
+@dataclass(frozen=True)
+class ListObjectStorageAction(GlobalSearcherOpsAction[ObjectStorageRow, ObjectStorageData]):
     """Every registered object storage, unpaged."""
-
-    searcher: ObjectStorageSearcher
 
     @override
     @classmethod
@@ -26,7 +23,3 @@ class ListObjectStorageAction(SearchGlobalOpsAction[ObjectStorageRow, ObjectStor
     @classmethod
     def action_name(cls) -> str:
         return "list_object_storages"
-
-    @override
-    def to_searcher(self) -> ObjectStorageSearcher:
-        return self.searcher

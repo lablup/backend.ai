@@ -19,7 +19,9 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.bulk_get import (
@@ -85,7 +87,15 @@ class StorageNamespaceAdapter(BaseAdapter):
     async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceNode]:
         """Retrieve all namespaces for a given storage."""
         action_result = await self._storage_namespace.global_get_namespaces.run(
-            GetNamespacesAction(storage_id)
+            GetNamespacesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(
+                        pagination=NoPagination(),
+                        conditions=[StorageNamespaceConditions.by_storage_id(storage_id)],
+                    ),
+                )
+            )
         )
         return [self._storage_namespace_data_to_dto(item) for item in action_result.items]
 
@@ -120,7 +130,7 @@ class StorageNamespaceAdapter(BaseAdapter):
         )
         searcher = StorageNamespaceSearcher(conditions=[], orders=[], pagination=pagination)
         action_result = await self._storage_namespace.global_search.run(
-            SearchStorageNamespacesAction(searcher=searcher)
+            SearchStorageNamespacesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchStorageNamespacesPayload(
             items=[self._storage_namespace_data_to_dto(item) for item in action_result.items],

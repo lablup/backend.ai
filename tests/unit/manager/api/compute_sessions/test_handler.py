@@ -49,6 +49,7 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.session.actions.global_search import GlobalSearchSessionsAction
 from ai.backend.manager.services.session.actions.global_search_kernels import (
     GlobalSearchKernelsAction,
@@ -516,12 +517,12 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Handler should call both global_search and global_search_kernels."""
         await mock_processors.session.global_search.wait_for_complete(
-            GlobalSearchSessionsAction(searcher=MagicMock())
+            GlobalSearchSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=MagicMock()))
         )
         mock_processors.session.global_search.wait_for_complete.assert_called_once()
 
         await mock_processors.session.global_search_kernels.wait_for_complete(
-            GlobalSearchKernelsAction(searcher=MagicMock())
+            GlobalSearchKernelsAction(searcher=GlobalSearcher(used_by=(), searcher=MagicMock()))
         )
         mock_processors.session.global_search_kernels.wait_for_complete.assert_called_once()
 
@@ -536,7 +537,7 @@ class TestComputeSessionsHandler:
         )
 
         result = await processors.session.global_search.wait_for_complete(
-            GlobalSearchSessionsAction(searcher=MagicMock())
+            GlobalSearchSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=MagicMock()))
         )
 
         assert result.items == []
@@ -550,10 +551,10 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Kernels should be correctly grouped by session ID."""
         session_result = await mock_processors.session.global_search.wait_for_complete(
-            GlobalSearchSessionsAction(searcher=MagicMock())
+            GlobalSearchSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=MagicMock()))
         )
         kernel_result = await mock_processors.session.global_search_kernels.wait_for_complete(
-            GlobalSearchKernelsAction(searcher=MagicMock())
+            GlobalSearchKernelsAction(searcher=GlobalSearcher(used_by=(), searcher=MagicMock()))
         )
 
         adapter = ComputeSessionsAdapter()
@@ -577,7 +578,7 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Pagination info should reflect the session search result."""
         session_result = await mock_processors.session.global_search.wait_for_complete(
-            GlobalSearchSessionsAction(searcher=MagicMock())
+            GlobalSearchSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=MagicMock()))
         )
 
         assert session_result.total_count == 2

@@ -93,6 +93,7 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
     BulkGetDeploymentPresetsAction,
 )
@@ -232,7 +233,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._deployment_revision_preset.global_search.run(
-            GlobalSearchDeploymentPresetsAction(searcher=searcher)
+            GlobalSearchDeploymentPresetsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchDeploymentRevisionPresetsPayload(
             items=[self._data_to_node(d) for d in result.items],

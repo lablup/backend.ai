@@ -83,7 +83,6 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_s
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
-    SearchAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -102,7 +101,6 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
-    SearchDeploymentPoliciesActionResult,
     UpsertDeploymentPolicyAction,
     UpsertDeploymentPolicyActionResult,
 )
@@ -182,7 +180,6 @@ from ai.backend.manager.services.deployment.actions.revision_operations import (
 )
 from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,
-    SearchRoutesActionResult,
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
@@ -258,7 +255,7 @@ class DeploymentProcessors:
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
     search_deployment_policies: GlobalActionProcessor[
-        SearchDeploymentPoliciesAction, SearchDeploymentPoliciesActionResult
+        SearchDeploymentPoliciesAction, BatchOpsResult[DeploymentPolicyData]
     ]
     upsert_deployment_policy: SingleEntityActionProcessor[
         UpsertDeploymentPolicyAction, UpsertDeploymentPolicyActionResult
@@ -286,7 +283,7 @@ class DeploymentProcessors:
 
     # Route operations
     sync_replicas: SingleEntityActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
-    search_routes: GlobalActionProcessor[SearchRoutesAction, SearchRoutesActionResult]
+    search_routes: GlobalActionProcessor[SearchRoutesAction, BatchOpsResult[RouteInfo]]
     update_route_traffic_status: SingleFieldActionProcessor[
         UpdateRouteTrafficStatusAction, UpdateRouteTrafficStatusActionResult
     ]
@@ -316,7 +313,7 @@ class DeploymentProcessors:
         BulkDeleteAutoScalingRulesAction, list[UUID]
     ]
     search_auto_scaling_rules: GlobalActionProcessor[
-        SearchAutoScalingRulesAction, SearchAutoScalingRulesActionResult
+        SearchAutoScalingRulesAction, BatchOpsResult[ModelDeploymentAutoScalingRuleData]
     ]
 
     # Access token
@@ -429,9 +426,9 @@ class DeploymentProcessors:
         self.lookup_auto_scaling_rule_deployment = group.key_owner_lookup_ops(
             LookupAutoScalingRuleDeploymentAction
         )
-        self.global_search_replicas = replicas.global_search_ops(GlobalSearchReplicasAction)
-        self.global_search_revisions = revisions.global_search_ops(GlobalSearchRevisionsAction)
-        self.global_search_access_tokens = access_tokens.global_search_ops(
+        self.global_search_replicas = replicas.global_searcher_ops(GlobalSearchReplicasAction)
+        self.global_search_revisions = revisions.global_searcher_ops(GlobalSearchRevisionsAction)
+        self.global_search_access_tokens = access_tokens.global_searcher_ops(
             GlobalSearchAccessTokensAction
         )
         # Deployment CRUD
@@ -466,8 +463,8 @@ class DeploymentProcessors:
         self.get_deployment_policy = group.single_entity(
             GetDeploymentPolicyAction, service.get_deployment_policy
         )
-        self.search_deployment_policies = group.global_scope(
-            SearchDeploymentPoliciesAction, service.search_deployment_policies
+        self.search_deployment_policies = policies.global_searcher_ops(
+            SearchDeploymentPoliciesAction
         )
         self.upsert_deployment_policy = group.single_entity(
             UpsertDeploymentPolicyAction, service.upsert_deployment_policy
@@ -491,7 +488,7 @@ class DeploymentProcessors:
 
         # Route operations
         self.sync_replicas = group.single_entity(SyncReplicaAction, service.sync_replicas)
-        self.search_routes = group.global_scope(SearchRoutesAction, service.search_routes)
+        self.search_routes = routes.global_searcher_ops(SearchRoutesAction)
         self.update_route_traffic_status = replicas.single_field(
             UpdateRouteTrafficStatusAction, service.update_route_traffic_status
         )
@@ -516,8 +513,8 @@ class DeploymentProcessors:
         self.bulk_delete_auto_scaling_rules = group.partial_bulk(
             BulkDeleteAutoScalingRulesAction, service.bulk_delete_auto_scaling_rules
         )
-        self.search_auto_scaling_rules = group.global_scope(
-            SearchAutoScalingRulesAction, service.search_auto_scaling_rules
+        self.search_auto_scaling_rules = auto_scaling_rules.global_searcher_ops(
+            SearchAutoScalingRulesAction
         )
 
         # Access token

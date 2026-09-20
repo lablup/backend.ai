@@ -12,7 +12,6 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
-    ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
@@ -26,10 +25,6 @@ from ai.backend.manager.models.container_registry.purgers import ContainerRegist
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -207,34 +202,6 @@ class ContainerRegistryRepository:
             return row
 
     @container_registry_repository_resilience.apply()
-    async def search_container_registries(
-        self,
-        querier: BatchQuerier,
-    ) -> ContainerRegistrySearchResult:
-        """Search container registries with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            ContainerRegistrySearchResult with items, total_count, and pagination info.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ContainerRegistryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            return ContainerRegistrySearchResult(
-                items=[row.ContainerRegistryRow.to_dataclass() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def _get_by_registry_and_project(
         self,
         session: SASession,

@@ -40,7 +40,9 @@ from ai.backend.manager.models.resource_preset.conditions import ResourcePresetC
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.searchers import ResourcePresetSearcher
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -109,10 +111,19 @@ class ResourcePresetAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._resource_preset.search_presets_v2.run(
-            SearchResourcePresetsV2Action(querier=querier)
+            SearchResourcePresetsV2Action(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourcePresetSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchResourcePresetsPayload(
-            items=[self._data_to_node(p) for p in result.presets],
+            items=[self._data_to_node(p) for p in result.items],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

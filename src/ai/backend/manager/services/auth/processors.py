@@ -200,9 +200,9 @@ class AuthProcessors:
         )
         self.search_login_sessions = self.login_sessions.search_ops(SearchLoginSessionsAction)
         self.search_login_history = self.login_history.search_ops(SearchLoginHistoryAction)
-        self.global_search_login_sessions = self.login_sessions.global_search_ops(
+        self.global_search_login_sessions = self.login_sessions.global_searcher_ops(
             GlobalSearchLoginSessionsAction
         )
-        self.global_search_login_history = self.login_history.global_search_ops(
+        self.global_search_login_history = self.login_history.global_searcher_ops(
             GlobalSearchLoginHistoryAction
         )
