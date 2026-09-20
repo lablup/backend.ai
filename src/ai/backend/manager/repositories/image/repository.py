@@ -324,7 +324,6 @@ class ImageRepository:
         return await self._db_source.remove_image_and_aliases(image_id)
 
     @image_repository_resilience.apply()
-    @image_repository_resilience.apply()
     async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
         """
         Search image aliases using a batch querier with conditions, pagination, and ordering.
