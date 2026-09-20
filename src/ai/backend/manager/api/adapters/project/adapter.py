@@ -78,7 +78,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -291,7 +291,11 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                targets=[DomainProjectTarget(domain_id=domain_id)], searcher=searcher
+                searcher=ScopedSearcher(
+                    scopes=[DomainProjectTarget(domain_id=domain_id)],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
 
@@ -330,7 +334,11 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project.scoped_search.run(
-            ScopedSearchProjectsAction(targets=self._scope_targets(input.scope), searcher=searcher)
+            ScopedSearchProjectsAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope), used_by=(), searcher=searcher
+                )
+            )
         )
         return AdminSearchGroupsPayload(
             items=[self._group_data_to_node(item) for item in result.items],
@@ -362,7 +370,9 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                targets=[UserProjectTarget(user_id=user_id)], searcher=searcher
+                searcher=ScopedSearcher(
+                    scopes=[UserProjectTarget(user_id=user_id)], used_by=(), searcher=searcher
+                )
             )
         )
 

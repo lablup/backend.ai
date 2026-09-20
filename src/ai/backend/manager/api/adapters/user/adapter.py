@@ -173,7 +173,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.searchers import KeyPairSearcher
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -283,8 +283,11 @@ class UserAdapter(BaseAdapter):
         )
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                targets=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
-                searcher=searcher,
+                searcher=ScopedSearcher(
+                    scopes=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
         return AdminSearchUsersPayload(
@@ -316,8 +319,11 @@ class UserAdapter(BaseAdapter):
         )
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                targets=[ProjectUserTarget(project_id=project_id)],
-                searcher=searcher,
+                searcher=ScopedSearcher(
+                    scopes=[ProjectUserTarget(project_id=project_id)],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
         return AdminSearchUsersPayload(
@@ -367,12 +373,15 @@ class UserAdapter(BaseAdapter):
         orders = self._convert_user_orders(input.order) if input.order else []
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                targets=self._scope_targets(input.scope),
-                searcher=UserSearcher(
-                    conditions=conditions,
-                    orders=orders,
-                    pagination=OffsetPagination(limit=input.limit, offset=input.offset),
-                ),
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope),
+                    used_by=(),
+                    searcher=UserSearcher(
+                        conditions=conditions,
+                        orders=orders,
+                        pagination=OffsetPagination(limit=input.limit, offset=input.offset),
+                    ),
+                )
             )
         )
         return SearchUsersPayload(
@@ -405,7 +414,11 @@ class UserAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._user.scoped_search.run(
-            ScopedSearchUsersAction(targets=self._scope_targets(scope), searcher=searcher)
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(scope), used_by=(), searcher=searcher
+                )
+            )
         )
         return AdminSearchUsersPayload(
             items=await self._user_nodes(result.items),
@@ -423,8 +436,11 @@ class UserAdapter(BaseAdapter):
         searcher = self._build_search_searcher(input)
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                targets=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
-                searcher=searcher,
+                searcher=ScopedSearcher(
+                    scopes=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
         return SearchUsersPayload(
@@ -445,8 +461,11 @@ class UserAdapter(BaseAdapter):
         searcher = self._build_search_searcher(input)
         result = await self._user.scoped_search.run(
             ScopedSearchUsersAction(
-                targets=[ProjectUserTarget(project_id=ProjectID(project_id))],
-                searcher=searcher,
+                searcher=ScopedSearcher(
+                    scopes=[ProjectUserTarget(project_id=ProjectID(project_id))],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
         return SearchUsersPayload(
