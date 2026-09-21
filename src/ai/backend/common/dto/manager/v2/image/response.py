@@ -38,6 +38,7 @@ __all__ = (
     "ImageRequirementsInfoDTO",
     "PurgeImagePayload",
     "RescanImagesPayload",
+    "SearchImageAliasesPayload",
     "SearchImagesPayload",
     "UpdateImagePayload",
 )
@@ -168,6 +169,15 @@ class ImageAliasNode(BaseResponseModel):
 
 class AdminSearchImageAliasesPayload(BaseResponseModel):
     """Payload for admin-scoped paginated image alias search results."""
+
+    items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
+    total_count: int = Field(description="Total number of aliases matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class SearchImageAliasesPayload(BaseResponseModel):
+    """Payload for the paginated aliases of one image."""
 
     items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
     total_count: int = Field(description="Total number of aliases matching the filter.")
