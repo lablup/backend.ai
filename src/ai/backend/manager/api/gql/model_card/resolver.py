@@ -49,7 +49,7 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardGQL,
     ModelCardOrderByGQL,
     ModelCardScopeGQL,
-    ModelCardUsedByGQL,
+    ModelCardUsageGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
     ProjectModelCardScopeGQL,
@@ -69,12 +69,12 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def admin_model_cards_v2(
     info: Info[StrawberryGQLContext],
-    used_by: Annotated[
-        ModelCardUsedByGQL | None,
+    usage: Annotated[
+        ModelCardUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; model cards the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; model cards the caller cannot "
                 "read are left out."
             )
         ),
@@ -90,7 +90,7 @@ async def admin_model_cards_v2(
 ) -> ModelCardV2Connection | None:
     check_admin_only()
     search_input = _build_search_input(
-        used_by, filter, order_by, first, after, last, before, limit, offset
+        usage, filter, order_by, first, after, last, before, limit, offset
     )
     result = await info.context.adapters.model_card.admin_search(search_input)
     return _build_connection(result)
@@ -108,12 +108,12 @@ async def admin_model_cards_v2(
 async def scoped_model_cards_v2(
     info: Info[StrawberryGQLContext],
     scope: ModelCardScopeGQL,
-    used_by: Annotated[
-        ModelCardUsedByGQL | None,
+    usage: Annotated[
+        ModelCardUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; model cards the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; model cards the caller cannot "
                 "read are left out."
             )
         ),
@@ -130,7 +130,7 @@ async def scoped_model_cards_v2(
     payload = await info.context.adapters.model_card.scoped_search(
         ScopedSearchModelCardsInput(
             scope=scope.to_pydantic(),
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -153,12 +153,12 @@ async def scoped_model_cards_v2(
 async def project_model_cards_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectModelCardScopeGQL,
-    used_by: Annotated[
-        ModelCardUsedByGQL | None,
+    usage: Annotated[
+        ModelCardUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; model cards the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; model cards the caller cannot "
                 "read are left out."
             )
         ),
@@ -173,7 +173,7 @@ async def project_model_cards_v2(
     offset: int | None = None,
 ) -> ModelCardV2Connection | None:
     search_input = _build_search_input(
-        used_by, filter, order_by, first, after, last, before, limit, offset
+        usage, filter, order_by, first, after, last, before, limit, offset
     )
     result = await info.context.adapters.model_card.project_search(scope.project_id, search_input)
     return _build_connection(result)
@@ -297,7 +297,7 @@ async def deploy_model_card_v2(
 
 
 def _build_search_input(
-    used_by: ModelCardUsedByGQL | None,
+    usage: ModelCardUsageGQL | None,
     filter: ModelCardFilterGQL | None,
     order_by: list[ModelCardOrderByGQL] | None,
     first: int | None,
@@ -318,7 +318,7 @@ def _build_search_input(
             for o in order_by
         ]
     return SearchModelCardsInput(
-        used_by=used_by.to_pydantic() if used_by else None,
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,

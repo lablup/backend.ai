@@ -6,6 +6,7 @@ into Processor actions and converts the action results back into v2 DTOs.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -48,7 +49,7 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     SearchRolePresetsPayload,
     UpdateRolePresetPayload,
 )
-from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.role_preset.types import (
@@ -76,6 +77,7 @@ from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePresetSearcher,
 )
 from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
+from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
@@ -148,6 +150,13 @@ class RolePresetAdapter(BaseAdapter):
         result = await self._role_preset.get.run(GetRolePresetAction(preset_id=role_preset_id))
         return self._data_to_node(result.data)
 
+    def _usage(self, usage: RolePresetUsage | None) -> list[UsedBy]:
+        """The uses the request named, each of which the caller must be able to read."""
+        if usage is None or usage.used_by is None:
+            return []
+        linked = RolePresetSearchableFields.linked.usage
+        return [linked.roles.used_by(RoleID(entity_id)) for entity_id in usage.used_by.role or ()]
+
     async def search(self, input: SearchRolePresetsInput) -> SearchRolePresetsPayload:
         """Search role presets with filtering and pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
@@ -170,7 +179,9 @@ class RolePresetAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._role_preset.search.run(
-            SearchRolePresetsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+            SearchRolePresetsAction(
+                searcher=GlobalSearcher(used_by=self._usage(input.usage), searcher=searcher)
+            )
         )
         return SearchRolePresetsPayload(
             items=[self._data_to_node(d) for d in result.items],

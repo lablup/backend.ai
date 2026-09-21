@@ -54,8 +54,7 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.image.scopes import (
     ImageTarget,
-    PublicImageTarget,
-    UserImageTarget,
+    VisibleImageTarget,
 )
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher, ReferenceImageSearcher
@@ -159,11 +158,11 @@ def _single_image(
 
 
 def _caller_targets(ctx: GraphQueryContext) -> list[ImageTarget]:
-    """The scopes these reads are answered from: the registries registered in `public`,
-    and what the caller holds themselves. A superadmin's read is unscoped, which the
-    service decides. A project's images are read through the v2 scoped search, where the
-    caller names the project."""
-    return [PublicImageTarget(), UserImageTarget(user_id=UserID(ctx.user["uuid"]))]
+    """The one scope these reads are answered from: everything the caller's roles grant
+    image READ on. These reads take no project, so a caller who named nothing still has
+    to be answered with everything they reach. A superadmin's read is unscoped, which
+    the service decides."""
+    return [VisibleImageTarget(user_id=UserID(ctx.user["uuid"]))]
 
 
 _queryfilter_fieldspec: FieldSpecType = {

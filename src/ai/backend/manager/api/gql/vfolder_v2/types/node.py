@@ -12,7 +12,7 @@ from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
-from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsedBy
+from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsage, ModelCardUses
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -154,7 +154,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     ) -> ModelCardV2Connection | None:
         result = await info.context.adapters.model_card.admin_search(
             SearchModelCardsInput(
-                used_by=ModelCardUsedBy(vfolder=[VFolderUUID(UUID(self.id))]),
+                usage=ModelCardUsage(uses=ModelCardUses(vfolder=[VFolderUUID(UUID(self.id))])),
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
                 first=first,

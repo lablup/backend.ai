@@ -84,7 +84,9 @@ def prometheus_query_preset_processors(
     prometheus_client_mock: MagicMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> PrometheusQueryPresetProcessors:
-    repo = PrometheusQueryPresetRepository(database_engine, prometheus_client_mock)
+    repo = PrometheusQueryPresetRepository(
+        database_engine, prometheus_client_mock, V2DBOpsProvider(database_engine)
+    )
     service = PrometheusQueryPresetService(
         repository=repo,
         prometheus_client=prometheus_client_mock,

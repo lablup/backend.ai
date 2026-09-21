@@ -244,6 +244,9 @@ from ai.backend.manager.services.image.actions.lookup_alias_owner import (
     LookupBulkImageAliasOwnerAction,
     LookupImageAliasOwnerAction,
 )
+from ai.backend.manager.services.image.actions.search_image_aliases import (
+    SearchImageAliasesAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
@@ -349,6 +352,8 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
+from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.mount_policy import (
@@ -878,6 +883,31 @@ def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
     )
 
 
+def test_image_alias_read_is_a_scoped_permission_read() -> None:
+    """The aliases of one image are read within that image's scope, not superadmin-only."""
+    registry = _ops_registry()
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[SearchImageAliasesAction] == (
+        ImageEntityType(),
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
+
+
 def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     """The DataLoaders over field rows read per named row, checked per owning entity.
 
@@ -1080,6 +1110,38 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
         ProjectEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
+    )
+
+
+def test_vfolder_loader_read_is_a_partial_permission_read() -> None:
+    """The vfolder DataLoader reads per named folder, not superadmin-only."""
+    registry = _ops_registry()
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFoldersAction] == (
+        VFolderEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_vfolder_allowed_types_read_is_public() -> None:
+    """The allowed vfolder types are read by any authenticated caller, not superadmin-only."""
+    registry = _ops_registry()
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[PublicListAllowedTypesAction] == (
+        VFolderEntityType(),
+        ActionKind.GLOBAL,
+        ActionGate.PUBLIC,
     )
 
 

@@ -26,7 +26,7 @@ from .types import (
     ImageScope,
     ImageStatusType,
     ImageTypeEnum,
-    ImageUsedBy,
+    ImageUsage,
     OrderDirection,
 )
 
@@ -48,10 +48,11 @@ __all__ = (
     "ImageScopeInputDTO",
     "ImageStatusFilterInputDTO",
     "ImageTypeFilterInputDTO",
-    "ImageUsedBy",
+    "ImageUsage",
     "PurgeImageInput",
     "RescanImagesInput",
     "ScopedSearchImagesInput",
+    "SearchImageAliasesInput",
     "SearchImagesInput",
     "UpdateImageInput",
     "UUIDFilter",
@@ -238,11 +239,11 @@ class PurgeImageInput(BaseRequestModel):
 class AdminSearchImagesInput(BaseRequestModel):
     """Input for admin search of images with cursor and offset pagination."""
 
-    used_by: ImageUsedBy | None = Field(
+    usage: ImageUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; images the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
         ),
     )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
@@ -261,11 +262,11 @@ class ScopedSearchImagesInput(BaseRequestModel):
     """Input for searching the images the named scopes reach."""
 
     scope: ImageScope = Field(description="Scope (OR across all items).")
-    used_by: ImageUsedBy | None = Field(
+    usage: ImageUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; images the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
         ),
     )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
@@ -282,6 +283,21 @@ class ScopedSearchImagesInput(BaseRequestModel):
 
 class AdminSearchImageAliasesInput(BaseRequestModel):
     """Input for admin search of image aliases with cursor and offset pagination."""
+
+    filter: ImageAliasFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageAliasOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class SearchImageAliasesInput(BaseRequestModel):
+    """Input for searching the aliases of one image with cursor and offset pagination."""
 
     filter: ImageAliasFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageAliasOrderByInputDTO] | None = Field(

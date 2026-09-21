@@ -43,12 +43,13 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
@@ -574,12 +575,12 @@ class ScheduleCoordinator:
         total_observed = 0
 
         while True:
-            querier = BatchQuerier(
+            searcher = KernelSearcher(
                 pagination=OffsetPagination(limit=_OBSERVER_BATCH_SIZE, offset=offset),
                 conditions=[condition],
             )
 
-            kernel_result = await self._repository.search_kernels_for_handler(querier)
+            kernel_result = await self._repository.search_kernels_for_handler(searcher)
 
             log.debug(
                 "[Coordinator] Observer {} batch: offset={}, items_count={}, has_next_page={}",
@@ -639,7 +640,7 @@ class ScheduleCoordinator:
         target_kernel_statuses = handler.target_kernel_statuses()
 
         fields = KernelSearchableFields.own
-        querier = BatchQuerier(
+        searcher = KernelSearcher(
             pagination=NoPagination(),
             conditions=[
                 fields.resource_group_id.filter.equals(
@@ -649,7 +650,7 @@ class ScheduleCoordinator:
             ],
         )
 
-        kernel_result = await self._repository.search_kernels_for_handler(querier)
+        kernel_result = await self._repository.search_kernels_for_handler(searcher)
 
         if not kernel_result.items:
             return
@@ -859,7 +860,7 @@ class ScheduleCoordinator:
             resource_group_id: The id of the resource group to process
         """
         fields = SessionSearchableFields.own
-        querier = BatchQuerier(
+        searcher = SessionInfoSearcher(
             pagination=NoPagination(),
             conditions=[
                 fields.resource_group_id.filter.equals(
@@ -871,7 +872,7 @@ class ScheduleCoordinator:
         )
 
         # Query sessions (only session data, no kernels)
-        session_infos = await self._repository.search_sessions_for_handler(querier)
+        session_infos = await self._repository.search_sessions_for_handler(searcher)
 
         if not session_infos:
             return
@@ -1023,7 +1024,7 @@ class ScheduleCoordinator:
 
         # Fetch full session+kernel data for hook execution
         session_ids = [s.session_id for s in session_infos]
-        querier = BatchQuerier(
+        searcher = SessionInfoSearcher(
             pagination=NoPagination(),
             conditions=[
                 SessionSearchableFields.own.id.filter.in_(
@@ -1031,7 +1032,7 @@ class ScheduleCoordinator:
                 )
             ],
         )
-        full_sessions = await self._repository.search_sessions_with_kernels_for_handler(querier)
+        full_sessions = await self._repository.search_sessions_with_kernels_for_handler(searcher)
 
         if not full_sessions:
             log.warning(

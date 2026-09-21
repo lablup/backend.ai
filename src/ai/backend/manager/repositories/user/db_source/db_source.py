@@ -25,7 +25,6 @@ from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
@@ -65,7 +64,6 @@ from ai.backend.manager.models.keypair.row import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
@@ -90,6 +88,7 @@ from ai.backend.manager.models.user.purgers import (
     UserSessionGroupPurger,
 )
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -99,7 +98,6 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
@@ -865,27 +863,17 @@ class UserDBSource:
 
     async def search_users(
         self,
-        querier: BatchQuerier,
+        searcher: UserSearcher,
     ) -> UserSearchResult:
-        """Search all users with pagination and filters (admin only).
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier)
-
-            items = [UserSearchableFields.own.to_data(row.UserRow) for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search all users with pagination and filters (admin only)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return UserSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def keypair_settings_to_inherit(self, user_uuid: UUID) -> KeyPairCreator:
         """The settings a newly issued keypair takes from the user's default keypair,
@@ -940,31 +928,6 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
             await self._switch_default_keypair(session, user_id, access_key)
-
-    async def search_my_keypairs(
-        self,
-        scope: UserKeypairTarget,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs owned by the scoped user.
-
-        Args:
-            scope: Search scope containing the user UUID whose keypairs to retrieve.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [KeyPairSearchableFields.own.to_data(row.KeyPairRow) for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Read one keypair by its id."""

@@ -4911,8 +4911,27 @@
         "title": "DeploymentStatusFilter",
         "type": "object"
       },
-      "DeploymentUsedBy": {
-        "description": "Entities whose use narrows the deployments read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Deployments the caller cannot\nread are left out even when a listed entity uses them.",
+      "DeploymentUsage": {
+        "description": "Uses narrowing the deployments read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Deployments the caller cannot\nread are left out even when a listed entity is tied to them.",
+        "properties": {
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the deployment uses, whose ids narrow the result"
+          }
+        },
+        "title": "DeploymentUsage",
+        "type": "object"
+      },
+      "DeploymentUses": {
+        "description": "Entities the deployment uses, whose ids narrow the result.",
         "properties": {
           "resource_group": {
             "anyOf": [
@@ -4930,9 +4949,94 @@
             "default": null,
             "description": "Resource groups the deployment runs in",
             "title": "Resource Group"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Images the deployment's live replica group names in its current revision",
+            "title": "Image"
+          },
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VFolders the deployment's live replica group names as the model of its current revision",
+            "title": "Vfolder"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions the deployment's route rows serve as their replicas",
+            "title": "Session"
+          },
+          "runtime_variant": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Runtime variants the deployment's revisions name",
+            "title": "Runtime Variant"
+          },
+          "deployment_preset": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Presets the deployment's revisions name",
+            "title": "Deployment Preset"
           }
         },
-        "title": "DeploymentUsedBy",
+        "title": "DeploymentUses",
         "type": "object"
       },
       "IntFilter": {
@@ -5550,17 +5654,17 @@
       "AdminSearchDeploymentsInput": {
         "description": "Input for searching deployments (admin, no scope).",
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeploymentUsedBy"
+                "$ref": "#/components/schemas/DeploymentUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -5753,17 +5857,17 @@
             "$ref": "#/components/schemas/DeploymentScope",
             "description": "Scope (OR across all items)."
           },
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeploymentUsedBy"
+                "$ref": "#/components/schemas/DeploymentUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -8231,8 +8335,27 @@
         "title": "DeploymentRevisionPresetOrderField",
         "type": "string"
       },
+      "DeploymentRevisionPresetUsage": {
+        "description": "Uses narrowing the presets read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentRevisionPresetUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the preset narrows the result"
+          }
+        },
+        "title": "DeploymentRevisionPresetUsage",
+        "type": "object"
+      },
       "DeploymentRevisionPresetUsedBy": {
-        "description": "Entities whose use narrows the presets read; every id is AND-ed.",
+        "description": "Entities whose use of the preset narrows the result.",
         "properties": {
           "deployment": {
             "anyOf": [
@@ -8257,17 +8380,17 @@
       },
       "SearchDeploymentRevisionPresetsInput": {
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeploymentRevisionPresetUsedBy"
+                "$ref": "#/components/schemas/DeploymentRevisionPresetUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller."
           },
           "filter": {
             "anyOf": [
@@ -12895,8 +13018,27 @@
         "title": "ImageTypeFilterInputDTO",
         "type": "object"
       },
+      "ImageUsage": {
+        "description": "Uses narrowing the images read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Images the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the image narrows the result"
+          }
+        },
+        "title": "ImageUsage",
+        "type": "object"
+      },
       "ImageUsedBy": {
-        "description": "Entities whose use narrows the images read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Images the caller cannot read\nare left out even when a listed entity uses them.",
+        "description": "Entities whose use of the image narrows the result.",
         "properties": {
           "session": {
             "anyOf": [
@@ -12939,17 +13081,17 @@
       "AdminSearchImagesInput": {
         "description": "Input for admin search of images with cursor and offset pagination.",
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ImageUsedBy"
+                "$ref": "#/components/schemas/ImageUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -13145,17 +13287,17 @@
             "$ref": "#/components/schemas/ImageScope",
             "description": "Scope (OR across all items)."
           },
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ImageUsedBy"
+                "$ref": "#/components/schemas/ImageUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -18781,9 +18923,64 @@
         "title": "RolePresetOrderField",
         "type": "string"
       },
+      "RolePresetUsage": {
+        "description": "Uses narrowing the presets read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePresetUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the preset narrows the result"
+          }
+        },
+        "title": "RolePresetUsage",
+        "type": "object"
+      },
+      "RolePresetUsedBy": {
+        "description": "Entities whose use of the preset narrows the result.",
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Roles instantiated from the preset",
+            "title": "Role"
+          }
+        },
+        "title": "RolePresetUsedBy",
+        "type": "object"
+      },
       "SearchRolePresetsInput": {
         "description": "Input for paginated search of role presets.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePresetUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller."
+          },
           "filter": {
             "anyOf": [
               {
@@ -19017,9 +19214,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -19032,6 +19230,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -19043,7 +19242,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -19058,6 +19258,7 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -20277,6 +20478,103 @@
         "title": "MappedScopeNestedFilter",
         "type": "object"
       },
+      "PermissionFilter": {
+        "description": "Filter for scoped permissions.",
+        "properties": {
+          "role_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the permission bit the entry grants."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "PermissionFilter",
+        "type": "object"
+      },
       "RoleFilter": {
         "description": "Filter for roles.",
         "properties": {
@@ -20344,6 +20642,62 @@
           "field"
         ],
         "title": "RoleOrderBy",
+        "type": "object"
+      },
+      "RolePermissionNestedFilter": {
+        "description": "The `permissions` field of a role filter.\n\nEach quantifier matches one permission entry at a time. To require two different\nentries, combine two of these with the role filter's own `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "RolePermissionNestedFilter",
         "type": "object"
       },
       "RoleSourceFilter": {
@@ -20468,8 +20822,27 @@
         "title": "RoleStatusFilter",
         "type": "object"
       },
-      "RoleUsedBy": {
-        "description": "Entities whose use narrows the roles read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Roles the caller cannot read\nare left out even when a listed entity uses them.",
+      "RoleUsage": {
+        "description": "Uses narrowing the roles read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Roles the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the role uses, whose ids narrow the result"
+          }
+        },
+        "title": "RoleUsage",
+        "type": "object"
+      },
+      "RoleUses": {
+        "description": "Entities the role uses, whose ids narrow the result.",
         "properties": {
           "role_preset": {
             "anyOf": [
@@ -20489,7 +20862,7 @@
             "title": "Role Preset"
           }
         },
-        "title": "RoleUsedBy",
+        "title": "RoleUses",
         "type": "object"
       },
       "UserNestedFilter": {
@@ -20558,10 +20931,10 @@
       "SearchRolesInput": {
         "description": "Pagination search input for roles.",
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RoleUsedBy"
+                "$ref": "#/components/schemas/RoleUsage"
               },
               {
                 "type": "null"
@@ -20793,91 +21166,6 @@
           "permission"
         ],
         "title": "CreatePermissionInput",
-        "type": "object"
-      },
-      "PermissionFilter": {
-        "description": "Filter for scoped permissions.",
-        "properties": {
-          "role_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "PermissionFilter",
         "type": "object"
       },
       "PermissionOrderBy": {
@@ -22149,12 +22437,84 @@
         "title": "ResourceGroupScope",
         "type": "object"
       },
+      "ResourceGroupUsage": {
+        "description": "Uses narrowing the resource groups read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Resource groups the caller\ncannot read are left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the resource group narrows the result"
+          }
+        },
+        "title": "ResourceGroupUsage",
+        "type": "object"
+      },
+      "ResourceGroupUsedBy": {
+        "description": "Entities whose use of the resource group narrows the result.",
+        "properties": {
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions the resource group runs",
+            "title": "Session"
+          },
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments the resource group runs",
+            "title": "Deployment"
+          }
+        },
+        "title": "ResourceGroupUsedBy",
+        "type": "object"
+      },
       "ScopedSearchResourceGroupsInput": {
         "description": "Input for searching the resource groups the named scopes reach.",
         "properties": {
           "scope": {
             "$ref": "#/components/schemas/ResourceGroupScope",
             "description": "Scope (OR across all items)."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -22272,6 +22632,18 @@
       "AdminSearchResourceGroupsInput": {
         "description": "Input for admin search of resource groups with cursor and offset pagination.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -26504,8 +26876,27 @@
         "title": "RuntimeVariantOrderField",
         "type": "string"
       },
+      "RuntimeVariantUsage": {
+        "description": "Uses narrowing the runtime variants read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeVariantUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the runtime variant narrows the result"
+          }
+        },
+        "title": "RuntimeVariantUsage",
+        "type": "object"
+      },
       "RuntimeVariantUsedBy": {
-        "description": "Entities whose use narrows the runtime variants read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "description": "Entities whose use of the runtime variant narrows the result.",
         "properties": {
           "deployment": {
             "anyOf": [
@@ -26530,17 +26921,17 @@
       },
       "SearchRuntimeVariantsInput": {
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RuntimeVariantUsedBy"
+                "$ref": "#/components/schemas/RuntimeVariantUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller."
           },
           "filter": {
             "anyOf": [
@@ -27664,7 +28055,7 @@
             ],
             "default": null,
             "deprecated": true,
-            "description": "Filter by the storage host backing the model card's VFolder. Deprecated: search vfolders by host first, then pass their ids as `used_by.vfolder`."
+            "description": "Filter by the storage host backing the model card's VFolder. Deprecated: search vfolders by host first, then pass their ids as `usage.uses.vfolder`."
           },
           "created_at": {
             "anyOf": [
@@ -27876,8 +28267,27 @@
         "title": "ModelCardResourceRequirementNestedFilter",
         "type": "object"
       },
-      "ModelCardUsedBy": {
-        "description": "Entities whose use narrows the model cards read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Model cards the caller cannot\nread are left out even when a listed entity uses them.",
+      "ModelCardUsage": {
+        "description": "Uses narrowing the model cards read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Model cards the caller cannot\nread are left out even when a listed entity is tied to them.",
+        "properties": {
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the model card uses, whose ids narrow the result"
+          }
+        },
+        "title": "ModelCardUsage",
+        "type": "object"
+      },
+      "ModelCardUses": {
+        "description": "Entities the model card uses, whose ids narrow the result.",
         "properties": {
           "vfolder": {
             "anyOf": [
@@ -27897,22 +28307,22 @@
             "title": "Vfolder"
           }
         },
-        "title": "ModelCardUsedBy",
+        "title": "ModelCardUses",
         "type": "object"
       },
       "SearchModelCardsInput": {
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ModelCardUsedBy"
+                "$ref": "#/components/schemas/ModelCardUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -28082,17 +28492,17 @@
             "$ref": "#/components/schemas/ModelCardScope",
             "description": "Scope (OR across all items)."
           },
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ModelCardUsedBy"
+                "$ref": "#/components/schemas/ModelCardUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -32229,8 +32639,39 @@
         "title": "SessionTypeFilter",
         "type": "object"
       },
+      "SessionUsage": {
+        "description": "Uses narrowing the sessions read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Sessions the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the session narrows the result"
+          },
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the session uses, whose ids narrow the result"
+          }
+        },
+        "title": "SessionUsage",
+        "type": "object"
+      },
       "SessionUsedBy": {
-        "description": "Entities whose use narrows the sessions read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Sessions the caller cannot read\nare left out even when a listed entity uses them.",
+        "description": "Entities whose use of the session narrows the result.",
         "properties": {
           "deployment": {
             "anyOf": [
@@ -32248,6 +32689,30 @@
             "default": null,
             "description": "Deployments whose route rows the session serves as a replica",
             "title": "Deployment"
+          }
+        },
+        "title": "SessionUsedBy",
+        "type": "object"
+      },
+      "SessionUses": {
+        "description": "Entities the session uses, whose ids narrow the result.",
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Images the session's kernels run",
+            "title": "Image"
           },
           "agent": {
             "anyOf": [
@@ -32284,23 +32749,23 @@
             "title": "Resource Group"
           }
         },
-        "title": "SessionUsedBy",
+        "title": "SessionUses",
         "type": "object"
       },
       "AdminSearchSessionsInput": {
         "description": "Input for admin search of sessions with cursor and offset pagination.",
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SessionUsedBy"
+                "$ref": "#/components/schemas/SessionUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -32786,17 +33251,17 @@
             "$ref": "#/components/schemas/SessionScope",
             "description": "Scope (OR across all items)."
           },
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SessionUsedBy"
+                "$ref": "#/components/schemas/SessionUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -34497,6 +34962,25 @@
         "title": "VFolderStatusFilter",
         "type": "object"
       },
+      "VFolderUsage": {
+        "description": "Uses narrowing the vfolders read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Vfolders the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the vfolder narrows the result"
+          }
+        },
+        "title": "VFolderUsage",
+        "type": "object"
+      },
       "VFolderUsageMode": {
         "description": "Usage mode of virtual folder.\n\nGENERAL: normal virtual folder\nMODEL: virtual folder which provides shared models\nDATA: virtual folder which provides shared data",
         "enum": [
@@ -34571,7 +35055,7 @@
         "type": "object"
       },
       "VFolderUsedBy": {
-        "description": "Entities whose use narrows the vfolders read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Vfolders the caller cannot read\nare left out even when a listed entity uses them.",
+        "description": "Entities whose use of the vfolder narrows the result.",
         "properties": {
           "deployment": {
             "anyOf": [
@@ -34614,17 +35098,17 @@
       "SearchVFoldersInput": {
         "description": "Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches).",
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VFolderUsedBy"
+                "$ref": "#/components/schemas/VFolderUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -34794,17 +35278,17 @@
       "ScopedSearchVFoldersInput": {
         "description": "Input for searching the vfolders the named scopes reach.",
         "properties": {
-          "used_by": {
+          "usage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VFolderUsedBy"
+                "$ref": "#/components/schemas/VFolderUsage"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [

@@ -53,7 +53,10 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantUsedBy
+from ai.backend.common.dto.manager.v2.runtime_variant.types import (
+    RuntimeVariantUsage,
+    RuntimeVariantUsedBy,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -237,10 +240,7 @@ class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Entities whose use narrows a runtime variant query; every id is AND-ed. The "
-            "caller must be able to read each listed entity, or the request is refused."
-        ),
+        description="Entities whose use of a runtime variant narrows the read.",
     ),
     name="RuntimeVariantUsedBy",
 )
@@ -249,6 +249,25 @@ class RuntimeVariantUsedByGQL(PydanticInputMixin[RuntimeVariantUsedBy]):
 
     deployment: list[UUID] | None = gql_field(
         default=None, description="Deployments whose revisions name the runtime variant."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only runtime variants the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+    ),
+    name="RuntimeVariantUsage",
+)
+class RuntimeVariantUsageGQL(PydanticInputMixin[RuntimeVariantUsage]):
+    """The uses that narrow a runtime variant read."""
+
+    used_by: RuntimeVariantUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the runtime variant narrows the read."
     )
 
 

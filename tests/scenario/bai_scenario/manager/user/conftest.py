@@ -33,6 +33,7 @@ from ai.backend.manager.repositories.client_ip_masking.repository import (
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -92,7 +93,7 @@ async def adapter(
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
-        DomainService(DomainRepository(engine, provider)),
+        DomainService(DomainRepository(engine, RelationOpsProvider(engine))),
     )
     return UserAdapter(user, domain, config.config.auth, key_pool)
 

@@ -33,6 +33,7 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
@@ -1442,6 +1443,24 @@ class Context(metaclass=ABCMeta):
         default_domain_id = next(
             domain["id"] for domain in user_fixture["domains"] if domain["name"] == "default"
         )
+        default_domain_node_id = next(
+            node["id"]
+            for node in user_fixture["virtual_entities"]
+            if node["entity_type"] == "domain" and node["entity_id"] == default_domain_id
+        )
+        resource_group_node_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"backend.ai/virtual-entity/resource_group/{resource_group_id}",
+            )
+        )
+        membership_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"backend.ai/entity-membership/resource_group/{resource_group_id}"
+                f"/domain/{default_domain_id}",
+            )
+        )
         with tempfile.TemporaryDirectory() as tmpdir:
             fixture_path = Path(tmpdir) / "fixture.json"
             with fixture_path.open("w") as fw:
@@ -1468,6 +1487,35 @@ class Context(metaclass=ABCMeta):
                             {
                                 "resource_group_id": resource_group_id,
                                 "domain_id": default_domain_id,
+                            }
+                        ],
+                        "virtual_entities": [
+                            {
+                                "id": resource_group_node_id,
+                                "entity_type": "resource_group",
+                                "entity_id": resource_group_id,
+                            }
+                        ],
+                        "entity_memberships": [
+                            {
+                                "id": membership_id,
+                                "virtual_entity_id": resource_group_node_id,
+                                "member_entity_id": default_domain_node_id,
+                                "capped": True,
+                            }
+                        ],
+                        "entity_membership_caps": [
+                            {
+                                "membership_id": membership_id,
+                                "permission": int(Permission.READ),
+                                "all_fields": True,
+                            }
+                        ],
+                        "scope_bindings": [
+                            {
+                                "virtual_entity_id": resource_group_node_id,
+                                "scope_entity_id": default_domain_node_id,
+                                "permission_cap": int(Permission.READ),
                             }
                         ],
                     })

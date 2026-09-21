@@ -103,7 +103,6 @@ from ai.backend.manager.models.condition_utils import combine_conditions_or, neg
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -484,10 +483,14 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
-        role_target = RoleUserTarget(role_id=RoleID(role_id))
-        searcher.conditions = [*searcher.conditions, role_target.to_condition()]
-        result = await self._user.global_search.run(
-            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[RoleUserTarget(role_id=RoleID(role_id))],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),
@@ -772,10 +775,10 @@ class UserAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserKeypairTarget(user_uuid=me.user_id)
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._convert_keypair_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            KeyPairSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_KEYPAIR_PAGINATION_SPEC,
@@ -787,13 +790,13 @@ class UserAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._user.search_my_keypairs.run(
-            SearchMyKeypairsAction(user_id=UserID(scope.user_uuid), querier=querier)
+            SearchMyKeypairsAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     @staticmethod

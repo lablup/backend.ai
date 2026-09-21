@@ -255,24 +255,24 @@ class TestSharingInputs:
         assert req.invitation_id == inv_id
 
 
-class TestSearchVFoldersInputUsedBy:
-    """``used_by`` is optional, so a body written before it existed still parses."""
+class TestSearchVFoldersInputUsage:
+    """``usage`` is optional, so a body written before it existed still parses."""
 
-    def test_body_without_used_by_parses(self) -> None:
+    def test_body_without_usage_parses(self) -> None:
         req = SearchVFoldersInput.model_validate({
             "filter": {"name": {"contains": "a"}},
             "limit": 5,
         })
-        assert req.used_by is None
+        assert req.usage is None
         assert req.limit == 5
 
-    def test_scoped_body_without_used_by_parses(self) -> None:
+    def test_scoped_body_without_usage_parses(self) -> None:
         project_id = uuid.uuid4()
         req = ScopedSearchVFoldersInput.model_validate({
             "scope": {"project": [{"value": str(project_id)}]},
             "limit": 5,
         })
-        assert req.used_by is None
+        assert req.usage is None
         assert req.scope.project is not None
         assert req.scope.project[0].value == project_id
 
@@ -280,12 +280,20 @@ class TestSearchVFoldersInputUsedBy:
         deployment_id = uuid.uuid4()
         model_card_id = uuid.uuid4()
         req = SearchVFoldersInput.model_validate({
-            "used_by": {"deployment": [str(deployment_id)], "model_card": [str(model_card_id)]},
+            "usage": {
+                "used_by": {
+                    "deployment": [str(deployment_id)],
+                    "model_card": [str(model_card_id)],
+                }
+            },
         })
-        assert req.used_by is not None
-        assert req.used_by.deployment == [deployment_id]
-        assert req.used_by.model_card == [model_card_id]
+        assert req.usage is not None
+        assert req.usage.used_by is not None
+        assert req.usage.used_by.deployment == [deployment_id]
+        assert req.usage.used_by.model_card == [model_card_id]
 
     def test_used_by_rejects_non_uuid(self) -> None:
         with pytest.raises((ValidationError, BackendAISchemaValidationFailed)):
-            SearchVFoldersInput.model_validate({"used_by": {"deployment": ["not-a-uuid"]}})
+            SearchVFoldersInput.model_validate({
+                "usage": {"used_by": {"deployment": ["not-a-uuid"]}}
+            })

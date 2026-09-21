@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.rbac import (
     AssignedUserOrder,
     AssignedUserOrderField,
     OrderDirection,
-    SearchUsersAssignedToRolePathParam,
     SearchUsersAssignedToRoleRequest,
 )
 from ai.backend.manager.data.permission.role import AssignedUserData
@@ -42,11 +41,13 @@ class AssignedUserAdapter(BaseFilterAdapter):
 
     def build_searcher(
         self,
-        param: SearchUsersAssignedToRolePathParam,
         request: SearchUsersAssignedToRoleRequest,
     ) -> RoleAssignmentSearcher:
-        """Build a searcher for the users assigned to the role in the path."""
-        conditions = [self._get_base_filter(param)]
+        """Build a searcher for the users assigned to a role.
+
+        The role itself is the scope the action names, so it carries no condition here.
+        """
+        conditions: list[QueryCondition] = []
         if request.filter is not None:
             conditions.extend(self._convert_filter(request.filter))
         orders: list[QueryOrder] = []
@@ -56,11 +57,6 @@ class AssignedUserAdapter(BaseFilterAdapter):
         pagination = self._build_pagination(request.limit, request.offset)
 
         return RoleAssignmentSearcher(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _get_base_filter(self, param: SearchUsersAssignedToRolePathParam) -> QueryCondition:
-        return RoleAssignmentSearchableFields.own.role_id.filter.equals(
-            UUIDEqualMatchSpec(value=param.role_id, negated=False)
-        )
 
     def _convert_filter(self, filter: AssignedUserFilter) -> list[QueryCondition]:
         """The searcher joins the assignment row to its user, so the user's columns

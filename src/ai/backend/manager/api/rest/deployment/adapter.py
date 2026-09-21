@@ -84,6 +84,7 @@ from ai.backend.manager.models.deployment_revision.searchable_fields import (
 )
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.routing.cursors import ReplicaCursor
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -169,21 +170,13 @@ class DeploymentAdapter(BaseFilterAdapter):
             sub_step=data.sub_step,
         )
 
-    def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
-        """
-        Build a BatchQuerier for deployments from search request.
-
-        Args:
-            request: Search request containing filter, order, and pagination
-
-        Returns:
-            BatchQuerier object with converted conditions, orders, and pagination
-        """
+    def build_searcher(self, request: SearchDeploymentsRequest) -> DeploymentInfoSearcher:
+        """Build the deployment searcher the legacy REST v1 read runs."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(request.order)] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return DeploymentInfoSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter: DeploymentFilter) -> list[QueryCondition]:
         """Convert deployment filter to list of query conditions."""

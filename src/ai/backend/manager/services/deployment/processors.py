@@ -82,6 +82,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_s
     GetAutoScalingRuleAction,
     GetAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.global_search_auto_scaling_rules import (
+    GlobalSearchAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -282,7 +285,7 @@ class DeploymentProcessors:
 
     # Route operations
     sync_replicas: SingleEntityActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
-    search_routes: GlobalActionProcessor[SearchRoutesAction, BatchOpsResult[RouteInfo]]
+    search_routes: BulkActionProcessor[SearchRoutesAction, ScopedFieldsOpsResult[RouteInfo]]
     update_route_traffic_status: SingleFieldActionProcessor[
         UpdateRouteTrafficStatusAction, UpdateRouteTrafficStatusActionResult
     ]
@@ -311,8 +314,11 @@ class DeploymentProcessors:
     bulk_delete_auto_scaling_rules: PartialBulkActionProcessor[
         BulkDeleteAutoScalingRulesAction, list[UUID]
     ]
-    search_auto_scaling_rules: GlobalActionProcessor[
-        SearchAutoScalingRulesAction, BatchOpsResult[ModelDeploymentAutoScalingRuleData]
+    search_auto_scaling_rules: BulkActionProcessor[
+        SearchAutoScalingRulesAction, ScopedFieldsOpsResult[ModelDeploymentAutoScalingRuleData]
+    ]
+    global_search_auto_scaling_rules: GlobalActionProcessor[
+        GlobalSearchAutoScalingRulesAction, BatchOpsResult[ModelDeploymentAutoScalingRuleData]
     ]
 
     # Access token
@@ -483,7 +489,7 @@ class DeploymentProcessors:
 
         # Route operations
         self.sync_replicas = group.single_entity(SyncReplicaAction, service.sync_replicas)
-        self.search_routes = routes.global_searcher_ops(SearchRoutesAction)
+        self.search_routes = routes.atomic_bulk_scoped_search_ops(SearchRoutesAction)
         self.update_route_traffic_status = replicas.single_field(
             UpdateRouteTrafficStatusAction, service.update_route_traffic_status
         )
@@ -508,8 +514,11 @@ class DeploymentProcessors:
         self.bulk_delete_auto_scaling_rules = group.partial_bulk(
             BulkDeleteAutoScalingRulesAction, service.bulk_delete_auto_scaling_rules
         )
-        self.search_auto_scaling_rules = auto_scaling_rules.global_searcher_ops(
+        self.search_auto_scaling_rules = auto_scaling_rules.atomic_bulk_scoped_search_ops(
             SearchAutoScalingRulesAction
+        )
+        self.global_search_auto_scaling_rules = auto_scaling_rules.global_searcher_ops(
+            GlobalSearchAutoScalingRulesAction
         )
 
         # Access token

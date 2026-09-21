@@ -3,7 +3,11 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedBatchOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    ScopedBatchOpsResult,
+    ScopedFieldsOpsResult,
+)
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
@@ -61,6 +65,9 @@ from ai.backend.manager.services.image.actions.scoped_search import (
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
     SearchAliasesActionResult,
+)
+from ai.backend.manager.services.image.actions.search_image_aliases import (
+    SearchImageAliasesAction,
 )
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
@@ -139,6 +146,10 @@ class ImageProcessors:
     bulk_get: PartialBulkActionProcessor[BulkGetImagesAction, ImageData]
     scoped_search: ScopeActionProcessor[ScopedSearchImagesAction, ScopedBatchOpsResult[ImageData]]
     search_aliases: GlobalActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
+    # What the nested field reads: the owning image is the scope.
+    search_image_aliases: ScopeActionProcessor[
+        SearchImageAliasesAction, ScopedFieldsOpsResult[ImageAliasData]
+    ]
     # What the DataLoader reads: checked per owning image.
     bulk_get_aliases: PartialBulkFieldActionProcessor[BulkGetImageAliasesAction, ImageAliasData]
 
@@ -196,4 +207,5 @@ class ImageProcessors:
             SetImageResourceLimitByIdAction, service.set_image_resource_limit_by_id
         )
         self.search_aliases = group.global_scope(SearchAliasesAction, service.search_aliases)
+        self.search_image_aliases = aliases.search_ops(SearchImageAliasesAction)
         self.bulk_get_aliases = aliases.partial_bulk_get_ops(BulkGetImageAliasesAction)

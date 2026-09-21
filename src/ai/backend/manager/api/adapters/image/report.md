@@ -1580,6 +1580,67 @@ Then
 - 거부된다
   - 거부: InvalidGraphQLParameters
 
+#### [a-user-who-can-read-the-image-gets-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다
+
+Given
+
+- 별칭이 등록된 이미지 1개, 그 이미지에 권한 있음인 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 이미지 image-1: 별칭 seeded-alias
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 image-keeper-1: image 전체에 READ 허용
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
+
+Then
+
+- 등록해 둔 별칭이 반환된다
+  - items = ['seeded-alias']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+#### [a-user-who-cannot-read-the-image-is-refused-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 별칭이 등록된 이미지 1개, 아무 권한도 없음인 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 이미지 image-1: 별칭 seeded-alias
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
 #### [a-user-who-is-not-the-superadmin-may-not-search-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
 슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다

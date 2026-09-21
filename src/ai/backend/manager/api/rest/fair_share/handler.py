@@ -78,6 +78,11 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
+)
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
     ProjectUsageBucketSearcher,
@@ -121,6 +126,15 @@ from ai.backend.manager.services.resource_usage.actions.global_search_project_us
 )
 from ai.backend.manager.services.resource_usage.actions.global_search_user_usage_buckets import (
     GlobalSearchUserUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.search_domain_usage_buckets import (
+    SearchDomainUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.search_project_usage_buckets import (
+    SearchProjectUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.search_user_usage_buckets import (
+    SearchUserUsageBucketsAction,
 )
 
 from .adapter import FairShareAdapter
@@ -424,17 +438,16 @@ class FairShareAPIHandler:
         )
 
         querier = self._adapter.build_domain_usage_bucket_querier(modified_request)
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
 
-        action_result = await self._resource_usage.global_search_domain_usage_buckets.run(
-            GlobalSearchDomainUsageBucketsAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=DomainUsageBucketSearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+        action_result = await self._resource_usage.search_domain_usage_buckets.run(
+            SearchDomainUsageBucketsAction(
+                targets=[DomainUsageBucketTarget(resource_group_id=resource_group_id)],
+                searcher=DomainUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
             )
         )
 
@@ -484,17 +497,21 @@ class FairShareAPIHandler:
         )
 
         querier = self._adapter.build_project_usage_bucket_querier(modified_request)
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
 
-        action_result = await self._resource_usage.global_search_project_usage_buckets.run(
-            GlobalSearchProjectUsageBucketsAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=ProjectUsageBucketSearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+        action_result = await self._resource_usage.search_project_usage_buckets.run(
+            SearchProjectUsageBucketsAction(
+                targets=[
+                    ProjectUsageBucketTarget(
+                        resource_group_id=resource_group_id,
+                        domain_name=path.parsed.domain_name,
+                    )
+                ],
+                searcher=ProjectUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
             )
         )
 
@@ -550,17 +567,22 @@ class FairShareAPIHandler:
         )
 
         querier = self._adapter.build_user_usage_bucket_querier(modified_request)
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
 
-        action_result = await self._resource_usage.global_search_user_usage_buckets.run(
-            GlobalSearchUserUsageBucketsAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=UserUsageBucketSearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+        action_result = await self._resource_usage.search_user_usage_buckets.run(
+            SearchUserUsageBucketsAction(
+                targets=[
+                    UserUsageBucketTarget(
+                        resource_group_id=resource_group_id,
+                        domain_name=path.parsed.domain_name,
+                        project_id=path.parsed.project_id,
+                    )
+                ],
+                searcher=UserUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
             )
         )
 

@@ -13,6 +13,8 @@ from .inputs import (
     BulkRestoreRolePresetsInputGQL,
     CreateRolePresetInputGQL,
     RolePermissionPresetEntryInputGQL,
+    RolePresetUsageGQL,
+    RolePresetUsedByGQL,
     UpdateRolePresetInputGQL,
 )
 from .node import (
@@ -63,6 +65,8 @@ __all__ = [
     "BulkRestoreRolePresetsInputGQL",
     "BulkPurgeRolePresetsInputGQL",
     "RolePermissionPresetEntryInputGQL",
+    "RolePresetUsageGQL",
+    "RolePresetUsedByGQL",
     "BulkAddRolePermissionPresetsInputGQL",
     "BulkRemoveRolePermissionPresetsInputGQL",
     # Payload types

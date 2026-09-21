@@ -21,6 +21,7 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
@@ -45,7 +46,7 @@ async def adapter(
     return DomainAdapter(
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, provider)),
+            DomainService(DomainRepository(engine, RelationOpsProvider(engine))),
         ),
         ResourceGroupProcessors(
             registry.group(GroupMeta(ResourceGroupEntityType())),

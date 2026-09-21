@@ -51,7 +51,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
     ModelCardScope,
-    ModelCardUsedBy,
+    ModelCardUsage,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
@@ -200,7 +200,7 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._model_card.global_search.run(
             GlobalSearchModelCardsAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_model_card_searcher(input),
                 )
             )
@@ -221,13 +221,13 @@ class ModelCardAdapter(BaseAdapter):
         )
         return targets
 
-    def _used_by(self, used_by: ModelCardUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: ModelCardUsage | None) -> list[UsedBy]:
         """The uses the request named."""
-        if used_by is None:
+        if usage is None or usage.uses is None:
             return []
-        linked = ModelCardSearchableFields.linked
+        linked = ModelCardSearchableFields.linked.usage
         return [
-            linked.vfolders.used_by(VFolderUUID(entity_id)) for entity_id in used_by.vfolder or ()
+            linked.vfolders.uses(VFolderUUID(entity_id)) for entity_id in usage.uses.vfolder or ()
         ]
 
     def _scoped_search_action(
@@ -238,7 +238,7 @@ class ModelCardAdapter(BaseAdapter):
         return ScopedSearchModelCardsAction(
             searcher=ScopedSearcher(
                 scopes=targets,
-                used_by=self._used_by(input.used_by),
+                used_by=self._usage(input.usage),
                 searcher=self._build_model_card_searcher(input),
             )
         )
@@ -563,7 +563,7 @@ class ModelCardAdapter(BaseAdapter):
         """The host of the vfolder the card is built on.
 
         Deprecated. Callers move to a vfolder search by host followed by
-        ``used_by: { vfolder }``; the reason it is not simply dropped is in
+        ``usage: { uses: { vfolder } }``; the reason it is not simply dropped is in
         ``models/model_card/deprecated_search.py``.
         """
         if host is None:

@@ -580,7 +580,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                VFolderSearchableFields.linked.model_cards.used_by(
+                VFolderSearchableFields.linked.usage.model_cards.used_by(
                     ModelCardID(model_cards["card_a"])
                 ).condition
             ],
@@ -603,7 +603,7 @@ class TestVfolderSearchFilter:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                VFolderSearchableFields.linked.model_cards.used_by(
+                VFolderSearchableFields.linked.usage.model_cards.used_by(
                     ModelCardID(model_cards["card_b"])
                 ).condition
             ],

@@ -45,7 +45,8 @@ __all__ = (
     "DeploymentOrderField",
     "DeploymentPolicyInfo",
     "DeploymentStrategy",
-    "DeploymentUsedBy",
+    "DeploymentUsage",
+    "DeploymentUses",
     "DeploymentStrategyInfoDTO",
     "DeploymentStrategySpecInfo",
     "EndpointLifecycle",
@@ -498,15 +499,43 @@ class DeploymentStrategyInfoDTO(BaseResponseModel):
     type: DeploymentStrategy
 
 
-class DeploymentUsedBy(BaseRequestModel):
-    """Entities whose use narrows the deployments read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Deployments the caller cannot
-    read are left out even when a listed entity uses them.
-    """
+class DeploymentUses(BaseRequestModel):
+    """Entities the deployment uses, whose ids narrow the result."""
 
     resource_group: list[UUID] | None = Field(
         default=None, description="Resource groups the deployment runs in"
+    )
+    image: list[UUID] | None = Field(
+        default=None,
+        description="Images the deployment's live replica group names in its current revision",
+    )
+    vfolder: list[UUID] | None = Field(
+        default=None,
+        description=(
+            "VFolders the deployment's live replica group names as the model of its current "
+            "revision"
+        ),
+    )
+    session: list[UUID] | None = Field(
+        default=None, description="Sessions the deployment's route rows serve as their replicas"
+    )
+    runtime_variant: list[UUID] | None = Field(
+        default=None, description="Runtime variants the deployment's revisions name"
+    )
+    deployment_preset: list[UUID] | None = Field(
+        default=None, description="Presets the deployment's revisions name"
+    )
+
+
+class DeploymentUsage(BaseRequestModel):
+    """Uses narrowing the deployments read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Deployments the caller cannot
+    read are left out even when a listed entity is tied to them.
+    """
+
+    uses: DeploymentUses | None = Field(
+        default=None, description="Entities the deployment uses, whose ids narrow the result"
     )
 
 

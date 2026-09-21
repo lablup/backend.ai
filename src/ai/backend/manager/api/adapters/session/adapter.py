@@ -14,6 +14,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -94,7 +95,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     OrderDirection,
     SessionOrderField,
     SessionScope,
-    SessionUsedBy,
+    SessionUsage,
 )
 from ai.backend.common.types import (
     AccessKey,
@@ -618,20 +619,29 @@ class SessionAdapter(BaseAdapter):
             )
         ])
 
-    def _used_by(self, used_by: SessionUsedBy | None) -> list[UsedBy]:
-        """The uses the request named."""
-        if used_by is None:
+    def _usage(self, usage: SessionUsage | None) -> list[UsedBy]:
+        """The uses the request named, the using side before the used side."""
+        if usage is None:
             return []
-        linked = SessionSearchableFields.linked
+        linked = SessionSearchableFields.linked.usage
+        used_by = usage.used_by
+        uses = usage.uses
         return [
             *(
                 linked.deployments.used_by(DeploymentID(entity_id))
-                for entity_id in used_by.deployment or ()
+                for entity_id in (used_by.deployment or () if used_by else ())
             ),
-            *(linked.agents.used_by(AgentUUID(entity_id)) for entity_id in used_by.agent or ()),
             *(
-                linked.resource_groups.used_by(ResourceGroupID(entity_id))
-                for entity_id in used_by.resource_group or ()
+                linked.images.uses(ImageID(entity_id))
+                for entity_id in (uses.image or () if uses else ())
+            ),
+            *(
+                linked.agents.uses(AgentUUID(entity_id))
+                for entity_id in (uses.agent or () if uses else ())
+            ),
+            *(
+                linked.resource_groups.uses(ResourceGroupID(entity_id))
+                for entity_id in (uses.resource_group or () if uses else ())
             ),
         ]
 
@@ -641,7 +651,7 @@ class SessionAdapter(BaseAdapter):
         return ScopedSearchSessionsAction(
             searcher=ScopedSearcher(
                 scopes=scopes,
-                used_by=self._used_by(input.used_by),
+                used_by=self._usage(input.usage),
                 searcher=self._build_session_searcher(input),
             )
         )
@@ -654,7 +664,7 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._session.global_search.run(
             GlobalSearchSessionsAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_session_searcher(input),
                 )
             )
@@ -692,7 +702,7 @@ class SessionAdapter(BaseAdapter):
         )
         action_result = await self._session.global_search.run(
             GlobalSearchSessionsAction(
-                searcher=GlobalSearcher(used_by=self._used_by(input.used_by), searcher=searcher)
+                searcher=GlobalSearcher(used_by=self._usage(input.usage), searcher=searcher)
             )
         )
 
@@ -759,7 +769,7 @@ class SessionAdapter(BaseAdapter):
             ScopedSearchSessionsAction(
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(input.scope),
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_scoped_session_searcher(input),
                 )
             )

@@ -14,11 +14,19 @@ class RuntimeVariantOrderField(StrEnum):
 
 
 class RuntimeVariantUsedBy(BaseRequestModel):
-    """Entities whose use narrows the runtime variants read; every id is AND-ed.
+    """Entities whose use of the runtime variant narrows the result."""
+
+    deployment: list[UUID] | None = Field(
+        default=None, description="Deployments whose revisions name the runtime variant"
+    )
+
+
+class RuntimeVariantUsage(BaseRequestModel):
+    """Uses narrowing the runtime variants read; every id is AND-ed.
 
     An entity the caller cannot read refuses the request.
     """
 
-    deployment: list[UUID] | None = Field(
-        default=None, description="Deployments whose revisions name the runtime variant"
+    used_by: RuntimeVariantUsedBy | None = Field(
+        default=None, description="Entities whose use of the runtime variant narrows the result"
     )

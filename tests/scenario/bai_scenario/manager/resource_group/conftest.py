@@ -116,7 +116,7 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, provider)),
+            DomainService(DomainRepository(engine, RelationOpsProvider(engine))),
         ),
         FakeDeploymentCoordinator(deployment_handlers),
         FakeScheduleCoordinator(lifecycle_handlers),

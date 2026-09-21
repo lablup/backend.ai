@@ -7,6 +7,7 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -18,10 +19,12 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
     ImageStatusFilterInputDTO,
+    SearchImageAliasesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
+    SearchImageAliasesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageAliasOrderField,
@@ -32,6 +35,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -49,6 +53,7 @@ from bai_scenario.components.image import (
     AliasesAndACaller,
     AliasesOnTwoImagesAndSomeone,
     AnAliasAndACaller,
+    AnAliasAndAPlainUser,
     AnAliasAndSomeone,
     ByABrokenCursor,
     ByCursor,
@@ -209,6 +214,30 @@ class SearchingTheAliasesOf(When[AnAliasAndACaller, ImageAdapter, AdminSearchIma
 
 
 @dataclass(frozen=True)
+class SearchingTheAliasesOfTheImage(
+    When[AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
+):
+    """그 이미지를 스코프로 별칭을 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search_aliases"
+
+    @override
+    def describe(self, laid: AnAliasAndACaller) -> str:
+        return f"{laid.caller.username}이 {laid.image.name}의 별칭을 검색함"
+
+    @override
+    async def call(
+        self, adapter: ImageAdapter, laid: AnAliasAndACaller
+    ) -> SearchImageAliasesPayload:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search_aliases(
+                ImageID(laid.image.id), SearchImageAliasesInput(limit=DEFAULT_PAGE)
+            )
+
+
+@dataclass(frozen=True)
 class SearchingAliasesForOneImage(
     When[AliasesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
@@ -244,17 +273,17 @@ class SearchingAliasesForOneImage(
 
 
 @dataclass(frozen=True)
-class TheAttachedAliasIsFound(Then[AnAliasAndACaller, AdminSearchImageAliasesPayload]):
-    """등록해 둔 별칭 1개가 반환된다."""
+class TheAttachedAliasIsFound[
+    TPayload: (AdminSearchImageAliasesPayload, SearchImageAliasesPayload)
+](Then[AnAliasAndACaller, TPayload]):
+    """등록해 둔 별칭 1개가 반환된다. 전체 별칭 검색과 한 이미지의 별칭 검색이 같이 쓴다."""
 
     @override
     def says(self) -> str:
         return "등록해 둔 별칭이 반환된다"
 
     @override
-    def look(
-        self, laid: AnAliasAndACaller, answered: Answered[AdminSearchImageAliasesPayload]
-    ) -> list[Verdict]:
+    def look(self, laid: AnAliasAndACaller, answered: Answered[TPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Held("응답", answered.response, Filled())]
@@ -851,6 +880,60 @@ class APlainUserMayNotSearchAliases(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
+@dataclass(frozen=True)
+class AReaderOfTheImageSearchesItsAliases(
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-can-read-the-image-gets-its-aliases"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+        return AnAliasAndAPlainUser(granted=True)
+
+    @override
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]:
+        return SearchingTheAliasesOfTheImage()
+
+    @override
+    def then(self) -> Then[AnAliasAndACaller, SearchImageAliasesPayload]:
+        return TheAttachedAliasIsFound()
+
+
+@dataclass(frozen=True)
+class AUserWithNoPermissionMayNotSearchTheImageAliases(
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-cannot-read-the-image-is-refused-its-aliases"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+        return AnAliasAndAPlainUser(granted=False)
+
+    @override
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]:
+        return SearchingTheAliasesOfTheImage()
+
+    @override
+    def then(self) -> Then[AnAliasAndACaller, SearchImageAliasesPayload]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[Any] = [
     SearchingWithoutAFilterCountsEvery(),
     SearchingByNameReturnsOnlyTheMatch(),
@@ -868,6 +951,8 @@ SCENARIOS: list[Any] = [
     SearchingAliasesFindsTheAttachedOne(),
     FilteringAndOrderingAliases(),
     APlainUserMayNotSearchAliases(),
+    AReaderOfTheImageSearchesItsAliases(),
+    AUserWithNoPermissionMayNotSearchTheImageAliases(),
 ]
 
 

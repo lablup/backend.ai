@@ -21,7 +21,7 @@ from .shelf_search import ShelfSearches, ids, ordered_ids, spec_graded
 OWN = ShelfSearchableFields.own
 BOXES = ShelfSearchableFields.nested.boxes
 CATEGORY = ShelfSearchableFields.nested.category
-CARTS = ShelfSearchableFields.linked.carts
+CARTS = ShelfSearchableFields.linked.usage.carts
 BOX = BoxSearchableFields.own
 
 

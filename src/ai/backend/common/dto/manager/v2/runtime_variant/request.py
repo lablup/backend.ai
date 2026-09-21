@@ -9,7 +9,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection, String128
 from ai.backend.common.dto.manager.v2.runtime_variant.types import (
     RuntimeVariantOrderField,
-    RuntimeVariantUsedBy,
+    RuntimeVariantUsage,
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -54,11 +54,10 @@ class RuntimeVariantOrder(BaseRequestModel):
 
 
 class SearchRuntimeVariantsInput(BaseRequestModel):
-    used_by: RuntimeVariantUsedBy | None = Field(
+    usage: RuntimeVariantUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller."
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
         ),
     )
     filter: RuntimeVariantFilter | None = Field(default=None)

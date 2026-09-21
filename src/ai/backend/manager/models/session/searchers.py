@@ -8,7 +8,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.types import SessionId, VFolderID
-from ai.backend.manager.data.session.types import SessionEntityData
+from ai.backend.manager.data.session.types import SessionEntityData, SessionInfo
 from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -29,6 +29,19 @@ class SessionSearcher(Searcher[SessionRow, SessionEntityData]):
     @override
     def to_data(self, row: SessionRow) -> SessionEntityData:
         return SessionSearchableFields.own.to_data(row)
+
+
+@dataclass
+class SessionInfoSearcher(Searcher[SessionRow, SessionInfo]):
+    """The session rows the scheduler handlers read, without their kernels."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(SessionRow)
+
+    @override
+    def to_data(self, row: SessionRow) -> SessionInfo:
+        return row.to_session_info()
 
 
 @dataclass

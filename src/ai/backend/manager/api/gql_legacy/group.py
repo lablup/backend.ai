@@ -28,7 +28,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project import (
@@ -132,6 +132,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
         "name": ("name", None),
+        "type": (EnumFieldItem("type", ProjectType), None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("updated_at", dtparse),

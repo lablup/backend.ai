@@ -32,9 +32,12 @@ from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPrese
 from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
     PrometheusQueryPresetSearchableFields,
 )
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
     PrometheusQueryPresetDBSource,
 )
@@ -66,9 +69,10 @@ class MetricRepository:
         db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
         default_timewindow: str,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
         self._prometheus_client = prometheus_client
-        self._prometheus_query_preset_db_source = PrometheusQueryPresetDBSource(db)
+        self._prometheus_query_preset_db_source = PrometheusQueryPresetDBSource(db, v2_ops_provider)
         self._default_timewindow = default_timewindow
 
     async def query_container_metric_metadata(self) -> list[str]:
@@ -109,7 +113,7 @@ class MetricRepository:
         if not queries:
             return {}
         preset_result = await self._prometheus_query_preset_db_source.search(
-            BatchQuerier(
+            PrometheusQueryPresetSearcher(
                 pagination=NoPagination(),
                 conditions=[
                     PrometheusQueryPresetSearchableFields.own.id.filter.in_(

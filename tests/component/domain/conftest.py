@@ -31,7 +31,7 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.project.processors import ProjectProcessors
@@ -43,7 +43,7 @@ DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 def domain_processors(
     database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
 ) -> DomainProcessors:
-    repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+    repo = DomainRepository(database_engine, RelationOpsProvider(database_engine))
     service = DomainService(repo)
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

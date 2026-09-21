@@ -17,6 +17,7 @@ __all__ = (
     "ImageAliasOrderField",
     "ImageLabelInfo",
     "ImageScope",
+    "ImageUsage",
     "ImageUsedBy",
     "ImageOrderField",
     "ImagePermissionType",
@@ -109,11 +110,7 @@ class ImagePermissionType(BaseResponseModel):
 
 
 class ImageUsedBy(BaseRequestModel):
-    """Entities whose use narrows the images read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Images the caller cannot read
-    are left out even when a listed entity uses them.
-    """
+    """Entities whose use of the image narrows the result."""
 
     session: list[UUID] | None = Field(
         default=None, description="Sessions whose kernels run the image"
@@ -121,6 +118,18 @@ class ImageUsedBy(BaseRequestModel):
     deployment: list[UUID] | None = Field(
         default=None,
         description="Deployments whose live replica groups name the image in their current revision",
+    )
+
+
+class ImageUsage(BaseRequestModel):
+    """Uses narrowing the images read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Images the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    used_by: ImageUsedBy | None = Field(
+        default=None, description="Entities whose use of the image narrows the result"
     )
 
 

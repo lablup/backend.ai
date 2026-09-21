@@ -46,7 +46,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
-    DeploymentRevisionPresetUsedBy,
+    DeploymentRevisionPresetUsage,
     PresetModelConfigInfoDTO,
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
@@ -75,6 +75,9 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
     PresetResourceSlotCreator,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.scopes import (
+    PublicDeploymentPresetTarget,
+)
 from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
     DeploymentPresetSearchableFields,
 )
@@ -93,7 +96,7 @@ from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
 from ai.backend.manager.models.specs.search.usage import UsedBy
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
     BulkGetDeploymentPresetsAction,
 )
@@ -106,8 +109,8 @@ from ai.backend.manager.services.deployment_revision_preset.actions.get import (
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
 )
-from ai.backend.manager.services.deployment_revision_preset.actions.search import (
-    GlobalSearchDeploymentPresetsAction,
+from ai.backend.manager.services.deployment_revision_preset.actions.scoped_search import (
+    ScopedSearchDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.search_resource_slots import (
     SearchPresetResourceSlotsAction,
@@ -232,9 +235,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._deployment_revision_preset.global_search.run(
-            GlobalSearchDeploymentPresetsAction(
-                searcher=GlobalSearcher(used_by=self._used_by(input.used_by), searcher=searcher)
+        result = await self._deployment_revision_preset.scoped_search.run(
+            ScopedSearchDeploymentPresetsAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicDeploymentPresetTarget()],
+                    used_by=self._usage(input.usage),
+                    searcher=searcher,
+                )
             )
         )
         return SearchDeploymentRevisionPresetsPayload(
@@ -441,14 +448,14 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conds))
         return conditions
 
-    def _used_by(self, used_by: DeploymentRevisionPresetUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: DeploymentRevisionPresetUsage | None) -> list[UsedBy]:
         """The uses the request named, each of which the caller must be able to read."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = DeploymentPresetSearchableFields.linked
+        linked = DeploymentPresetSearchableFields.linked.usage
         return [
             linked.deployments.used_by(DeploymentID(entity_id))
-            for entity_id in used_by.deployment or ()
+            for entity_id in usage.used_by.deployment or ()
         ]
 
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:

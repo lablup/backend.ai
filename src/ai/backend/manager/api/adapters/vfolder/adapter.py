@@ -75,7 +75,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderPermissionField,
     VFolderQuotaInfo,
     VFolderScope,
-    VFolderUsedBy,
+    VFolderUsage,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -134,9 +134,7 @@ from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
 from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashAction,
 )
-from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    GlobalBatchLoadVFoldersAction,
-)
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
 )
@@ -275,22 +273,22 @@ class VFolderAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, ids: Sequence[VFolderUUID]) -> list[VFolderNode | None]:
-        """Batch fetch vfolders by IDs for GraphQL DataLoader.
+    async def batch_load_by_ids(
+        self, ids: Sequence[VFolderUUID]
+    ) -> list[VFolderNode | Exception | None]:
+        """Batch load vfolders by id for DataLoader use, checked per folder.
 
-        Used by field resolvers (e.g. ``ModelCardGQL.vfolder``) that surface a
-        related vfolder for an entity that is already accessible to the caller.
-        Returns nodes in the same order as the input IDs; missing entries are
-        ``None``.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        action_result = await self._vfolder.batch_load_vfolders_by_ids.run(
-            GlobalBatchLoadVFoldersAction(ids=list(ids))
-        )
+        result = await self._vfolder.bulk_get.run(BulkGetVFoldersAction(ids=list(ids)))
         return [
-            self._vfolder_data_to_node(item) if item is not None else None
-            for item in action_result.data
+            self._vfolder_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
         ]
 
     async def batch_load_permissions(
@@ -329,7 +327,7 @@ class VFolderAdapter(BaseAdapter):
         action_result = await self._vfolder_admin.admin_search_vfolders.run(
             GlobalSearchVFoldersAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_vfolder_searcher(input),
                 )
             )
@@ -394,11 +392,12 @@ class VFolderAdapter(BaseAdapter):
         scopes.extend(UserVFolderTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
         return scopes
 
-    def _used_by(self, used_by: VFolderUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: VFolderUsage | None) -> list[UsedBy]:
         """The uses the request named, deployments before model cards."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = VFolderSearchableFields.linked
+        used_by = usage.used_by
+        linked = VFolderSearchableFields.linked.usage
         return [
             *(
                 linked.deployments.used_by(DeploymentID(entity_id))
@@ -416,7 +415,7 @@ class VFolderAdapter(BaseAdapter):
         return ScopedSearchVFoldersAction(
             searcher=ScopedSearcher(
                 scopes=scopes,
-                used_by=self._used_by(input.used_by),
+                used_by=self._usage(input.usage),
                 searcher=self._build_vfolder_searcher(input),
             )
         )

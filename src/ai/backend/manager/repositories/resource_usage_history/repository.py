@@ -29,8 +29,13 @@ from ai.backend.manager.models.resource_usage_history.scopes import (
     ProjectUsageBucketTarget,
     UserUsageBucketTarget,
 )
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
+)
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
@@ -166,43 +171,43 @@ class ResourceUsageHistoryRepository:
     @resource_usage_history_repository_resilience.apply()
     async def search_kernel_usage_records(
         self,
-        querier: BatchQuerier,
+        searcher: KernelUsageRecordSearcher,
     ) -> KernelUsageRecordSearchResult:
         """Search kernel usage records with pagination."""
-        return await self._db_source.search_kernel_usage_records(querier)
+        return await self._db_source.search_kernel_usage_records(searcher)
 
     # ==================== Domain Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def search_domain_usage_buckets(
         self,
-        querier: BatchQuerier,
+        searcher: DomainUsageBucketSearcher,
         scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        return await self._db_source.search_domain_usage_buckets(querier, scope)
+        return await self._db_source.search_domain_usage_buckets(searcher, scope)
 
     # ==================== Project Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def search_project_usage_buckets(
         self,
-        querier: BatchQuerier,
+        searcher: ProjectUsageBucketSearcher,
         scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        return await self._db_source.search_project_usage_buckets(querier, scope)
+        return await self._db_source.search_project_usage_buckets(searcher, scope)
 
     # ==================== User Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def search_user_usage_buckets(
         self,
-        querier: BatchQuerier,
+        searcher: UserUsageBucketSearcher,
         scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        return await self._db_source.search_user_usage_buckets(querier, scope)
+        return await self._db_source.search_user_usage_buckets(searcher, scope)
 
     # ==================== Aggregation Queries ====================
 

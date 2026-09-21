@@ -196,7 +196,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

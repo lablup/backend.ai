@@ -3,8 +3,8 @@
 `ModelCardV2Filter.storageHost` narrows model cards by the `host` of the vfolder they are
 built on. A vfolder is another entity, so the EXISTS has no place to check the caller's
 permission on it, which is why the declaration rules keep it out of `nested`. It shipped
-in 26.4.2, so it cannot be dropped outright, and `used_by: { vfolder }` is the route off
-it.
+in 26.4.2, so it cannot be dropped outright, and `usage: { uses: { vfolder } }` is the route
+off it.
 
 Deleting this module completes the model card's migration, as deleting `conditions.py`
 and `orders.py` did.
