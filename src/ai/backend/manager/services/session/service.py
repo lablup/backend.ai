@@ -25,7 +25,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
@@ -54,6 +54,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
 )
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -112,7 +113,6 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
-    BatchGetKernelResourceAllocationActionResult,
 )
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
@@ -1479,12 +1479,16 @@ class SessionService:
 
     async def batch_get_kernel_resource_allocation(
         self, action: BatchGetKernelResourceAllocationAction
-    ) -> BatchGetKernelResourceAllocationActionResult:
+    ) -> BulkFieldOpsResult[ResourceAllocationAggregate]:
         """Aggregate resource_allocations per kernel (requested/used/allocated)."""
         data = await self._session_repository.batch_get_resource_allocation_by_kernel([
             KernelId(kernel_id) for kernel_id in action.kernel_ids
         ])
-        return BatchGetKernelResourceAllocationActionResult(data=data)
+        successes: dict[FieldIdentifier, ResourceAllocationAggregate] = {
+            kernel_id: data.get(KernelId(kernel_id), ResourceAllocationAggregate.empty())
+            for kernel_id in action.kernel_ids
+        }
+        return BulkFieldOpsResult(successes=successes, errors={})
 
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:
         """Enqueue a new compute session (PENDING) through the scheduler.

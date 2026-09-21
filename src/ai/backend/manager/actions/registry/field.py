@@ -489,16 +489,20 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
             partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
-    def partial_bulk_field[TAction: BasePartialBulkFieldAction[Any, Any]](
+    def partial_bulk_field[TAction: BasePartialBulkFieldAction[Any, Any], TData](
         self,
         action_cls: type[TAction],
-        func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TFieldData]]],
+        func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TData]]],
         *,
         validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> PartialBulkFieldActionProcessor[TAction, TFieldData]:
-        """Several field rows written by a service, each answered for by the entity
-        owning it — the service-backed counterpart of :meth:`partial_bulk_purge_ops`."""
+    ) -> PartialBulkFieldActionProcessor[TAction, TData]:
+        """Several field rows read or written by a service, each answered for by the
+        entity owning it — the service-backed counterpart of :meth:`partial_bulk_purge_ops`.
+
+        Typed by what the service answers per row rather than by this group's
+        ``FieldData``: a read may answer with a value derived from the row.
+        """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
         self._record_partial_owner_lookup()
         return PartialBulkFieldActionProcessor(
