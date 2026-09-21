@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, override
+from typing import override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import (
@@ -14,18 +14,9 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.mixins.registry_name import RegistryNameMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("HuggingFaceRegistryRow",)
-
-
-def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-
-    return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
 class HuggingFaceRegistryRow(RegistryNameMixin, Base):
@@ -36,14 +27,6 @@ class HuggingFaceRegistryRow(RegistryNameMixin, Base):
     )
     url: Mapped[str] = mapped_column("url", sa.String, nullable=False)
     token: Mapped[str | None] = mapped_column("token", sa.String, nullable=True, default=None)
-
-    meta: Mapped[ArtifactRegistryRow | None] = relationship(
-        "ArtifactRegistryRow",
-        back_populates="huggingface_registries",
-        primaryjoin=_get_registry_meta_join_condition,
-        uselist=False,
-        viewonly=True,
-    )
 
     @override
     def __str__(self) -> str:

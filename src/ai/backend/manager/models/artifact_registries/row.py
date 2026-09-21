@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, override
+from typing import override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.logging import BraceStyleAdapter
@@ -14,25 +14,9 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-    from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRegistryRow",)
-
-
-def _get_huggingface_registry_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-
-    return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
-
-
-def _get_reservoir_registry_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
-
-    return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
 class ArtifactRegistryRow(Base):
@@ -51,21 +35,6 @@ class ArtifactRegistryRow(Base):
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, unique=True)
     registry_id: Mapped[uuid.UUID] = mapped_column("registry_id", GUID, nullable=False, unique=True)
     type: Mapped[str] = mapped_column("type", sa.String, nullable=False)
-
-    huggingface_registries: Mapped[HuggingFaceRegistryRow | None] = relationship(
-        "HuggingFaceRegistryRow",
-        back_populates="meta",
-        primaryjoin=_get_huggingface_registry_join_condition,
-        uselist=False,
-        viewonly=True,
-    )
-    reservoir_registries: Mapped[ReservoirRegistryRow | None] = relationship(
-        "ReservoirRegistryRow",
-        back_populates="meta",
-        primaryjoin=_get_reservoir_registry_join_condition,
-        uselist=False,
-        viewonly=True,
-    )
 
     @override
     def __str__(self) -> str:

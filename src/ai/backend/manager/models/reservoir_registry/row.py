@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, override
+from typing import override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import (
@@ -14,18 +14,9 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.mixins.registry_name import RegistryNameMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("ReservoirRegistryRow",)
-
-
-def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-
-    return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
 class ReservoirRegistryRow(RegistryNameMixin, Base):
@@ -38,14 +29,6 @@ class ReservoirRegistryRow(RegistryNameMixin, Base):
     access_key: Mapped[str] = mapped_column("access_key", sa.String, nullable=False)
     secret_key: Mapped[str] = mapped_column("secret_key", sa.String, nullable=False)
     api_version: Mapped[str] = mapped_column("api_version", sa.String, nullable=False)
-
-    meta: Mapped[ArtifactRegistryRow | None] = relationship(
-        "ArtifactRegistryRow",
-        back_populates="reservoir_registries",
-        primaryjoin=_get_registry_meta_join_condition,
-        uselist=False,
-        viewonly=True,
-    )
 
     @override
     def __str__(self) -> str:
