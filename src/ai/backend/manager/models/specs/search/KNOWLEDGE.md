@@ -26,6 +26,9 @@ sources:
 generated:
   by: claude-code/opus-5
   at: 2026-09-21
+updated:
+  by: claude-code/opus-5
+  at: 2026-09-21
 status: stable
 ---
 
@@ -422,6 +425,7 @@ Nothing is left. `resource_group.get_wsproxy_version` became a scope action taki
 | `domain` | `lookup`, `bulk_lookup` | A name in `domains` to its id | Not moved | Same |
 | `project` | `lookup` | A (domain name, name) pair in `groups` to its id | Not moved | Same |
 | `resource_group` | `lookup`, `bulk_lookup` | A name in `scaling_groups` to its id | Not moved | Same |
+| `resource_policy` | `lookup` of the keypair, user and project policy | A name in `keypair_resource_policies`, `user_resource_policies` or `project_resource_policies` to its id | Not moved | Same. Created in global, which no role governs, so a lookup judged on the node would refuse everyone but a superadmin |
 | `session` | `lookup` | A (user, name, non-terminal status) in `sessions` to its id | Not moved | Same. The handler decides the user |
 | `etcd_config` | `get_resource_slots`, `get_resource_metadata`, `get_vfolder_types` | etcd settings, device metadata in valkey | Not moved | Not an entity |
 | `manager_admin` | `get_announcement` | The announcement in etcd | Not moved | Not an entity |

@@ -1,7 +1,7 @@
 """정책 수정 — 무엇이 바뀌고, 값을 비우라는 요청을 어떻게 처리하는가.
 
-권한 없는 사용자는 수정 로직에 이르기 전에 이름 조회 단계에서 막히므로, 거부 이유가 조회와
-같다.
+권한 없는 사용자는 이름은 풀리지만 수정 로직에 이르기 전에 정책 노드에 대한 권한 검사에서
+막히므로, 거부 이유가 조회와 같다.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import CheckConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -230,7 +230,7 @@ class AUserGrantedNothingMayNotEdit(
     def describe(self) -> str:
         return (
             f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 수정하려 하면, "
-            "수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다"
+            "수정 로직에 이르기 전에 그 정책을 고칠 권한이 없어 거부된다"
         )
 
     @override
@@ -243,7 +243,7 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -251,21 +251,25 @@ class ANameNothingAnswersToIsNotFound(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
+    role: UserRole
 
     @override
     def summary(self) -> str:
-        return f"editing-a-{self.family.label}-name-nothing-answers-to-is-not-found"
+        return (
+            f"editing-a-{self.family.label}-name-nothing-answers-to-is-not-found-"
+            f"for-a-{self.role.value}"
+        )
 
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름을 수정하려 하면, "
+            f"{self.role.value}이 어느 {self.family.kind}에도 없는 이름을 수정하려 하면, "
             "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family, role=self.role)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
@@ -286,7 +290,11 @@ SCENARIOS: list[EditingStep] = [
     *(ANonNullableValueStaysWhenCleared(family, started=datetime.now(UTC)) for family in FAMILIES),
     APriorityCapMovedOutOfRangeIsRefused(),
     *(AUserGrantedNothingMayNotEdit(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
+    *(
+        ANameNothingAnswersToIsNotFound(family, role)
+        for family in FAMILIES
+        for role in (UserRole.SUPERADMIN, UserRole.USER)
+    ),
 ]
 
 

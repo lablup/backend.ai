@@ -1,8 +1,8 @@
 """정책을 이름으로 조회 — 누가 조회할 수 있고, 이름이 무엇을 숨기는가.
 
-이름을 정책으로 풀어내는 단계가 먼저 실행되고, 존재하지 않는 이름과 권한이 미치지 않는
-이름을 같은 이유로 거부한다. 슈퍼관리자에게도 동일하므로 "대상 없음"으로 거부되는
-시나리오가 따로 없다.
+이름을 정책으로 풀어내는 단계는 로그인한 누구에게나 열려 있고, 권한은 그 뒤의 조회가
+정책 노드에 대해 검사한다. 그래서 존재하지 않는 이름은 누구에게나 대상 없음으로, 권한이
+미치지 않는 이름은 권한 부족으로 거부된다.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
@@ -110,7 +110,7 @@ class AUserGrantedNothingMayNotRead(
     def describe(self) -> str:
         return (
             f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, "
-            "정책을 찾을 수 없다는 이유로 거부된다"
+            "이름은 풀리지만 그 정책을 읽을 권한이 없어 거부된다"
         )
 
     @override
@@ -123,7 +123,7 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Any]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -131,21 +131,25 @@ class ANameNothingAnswersToIsNotFound(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
+    role: UserRole
 
     @override
     def summary(self) -> str:
-        return f"reading-a-{self.family.label}-name-nothing-answers-to-is-not-found"
+        return (
+            f"reading-a-{self.family.label}-name-nothing-answers-to-is-not-found-"
+            f"for-a-{self.role.value}"
+        )
 
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름으로 조회하면, "
+            f"{self.role.value}이 어느 {self.family.kind}에도 없는 이름으로 조회하면, "
             "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family, role=self.role)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
@@ -191,7 +195,11 @@ class EnforcementOffOpensTheRead(
 SCENARIOS: list[ReadingStep] = [
     *(TheSuperadminReadsItByName(family, started=datetime.now(UTC)) for family in FAMILIES),
     *(AUserGrantedNothingMayNotRead(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
+    *(
+        ANameNothingAnswersToIsNotFound(family, role)
+        for family in FAMILIES
+        for role in (UserRole.SUPERADMIN, UserRole.USER)
+    ),
     *(EnforcementOffOpensTheRead(family, started=datetime.now(UTC)) for family in FAMILIES),
 ]
 

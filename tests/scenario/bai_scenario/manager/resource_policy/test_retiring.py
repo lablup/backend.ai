@@ -14,7 +14,7 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -170,7 +170,7 @@ class AUserGrantedNothingMayNotPurge(
     def describe(self) -> str:
         return (
             f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 삭제하려 하면, "
-            "삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다"
+            "삭제 로직에 이르기 전에 그 정책을 지울 권한이 없어 거부된다"
         )
 
     @override
@@ -183,7 +183,7 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], Purged]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -191,21 +191,25 @@ class ANameNothingAnswersToIsNotFound(
     Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
+    role: UserRole
 
     @override
     def summary(self) -> str:
-        return f"purging-a-{self.family.label}-name-nothing-answers-to-is-not-found"
+        return (
+            f"purging-a-{self.family.label}-name-nothing-answers-to-is-not-found-"
+            f"for-a-{self.role.value}"
+        )
 
     @override
     def describe(self) -> str:
         return (
-            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름을 삭제하려 하면, "
+            f"{self.role.value}이 어느 {self.family.kind}에도 없는 이름을 삭제하려 하면, "
             "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family, role=self.role)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
@@ -220,7 +224,11 @@ SCENARIOS: list[RetiringStep] = [
     *(TheSuperadminPurgesAnUnusedPolicy(family) for family in FAMILIES),
     *(APolicyStillHeldIsRefused(family) for family in FAMILIES),
     *(AUserGrantedNothingMayNotPurge(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
+    *(
+        ANameNothingAnswersToIsNotFound(family, role)
+        for family in FAMILIES
+        for role in (UserRole.SUPERADMIN, UserRole.USER)
+    ),
 ]
 
 

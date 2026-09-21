@@ -245,6 +245,9 @@ from ai.backend.manager.services.image.actions.lookup_alias_owner import (
     LookupImageAliasOwnerAction,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+    LookupKeypairResourcePolicyAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
@@ -270,6 +273,9 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+    LookupProjectResourcePolicyAction,
+)
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -346,6 +352,9 @@ from ai.backend.manager.services.storage_namespace.processors import (
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user_resource_policy.actions.lookup import (
+    LookupUserResourcePolicyAction,
+)
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
@@ -684,6 +693,45 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
             ResourcePresetEntityType(),
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,
+        ),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
+
+
+def test_resource_policy_name_lookups_are_public() -> None:
+    """Pins the three policy name lookups public, as every global entity's name lookup
+    is, so a rewiring has to restate it.
+
+    A policy is created in the global scope, which no role governs, so a lookup judged
+    on the policy node refuses every caller but a superadmin. The name resolves for any
+    caller that is logged in; the read, update or purge that follows is judged on the
+    node.
+    """
+    registry = _ops_registry()
+    KeypairResourcePolicyProcessors(registry.group(GroupMeta(KeyPairResourcePolicyEntityType())))
+    UserResourcePolicyProcessors(registry.group(GroupMeta(UserResourcePolicyEntityType())))
+    ProjectResourcePolicyProcessors(registry.group(GroupMeta(ProjectResourcePolicyEntityType())))
+
+    judged = {
+        LookupKeypairResourcePolicyAction: (
+            KeyPairResourcePolicyEntityType(),
+            ActionKind.LOOKUP,
+            ActionGate.PUBLIC,
+        ),
+        LookupUserResourcePolicyAction: (
+            UserResourcePolicyEntityType(),
+            ActionKind.LOOKUP,
+            ActionGate.PUBLIC,
+        ),
+        LookupProjectResourcePolicyAction: (
+            ProjectResourcePolicyEntityType(),
+            ActionKind.LOOKUP,
+            ActionGate.PUBLIC,
         ),
     }
     recorded = {

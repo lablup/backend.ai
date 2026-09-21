@@ -58,7 +58,7 @@ class ProjectResourcePolicyProcessors:
 
     def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetProjectResourcePolicyAction)
-        self.lookup = group.lookup_ops(LookupProjectResourcePolicyAction)
+        self.lookup = group.public_lookup_ops(LookupProjectResourcePolicyAction)
         self.global_search = group.global_searcher_ops(SearchProjectResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)
         self.update = group.single_update_ops(UpdateProjectResourcePolicyAction)
