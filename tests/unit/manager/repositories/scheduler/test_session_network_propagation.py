@@ -48,10 +48,10 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
@@ -310,7 +310,7 @@ class TestPersistentNetworkNotRecreated:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
-        querier = BatchQuerier(
+        searcher = SessionSearcher(
             pagination=NoPagination(),
             conditions=[
                 SessionSearchableFields.own.id.filter.in_(
@@ -318,7 +318,7 @@ class TestPersistentNetworkNotRecreated:
                 )
             ],
         )
-        result = await db_source.search_sessions_with_kernels_and_user(querier)
+        result = await db_source.search_sessions_with_kernels_and_user(searcher)
 
         assert len(result.sessions) == 1
         session = result.sessions[0]

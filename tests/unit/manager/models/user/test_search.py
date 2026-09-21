@@ -54,9 +54,9 @@ from ai.backend.manager.models.user.deprecated_search import (
     DeprecatedUserOrders,
 )
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.db_source import UserDBSource
@@ -454,7 +454,7 @@ class TestUserNestedSearchIntegration:
         search_fixture: UserSearchFixture,
     ) -> None:
         """The domain filter returns only the users in an active domain."""
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
@@ -463,7 +463,7 @@ class TestUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain
@@ -475,7 +475,7 @@ class TestUserNestedSearchIntegration:
     ) -> None:
         """search_users with domain description filter returns matching users."""
         spec = StringMatchSpec(value="Research", case_insensitive=True, negated=False)
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
@@ -484,7 +484,7 @@ class TestUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain
@@ -498,7 +498,7 @@ class TestUserNestedSearchIntegration:
     ) -> None:
         """search_users with by_project_name_contains filters by project membership."""
         spec = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
@@ -507,7 +507,7 @@ class TestUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain
@@ -519,7 +519,7 @@ class TestUserNestedSearchIntegration:
     ) -> None:
         """Negated project name filter excludes matching users."""
         spec = StringMatchSpec(value="alpha", case_insensitive=False, negated=True)
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_project_combined([
@@ -528,7 +528,7 @@ class TestUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_inactive_domain
@@ -541,12 +541,12 @@ class TestUserNestedSearchIntegration:
         search_fixture: UserSearchFixture,
     ) -> None:
         """The declared order sorts by the user's own domain_name column."""
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[UserSearchableFields.own.domain_name.order.apply(True)],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 2
         # Sorted by domain name ascending: active-dom < inactive-dom
@@ -561,12 +561,12 @@ class TestUserNestedSearchIntegration:
         search_fixture: UserSearchFixture,
     ) -> None:
         """search_users with by_project_name order sorts by MIN(project name)."""
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[DeprecatedUserOrders.by_project_name(ascending=True)],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 2
         # alpha-project < beta-project
@@ -581,7 +581,7 @@ class TestUserNestedSearchIntegration:
         search_fixture: UserSearchFixture,
     ) -> None:
         """Combining domain filter + project order in single search call."""
-        querier = BatchQuerier(
+        searcher = UserSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedUserConditions.exists_domain_combined([
@@ -590,7 +590,7 @@ class TestUserNestedSearchIntegration:
             ],
             orders=[DeprecatedUserOrders.by_project_name(ascending=True)],
         )
-        result = await user_db_source.search_users(querier)
+        result = await user_db_source.search_users(searcher)
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain

@@ -264,6 +264,7 @@ from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
     resolve_allocated_slot_revision_order,
 )
+from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher, RouteInfoSearcher
@@ -1380,11 +1381,11 @@ class DeploymentAdapter(BaseAdapter):
         input: SearchAllocatedResourceSlotsInput,
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision."""
-        querier = self._build_revision_resource_slot_querier(input, revision_id=revision_id)
+        searcher = self._build_revision_resource_slot_searcher(input, revision_id=revision_id)
         action_result = await self._deployment.search_revision_resource_slots.run(
             SearchRevisionResourceSlotsAction(
                 revision_id=revision_id,
-                querier=querier,
+                searcher=searcher,
             )
         )
         return SearchAllocatedResourceSlotsPayload(
@@ -2066,14 +2067,12 @@ class DeploymentAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-    def _build_revision_resource_slot_querier(
+    def _build_revision_resource_slot_searcher(
         self,
         input: SearchAllocatedResourceSlotsInput,
         revision_id: DeploymentRevisionID,
-    ) -> BatchQuerier:
-        conditions: list[QueryCondition] = [
-            RevisionResourceSlotConditions.by_revision_id(revision_id),
-        ]
+    ) -> RevisionResourceSlotSearcher:
+        conditions: list[QueryCondition] = []
         if input.filter:
             conditions.extend(
                 self._convert_allocated_slot_filter(
@@ -2086,7 +2085,7 @@ class DeploymentAdapter(BaseAdapter):
             if input.order
             else []
         )
-        return self._build_querier(
+        querier = self._build_querier(
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_revision_resource_slot_pagination_spec(),
@@ -2096,6 +2095,12 @@ class DeploymentAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
+        )
+        return RevisionResourceSlotSearcher(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
+            revision_id=revision_id,
         )
 
     def _convert_allocated_slot_filter(

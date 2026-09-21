@@ -29,10 +29,10 @@ from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteDataSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteHistoryToCreate
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -235,7 +235,7 @@ class RouteCoordinator:
             if target.sub_status is not None:
                 conditions.append(fields.sub_status.filter.in_(target.sub_status))
             routes = await self._deployment_repository.search_route_datas_with_last_history(
-                querier=BatchQuerier(pagination=NoPagination(), conditions=conditions),
+                searcher=RouteDataSearcher(pagination=NoPagination(), conditions=conditions),
                 category=handler.category(),
             )
             if not routes:
@@ -274,7 +274,7 @@ class RouteCoordinator:
         replica_fields = ReplicaSearchableFields.own
         try:
             routes = await self._deployment_repository.search_route_datas(
-                querier=BatchQuerier(
+                searcher=RouteDataSearcher(
                     pagination=NoPagination(),
                     conditions=[
                         combine_conditions_or([

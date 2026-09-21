@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
@@ -952,6 +953,65 @@ class RouteInfo(FieldData):
     health_check: ModelHealthCheck | None
     replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RouteData:
+    """Data structure for model service route."""
+
+    route_id: ReplicaID
+    deployment_id: DeploymentID
+    session_id: SessionId | None
+    status: RouteStatus
+    health_status: RouteHealthStatus
+    traffic_ratio: float
+    created_at: datetime
+    revision_id: DeploymentRevisionID
+    traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
+    termination_grace_period: float
+    replica_host: str | None = None
+    replica_port: int | None = None
+    updated_at: datetime | None = None
+    sub_status: RouteSubStatus | None = None
+    last_transition_at: datetime | None = None
+    error_data: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def enabled_health_check(self) -> ModelHealthCheck | None:
+        """The health check to enforce, or ``None`` when absent or disabled.
+
+        A ``health_check`` with ``enable=False`` means the route activates
+        immediately and the remaining fields are ignored, so it must be
+        treated the same as no health check at all.
+        """
+        if self.health_check is None or not self.health_check.enable:
+            return None
+        return self.health_check
+
+    def is_termination_grace_elapsed(self, now: datetime) -> bool:
+        """Whether the session may be cleaned up at ``now``.
+
+        The grace period counts from ``last_transition_at`` — for a
+        COOLING_DOWN route, the moment the draining stage finished. When
+        no transition history exists (pre-migration rows) or the grace
+        period is non-positive, the session is cleaned up immediately.
+        """
+        if self.last_transition_at is None:
+            return True
+        if self.termination_grace_period <= 0:
+            return True
+        elapsed = (now - self.last_transition_at).total_seconds()
+        return elapsed >= self.termination_grace_period
+
+
+@dataclass(frozen=True)
+class RevisionResourceSlotData(FieldData):
+    """One slot's amount on the revision that owns it."""
+
+    revision_id: DeploymentRevisionID
+    slot_name: str
+    quantity: Decimal
 
 
 @dataclass

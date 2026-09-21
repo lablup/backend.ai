@@ -210,12 +210,11 @@ class DeploymentAPIHandler:
         body: BodyParam[SearchDeploymentsRequest],
     ) -> APIResponse:
         """Search deployments with filters, orders, and pagination."""
-        # Build querier using adapter
-        querier = self._deployment_adapter.build_querier(body.parsed)
+        searcher = self._deployment_adapter.build_searcher(body.parsed)
 
         # Call service action (legacy full-revision read path for v1)
         action_result = await self._deployment.global_search_legacy.run(
-            GlobalSearchLegacyDeploymentsAction(querier=querier)
+            GlobalSearchLegacyDeploymentsAction(searcher=searcher)
         )
 
         # Build response

@@ -38,6 +38,7 @@ from ai.backend.manager.models.project.deprecated_search import (
     DeprecatedProjectOrders,
 )
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -55,7 +56,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.testutils.db import TableOrORM, with_tables
@@ -249,7 +249,7 @@ class TestGroupNestedSearchIntegration:
         two_domains_with_projects: dict[str, list[uuid.UUID]],
     ) -> None:
         """search_projects with by_domain_is_active(True) returns only projects in active domains."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
@@ -258,7 +258,7 @@ class TestGroupNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         active_domain = [d for d, _ in two_domains_with_projects.items() if "active-dom" in d][0]
@@ -276,7 +276,7 @@ class TestGroupNestedSearchIntegration:
             if "active-dom" in d and not d.startswith("inactive")
         ][0]
         spec = StringMatchSpec(value=active_domain, case_insensitive=False, negated=False)
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
@@ -285,7 +285,7 @@ class TestGroupNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id == two_domains_with_projects[active_domain][0]
@@ -302,7 +302,7 @@ class TestGroupNestedSearchIntegration:
             if "active-dom" in d and not d.startswith("inactive")
         ][0]
         spec = StringMatchSpec(value=active_domain, case_insensitive=False, negated=True)
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
@@ -311,7 +311,7 @@ class TestGroupNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id != two_domains_with_projects[active_domain][0]
@@ -322,12 +322,12 @@ class TestGroupNestedSearchIntegration:
         two_domains_with_projects: dict[str, list[uuid.UUID]],
     ) -> None:
         """search_projects with by_domain_name order sorts by correlated domain name."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[ProjectSearchableFields.own.domain_name.order.apply(ascending=True)],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 2
         domain_names = sorted(two_domains_with_projects.keys())
@@ -340,7 +340,7 @@ class TestGroupNestedSearchIntegration:
         two_domains_with_projects: dict[str, list[uuid.UUID]],
     ) -> None:
         """Combining nested filter + nested order in single search call."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_domain_combined([
@@ -349,7 +349,7 @@ class TestGroupNestedSearchIntegration:
             ],
             orders=[ProjectSearchableFields.own.domain_name.order.apply(ascending=True)],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
 
@@ -738,7 +738,7 @@ class TestGroupUserNestedSearchIntegration:
         """Filter projects by user UUID (equals)."""
         alpha_info = projects_with_users["proj_alpha"]
         spec = UUIDEqualMatchSpec(value=alpha_info["user_id"], negated=False)
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -747,7 +747,7 @@ class TestGroupUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id == alpha_info["project_id"]
@@ -761,7 +761,7 @@ class TestGroupUserNestedSearchIntegration:
         alpha_info = projects_with_users["proj_alpha"]
         beta_info = projects_with_users["proj_beta"]
         spec = UUIDInMatchSpec(values=[alpha_info["user_id"], beta_info["user_id"]], negated=False)
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -770,7 +770,7 @@ class TestGroupUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 2
 
@@ -781,7 +781,7 @@ class TestGroupUserNestedSearchIntegration:
     ) -> None:
         """Filter projects by user username (contains)."""
         spec = StringMatchSpec(value="alice", case_insensitive=True, negated=False)
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -790,7 +790,7 @@ class TestGroupUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id == projects_with_users["proj_alpha"]["project_id"]
@@ -802,7 +802,7 @@ class TestGroupUserNestedSearchIntegration:
     ) -> None:
         """Filter projects by user email (contains)."""
         spec = StringMatchSpec(value="bob@", case_insensitive=False, negated=False)
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -811,7 +811,7 @@ class TestGroupUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id == projects_with_users["proj_beta"]["project_id"]
@@ -822,7 +822,7 @@ class TestGroupUserNestedSearchIntegration:
         projects_with_users: dict[str, dict[str, Any]],
     ) -> None:
         """Filter projects by user active status."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -831,7 +831,7 @@ class TestGroupUserNestedSearchIntegration:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id == projects_with_users["proj_alpha"]["project_id"]
@@ -842,12 +842,12 @@ class TestGroupUserNestedSearchIntegration:
         projects_with_users: dict[str, dict[str, Any]],
     ) -> None:
         """Order projects by user username (MIN aggregation)."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[DeprecatedProjectOrders.by_user_username(ascending=True)],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 2
         # alice < bob alphabetically
@@ -860,12 +860,12 @@ class TestGroupUserNestedSearchIntegration:
         projects_with_users: dict[str, dict[str, Any]],
     ) -> None:
         """Order projects by user email (MIN aggregation)."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[DeprecatedProjectOrders.by_user_email(ascending=True)],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 2
         # alice@example.com < bob@example.com
@@ -991,7 +991,7 @@ class TestGroupUserNestedSameMember:
         project_with_two_members: uuid.UUID,
     ) -> None:
         """Carol's username and Carol's email are the same member, so the project matches."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -1005,7 +1005,7 @@ class TestGroupUserNestedSameMember:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 1
         assert result.items[0].id == project_with_two_members
@@ -1016,7 +1016,7 @@ class TestGroupUserNestedSameMember:
         project_with_two_members: uuid.UUID,
     ) -> None:
         """Carol's username and Dave's email are different members, so nothing matches."""
-        querier = BatchQuerier(
+        searcher = ProjectSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[
                 DeprecatedProjectConditions.exists_user_combined([
@@ -1030,6 +1030,6 @@ class TestGroupUserNestedSameMember:
             ],
             orders=[],
         )
-        result = await group_db_source.search_projects(querier)
+        result = await group_db_source.search_projects(searcher)
 
         assert result.total_count == 0

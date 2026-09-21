@@ -35,6 +35,11 @@ class _KernelOwnFields:
         StringConditions(KernelRow.cluster_mode),
         ColumnOrder(KernelRow.cluster_mode),
     )
+    cluster_role = SearchableField(
+        KernelRow.cluster_role,
+        StringConditions(KernelRow.cluster_role),
+        ColumnOrder(KernelRow.cluster_role),
+    )
     cluster_idx = SearchableField(
         KernelRow.cluster_idx,
         IntConditions(KernelRow.cluster_idx),

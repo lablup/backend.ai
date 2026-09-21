@@ -9,16 +9,19 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
+    KernelUsageRecordData,
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
+    KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.resource_usage_history.searchable_fields import (
     DomainUsageBucketSearchableFields,
+    KernelUsageRecordSearchableFields,
     ProjectUsageBucketSearchableFields,
     UserUsageBucketSearchableFields,
 )
@@ -56,3 +59,14 @@ class UserUsageBucketSearcher(Searcher[UserUsageBucketRow, UserUsageBucketData])
     @override
     def to_data(self, row: UserUsageBucketRow) -> UserUsageBucketData:
         return UserUsageBucketSearchableFields.own.to_data(row)
+
+
+@dataclass
+class KernelUsageRecordSearcher(Searcher[KernelUsageRecordRow, KernelUsageRecordData]):
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(KernelUsageRecordRow)
+
+    @override
+    def to_data(self, row: KernelUsageRecordRow) -> KernelUsageRecordData:
+        return KernelUsageRecordSearchableFields.own.to_data(row)

@@ -73,8 +73,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     PurgeKeypairAction,
     PurgeKeypairActionResult,
-    SearchMyKeypairsAction,
-    SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
     UpdateKeypairAction,
@@ -322,15 +320,6 @@ class UserService:
             user_id=action.user_id, access_key=action.access_key
         )
         return SwitchDefaultAccessKeyActionResult(success=True)
-
-    async def search_my_keypairs(
-        self, action: SearchMyKeypairsAction
-    ) -> SearchMyKeypairsActionResult:
-        """Search keypairs owned by the current user."""
-        result = await self._user_repository.search_my_keypairs(
-            scope=action.scope(), querier=action.querier
-        )
-        return SearchMyKeypairsActionResult(result=result)
 
     async def admin_create_keypair(
         self, action: AdminCreateKeypairAction
