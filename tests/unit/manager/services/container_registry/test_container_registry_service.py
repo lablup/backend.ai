@@ -5,7 +5,7 @@ Tests the service layer with mocked repository.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
@@ -787,7 +787,9 @@ class TestRescanImages:
 
 @dataclass(frozen=True)
 class _MissingQuotaFieldCase:
-    field: str
+    project: str | None
+    username: str | None
+    password: str | None
 
 
 class TestReadRegistryQuota:
@@ -824,11 +826,11 @@ class TestReadRegistryQuota:
     @pytest.mark.parametrize(
         "case",
         [
-            _MissingQuotaFieldCase(field="project"),
-            _MissingQuotaFieldCase(field="username"),
-            _MissingQuotaFieldCase(field="password"),
+            _MissingQuotaFieldCase(project=None, username="robot$quota", password="secret"),
+            _MissingQuotaFieldCase(project="harbor-project", username=None, password="secret"),
+            _MissingQuotaFieldCase(project="harbor-project", username="robot$quota", password=None),
         ],
-        ids=lambda case: case.field,
+        ids=lambda case: next(f.name for f in fields(case) if getattr(case, f.name) is None),
     )
     async def test_rejects_registry_missing_quota_field(
         self,
@@ -840,7 +842,12 @@ class TestReadRegistryQuota:
     ) -> None:
         """A registry without a project or credentials is rejected before Harbor is called."""
         mock_container_registry_repository.get_project_registry = AsyncMock(
-            return_value=replace(harbor_registry_data, **{case.field: None})
+            return_value=replace(
+                harbor_registry_data,
+                project=case.project,
+                username=case.username,
+                password=case.password,
+            )
         )
 
         with pytest.raises(ContainerRegistryQuotaNotConfigurable):

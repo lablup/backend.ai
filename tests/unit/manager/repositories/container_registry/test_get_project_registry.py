@@ -34,7 +34,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -106,7 +106,7 @@ class TestGetProjectRegistry:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
-        return ContainerRegistryRepository(db_with_cleanup, RelationOpsProvider(db_with_cleanup))
+        return ContainerRegistryRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def sample_domain(

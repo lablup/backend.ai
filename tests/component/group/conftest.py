@@ -191,6 +191,8 @@ async def target_group(
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project=group_name,
+                username="robot$quota",
+                password="secret",
             )
         )
         await conn.execute(
