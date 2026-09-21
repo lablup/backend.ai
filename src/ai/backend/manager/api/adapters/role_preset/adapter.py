@@ -359,6 +359,11 @@ class RolePresetAdapter(BaseAdapter):
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
             *self.apply_bool_filter(filter_.deleted, fields.deleted.filter),
+            *self.apply_to_many_filter(
+                filter_.permissions,
+                RolePresetSearchableFields.nested.permissions.correlation,
+                self._convert_permission_filter,
+            ),
         ]
         if filter_.AND:
             for sub in filter_.AND:
