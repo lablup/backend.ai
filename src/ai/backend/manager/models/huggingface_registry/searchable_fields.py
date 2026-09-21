@@ -22,7 +22,11 @@ from ai.backend.manager.models.specs.search.field import NestedSearchableField, 
 class _HuggingFaceRegistryOwnFields(
     RowDataConverter[HuggingFaceRegistryRow, HuggingFaceRegistryData]
 ):
-    """The HuggingFace registry's own columns. ``name`` is the meta row's, declared in ``nested``."""
+    """The HuggingFace registry's own columns.
+
+    ``name`` is the artifact_registries row's, read off ``registry_name`` once the
+    reader has joined it; filtering and ordering by it go through ``nested.meta``.
+    """
 
     id = SearchableField(
         HuggingFaceRegistryRow.id,
@@ -36,15 +40,17 @@ class _HuggingFaceRegistryOwnFields(
     )
     token = SearchableField(HuggingFaceRegistryRow.token, None, None)
     """Sensitive: the plaintext token the manager authenticates to the registry with."""
+    name = SearchableField(HuggingFaceRegistryRow.registry_name, None, None)
+    """Derived: the artifact_registries row's name, filled by the reader's join."""
 
     @override
     def to_data(self, row: HuggingFaceRegistryRow) -> HuggingFaceRegistryData:
-        meta = row.meta
-        if meta is None:
+        name = self.name.read(row)
+        if name is None:
             raise RelationNotLoadedError()
         return HuggingFaceRegistryData(
             id=self.id.read(row),
-            name=ArtifactRegistrySearchableFields.own.name.read(meta),
+            name=name,
             url=self.url.read(row),
             token=self.token.read(row),
         )
