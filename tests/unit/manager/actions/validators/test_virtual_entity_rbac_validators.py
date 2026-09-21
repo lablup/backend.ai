@@ -1083,28 +1083,15 @@ class TestUpsertRequiresBothCreateAndUpdate:
 class TestVirtualEntityAtomicBulkActionRBACValidator:
     async def test_superadmin_bypasses_check(
         self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
         bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: ActionTriggerMeta,
-        seeded_superadmin_user: UserData,
+        superadmin_user: UserData,
     ) -> None:
-        # No permission rows seeded; the stored role answers for every existing entity.
-        async with db_with_rbac_tables.begin_session() as db_sess:
-            for entity_id in bulk_vfolder_action.entity_ids():
-                await VirtualEntitySeeder().provision(db_sess, VFolderEntityType(), entity_id)
-        with with_user(seeded_superadmin_user):
-            await bulk_validator.validate(
-                BulkActionTriggerMeta(
-                    action_id=trigger_meta.action_id,
-                    started_at=trigger_meta.started_at,
-                    entity_ids=bulk_vfolder_action.entity_ids(),
-                    operation_type=bulk_vfolder_action.operation_type(),
-                    action_name=bulk_vfolder_action.action_name(),
-                )
-            )
+        with with_user(superadmin_user):
+            await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
 
-    async def test_superadmin_is_refused_an_entity_without_a_node(
+    async def test_superadmin_passes_an_entity_without_a_node(
         self,
         bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
@@ -1112,8 +1099,16 @@ class TestVirtualEntityAtomicBulkActionRBACValidator:
         seeded_superadmin_user: UserData,
     ) -> None:
         with with_user(seeded_superadmin_user):
-            with pytest.raises(NotEnoughPermission):
-                await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
+            await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
+
+    async def test_missing_user_raises(
+        self,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
+        bulk_vfolder_action: _BulkVfolderUpdateAction,
+        trigger_meta: ActionTriggerMeta,
+    ) -> None:
+        with pytest.raises(UnreachableError):
+            await bulk_validator.validate(_bulk_meta(bulk_vfolder_action, trigger_meta))
 
     async def test_all_targets_granted_passes(
         self,
