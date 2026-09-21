@@ -187,9 +187,17 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Gates
 
-- `global` extends `scope` to the whole system and runs behind the SUPERADMIN
-  gate. Global reads open to all authenticated users are wired via the `public_*`
-  factories — read operations only; the constructor rejects writes.
+- `global` extends `scope` to the whole system. The gate is what the `global`
+  singleton grants on the action's entity type, and the check is by type, so it puts no
+  row condition on the query. A super admin passes everything and a monitor passes the
+  reads — both are read off the user role, so neither needs a role row. With RBAC
+  enforcement off those two bypasses are the whole gate. Global reads open to all
+  authenticated users are wired via the `public_*` factories — read operations only;
+  the constructor rejects writes.
+- The global gate is a validator the wiring supplies, as it is for every other shape.
+  `GlobalActionProcessor` refuses an empty validator list, so a wiring that states no
+  gate fails where it is made rather than at request time. A tool that only reads the
+  wiring states `RefusingGlobalActionValidator`, which lets no one through.
 - `anonymous_global` takes no gate at all and accepts writes. Wire through any other
   factory that fits. It is available only when both hold — the caller is an external
   system that can never hold a principal, and the service checks that caller itself
