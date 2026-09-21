@@ -18843,6 +18843,172 @@
         "title": "CreateRolePresetInput",
         "type": "object"
       },
+      "PermissionBitFilter": {
+        "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionBitDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionBitDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "PermissionBitFilter",
+        "type": "object"
+      },
+      "RolePermissionPresetFilter": {
+        "description": "Filter criteria for role_permission_presets rows.\n\nDoubles as the input for the ``permissions`` field resolver under\n``RolePresetNode``: the resolver supplies ``role_preset_id`` from its parent\nand merges any caller-provided fields here.",
+        "properties": {
+          "role_preset_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by parent role preset ID."
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by entity type the permission applies to."
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the operation bit granted."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation timestamp."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation.",
+            "title": "Not"
+          }
+        },
+        "title": "RolePermissionPresetFilter",
+        "type": "object"
+      },
       "RolePresetFilter": {
         "description": "Filter criteria for searching role presets.",
         "properties": {
@@ -18895,6 +19061,18 @@
             "default": null,
             "description": "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to ``true`` to inspect archived presets.",
             "title": "Deleted"
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePresetPermissionNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by conditions on the permission entries the preset carries."
           },
           "AND": {
             "anyOf": [
@@ -18977,6 +19155,62 @@
         ],
         "title": "RolePresetOrderField",
         "type": "string"
+      },
+      "RolePresetPermissionNestedFilter": {
+        "description": "The `permissions` field of a role preset filter.\n\nEach quantifier matches one permission entry at a time. To require two different\nentries, combine two of these with the preset filter's own `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePermissionPresetFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePermissionPresetFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePermissionPresetFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "RolePresetPermissionNestedFilter",
+        "type": "object"
       },
       "RolePresetUsage": {
         "description": "Uses narrowing the presets read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
@@ -19255,172 +19489,6 @@
           }
         },
         "title": "UpdateRolePresetBody",
-        "type": "object"
-      },
-      "PermissionBitFilter": {
-        "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionBitDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided values.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude an exact match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionBitDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided values.",
-            "title": "Not In"
-          }
-        },
-        "title": "PermissionBitFilter",
-        "type": "object"
-      },
-      "RolePermissionPresetFilter": {
-        "description": "Filter criteria for role_permission_presets rows.\n\nDoubles as the input for the ``permissions`` field resolver under\n``RolePresetNode``: the resolver supplies ``role_preset_id`` from its parent\nand merges any caller-provided fields here.",
-        "properties": {
-          "role_preset_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by parent role preset ID."
-          },
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by entity type the permission applies to."
-          },
-          "permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by the operation bit granted."
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by creation timestamp."
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "AND conjunction.",
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "OR conjunction.",
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "NOT negation.",
-            "title": "Not"
-          }
-        },
-        "title": "RolePermissionPresetFilter",
         "type": "object"
       },
       "RolePermissionPresetOrder": {
