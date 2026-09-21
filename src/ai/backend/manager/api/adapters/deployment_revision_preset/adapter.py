@@ -13,6 +13,7 @@ from ai.backend.common.config import (
     PresetModelServiceConfig,
     PreStartAction,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -45,6 +46,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
+    DeploymentRevisionPresetUsedBy,
     PresetModelConfigInfoDTO,
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
@@ -68,17 +70,14 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.deployment_revision_preset.conditions import (
-    DeploymentRevisionPresetConditions,
-)
 from ai.backend.manager.models.deployment_revision_preset.creators import (
     DeploymentPresetCreator,
     PresetResourceSlotCreator,
 )
-from ai.backend.manager.models.deployment_revision_preset.orders import (
-    DeploymentRevisionPresetOrders,
-)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     DeploymentPresetSearcher,
     PresetResourceSlotSearcher,
@@ -93,6 +92,7 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
+from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
     BulkGetDeploymentPresetsAction,
@@ -123,7 +123,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentRevisionPresetOrders.created_at(ascending=False),
+        forward_order=DeploymentPresetSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=DeploymentRevisionPresetRow.id,
     )
 
@@ -234,7 +234,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
         result = await self._deployment_revision_preset.global_search.run(
             GlobalSearchDeploymentPresetsAction(
-                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+                searcher=GlobalSearcher(used_by=self._used_by(input.used_by), searcher=searcher)
             )
         )
         return SearchDeploymentRevisionPresetsPayload(
@@ -441,35 +441,23 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conds))
         return conditions
 
+    def _used_by(self, used_by: DeploymentRevisionPresetUsedBy | None) -> list[UsedBy]:
+        """The uses the request named, each of which the caller must be able to read."""
+        if used_by is None:
+            return []
+        linked = DeploymentPresetSearchableFields.linked
+        return [
+            linked.deployments.used_by(DeploymentID(entity_id))
+            for entity_id in used_by.deployment or ()
+        ]
+
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.id is not None:
-            cond = self.convert_uuid_filter(
-                filter_.id,
-                equals_factory=DeploymentRevisionPresetConditions.by_id_equals,
-                in_factory=DeploymentRevisionPresetConditions.by_id_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.runtime_variant_id is not None:
-            cond = self.convert_uuid_filter(
-                filter_.runtime_variant_id,
-                equals_factory=DeploymentRevisionPresetConditions.by_runtime_variant_id_equals,
-                in_factory=DeploymentRevisionPresetConditions.by_runtime_variant_id_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=DeploymentRevisionPresetConditions.by_name_contains,
-                equals_factory=DeploymentRevisionPresetConditions.by_name_equals,
-                starts_with_factory=DeploymentRevisionPresetConditions.by_name_starts_with,
-                ends_with_factory=DeploymentRevisionPresetConditions.by_name_ends_with,
-                in_factory=DeploymentRevisionPresetConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
+        fields = DeploymentPresetSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter_.id, fields.id.filter),
+            *self.apply_uuid_filter(filter_.runtime_variant_id, fields.runtime_variant_id.filter),
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -488,16 +476,17 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:
+        fields = DeploymentPresetSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction.value == "ASC"
             match order.field:
                 case DeploymentRevisionPresetOrderField.NAME:
-                    result.append(DeploymentRevisionPresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case DeploymentRevisionPresetOrderField.RANK:
-                    result.append(DeploymentRevisionPresetOrders.rank(ascending))
+                    result.append(fields.rank.order.apply(ascending))
                 case DeploymentRevisionPresetOrderField.CREATED_AT:
-                    result.append(DeploymentRevisionPresetOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
         return result
 
     @staticmethod

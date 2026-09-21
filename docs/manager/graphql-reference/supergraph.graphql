@@ -6746,6 +6746,16 @@ enum DeploymentRevisionPresetOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.9.0. Entities whose use narrows a deployment preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused.
+"""
+input DeploymentRevisionPresetUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Deployments whose revisions name the preset."""
+  deployment: [UUID!] = null
+}
+
 """Added in 24.09.0. Scope for deployment scheduling history query"""
 input DeploymentScope
   @join__type(graph: STRAWBERRY)
@@ -18077,7 +18087,20 @@ type Query
   adminAppConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search runtime variants."""
-  runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)
+  runtimeVariants(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller.
+    """
+    usedBy: RuntimeVariantUsedBy = null
+    filter: RuntimeVariantFilter = null
+    orderBy: [RuntimeVariantOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RuntimeVariantConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant @join__field(graph: STRAWBERRY)
@@ -18117,7 +18140,20 @@ type Query
   runtimeVariantPreset(id: UUID!): RuntimeVariantPreset @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search deployment revision presets."""
-  deploymentRevisionPresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection @join__field(graph: STRAWBERRY)
+  deploymentRevisionPresets(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller.
+    """
+    usedBy: DeploymentRevisionPresetUsedBy = null
+    filter: DeploymentRevisionPresetFilter = null
+    orderBy: [DeploymentRevisionPresetOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): DeploymentRevisionPresetConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Get a single deployment revision preset by ID."""
   deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset @join__field(graph: STRAWBERRY)
@@ -21507,6 +21543,16 @@ input RuntimeVariantPresetValueInput
   The concrete value to set for the referenced runtime variant preset parameter.
   """
   value: String!
+}
+
+"""
+Added in 26.9.0. Entities whose use narrows a runtime variant query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused.
+"""
+input RuntimeVariantUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Deployments whose revisions name the runtime variant."""
+  deployment: [UUID!] = null
 }
 
 type ScalingGroup

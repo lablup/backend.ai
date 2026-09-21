@@ -13,6 +13,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.config import DefaultModelDefinition
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     DeleteRuntimeVariantPayload,
@@ -24,6 +25,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -36,7 +38,12 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.components.system import (
+    KEPT,
+    Kept,
+    lay_a_public_reader,
+    role_named,
+)
 from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
 
 DESCRIBED = "미리 만들어 둔 런타임 변형"
@@ -81,7 +88,7 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
         variant = await seeding.creating(
             SeedRuntimeVariant(name_hint="variant", description=self.described)
         )
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType(), self.role)
         return AVariantAndACaller(seeding.made(variant), seeding.made(caller))
 
 
@@ -105,7 +112,7 @@ class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
             await seeding.creating(SeedRuntimeVariant(name_hint="other", description=DESCRIBED))
             for _ in range(self.besides)
         ]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType(), self.role)
         return ManyVariantsAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),
@@ -266,13 +273,13 @@ class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsP
 class TheVariantsInTheOrderAsked(
     Then[ManyVariantsAndACaller, list[RuntimeVariantNode | Exception | None]]
 ):
-    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
+    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 거부로."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다"
 
     @override
     def look(
@@ -300,8 +307,8 @@ class TheVariantsInTheOrderAsked(
                     written=written,
                 )
             )
-        last = items[asked - 1] if len(items) >= asked else "없음"
-        seen.append(Same(f"items[{asked - 1}]", last, None))
+        last = items[asked - 1] if len(items) >= asked else None
+        seen.append(Refused(NotEnoughPermission, last if isinstance(last, BaseException) else None))
         return seen
 
 

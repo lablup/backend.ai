@@ -136,6 +136,9 @@ from ai.backend.manager.models.deployment_revision.searchable_fields import (
 from ai.backend.manager.models.deployment_revision_preset.row import (
     DeploymentRevisionPresetRow,
 )
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -172,6 +175,9 @@ from ai.backend.manager.models.routing.creators import ReplicaCreator
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.searchable_fields import (
+    RuntimeVariantSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
@@ -2448,8 +2454,12 @@ class DeploymentDBSource:
             variant_row = await self._fetch_runtime_variant_by_id(session, runtime_variant_id)
             preset_row, preset_slots = await self._fetch_preset_with_slots(session, preset_id)
             return LegacyRevisionCreateReadBundle(
-                variant=variant_row.to_data(),
-                preset=preset_row.to_data() if preset_row is not None else None,
+                variant=RuntimeVariantSearchableFields.own.to_data(variant_row),
+                preset=(
+                    DeploymentPresetSearchableFields.own.to_data(preset_row)
+                    if preset_row is not None
+                    else None
+                ),
                 preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
             )
 
@@ -2462,8 +2472,12 @@ class DeploymentDBSource:
             variant_row = await self._fetch_runtime_variant_by_id(session, runtime_variant_id)
             preset_row, preset_slots = await self._fetch_preset_with_slots(session, preset_id)
             return DeploymentRevisionReadBundle(
-                variant=variant_row.to_data(),
-                preset=preset_row.to_data() if preset_row is not None else None,
+                variant=RuntimeVariantSearchableFields.own.to_data(variant_row),
+                preset=(
+                    DeploymentPresetSearchableFields.own.to_data(preset_row)
+                    if preset_row is not None
+                    else None
+                ),
                 preset_resource_slots=_project_preset_slots(preset_row, preset_slots),
             )
 

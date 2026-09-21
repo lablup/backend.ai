@@ -14,6 +14,9 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PrometheusQueryPresetEntityType,
+)
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload,
@@ -43,9 +46,9 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.system import lay_a_caller, lay_a_public_reader
 from bai_scenario.fakes.prometheus import ANSWERED_AT, INSTANT
-from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.prometheus_query_preset.category import SeedCategory
 from bai_scenario.seeds.prometheus_query_preset.preset import (
     METRIC,
@@ -97,10 +100,8 @@ class ManyPresetsAndACaller:
 
 
 async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
-    """호출자 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나를 함께 만든다."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    laid: Laid[UserData] = await seeding.within(SomeoneOf(domain, role=role))
-    return laid
+    """호출자 한 명. public 에서 읽을 권한을 함께 받는다."""
+    return await lay_a_public_reader(seeding, PrometheusQueryPresetEntityType(), role)
 
 
 @dataclass(frozen=True)
@@ -145,10 +146,13 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     time_window: str | None = None
     filter_labels: Sequence[str] = ()
     group_labels: Sequence[str] = ()
+    reading_in_public: bool = True
+    """호출자가 public 에서 프리셋을 읽을 수 있는지. 읽기가 없는 쪽을 세우는 행이 끈다."""
 
     @override
     def describe(self) -> str:
-        return f"이미 있는 프리셋 하나와, {self.role.value} 한 명"
+        reach = "프리셋을 읽을 수 있는" if self.reading_in_public else "아무 권한도 없는"
+        return f"이미 있는 프리셋 하나와, {reach} {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
@@ -160,7 +164,11 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
                 group_labels=self.group_labels,
             )
         )
-        caller = await lay_someone(seeding, self.role)
+        caller = (
+            await lay_someone(seeding, self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
         return APresetAndACaller(preset=seeding.made(preset), caller=seeding.made(caller))
 
 

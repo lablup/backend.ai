@@ -24,10 +24,9 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
 )
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.prometheus_query_preset.conditions import (
-    PrometheusQueryPresetConditions,
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
 )
-from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
@@ -96,27 +95,17 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter_req: QueryDefinitionFilter) -> list[QueryCondition]:
         """Convert query definition filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-        if filter_req.name is not None:
-            condition = self.convert_string_filter(
-                filter_req.name,
-                contains_factory=PrometheusQueryPresetConditions.by_name_contains,
-                equals_factory=PrometheusQueryPresetConditions.by_name_equals,
-                starts_with_factory=PrometheusQueryPresetConditions.by_name_starts_with,
-                ends_with_factory=PrometheusQueryPresetConditions.by_name_ends_with,
-                in_factory=PrometheusQueryPresetConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
+        fields = PrometheusQueryPresetSearchableFields.own
+        return self.apply_string_filter(filter_req.name, fields.name.filter)
 
     def _convert_order(self, order: QueryDefinitionOrder) -> QueryOrder:
         """Convert query definition order specification to query order."""
+        fields = PrometheusQueryPresetSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         if order.field == QueryDefinitionOrderField.NAME:
-            return PrometheusQueryPresetOrders.name(ascending=ascending)
+            return fields.name.order.apply(ascending)
         if order.field == QueryDefinitionOrderField.CREATED_AT:
-            return PrometheusQueryPresetOrders.created_at(ascending=ascending)
+            return fields.created_at.order.apply(ascending)
         if order.field == QueryDefinitionOrderField.UPDATED_AT:
-            return PrometheusQueryPresetOrders.updated_at(ascending=ascending)
+            return fields.updated_at.order.apply(ascending)
         raise ValueError(f"Unknown order field: {order.field}")

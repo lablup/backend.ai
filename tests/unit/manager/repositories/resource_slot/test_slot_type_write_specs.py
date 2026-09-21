@@ -53,6 +53,9 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.routing import RoutingRow
@@ -143,7 +146,7 @@ async def existing_slot_type(
         )
         db_sess.add(row)
         await db_sess.flush()
-        return row.to_data()
+        return ResourceSlotTypeSearchableFields.own.to_data(row)
 
 
 def _creator(

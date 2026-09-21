@@ -17,14 +17,14 @@ from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantP
 class GetRuntimeVariantPresetAction(
     GetSingleEntityOpsAction[RuntimeVariantPresetRow, RuntimeVariantPresetData]
 ):
-    """Read one runtime variant preset; every authenticated user may."""
+    """Read one runtime variant preset."""
 
     preset_id: RuntimeVariantPresetID
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_get_runtime_variant_preset"
+        return "get_runtime_variant_preset"
 
     @override
     def entity_id(self) -> EntityIdentifier:

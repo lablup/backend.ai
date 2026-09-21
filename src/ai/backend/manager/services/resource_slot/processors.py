@@ -6,10 +6,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -17,12 +14,10 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
-from ai.backend.manager.actions.v2.single_entity.processor import (
-    PublicSingleEntityActionProcessor,
-    SingleEntityActionProcessor,
-)
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
@@ -63,14 +58,14 @@ from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner impor
     LookupKernelOwnerAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
+    ScopedSearchResourceSlotTypesAction,
+)
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
     GlobalSearchAgentResourcesAction,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_allocations import (
     GlobalSearchResourceAllocationsAction,
-)
-from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
-    SearchResourceSlotTypesAction,
 )
 from ai.backend.manager.services.resource_slot.actions.update import UpdateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
@@ -90,16 +85,16 @@ class ResourceSlotProcessors:
     search_resource_allocations: GlobalActionProcessor[
         GlobalSearchResourceAllocationsAction, BatchOpsResult[ResourceAllocationData]
     ]
-    public_get_resource_slot_type: PublicSingleEntityActionProcessor[
+    get_resource_slot_type: SingleEntityActionProcessor[
         GetResourceSlotTypeAction, EntityOpsResult[ResourceSlotTypeData]
     ]
-    public_lookup_resource_slot_type: LookupActionProcessor[
+    lookup_resource_slot_type: LookupActionProcessor[
         LookupResourceSlotTypeAction,
         LookupOpsResult[ResourceSlotTypeUUID],
     ]
-    public_search_resource_slot_types: PublicActionProcessor[
-        SearchResourceSlotTypesAction,
-        BatchOpsResult[ResourceSlotTypeData],
+    scoped_search_resource_slot_types: ScopeActionProcessor[
+        ScopedSearchResourceSlotTypesAction,
+        ScopedBatchOpsResult[ResourceSlotTypeData],
     ]
     get_domain_resource_overview: ScopeActionProcessor[
         GetDomainResourceOverviewAction, GetDomainResourceOverviewResult
@@ -152,12 +147,10 @@ class ResourceSlotProcessors:
         self.search_resource_allocations = resource_allocations.global_searcher_ops(
             GlobalSearchResourceAllocationsAction
         )
-        self.public_get_resource_slot_type = slot_type.public_get_ops(GetResourceSlotTypeAction)
-        self.public_lookup_resource_slot_type = slot_type.public_lookup_ops(
-            LookupResourceSlotTypeAction
-        )
-        self.public_search_resource_slot_types = slot_type.public_search_ops(
-            SearchResourceSlotTypesAction
+        self.get_resource_slot_type = slot_type.single_get_ops(GetResourceSlotTypeAction)
+        self.lookup_resource_slot_type = slot_type.lookup_ops(LookupResourceSlotTypeAction)
+        self.scoped_search_resource_slot_types = slot_type.scoped_search_ops(
+            ScopedSearchResourceSlotTypesAction
         )
         self.get_domain_resource_overview = session.scope(
             GetDomainResourceOverviewAction, service.get_domain_resource_overview

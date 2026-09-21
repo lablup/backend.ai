@@ -7,6 +7,9 @@ keywords: [resource slot type, agent resource, kernel allocation, resource overv
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-09-21
 status: draft
 ---
 # resource_slot 어댑터 — 시나리오
@@ -18,9 +21,10 @@ status: draft
 커널이 할당받은 리소스인 `resource_allocation` 행의 조회, 그리고 도메인과 프로젝트의 리소스 개요를
 다룬다.
 
-`resource_slot_type` 행은 어느 스코프에도 속하지 않게 만들어진다. 생성과 수정은 호출한 사용자가
-슈퍼관리자인지 검사한다. 삭제만 그 `resource_slot_type` 행에 대한 권한을 검사하는데, 스코프가 없는
-행에는 어떤 역할도 권한을 부여할 수 없으므로 슈퍼관리자만 통과한다. 조회와 검색은 인증만 확인한다.
+`resource_slot_type` 행은 global 과 public 양쪽에 소속되어 만들어진다. 생성과 수정은 호출한
+사용자가 슈퍼관리자인지 검사한다. 삭제만 그 `resource_slot_type` 행에 대한 권한을 검사하는데, 그
+권한은 global 에서만 나오므로 슈퍼관리자만 통과한다. 조회와 검색은 public 에서 READ 를 검사한다.
+모든 계정이 public 소속 역할을 자동으로 받으므로 로그인한 사용자는 모두 읽을 수 있다.
 
 `resource_slot_type` 인터페이스는 전부 이름 기반이다. id를 받는 호출이 하나도 없고, 조회·수정·삭제는
 먼저 이름으로 id를 찾은 뒤 실제 연산을 실행한다. 쓰기는 호출한 사용자가 쓸 수 있는지를 먼저 검사한
@@ -59,12 +63,12 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 아무 권한도 없는 사용자가 이름으로 조회한다 | `resource_slot_type` 하나, 아무 권한도 없음 | 이름으로 조회 | 그 `resource_slot_type` 전체 |
-| 존재하지 않는 이름으로 조회한다 | 다른 `resource_slot_type` 행만 있음 | 이름으로 조회 | 대상을 찾을 수 없어 거부 |
+| public 에서 읽는 사용자가 이름으로 조회한다 | `resource_slot_type` 하나, public 조회 권한만 있음 | 이름으로 조회 | 그 `resource_slot_type` 전체 |
+| 존재하지 않는 이름으로 조회한다 | 다른 `resource_slot_type` 행만 있음 | 이름으로 조회 | 잘못된 요청으로 거부 |
 
-조회에는 권한 검사가 없다. 이름으로 id를 찾는 단계도 그 뒤의 조회도 인증만 확인하므로, 아무 권한도
-없는 사용자가 성공하는 시나리오가 그것을 증명한다. 이 시나리오는 생성 절의 역할 부족으로 거부되는
-시나리오와 대비된다.
+조회는 public 에서 READ 를 검사한다. 이름으로 id를 찾는 단계도 찾아낸 대상에 권한 검사가 뒤따르므로,
+존재하지 않는 이름과 닿을 수 없는 이름이 같은 이유로 거부된다. public 조회 권한만 받은 사용자가
+성공하는 시나리오가 그것을 증명하고, 생성 절의 역할 부족으로 거부되는 시나리오와 대비된다.
 
 인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
 

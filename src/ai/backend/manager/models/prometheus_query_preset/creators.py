@@ -15,6 +15,9 @@ from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
     PrometheusQueryPresetRow,
 )
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -63,4 +66,4 @@ class PrometheusQueryPresetCreator(
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
-        return row.to_data()
+        return PrometheusQueryPresetSearchableFields.own.to_data(row)

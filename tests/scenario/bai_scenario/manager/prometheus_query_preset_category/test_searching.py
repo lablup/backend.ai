@@ -15,10 +15,10 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request i
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     SearchCategoriesPayload,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
     PrometheusQueryPresetCategoryAdapter,
 )
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -118,7 +118,7 @@ class OnlyTheNamedOneIsFound(Then[ManyCategoriesAndACaller, Searched]):
     def look(self, laid: ManyCategoriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
         page = answered.response
         if page is None:
-            return [Refused(UserNotFound, answered.raised)]
+            return [Refused(UnreachableError, answered.raised)]
         return [
             Same("items", [one.name for one in page.items], [laid.named.name]),
             Same("total_count", page.total_count, 1),
@@ -222,7 +222,7 @@ class NobodyMayNotSearch(Scenario[SeedingSession, ACategoryAlone, Adapter, Searc
 
     @override
     def then(self) -> Then[ACategoryAlone, Searched]:
-        return TheCallIsRefused(UserNotFound)
+        return TheCallIsRefused(UnreachableError)
 
 
 SCENARIOS: list[SearchingStep] = [

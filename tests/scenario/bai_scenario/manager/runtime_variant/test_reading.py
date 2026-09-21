@@ -14,6 +14,8 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -194,11 +196,14 @@ class AnIdNothingAnswersToIsNotFound(
 ):
     @override
     def summary(self) -> str:
-        return "reading-a-variant-id-nothing-answers-to-is-not-found"
+        return "reading-a-variant-id-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return (
+            "존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 "
+            "닿지 못하는 것인지는 응답으로 드러나지 않는다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, AVariantAndACaller]:
@@ -210,7 +215,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -244,13 +249,13 @@ class ANameNothingAnswersToIsNotFound(
 ):
     @override
     def summary(self) -> str:
-        return "resolving-a-variant-name-nothing-answers-to-is-not-found"
+        return "resolving-a-variant-name-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
         return (
-            "존재하지 않는 이름을 id로 변환하면 대상을 찾을 수 없다는 이유로 거부된다. "
-            "이 변환에는 뒤따르는 권한 검사가 없어 존재하지 않는다는 사실이 그대로 드러난다"
+            "존재하지 않는 이름을 id로 변환하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 "
+            "존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다"
         )
 
     @override
@@ -263,7 +268,7 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[AVariantAndACaller, RuntimeVariantID]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)

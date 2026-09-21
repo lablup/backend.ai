@@ -33,11 +33,11 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
-from ai.backend.manager.models.deployment_revision_preset.conditions import (
-    DeploymentRevisionPresetConditions,
+from ai.backend.manager.models.deployment_revision_preset.scopes import (
+    PublicDeploymentPresetTarget,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
-    DeploymentPresetSearcher,
+    ModelCardSatisfyingPresetSearcher,
 )
 from ai.backend.manager.models.model_card.creators import ModelCardResourceRequirementCreator
 from ai.backend.manager.models.model_card.purgers import (
@@ -247,17 +247,14 @@ class ModelCardDBSource:
         preset_resource_slots with quantity >= min_quantity.
         """
         async with self._v2_ops.read_ops() as r:
-            result = await r.search_in_global(
-                DeploymentPresetSearcher(
+            result = await r.search_with_scopes(
+                [PublicDeploymentPresetTarget()],
+                ModelCardSatisfyingPresetSearcher(
+                    model_card_id=ModelCardID(model_card_id),
                     pagination=OffsetPagination(
                         limit=search_input.limit or 20, offset=search_input.offset or 0
                     ),
-                    conditions=[
-                        DeploymentRevisionPresetConditions.satisfying_model_card(
-                            ModelCardID(model_card_id)
-                        )
-                    ],
-                )
+                ),
             )
         return AvailablePresetsSearchResult(
             items=result.items,

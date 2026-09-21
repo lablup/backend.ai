@@ -1,19 +1,14 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
-    BatchOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
+    ScopedBatchOpsResult,
 )
-from ai.backend.manager.actions.v2.single_entity.processor import (
-    PublicSingleEntityActionProcessor,
-    SingleEntityActionProcessor,
-)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
 from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
@@ -26,7 +21,9 @@ from ai.backend.manager.services.prometheus_query_preset.actions.preview import 
     PreviewPresetActionResult,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.purge import PurgePresetAction
-from ai.backend.manager.services.prometheus_query_preset.actions.search import SearchPresetsAction
+from ai.backend.manager.services.prometheus_query_preset.actions.scoped_search import (
+    ScopedSearchPresetsAction,
+)
 from ai.backend.manager.services.prometheus_query_preset.actions.update import (
     UpdatePresetAction,
     UpdatePresetActionResult,
@@ -42,11 +39,11 @@ class PrometheusQueryPresetProcessors:
     global_create_preset: GlobalActionProcessor[
         CreatePresetAction, CreatedEntityOpsResult[PrometheusQueryPresetData]
     ]
-    public_get_preset: PublicSingleEntityActionProcessor[
+    get_preset: SingleEntityActionProcessor[
         GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
-    public_search_presets: PublicActionProcessor[
-        SearchPresetsAction, BatchOpsResult[PrometheusQueryPresetData]
+    scoped_search_presets: ScopeActionProcessor[
+        ScopedSearchPresetsAction, ScopedBatchOpsResult[PrometheusQueryPresetData]
     ]
     purge_preset: SingleEntityActionProcessor[
         PurgePresetAction, EntityOpsResult[PrometheusQueryPresetData]
@@ -62,8 +59,8 @@ class PrometheusQueryPresetProcessors:
     ) -> None:
         # The create validates its query template, so it keeps a service method.
         self.global_create_preset = group.global_scope(CreatePresetAction, service.create_preset)
-        self.public_get_preset = group.public_get_ops(GetPresetAction)
-        self.public_search_presets = group.public_search_ops(SearchPresetsAction)
+        self.get_preset = group.single_get_ops(GetPresetAction)
+        self.scoped_search_presets = group.scoped_search_ops(ScopedSearchPresetsAction)
         self.purge_preset = group.entity_purge_ops(PurgePresetAction)
         self.update_preset = group.single_entity(UpdatePresetAction, service.update_preset)
         self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)

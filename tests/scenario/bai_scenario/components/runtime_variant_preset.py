@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     DeleteRuntimeVariantPresetPayload,
@@ -40,7 +41,12 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.runtime_variant import AVariantAndACaller
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.components.system import (
+    KEPT,
+    Kept,
+    lay_a_public_reader,
+    role_named,
+)
 from bai_scenario.seeds.runtime_variant.preset import SeedRuntimeVariantPreset
 from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
 
@@ -106,7 +112,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
             ),
             variant,
         )
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
         return APresetAndACaller(seeding.made(variant), seeding.made(preset), seeding.made(caller))
 
 
@@ -125,7 +131,7 @@ class TwoVariantsOneWithAPreset(Given[Any, TwoVariantsAndAPreset]):
         variant = await seeding.creating(SeedRuntimeVariant(name_hint="taken"))
         other = await seeding.creating(SeedRuntimeVariant(name_hint="free"))
         preset = await seeding.creating_from(SeedRuntimeVariantPreset(), variant)
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
         return TwoVariantsAndAPreset(
             seeding.made(variant), seeding.made(other), seeding.made(preset), seeding.made(caller)
         )
@@ -149,7 +155,7 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
             await seeding.creating_from(SeedRuntimeVariantPreset(), variant)
             for _ in range(self.besides + 1)
         ]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
         return ManyPresetsAndACaller(
             variant=seeding.made(variant),
             laid=tuple(seeding.made(one) for one in presets),
@@ -174,7 +180,7 @@ class PresetsInTwoVariants(Given[Any, ManyPresetsAndACaller]):
             for _ in range(2)
         ]
         await seeding.creating_from(SeedRuntimeVariantPreset(name_hint="elsewhere"), other)
-        caller = await lay_a_caller(seeding)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType())
         return ManyPresetsAndACaller(
             variant=seeding.made(variant),
             laid=tuple(seeding.made(one) for one in mine),
@@ -215,7 +221,7 @@ class PresetsAcrossVersions(Given[Any, ManyPresetsAndACaller]):
         await seeding.creating_from(
             SeedRuntimeVariantPreset(name_hint="upcoming", added_version="3.0.0"), variant
         )
-        caller = await lay_a_caller(seeding)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType())
         return ManyPresetsAndACaller(
             variant=seeding.made(variant),
             laid=tuple(seeding.made(one) for one in valid),

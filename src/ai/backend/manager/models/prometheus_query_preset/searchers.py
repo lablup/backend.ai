@@ -9,6 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,4 +23,4 @@ class PrometheusQueryPresetSearcher(Searcher[PrometheusQueryPresetRow, Prometheu
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
-        return row.to_data()
+        return PrometheusQueryPresetSearchableFields.own.to_data(row)

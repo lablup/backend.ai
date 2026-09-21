@@ -12,6 +12,9 @@ from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantP
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
+    RuntimeVariantPresetSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityBatchPurger, EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -40,7 +43,7 @@ class RuntimeVariantPresetPurger(EntityPurger[RuntimeVariantPresetRow, RuntimeVa
 
     @override
     def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
-        return row.to_data()
+        return RuntimeVariantPresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -67,4 +70,4 @@ class RuntimeVariantPresetsOfVariantPurger(
 
     @override
     def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
-        return row.to_data()
+        return RuntimeVariantPresetSearchableFields.own.to_data(row)

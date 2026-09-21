@@ -11,15 +11,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.models.prometheus_query_preset.conditions import (
-    PrometheusQueryPresetConditions,
-)
-from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
@@ -165,7 +164,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="GPU Memory Usage", metric_name="backendai_gpu"),
                 ),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_contains(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.contains(
                         StringMatchSpec("Container", case_insensitive=False, negated=False)
                     )
                 ],
@@ -179,7 +178,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="GPU Memory Usage", metric_name="backendai_gpu"),
                 ),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_contains(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.contains(
                         StringMatchSpec("container", case_insensitive=True, negated=False)
                     )
                 ],
@@ -192,7 +191,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="container cpu rate"),
                 ),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_equals(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.equals(
                         StringMatchSpec("Container CPU Rate", case_insensitive=False, negated=False)
                     )
                 ],
@@ -202,7 +201,7 @@ class TestPrometheusQueryPresetOptions:
             ConditionCase(
                 seeds=(PresetSeed(name="Existing Preset"),),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_equals(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.equals(
                         StringMatchSpec("NonexistentPreset", case_insensitive=False, negated=False)
                     )
                 ],
@@ -251,7 +250,11 @@ class TestPrometheusQueryPresetOptions:
         target_ids = ids_presets[:2]
         searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[PrometheusQueryPresetConditions.by_ids(target_ids)],
+            conditions=[
+                PrometheusQueryPresetSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=target_ids, negated=False)
+                )
+            ],
             orders=[],
         )
         result = await preset_ops.search_in_global(searcher)
@@ -268,7 +271,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.name(ascending=True)],
+                orders=[PrometheusQueryPresetSearchableFields.own.name.order.apply(True)],
                 expected_ordered_names=("Alpha Preset", "Beta Preset", "Zebra Preset"),
             ),
             OrderCase(
@@ -277,7 +280,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.name(ascending=False)],
+                orders=[PrometheusQueryPresetSearchableFields.own.name.order.apply(False)],
                 expected_ordered_names=("Zebra Preset", "Beta Preset", "Alpha Preset"),
             ),
             OrderCase(
@@ -286,7 +289,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.created_at(ascending=True)],
+                orders=[PrometheusQueryPresetSearchableFields.own.created_at.order.apply(True)],
                 expected_ordered_names=("Zebra Preset", "Alpha Preset", "Beta Preset"),
             ),
             OrderCase(
@@ -295,7 +298,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.created_at(ascending=False)],
+                orders=[PrometheusQueryPresetSearchableFields.own.created_at.order.apply(False)],
                 expected_ordered_names=("Beta Preset", "Alpha Preset", "Zebra Preset"),
             ),
         ],

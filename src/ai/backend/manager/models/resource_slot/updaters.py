@@ -11,6 +11,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -71,4 +74,4 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return row.to_data()
+        return ResourceSlotTypeSearchableFields.own.to_data(row)

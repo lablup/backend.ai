@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -12,6 +14,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     SearchRuntimeVariantsInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant.types import (
@@ -25,6 +28,7 @@ from ai.backend.manager.api.gql.runtime_variant.types import (
     RuntimeVariantFilterGQL,
     RuntimeVariantGQL,
     RuntimeVariantOrderByGQL,
+    RuntimeVariantUsedByGQL,
     UpdateRuntimeVariantInputGQL,
     UpdateRuntimeVariantPayloadGQL,
 )
@@ -40,6 +44,15 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def runtime_variants(
     info: Info[StrawberryGQLContext],
+    used_by: Annotated[
+        RuntimeVariantUsedByGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
+                "listed entity must be readable by the caller."
+            )
+        ),
+    ] = None,
     filter: RuntimeVariantFilterGQL | None = None,
     order_by: list[RuntimeVariantOrderByGQL] | None = None,
     before: str | None = None,
@@ -61,6 +74,7 @@ async def runtime_variants(
         ]
 
     search_input = SearchRuntimeVariantsInput(
+        used_by=used_by.to_pydantic() if used_by else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,

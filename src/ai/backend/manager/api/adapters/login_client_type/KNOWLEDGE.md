@@ -7,6 +7,9 @@ keywords: [login client type, scenario, adapter, superadmin, public read, page s
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-09-21
 status: draft
 ---
 # login_client_type 어댑터 — 시나리오
@@ -14,10 +17,11 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
 의심한다.
 
-`login_client_type` 엔티티는 어느 스코프에도 속하지 않는다. 생성은 호출한 사용자가 슈퍼관리자인지
-검사하고, 하나를 지정해 수정·삭제하는 호출은 그 `login_client_type` 행에 부여된 권한을 검사하는데 그 권한을
-받을 방법이 없다. 생성과 수정·삭제 모두 슈퍼관리자만 성공하지만 거부 이유가 서로 다르다. 조회와
-검색은 인증만 확인한다.
+`login_client_type` 엔티티는 global 과 public 양쪽에 소속된다. 생성은 호출한 사용자가
+슈퍼관리자인지 검사하고, 하나를 지정해 수정·삭제하는 호출은 그 `login_client_type` 행에 부여된
+권한을 검사하는데 그 권한은 global 에서만 나온다. 생성과 수정·삭제 모두 슈퍼관리자만 성공하지만
+거부 이유가 서로 다르다. 조회와 검색은 public 에서 READ 를 검사한다. 모든 계정이 public 소속
+역할을 자동으로 받으므로 로그인한 사용자는 모두 읽을 수 있다.
 
 ## 생성
 
@@ -36,12 +40,12 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 아무 권한도 없는 사용자가 id로 조회한다 | `login_client_type` 하나, 아무 권한도 없음 | id로 조회 | 그 `login_client_type` 노드 전체 |
-| 존재하지 않는 id로 조회한다 | 다른 `login_client_type` 행만 있음 | id로 조회 | 대상을 찾을 수 없어 거부 |
+| public 에서 읽는 사용자가 id로 조회한다 | `login_client_type` 하나, public 조회 권한만 있음 | id로 조회 | 그 `login_client_type` 노드 전체 |
+| 존재하지 않는 id로 조회한다 | 다른 `login_client_type` 행만 있음 | id로 조회 | 권한 부족으로 거부 |
 
-조회에는 권한 검사가 없다. 아무 권한도 없는 사용자가 성공하는 시나리오가 그것을 증명하므로 이
-절에는 그 성공 시나리오에 대응하는 거부 시나리오가 없고, 대응하는 거부 시나리오는 생성 절의 역할
-부족으로 거부되는 시나리오다.
+조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자가 성공하는 시나리오가 그것을
+증명하고, 대응하는 거부 시나리오는 생성 절의 역할 부족으로 거부되는 시나리오다. 존재하지 않는 id와
+닿을 수 없는 id는 같은 이유로 거부된다.
 
 인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
 

@@ -10,6 +10,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.searchable_fields import (
+    RuntimeVariantSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -32,7 +35,7 @@ class RuntimeVariantQuerier(DataQuerier[RuntimeVariantRow, RuntimeVariantData]):
 
     @override
     def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
-        return row.to_data()
+        return RuntimeVariantSearchableFields.own.to_data(row)
 
 
 class BulkRuntimeVariantQuerier(BulkEntityQuerier[RuntimeVariantRow, RuntimeVariantData]):
@@ -48,4 +51,4 @@ class BulkRuntimeVariantQuerier(BulkEntityQuerier[RuntimeVariantRow, RuntimeVari
 
     @override
     def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
-        return row.to_data()
+        return RuntimeVariantSearchableFields.own.to_data(row)

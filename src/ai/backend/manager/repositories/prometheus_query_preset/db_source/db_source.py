@@ -13,6 +13,9 @@ from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetListResult,
 )
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 
 if TYPE_CHECKING:
@@ -38,7 +41,7 @@ class PrometheusQueryPresetDBSource:
                 raise PrometheusQueryPresetNotFound(
                     f"Prometheus query preset {preset_id} not found"
                 )
-            return row.to_data()
+            return PrometheusQueryPresetSearchableFields.own.to_data(row)
 
     async def search(
         self,
@@ -52,7 +55,10 @@ class PrometheusQueryPresetDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(PrometheusQueryPresetRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.PrometheusQueryPresetRow.to_data() for row in result.rows]
+            items = [
+                PrometheusQueryPresetSearchableFields.own.to_data(row.PrometheusQueryPresetRow)
+                for row in result.rows
+            ]
             return PrometheusQueryPresetListResult(
                 items=items,
                 total_count=result.total_count,

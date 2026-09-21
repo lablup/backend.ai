@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     AllocatedResourceSlotOrderField,
     OrderDirection,
     ResourceAllocationOrderField,
-    ResourceSlotTypeOrderField,
 )
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.resource_slot.row import (
@@ -24,49 +23,6 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 
 _OrderColumn = sa.ColumnElement[Any] | InstrumentedAttribute[Any]
-
-# ========== ResourceSlotType orders ==========
-
-SLOT_TYPE_ORDER_FIELD_MAP: dict[ResourceSlotTypeOrderField, _OrderColumn] = {
-    ResourceSlotTypeOrderField.SLOT_NAME: ResourceSlotTypeRow.slot_name,
-    ResourceSlotTypeOrderField.RANK: ResourceSlotTypeRow.rank,
-    ResourceSlotTypeOrderField.DISPLAY_NAME: ResourceSlotTypeRow.display_name,
-}
-
-SLOT_TYPE_DEFAULT_FORWARD_ORDER: QueryOrder = ResourceSlotTypeRow.slot_name.asc()
-
-
-class ResourceSlotTypeOrders:
-    """Order factories for resource slot type rows."""
-
-    @staticmethod
-    def slot_name(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ResourceSlotTypeRow.slot_name.asc()
-        return ResourceSlotTypeRow.slot_name.desc()
-
-    @staticmethod
-    def rank(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ResourceSlotTypeRow.rank.asc()
-        return ResourceSlotTypeRow.rank.desc()
-
-    @staticmethod
-    def display_name(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return ResourceSlotTypeRow.display_name.asc()
-        return ResourceSlotTypeRow.display_name.desc()
-
-
-def resolve_slot_type_order(
-    field: ResourceSlotTypeOrderField, direction: OrderDirection
-) -> QueryOrder:
-    """Resolve a DTO order field + direction to a SQLAlchemy order expression."""
-    col = SLOT_TYPE_ORDER_FIELD_MAP[field]
-    if direction == OrderDirection.DESC:
-        return col.desc()
-    return col.asc()
-
 
 # ========== AgentResource orders ==========
 

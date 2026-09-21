@@ -15,11 +15,15 @@ Given
 - 이미 있는 카테고리 하나와, superadmin 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -38,11 +42,15 @@ Given
 
 - 카테고리가 하나도 없고, user 한 명
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -61,11 +69,15 @@ Given
 
 - 카테고리가 하나도 없고, superadmin 한 명
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -88,11 +100,15 @@ Given
 
 - 카테고리가 하나도 없고, superadmin 한 명
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -115,11 +131,15 @@ Given
 
 - 카테고리가 하나도 없고, user 한 명
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -141,11 +161,15 @@ Given
 - 카테고리 1개와, user 한 명
   - 카테고리 wanted-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -156,9 +180,9 @@ Then
 - 빈 응답이 반환된다
   - answer = []
 
-#### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_loading.py) — pass
+#### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_loading.py) — pass
 
-카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다
+카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다
 
 Given
 
@@ -166,11 +190,15 @@ Given
   - 카테고리 wanted-1
   - 카테고리 other-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -178,11 +206,11 @@ When
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다
+- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다
   - len = 3
   - [0]: 1번째로 요청한 id의 카테고리 전체와 같다
   - [1]: 2번째로 요청한 id의 카테고리 전체와 같다
-  - [2] = None
+  - 거부: NotEnoughPermission
 
 ### purging
 
@@ -195,11 +223,15 @@ Given
 - 이미 있는 카테고리 하나와, user 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -219,11 +251,15 @@ Given
 - 이미 있는 카테고리 하나와, superadmin 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -243,11 +279,15 @@ Given
 - 이미 있는 카테고리 하나와, superadmin 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -267,11 +307,15 @@ Given
 - 이미 있는 카테고리 하나와, user 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -286,7 +330,7 @@ Then
 
 #### [a-call-carrying-no-user-may-not-read-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py) — pass
 
-카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 인증 실패로 거부된다
+카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다
 
 Given
 
@@ -300,7 +344,7 @@ When
 Then
 
 - 거부된다
-  - 거부: UserNotFound
+  - 거부: UnreachableError
 
 #### [a-user-granted-nothing-reads-a-category-by-id](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py) — pass
 
@@ -311,11 +355,15 @@ Given
 - 이미 있는 카테고리 하나와, user 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -330,20 +378,24 @@ Then
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
-#### [an-id-nothing-answers-to-is-not-found-for-anyone](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py) — pass
 
-아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 조회는 인증만 확인하므로 권한 검사가 먼저 막지 않는다
+public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다
 
 Given
 
 - 이미 있는 카테고리 하나와, user 한 명
   - 카테고리 category-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -352,7 +404,7 @@ When
 Then
 
 - 거부된다
-  - 거부: EntityNotFoundError
+  - 거부: NotEnoughPermission
 
 ### searching
 
@@ -372,7 +424,7 @@ When
 Then
 
 - 거부된다
-  - 거부: UserNotFound
+  - 거부: UnreachableError
 
 #### [a-user-granted-nothing-counts-every-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_searching.py) — pass
 
@@ -384,11 +436,15 @@ Given
   - 카테고리 wanted-1
   - 카테고리 other-1
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -413,11 +469,15 @@ Given
   - 카테고리 other-1
   - 카테고리 other-2
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -450,11 +510,15 @@ Given
   - 카테고리 other-9
   - 카테고리 other-10
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 

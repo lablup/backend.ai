@@ -11,12 +11,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Given
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.seeder import Laid
+from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
@@ -46,6 +52,49 @@ async def lay_a_caller(seeding: Any, role: UserRole = UserRole.USER) -> Laid[Use
     """A user of the given role, in a domain of their own."""
     home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
     caller: Laid[UserData] = await seeding.within(SomeoneOf(home, role=role))
+    return caller
+
+
+@dataclass(frozen=True)
+class SomeoneReadingInPublic(SeedNest[Laid[UserData]]):
+    """그 사용자에게 public 에서 한 엔티티 타입을 읽을 권한을 준다.
+
+    설치본은 모든 계정에 public_member 를 자동으로 붙이지만 시나리오 스키마는 시드 역할을
+    만들지 않는다. 그래서 같은 범위를 시나리오가 직접 역할로 준다.
+    """
+
+    domain: Laid[Any]
+    entity_type: EntityType
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        return f"public 에서 {self.entity_type} 조회 권한을 받은 사용자 준비"
+
+    @override
+    def lay(self, seed: Seeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        granted = seed.creating_from(
+            SeedRole(
+                lambda _: global_entity_id(GlobalEntityName.PUBLIC), name_hint="public-reader"
+            ),
+            someone,
+        )
+        seed.adding(
+            SeedPermission(entity_type=self.entity_type, permission=Permission.READ), granted
+        )
+        seed.granting(granted, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+async def lay_a_public_reader(
+    seeding: Any, entity_type: EntityType, role: UserRole = UserRole.USER
+) -> Laid[UserData]:
+    """A user of the given role who reads one entity type in public."""
+    home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    caller: Laid[UserData] = await seeding.within(
+        SomeoneReadingInPublic(home, entity_type, role=role)
+    )
     return caller
 
 
