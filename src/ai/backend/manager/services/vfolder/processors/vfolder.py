@@ -2,7 +2,10 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -83,14 +86,14 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GlobalGetVolumePerfMetricActionResult,
     GlobalListAllHostsAction,
     GlobalListAllHostsActionResult,
-    GlobalListAllowedTypesAction,
-    GlobalListAllowedTypesActionResult,
     GlobalListMountsAction,
     GlobalListMountsActionResult,
     GlobalMountHostAction,
     GlobalMountHostActionResult,
     GlobalUmountHostAction,
     GlobalUmountHostActionResult,
+    PublicListAllowedTypesAction,
+    PublicListAllowedTypesActionResult,
     SearchHostsAction,
     SearchHostsActionResult,
     UpdateQuotaAction,
@@ -133,8 +136,8 @@ class VFolderProcessors:
     ]
     clone_vfolder: SingleEntityActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: ScopeActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
-    list_allowed_types: GlobalActionProcessor[
-        GlobalListAllowedTypesAction, GlobalListAllowedTypesActionResult
+    public_list_allowed_types: PublicActionProcessor[
+        PublicListAllowedTypesAction, PublicListAllowedTypesActionResult
     ]
     list_all_hosts: GlobalActionProcessor[GlobalListAllHostsAction, GlobalListAllHostsActionResult]
     get_volume_perf_metric: GlobalActionProcessor[
@@ -211,8 +214,8 @@ class VFolderProcessors:
 
         # Actions without RBAC validation (internal/legacy/storage ops)
         self.get_task_logs = group.scope(GetTaskLogsAction, service.get_task_logs)
-        self.list_allowed_types = group.global_scope(
-            GlobalListAllowedTypesAction, service.list_allowed_types
+        self.public_list_allowed_types = group.public(
+            PublicListAllowedTypesAction, service.public_list_allowed_types
         )
         self.list_all_hosts = group.global_scope(GlobalListAllHostsAction, service.list_all_hosts)
         self.get_volume_perf_metric = group.global_scope(
