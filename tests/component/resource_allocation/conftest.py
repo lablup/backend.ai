@@ -28,7 +28,10 @@ from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     GroupMeta,
 )
-from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
+from ai.backend.manager.api.adapters.resource_allocation.adapter import (
+    ResourceAllocationAdapter,
+    ResourceAllocationAdapterArgs,
+)
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.resource_allocation.handler import (
@@ -170,11 +173,13 @@ def server_module_registries(
     processors.session.resource_allocation = resource_allocation_processors
 
     adapter = ResourceAllocationAdapter(
-        processors.session,
-        processors.domain,
-        processors.user,
-        processors.resource_group,
-        config_provider=config_provider,
+        ResourceAllocationAdapterArgs(
+            session=processors.session,
+            domain=processors.domain,
+            user=processors.user,
+            resource_group=processors.resource_group,
+            config_provider=config_provider,
+        )
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)
 

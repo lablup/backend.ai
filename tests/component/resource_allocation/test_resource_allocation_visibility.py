@@ -39,7 +39,10 @@ from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     GroupMeta,
 )
-from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
+from ai.backend.manager.api.adapters.resource_allocation.adapter import (
+    ResourceAllocationAdapter,
+    ResourceAllocationAdapterArgs,
+)
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.resource_allocation.handler import (
@@ -116,11 +119,13 @@ def _build_registries(
     processors.session = MagicMock()
     processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
-        processors.session,
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-        config_provider=config_provider,
+        ResourceAllocationAdapterArgs(
+            session=processors.session,
+            domain=MagicMock(),
+            user=MagicMock(),
+            resource_group=MagicMock(),
+            config_provider=config_provider,
+        )
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

@@ -16,7 +16,10 @@ from ai.backend.common.data.entity.resource_group import (
 )
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
-from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
+from ai.backend.manager.api.adapters.resource_allocation.adapter import (
+    ResourceAllocationAdapter,
+    ResourceAllocationAdapterArgs,
+)
 from ai.backend.manager.data.resource_allocation.types import ResourceGroupUsageData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -58,11 +61,13 @@ def processors(usage: ResourceGroupUsageData) -> MagicMock:
 @pytest.fixture
 def adapter(processors: MagicMock) -> ResourceAllocationAdapter:
     return ResourceAllocationAdapter(
-        processors.session,
-        processors.domain,
-        processors.user,
-        processors.resource_group,
-        config_provider=None,
+        ResourceAllocationAdapterArgs(
+            session=processors.session,
+            domain=processors.domain,
+            user=processors.user,
+            resource_group=processors.resource_group,
+            config_provider=None,
+        )
     )
 
 

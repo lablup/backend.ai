@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -73,6 +74,15 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
 from ai.backend.manager.services.user.processors import UserProcessors
 
 
+@dataclass
+class ResourceAllocationAdapterArgs:
+    session: SessionProcessors
+    domain: DomainProcessors
+    user: UserProcessors
+    resource_group: ResourceGroupProcessors
+    config_provider: ManagerConfigProvider | None
+
+
 class ResourceAllocationAdapter(BaseAdapter):
     """Adapter for resource allocation operations."""
 
@@ -82,19 +92,12 @@ class ResourceAllocationAdapter(BaseAdapter):
     _resource_group: ResourceGroupProcessors
     _config_provider: ManagerConfigProvider | None
 
-    def __init__(
-        self,
-        session: SessionProcessors,
-        domain: DomainProcessors,
-        user: UserProcessors,
-        resource_group: ResourceGroupProcessors,
-        config_provider: ManagerConfigProvider | None,
-    ) -> None:
-        self._session = session
-        self._domain = domain
-        self._user = user
-        self._resource_group = resource_group
-        self._config_provider = config_provider
+    def __init__(self, args: ResourceAllocationAdapterArgs) -> None:
+        self._session = args.session
+        self._domain = args.domain
+        self._user = args.user
+        self._resource_group = args.resource_group
+        self._config_provider = args.config_provider
 
     def _visibility_settings(self) -> tuple[bool, bool]:
         """Return (group_resource_visibility, hide_agents) from config."""

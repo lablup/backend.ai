@@ -52,7 +52,10 @@ from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter im
 )
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.adapters.reservoir_registry.adapter import ReservoirRegistryAdapter
-from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
+from ai.backend.manager.api.adapters.resource_allocation.adapter import (
+    ResourceAllocationAdapter,
+    ResourceAllocationAdapterArgs,
+)
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
@@ -263,11 +266,13 @@ class Adapters:
             rbac=RBACAdapter(processors.rbac, processors.permission_controller),
             reservoir_registry=ReservoirRegistryAdapter(processors.artifact_registry),
             resource_allocation=ResourceAllocationAdapter(
-                processors.session,
-                processors.domain,
-                processors.user,
-                processors.resource_group,
-                config_provider,
+                ResourceAllocationAdapterArgs(
+                    session=processors.session,
+                    domain=processors.domain,
+                    user=processors.user,
+                    resource_group=processors.resource_group,
+                    config_provider=config_provider,
+                )
             ),
             resource_group=ResourceGroupAdapter(
                 processors.resource_group,
