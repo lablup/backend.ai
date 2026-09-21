@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
@@ -37,13 +38,16 @@ from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
-from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.searchable_fields import (
+    ResourcePresetSearchableFields,
+)
 from ai.backend.manager.models.resource_preset.searchers import ResourcePresetSearcher
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -82,7 +86,7 @@ def _resource_slot_entries_to_slot(
 
 def _resource_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourcePresetOrders.name(ascending=True),
+        forward_order=ResourcePresetSearchableFields.own.name.order.apply(ascending=True),
         cursor_column=ResourcePresetRow.id,
     )
 
@@ -91,9 +95,25 @@ class ResourcePresetAdapter(BaseAdapter):
     """Adapter for resource preset operations."""
 
     _resource_preset: ResourcePresetProcessors
+    _resource_group: ResourceGroupProcessors
 
-    def __init__(self, resource_preset: ResourcePresetProcessors) -> None:
+    def __init__(
+        self,
+        resource_preset: ResourcePresetProcessors,
+        resource_group: ResourceGroupProcessors,
+    ) -> None:
         self._resource_preset = resource_preset
+        self._resource_group = resource_group
+
+    async def _resource_group_id(self, name: str | None) -> ResourceGroupID | None:
+        """The id of the group a preset is bound to; the preset row records only its
+        name, and what the preset belongs to is named by id."""
+        if name is None:
+            return None
+        lookup = await self._resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
+        )
+        return lookup.resolved_entity_id
 
     async def search(
         self,
@@ -159,6 +179,7 @@ class ResourcePresetAdapter(BaseAdapter):
             resource_slots=resource_slots,
             shared_memory=shared_memory_str,
             resource_group_name=resource_group_name,
+            resource_group_id=await self._resource_group_id(resource_group_name),
         )
         result = await self._resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
@@ -215,29 +236,13 @@ class ResourcePresetAdapter(BaseAdapter):
 
     def _convert_filter(self, filter_: ResourcePresetFilter) -> list[QueryCondition]:
         """Convert ResourcePresetFilter DTO to QueryConditions."""
-        conditions: list[QueryCondition] = []
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=ResourcePresetConditions.by_name_contains,
-                equals_factory=ResourcePresetConditions.by_name_equals,
-                starts_with_factory=ResourcePresetConditions.by_name_starts_with,
-                ends_with_factory=ResourcePresetConditions.by_name_ends_with,
-                in_factory=ResourcePresetConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
-        if filter_.resource_group_name:
-            cond = self.convert_string_filter(
-                filter_.resource_group_name,
-                contains_factory=ResourcePresetConditions.by_resource_group_name_contains,
-                equals_factory=ResourcePresetConditions.by_resource_group_name_equals,
-                starts_with_factory=ResourcePresetConditions.by_resource_group_name_starts_with,
-                ends_with_factory=ResourcePresetConditions.by_resource_group_name_ends_with,
-                in_factory=ResourcePresetConditions.by_resource_group_name_in,
-            )
-            if cond:
-                conditions.append(cond)
+        fields = ResourcePresetSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_string_filter(
+                filter_.resource_group_name, fields.resource_group_name.filter
+            ),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -257,12 +262,13 @@ class ResourcePresetAdapter(BaseAdapter):
 
     def _convert_orders(self, orders: list[ResourcePresetOrder]) -> list[Any]:
         """Convert ResourcePresetOrder DTOs to QueryOrders."""
+        fields = ResourcePresetSearchableFields.own
         result = []
         for order in orders:
             ascending = order.direction == ResourcePresetOrderDirection.ASC
             match order.field:
                 case ResourcePresetOrderField.NAME:
-                    result.append(ResourcePresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
         return result
 
     @staticmethod

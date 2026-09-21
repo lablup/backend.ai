@@ -13,6 +13,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
@@ -34,6 +35,11 @@ from ai.backend.common.types import AccessKey, AgentId
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.models.resource_preset.scopes import (
+    PublicResourcePresetTarget,
+    ResourceGroupResourcePresetTarget,
+    ResourcePresetTarget,
+)
 from ai.backend.manager.repositories.resource_slot.types import quantities_to_dict
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
@@ -47,6 +53,7 @@ from ai.backend.manager.services.container_registry.actions.get_container_regist
 )
 from ai.backend.manager.services.project.actions.usage_per_month import UsagePerMonthAction
 from ai.backend.manager.services.project.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
@@ -62,6 +69,7 @@ if TYPE_CHECKING:
         ContainerRegistryProcessors,
     )
     from ai.backend.manager.services.project.processors import ProjectProcessors
+    from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
     from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -75,16 +83,31 @@ class ResourceHandler:
         self,
         *,
         resource_preset: ResourcePresetProcessors,
+        resource_group: ResourceGroupProcessors,
         agent: AgentProcessors,
         project: ProjectProcessors,
         user: UserProcessors,
         container_registry: ContainerRegistryProcessors,
     ) -> None:
         self._resource_preset = resource_preset
+        self._resource_group = resource_group
         self._agent = agent
         self._project = project
         self._user = user
         self._container_registry = container_registry
+
+    async def _preset_targets(self, resource_group: str | None) -> list[ResourcePresetTarget]:
+        """The scopes a preset read is answered from: public, and the resource group the
+        caller named. Naming a group the caller holds no permission at refuses the read."""
+        targets: list[ResourcePresetTarget] = [PublicResourcePresetTarget()]
+        if resource_group is not None:
+            lookup = await self._resource_group.lookup.run(
+                LookupResourceGroupAction(name=ResourceGroupName(resource_group))
+            )
+            targets.append(
+                ResourceGroupResourcePresetTarget(resource_group_id=lookup.resolved_entity_id)
+            )
+        return targets
 
     # ------------------------------------------------------------------
     # list_presets (GET /resource/presets)
@@ -98,6 +121,7 @@ class ResourceHandler:
         params = query.parsed
         result = await self._resource_preset.list_presets.run(
             ListResourcePresetsAction(
+                targets=await self._preset_targets(params.scaling_group),
                 access_key=ctx.access_key,
                 resource_group=params.scaling_group,
             )
@@ -118,6 +142,7 @@ class ResourceHandler:
         resource_policy = req.request["keypair"]["resource_policy"]
         result = await self._resource_preset.check_presets.run(
             CheckResourcePresetsAction(
+                targets=await self._preset_targets(params.scaling_group),
                 access_key=AccessKey(ctx.access_key),
                 resource_policy=resource_policy,
                 domain_name=ctx.user_domain,

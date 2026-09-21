@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.etcd import AsyncEtcd
@@ -45,6 +46,7 @@ from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -55,6 +57,8 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -92,6 +96,20 @@ def resource_preset_processors(
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
         processor_registry.group(GroupMeta(ResourcePresetEntityType())), service
+    )
+
+
+@pytest.fixture()
+def resource_group_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> ResourceGroupProcessors:
+    """The handler resolves the named resource group's name to its id, so this runs
+    against the DB."""
+    repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
+    service = ResourceGroupService(repo, appproxy_client_pool=AsyncMock())
+    return ResourceGroupProcessors(
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 
@@ -181,6 +199,7 @@ def user_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     resource_preset_processors: ResourcePresetProcessors,
+    resource_group_processors: ResourceGroupProcessors,
     agent_processors: AgentProcessors,
     project_processors: ProjectProcessors,
     user_processors: UserProcessors,
@@ -191,6 +210,7 @@ def server_module_registries(
         register_resource_routes(
             ResourceHandler(
                 resource_preset=resource_preset_processors,
+                resource_group=resource_group_processors,
                 agent=agent_processors,
                 project=project_processors,
                 user=user_processors,

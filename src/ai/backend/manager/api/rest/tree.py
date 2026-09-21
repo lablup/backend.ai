@@ -198,6 +198,7 @@ def build_api_routes(
     )
     resource_handler = ResourceHandler(
         resource_preset=processors.resource_preset,
+        resource_group=processors.resource_group,
         agent=processors.agent,
         project=processors.project,
         user=processors.user,

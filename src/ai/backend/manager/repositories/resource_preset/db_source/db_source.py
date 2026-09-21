@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
@@ -44,10 +46,15 @@ from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
+from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
+from ai.backend.manager.models.resource_preset.queriers import ResourcePresetQuerier
+from ai.backend.manager.models.resource_preset.searchable_fields import (
+    ResourcePresetSearchableFields,
+)
 from ai.backend.manager.models.resource_preset.updaters import (
     ResourcePresetResourceGroupUpdater,
     ResourcePresetUpdater,
@@ -61,6 +68,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.resource_slot.types import (
     add_quantities,
     min_quantities,
@@ -115,7 +123,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_id(session, preset_id)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            return preset_row.to_dataclass()
+            return ResourcePresetSearchableFields.own.to_data(preset_row)
 
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
@@ -126,7 +134,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_name(session, name)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            return preset_row.to_dataclass()
+            return ResourcePresetSearchableFields.own.to_data(preset_row)
 
     async def get_preset_by_id_or_name(
         self, preset_id: UUID | None, name: str | None
@@ -138,7 +146,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            return preset_row.to_dataclass()
+            return ResourcePresetSearchableFields.own.to_data(preset_row)
 
     async def _get_preset_by_id_or_name(
         self, db_sess: SASession, preset_id: UUID | None, name: str | None
@@ -168,21 +176,40 @@ class ResourcePresetDBSource:
     async def set_preset_resource_group(
         self, updater: ResourcePresetResourceGroupUpdater
     ) -> ResourcePresetData:
-        """Write the preset's resource group and put it into the `public` scope or take
-        it out, in one transaction.
+        """Write the preset's resource group and move it to the scope that group stands
+        for, in one transaction. Membership of `global` is left as it is.
         """
-        public = global_entity_id(GlobalEntityName.PUBLIC)
         async with self._v2_ops.write_ops() as w:
+            before = await w.query_data(ResourcePresetQuerier(preset_id=updater.preset_id))
+            if before is None:
+                raise ResourcePresetNotFound(
+                    f"Resource preset with ID {updater.preset_id} not found."
+                )
             preset = await w.update_data(updater)
             if preset is None:
                 raise ResourcePresetNotFound(
                     f"Resource preset with ID {updater.preset_id} not found."
                 )
-            if updater.resource_group_name is None:
-                await w.add_membership([public], [updater.preset_id])
-            else:
-                await w.remove_membership([public], [updater.preset_id])
+            leaving = await self._preset_scope(w, before.resource_group_name)
+            landing = await self._preset_scope(w, preset.resource_group_name)
+            if leaving != landing:
+                await w.remove_membership([leaving], [updater.preset_id])
+                await w.add_membership([landing], [updater.preset_id])
             return preset
+
+    async def _preset_scope(
+        self, w: V2ShareWriteOps, resource_group_name: str | None
+    ) -> EntityIdentifier:
+        """The scope a preset belongs to: `public` while it is bound to no resource
+        group, that resource group once it is."""
+        if resource_group_name is None:
+            return global_entity_id(GlobalEntityName.PUBLIC)
+        resource_group_id = await w.lookup_entity_id(
+            ResourceGroupNameLookup(name=ResourceGroupName(resource_group_name))
+        )
+        if resource_group_id is None:
+            raise ResourceGroupNotFound(resource_group_name)
+        return resource_group_id
 
     async def delete_preset(self, preset_id: ResourcePresetID) -> ResourcePresetData:
         """
@@ -217,7 +244,7 @@ class ResourcePresetDBSource:
 
             presets = []
             async for row in await session.stream_scalars(query):
-                presets.append(row.to_dataclass())
+                presets.append(ResourcePresetSearchableFields.own.to_data(row))
 
         return presets
 
