@@ -4,9 +4,6 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    SearchDeploymentRevisionPresetsInput,
-)
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.model_card.types import (
@@ -17,9 +14,6 @@ from ai.backend.manager.data.model_card.types import (
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
-from ai.backend.manager.repositories.model_card.types import (
-    AvailablePresetsSearchResult,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source.db_source import ModelCardDBSource
@@ -55,13 +49,6 @@ class ModelCardRepository:
 
     async def get_existing_card_names(self, project_id: UUID, domain: str) -> set[str]:
         return await self._db_source.get_existing_card_names(project_id, domain)
-
-    async def search_available_presets(
-        self,
-        model_card_id: UUID,
-        search_input: SearchDeploymentRevisionPresetsInput,
-    ) -> AvailablePresetsSearchResult:
-        return await self._db_source.search_available_presets(model_card_id, search_input)
 
     async def bulk_upsert_scan(
         self,
