@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
+from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -564,3 +565,13 @@ class TestModelCardScanResourceRequirements:
             f"Expected only the satisfying preset, got {len(returned_ids)}: "
             "the relational-division filter regressed."
         )
+
+    async def test_search_available_presets_for_a_missing_card_answers_not_found(
+        self,
+        db_source: ModelCardDBSource,
+    ) -> None:
+        with pytest.raises(ModelCardNotFound):
+            await db_source.search_available_presets(
+                uuid.uuid4(),
+                SearchDeploymentRevisionPresetsInput(),
+            )

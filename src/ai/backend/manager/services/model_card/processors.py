@@ -76,7 +76,9 @@ class ModelCardProcessors:
         ScopedSearchModelCardsAction, ScopedBatchOpsResult[ModelCardData]
     ]
     scan: GlobalActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
-    available_presets: GlobalActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
+    available_presets: SingleEntityActionProcessor[
+        AvailablePresetsAction, AvailablePresetsActionResult
+    ]
     scoped_search_requirements: BulkActionProcessor[
         ScopedSearchModelCardResourceRequirementsAction,
         ScopedFieldsOpsResult[ModelCardResourceRequirementData],
@@ -91,7 +93,7 @@ class ModelCardProcessors:
         self.global_search = group.global_searcher_ops(GlobalSearchModelCardsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchModelCardsAction)
         self.scan = group.global_scope(ScanProjectModelCardsAction, service.scan)
-        self.available_presets = group.global_scope(
+        self.available_presets = group.single_entity(
             AvailablePresetsAction, service.available_presets
         )
 

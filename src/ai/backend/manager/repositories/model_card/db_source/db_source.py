@@ -45,6 +45,7 @@ from ai.backend.manager.models.model_card.purgers import (
     ModelCardResourceRequirementBatchPurger,
     ModelCardVFolderBatchPurger,
 )
+from ai.backend.manager.models.model_card.queriers import ModelCardQuerier
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
@@ -247,6 +248,9 @@ class ModelCardDBSource:
         preset_resource_slots with quantity >= min_quantity.
         """
         async with self._v2_ops.read_ops() as r:
+            card = await r.query_data(ModelCardQuerier(model_card_id=ModelCardID(model_card_id)))
+            if card is None:
+                raise ModelCardNotFound(f"Model card with ID {model_card_id} not found.")
             result = await r.search_with_scopes(
                 [PublicDeploymentPresetTarget()],
                 ModelCardSatisfyingPresetSearcher(

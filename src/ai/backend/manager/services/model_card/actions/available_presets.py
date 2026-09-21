@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.model_card.types import AvailablePresetsSearchResult
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.services.model_card.actions.base import ModelCardSingleEntityAction
 
 
 @dataclass
-class AvailablePresetsAction(ModelCardAction):
-    model_card_id: UUID
+class AvailablePresetsAction(ModelCardSingleEntityAction):
+    """Read the deployment revision presets that satisfy one model card's requirements."""
+
     search_input: SearchDeploymentRevisionPresetsInput
 
     @override

@@ -255,6 +255,9 @@ from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
 from ai.backend.manager.services.metric.processors import MetricProcessors
+from ai.backend.manager.services.model_card.actions.available_presets import (
+    AvailablePresetsAction,
+)
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
@@ -903,6 +906,22 @@ def test_image_alias_read_is_a_scoped_permission_read() -> None:
     assert recorded[SearchImageAliasesAction] == (
         ImageEntityType(),
         ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_model_card_available_presets_read_is_checked_on_the_card() -> None:
+    """The presets a model card can run on are read as that card's reader, not superadmin-only."""
+    registry = _ops_registry()
+    ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[AvailablePresetsAction] == (
+        ModelCardEntityType(),
+        ActionKind.SINGLE_ENTITY,
         ActionGate.PERMISSION,
     )
 
