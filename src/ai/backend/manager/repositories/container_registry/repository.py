@@ -256,7 +256,7 @@ class ContainerRegistryRepository:
             return result.scalars().one_or_none()
 
     @container_registry_repository_resilience.apply()
-    async def get_by_project_scope(self, scope_id: ProjectScope) -> ContainerRegistryInfo:
+    async def get_project_registry(self, scope_id: ProjectScope) -> ContainerRegistryInfo:
         registry_id = await self._db_source.lookup_image_commit_registry_id(
             ProjectID(scope_id.project_id)
         )

@@ -251,7 +251,7 @@ class ContainerRegistryService:
         return HandleHarborWebhookActionResult()
 
     async def _registry_quota_target(self, scope_id: ProjectScope) -> _RegistryQuotaTarget:
-        registry_info = await self._container_registry_repository.get_by_project_scope(scope_id)
+        registry_info = await self._container_registry_repository.get_project_registry(scope_id)
         return _RegistryQuotaTarget(
             client=self._quota_client_pool.make_client(registry_info.type),
             project=HarborProjectInfo(
