@@ -97,16 +97,30 @@ class InMemoryQuotaClientPool(PerProjectContainerRegistryQuotaClientPool):
 
 
 @pytest.fixture()
+def registry_quota_repository(
+    database_engine: ExtendedAsyncSAEngine,
+) -> PerProjectRegistryQuotaRepository:
+    return PerProjectRegistryQuotaRepository(database_engine)
+
+
+@pytest.fixture()
+def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
+    return InMemoryQuotaClientPool()
+
+
+@pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
+    registry_quota_repository: PerProjectRegistryQuotaRepository,
+    registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(
         database_engine,
         repo,
-        PerProjectRegistryQuotaRepository(database_engine),
-        InMemoryQuotaClientPool(),
+        registry_quota_repository,
+        registry_quota_client_pool,
     )
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
