@@ -81,6 +81,9 @@ from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -165,6 +168,7 @@ class ProcessingInput:
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
+    registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool
     prometheus_client: PrometheusClient
 
     # BgtaskRegistry creation (additional)
@@ -365,6 +369,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
+            registry_quota_client_pool=setup_input.registry_quota_client_pool,
             prometheus_client=setup_input.prometheus_client,
             ssh_key_validator=ssh_key_validator,
             key_provider_pool=setup_input.key_provider_pool,

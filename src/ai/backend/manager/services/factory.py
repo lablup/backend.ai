@@ -76,9 +76,6 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
-from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
-)
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -336,7 +333,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             args.db,
             repositories.container_registry.repository,
             repositories.container_registry_quota.repository,
-            PerProjectContainerRegistryQuotaClientPool(),
+            args.registry_quota_client_pool,
         ),
         vfolder=VFolderService(
             args.config_provider,
