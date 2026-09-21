@@ -47,15 +47,23 @@ class ModelCardAvailablePresetsScope(BaseRequestModel):
     )
 
 
-class ModelCardUsedBy(BaseRequestModel):
-    """Entities whose use narrows the model cards read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Model cards the caller cannot
-    read are left out even when a listed entity uses them.
-    """
+class ModelCardUses(BaseRequestModel):
+    """Entities the model card uses, whose ids narrow the result."""
 
     vfolder: list[UUID] | None = Field(
         default=None, description="VFolders the model card is built on"
+    )
+
+
+class ModelCardUsage(BaseRequestModel):
+    """Uses narrowing the model cards read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Model cards the caller cannot
+    read are left out even when a listed entity is tied to them.
+    """
+
+    uses: ModelCardUses | None = Field(
+        default=None, description="Entities the model card uses, whose ids narrow the result"
     )
 
 

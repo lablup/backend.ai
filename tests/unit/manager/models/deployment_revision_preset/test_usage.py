@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
@@ -46,6 +47,8 @@ from ai.backend.manager.models.deployment_revision_preset.searchers import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -69,7 +72,7 @@ from ai.backend.manager.models.runtime_variant.searchable_fields import (
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -296,6 +299,12 @@ class TestDeploymentUsage:
     ) -> OpsRepository[DeploymentRevisionPresetData]:
         return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
+    @pytest.fixture
+    def deployment_repository(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> OpsRepository[ModelDeploymentData]:
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
     async def test_variant_usage_keeps_the_variant_the_deployment_names(
         self,
         variant_repository: OpsRepository[RuntimeVariantData],
@@ -305,7 +314,9 @@ class TestDeploymentUsage:
             ScopedSearcher(
                 scopes=[PublicRuntimeVariantTarget()],
                 used_by=[
-                    RuntimeVariantSearchableFields.linked.deployments.used_by(usage.deployment_id)
+                    RuntimeVariantSearchableFields.linked.usage.deployments.used_by(
+                        usage.deployment_id
+                    )
                 ],
                 searcher=RuntimeVariantSearcher(pagination=OffsetPagination(limit=10)),
             )
@@ -322,10 +333,66 @@ class TestDeploymentUsage:
             ScopedSearcher(
                 scopes=[PublicDeploymentPresetTarget()],
                 used_by=[
-                    DeploymentPresetSearchableFields.linked.deployments.used_by(usage.deployment_id)
+                    DeploymentPresetSearchableFields.linked.usage.deployments.used_by(
+                        usage.deployment_id
+                    )
                 ],
                 searcher=DeploymentPresetSearcher(pagination=OffsetPagination(limit=10)),
             )
         )
 
         assert [item.id for item in result.items] == [usage.used_preset_id]
+
+    async def test_deployment_uses_keeps_the_deployment_naming_the_variant(
+        self,
+        deployment_repository: OpsRepository[ModelDeploymentData],
+        usage: UsageFixture,
+    ) -> None:
+        result = await deployment_repository.global_search(
+            GlobalSearcher(
+                used_by=[
+                    DeploymentSearchableFields.linked.usage.runtime_variants.uses(
+                        usage.used_variant_id
+                    )
+                ],
+                searcher=DeploymentSearcher(pagination=OffsetPagination(limit=10)),
+            )
+        )
+
+        assert [item.id for item in result.items] == [usage.deployment_id]
+
+    async def test_deployment_uses_leaves_out_a_variant_no_revision_names(
+        self,
+        deployment_repository: OpsRepository[ModelDeploymentData],
+        usage: UsageFixture,
+    ) -> None:
+        result = await deployment_repository.global_search(
+            GlobalSearcher(
+                used_by=[
+                    DeploymentSearchableFields.linked.usage.runtime_variants.uses(
+                        usage.unused_variant_id
+                    )
+                ],
+                searcher=DeploymentSearcher(pagination=OffsetPagination(limit=10)),
+            )
+        )
+
+        assert result.items == []
+
+    async def test_deployment_uses_keeps_the_deployment_naming_the_preset(
+        self,
+        deployment_repository: OpsRepository[ModelDeploymentData],
+        usage: UsageFixture,
+    ) -> None:
+        result = await deployment_repository.global_search(
+            GlobalSearcher(
+                used_by=[
+                    DeploymentSearchableFields.linked.usage.deployment_presets.uses(
+                        usage.used_preset_id
+                    )
+                ],
+                searcher=DeploymentSearcher(pagination=OffsetPagination(limit=10)),
+            )
+        )
+
+        assert [item.id for item in result.items] == [usage.deployment_id]

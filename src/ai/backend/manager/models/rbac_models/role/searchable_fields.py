@@ -22,7 +22,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsesConditions
 
 __all__ = ("RoleSearchableFields",)
 
@@ -116,14 +116,20 @@ class _RoleOwnFields(RowDataConverter[RoleRow, RoleData]):
         )
 
 
-class _RoleLinkedEntities:
-    """How a role connects to other entities; the other entity's permission governs."""
+class _RoleUsage:
+    """Uses between a role and other entities."""
 
-    role_presets = UsageConditions[RolePresetID](
+    role_presets = UsesConditions[RolePresetID](
         ToManyCorrelation(RolePresetRow, RoleRow, RolePresetRow.id == RoleRow.role_preset_id),
         RolePresetRow.id,
     )
     """Roles instantiated from the preset."""
+
+
+class _RoleLinkedEntities:
+    """How a role connects to other entities; the other entity's permission governs."""
+
+    usage = _RoleUsage
 
 
 class RoleSearchableFields:

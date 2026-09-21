@@ -68,8 +68,9 @@ from .role import (
     RoleSourceGQL,
     RoleStatusFilterGQL,
     RoleStatusGQL,
-    RoleUsedByGQL,
+    RoleUsageGQL,
     RoleUserNestedFilterGQL,
+    RoleUsesGQL,
     UpdateRoleInput,
 )
 from .scope import PermissionBitGQL, ScopeInputGQL
@@ -105,7 +106,8 @@ __all__ = [
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
-    "RoleUsedByGQL",
+    "RoleUsageGQL",
+    "RoleUsesGQL",
     "RoleAssignmentOrderBy",
     "EntityOrderByGQL",
     # Inputs

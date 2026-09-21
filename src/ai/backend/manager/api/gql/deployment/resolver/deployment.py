@@ -48,7 +48,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
 )
 from ai.backend.manager.api.gql.deployment.types.scopes import (
     DeploymentScopeGQL,
-    DeploymentUsedByGQL,
+    DeploymentUsageGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -65,12 +65,12 @@ from ai.backend.manager.errors.user import UserNotFound
 )  # type: ignore[misc]
 async def admin_deployments(
     info: Info[StrawberryGQLContext],
-    used_by: Annotated[
-        DeploymentUsedByGQL | None,
+    usage: Annotated[
+        DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; deployments the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
         ),
@@ -90,7 +90,7 @@ async def admin_deployments(
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.admin_search(
         AdminSearchDeploymentsInput(
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,
@@ -127,12 +127,12 @@ async def admin_deployments(
 async def scoped_deployments(
     info: Info[StrawberryGQLContext],
     scope: DeploymentScopeGQL,
-    used_by: Annotated[
-        DeploymentUsedByGQL | None,
+    usage: Annotated[
+        DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; deployments the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
         ),
@@ -150,7 +150,7 @@ async def scoped_deployments(
     payload = await info.context.adapters.deployment.scoped_search(
         ScopedSearchDeploymentsInput(
             scope=scope.to_pydantic(),
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -184,12 +184,12 @@ async def scoped_deployments(
 async def project_deployments(
     info: Info[StrawberryGQLContext],
     scope: ProjectDeploymentScopeGQL,
-    used_by: Annotated[
-        DeploymentUsedByGQL | None,
+    usage: Annotated[
+        DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; deployments the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
         ),
@@ -209,7 +209,7 @@ async def project_deployments(
     payload = await info.context.adapters.deployment.project_search(
         scope.project_id,
         AdminSearchDeploymentsInput(
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,
@@ -242,12 +242,12 @@ async def project_deployments(
 )  # type: ignore[misc]
 async def my_deployments(
     info: Info[StrawberryGQLContext],
-    used_by: Annotated[
-        DeploymentUsedByGQL | None,
+    usage: Annotated[
+        DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; deployments the caller cannot "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
         ),
@@ -266,7 +266,7 @@ async def my_deployments(
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.my_search(
         AdminSearchDeploymentsInput(
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,

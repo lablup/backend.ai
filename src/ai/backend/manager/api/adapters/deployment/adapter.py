@@ -24,15 +24,20 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
@@ -131,7 +136,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentScope,
     DeploymentStrategyInfoDTO,
-    DeploymentUsedBy,
+    DeploymentUsage,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
@@ -729,7 +734,7 @@ class DeploymentAdapter(BaseAdapter):
         action_result = await self._deployment.global_search.run(
             GlobalSearchDeploymentsAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_deployment_searcher(input),
                 )
             )
@@ -741,14 +746,28 @@ class DeploymentAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _used_by(self, used_by: DeploymentUsedBy | None) -> list[UsedBy]:
-        """The uses the request named."""
-        if used_by is None:
+    def _usage(self, usage: DeploymentUsage | None) -> list[UsedBy]:
+        """The uses the request named, in the order the input declares them."""
+        if usage is None or usage.uses is None:
             return []
-        linked = DeploymentSearchableFields.linked
+        uses = usage.uses
+        linked = DeploymentSearchableFields.linked.usage
         return [
-            linked.resource_groups.used_by(ResourceGroupID(entity_id))
-            for entity_id in used_by.resource_group or ()
+            *(
+                linked.resource_groups.uses(ResourceGroupID(entity_id))
+                for entity_id in uses.resource_group or ()
+            ),
+            *(linked.images.uses(ImageID(entity_id)) for entity_id in uses.image or ()),
+            *(linked.vfolders.uses(VFolderUUID(entity_id)) for entity_id in uses.vfolder or ()),
+            *(linked.sessions.uses(SessionID(entity_id)) for entity_id in uses.session or ()),
+            *(
+                linked.runtime_variants.uses(RuntimeVariantID(entity_id))
+                for entity_id in uses.runtime_variant or ()
+            ),
+            *(
+                linked.deployment_presets.uses(DeploymentPresetID(entity_id))
+                for entity_id in uses.deployment_preset or ()
+            ),
         ]
 
     def _scope_targets(self, scope: DeploymentScope) -> list[DeploymentTarget]:
@@ -774,7 +793,7 @@ class DeploymentAdapter(BaseAdapter):
             ScopedSearchDeploymentsAction(
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(input.scope),
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_scoped_deployment_searcher(input),
                 )
             )
@@ -798,7 +817,7 @@ class DeploymentAdapter(BaseAdapter):
             ScopedSearchDeploymentsAction(
                 searcher=ScopedSearcher(
                     scopes=[UserDeploymentTarget(user_id=UserID(user.user_id))],
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_deployment_searcher(input),
                 )
             )
@@ -820,7 +839,7 @@ class DeploymentAdapter(BaseAdapter):
             ScopedSearchDeploymentsAction(
                 searcher=ScopedSearcher(
                     scopes=[ProjectDeploymentTarget(project_id=ProjectID(project_id))],
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_deployment_searcher(input),
                 )
             )

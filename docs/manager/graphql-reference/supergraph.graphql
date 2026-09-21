@@ -6750,7 +6750,17 @@ enum DeploymentRevisionPresetOrderField
 }
 
 """
-Added in 26.9.0. Entities whose use narrows a deployment preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused.
+Added in 26.9.0. Uses narrowing a deployment preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
+"""
+input DeploymentRevisionPresetUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the preset narrows the read."""
+  usedBy: DeploymentRevisionPresetUsedBy = null
+}
+
+"""
+Added in 26.9.0. Entities whose use of a deployment preset narrows the read.
 """
 input DeploymentRevisionPresetUsedBy
   @join__type(graph: STRAWBERRY)
@@ -6860,13 +6870,42 @@ enum DeploymentStrategyType
 }
 
 """
-Added in 26.9.0. Entities whose use narrows a deployment query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only deployments the caller can read are returned, even when a listed entity uses others.
+Added in 26.9.0. Uses narrowing a deployment query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only deployments the caller can read are returned, even when a listed entity is tied to others.
 """
-input DeploymentUsedBy
+input DeploymentUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities the deployment uses, whose ids narrow the read."""
+  uses: DeploymentUses = null
+}
+
+"""
+Added in 26.9.0. Entities a deployment uses, whose ids narrow the read.
+"""
+input DeploymentUses
   @join__type(graph: STRAWBERRY)
 {
   """Resource groups the deployment runs in."""
   resourceGroup: [UUID!] = null
+
+  """
+  Images the deployment's live replica group names in its current revision.
+  """
+  image: [UUID!] = null
+
+  """
+  VFolders the deployment's live replica group names as the model of its current revision.
+  """
+  vfolder: [UUID!] = null
+
+  """Sessions the deployment's route rows serve as their replicas."""
+  session: [UUID!] = null
+
+  """Runtime variants the deployment's revisions name."""
+  runtimeVariant: [UUID!] = null
+
+  """Presets the deployment's revisions name."""
+  deploymentPreset: [UUID!] = null
 }
 
 """Added in 26.4.2. Input for deploying a model card as a new deployment."""
@@ -9520,8 +9559,16 @@ enum ImageType
 }
 
 """
-Added in 26.9.0. Entities whose use narrows an image query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only images the caller can read are returned, even when a listed entity uses others.
+Added in 26.9.0. Uses narrowing an image query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only images the caller can read are returned, even when a listed entity is tied to others.
 """
+input ImageUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the image narrows the read."""
+  usedBy: ImageUsedBy = null
+}
+
+"""Added in 26.9.0. Entities whose use of an image narrows the read."""
 input ImageUsedBy
   @join__type(graph: STRAWBERRY)
 {
@@ -11612,9 +11659,19 @@ input ModelCardScope
 }
 
 """
-Added in 26.9.0. Entities whose use narrows a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity uses others.
+Added in 26.9.0. Uses narrowing a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity is tied to others.
 """
-input ModelCardUsedBy
+input ModelCardUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities the model card uses, whose ids narrow the read."""
+  uses: ModelCardUses = null
+}
+
+"""
+Added in 26.9.0. Entities a model card uses, whose ids narrow the read.
+"""
+input ModelCardUses
   @join__type(graph: STRAWBERRY)
 {
   """VFolders the model card is built on."""
@@ -17351,12 +17408,40 @@ type Query
   imageAlias(id: ID!): ImageV2Alias @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups (admin only)"""
-  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY)
+  adminResourceGroups(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
+    """
+    usage: ResourceGroupUsage = null
+    filter: ResourceGroupFilter = null
+    orderBy: [ResourceGroupOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ResourceGroupConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  scopedResourceGroups(scope: ResourceGroupScope!, filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY)
+  scopedResourceGroups(
+    scope: ResourceGroupScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
+    """
+    usage: ResourceGroupUsage = null
+    filter: ResourceGroupFilter = null
+    orderBy: [ResourceGroupOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ResourceGroupConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Get a single resource group by name (admin only)."""
   adminResourceGroupV2(name: String!): ResourceGroup @join__field(graph: STRAWBERRY)
@@ -17403,9 +17488,9 @@ type Query
   """Added in 25.16.0. List all deployments (superadmin only)."""
   adminDeployments(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
-    usedBy: DeploymentUsedBy = null
+    usage: DeploymentUsage = null
     filter: DeploymentFilter = null
     orderBy: [DeploymentOrderBy!] = null
     before: String = null
@@ -17471,9 +17556,9 @@ type Query
   """
   adminImagesV2(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
     """
-    usedBy: ImageUsedBy = null
+    usage: ImageUsage = null
     filter: ImageV2Filter = null
     orderBy: [ImageV2OrderBy!] = null
     before: String = null
@@ -17491,9 +17576,9 @@ type Query
     scope: ImageSearchScope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
     """
-    usedBy: ImageUsedBy = null
+    usage: ImageUsage = null
     filter: ImageV2Filter = null
     orderBy: [ImageV2OrderBy!] = null
     before: String = null
@@ -17549,9 +17634,9 @@ type Query
   """
   adminSessionsV2(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
-    usedBy: SessionUsedBy = null
+    usage: SessionUsage = null
     filter: SessionV2Filter = null
     orderBy: [SessionV2OrderBy!] = null
     before: String = null
@@ -17569,9 +17654,9 @@ type Query
     scope: ProjectSessionV2Scope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
-    usedBy: SessionUsedBy = null
+    usage: SessionUsage = null
     filter: SessionV2Filter = null
     orderBy: [SessionV2OrderBy!] = null
     before: String = null
@@ -17589,9 +17674,9 @@ type Query
     scope: SessionSearchScope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
-    usedBy: SessionUsedBy = null
+    usage: SessionUsage = null
     filter: SessionV2Filter = null
     orderBy: [SessionV2OrderBy!] = null
     before: String = null
@@ -17612,9 +17697,9 @@ type Query
     scope: ProjectDeploymentScope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
-    usedBy: DeploymentUsedBy = null
+    usage: DeploymentUsage = null
     filter: DeploymentFilter = null
     orderBy: [DeploymentOrderBy!] = null
     before: String = null
@@ -17632,9 +17717,9 @@ type Query
     scope: DeploymentSearchScope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
-    usedBy: DeploymentUsedBy = null
+    usage: DeploymentUsage = null
     filter: DeploymentFilter = null
     orderBy: [DeploymentOrderBy!] = null
     before: String = null
@@ -17648,9 +17733,9 @@ type Query
   """Added in 25.19.0. List deployments owned by the current user."""
   myDeployments(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
-    usedBy: DeploymentUsedBy = null
+    usage: DeploymentUsage = null
     filter: DeploymentFilter = null
     orderBy: [DeploymentOrderBy!] = null
     before: String = null
@@ -17712,7 +17797,20 @@ type Query
   """
   Added in 26.4.4. List role presets with filtering and pagination (admin only).
   """
-  adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection @join__field(graph: STRAWBERRY)
+  adminRolePresets(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    """
+    usage: RolePresetUsage = null
+    filter: RolePresetFilter = null
+    orderBy: [RolePresetOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RolePresetConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role @join__field(graph: STRAWBERRY)
@@ -17722,9 +17820,9 @@ type Query
   """
   adminRoles(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
     """
-    usedBy: RoleUsedBy = null
+    usage: RoleUsage = null
     filter: RoleFilter = null
     orderBy: [RoleOrderBy!] = null
     before: String = null
@@ -17813,9 +17911,9 @@ type Query
   """Added in 26.9.0. List the roles the current authenticated user holds."""
   myRolesV2(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
     """
-    usedBy: RoleUsedBy = null
+    usage: RoleUsage = null
     filter: RoleFilter = null
     orderBy: [RoleOrderBy!] = null
     before: String = null
@@ -17831,9 +17929,9 @@ type Query
     projectId: UUID!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
     """
-    usedBy: RoleUsedBy = null
+    usage: RoleUsage = null
     filter: RoleFilter = null
     orderBy: [RoleOrderBy!] = null
     before: String = null
@@ -18133,9 +18231,9 @@ type Query
   """Added in 26.4.2. Search runtime variants."""
   runtimeVariants(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
     """
-    usedBy: RuntimeVariantUsedBy = null
+    usage: RuntimeVariantUsage = null
     filter: RuntimeVariantFilter = null
     orderBy: [RuntimeVariantOrderBy!] = null
     before: String = null
@@ -18186,9 +18284,9 @@ type Query
   """Added in 26.4.2. Search deployment revision presets."""
   deploymentRevisionPresets(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
     """
-    usedBy: DeploymentRevisionPresetUsedBy = null
+    usage: DeploymentRevisionPresetUsage = null
     filter: DeploymentRevisionPresetFilter = null
     orderBy: [DeploymentRevisionPresetOrderBy!] = null
     before: String = null
@@ -18205,9 +18303,9 @@ type Query
   """Added in 26.4.2. Search all model cards (superadmin only)."""
   adminModelCardsV2(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
-    usedBy: ModelCardUsedBy = null
+    usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
     orderBy: [ModelCardV2OrderBy!] = null
     before: String = null
@@ -18223,9 +18321,9 @@ type Query
     scope: ProjectModelCardV2Scope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
-    usedBy: ModelCardUsedBy = null
+    usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
     orderBy: [ModelCardV2OrderBy!] = null
     before: String = null
@@ -18243,9 +18341,9 @@ type Query
     scope: ModelCardScope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
-    usedBy: ModelCardUsedBy = null
+    usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
     orderBy: [ModelCardV2OrderBy!] = null
     before: String = null
@@ -18294,9 +18392,9 @@ type Query
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
   adminVfoldersV2(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
-    usedBy: VFolderUsedBy = null
+    usage: VFolderUsage = null
     filter: VFolderFilter = null
     orderBy: [VFolderOrderBy!] = null
     before: String = null
@@ -18315,9 +18413,9 @@ type Query
     projectId: UUID!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
-    usedBy: VFolderUsedBy = null
+    usage: VFolderUsage = null
     filter: VFolderFilter = null
     orderBy: [VFolderOrderBy!] = null
     before: String = null
@@ -18335,9 +18433,9 @@ type Query
     scope: VFolderScope!
 
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
-    usedBy: VFolderUsedBy = null
+    usage: VFolderUsage = null
     filter: VFolderFilter = null
     orderBy: [VFolderOrderBy!] = null
     before: String = null
@@ -18358,9 +18456,9 @@ type Query
   """
   myVfolders(
     """
-    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
-    usedBy: VFolderUsedBy = null
+    usage: VFolderUsage = null
     filter: VFolderFilter = null
     orderBy: [VFolderOrderBy!] = null
     before: String = null
@@ -19434,6 +19532,16 @@ type ResourceGroupStatus
 }
 
 """
+Added in 26.9.0. Uses narrowing a resource group query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only resource groups the caller can read are returned, even when a listed entity is tied to others.
+"""
+input ResourceGroupUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the resource group narrows the read."""
+  usedBy: ResourceGroupUsedBy = null
+}
+
+"""
 Added in 26.4.2. Resource usage for a resource group (agent-level physical resources).
 """
 type ResourceGroupUsageV2
@@ -19450,6 +19558,19 @@ type ResourceGroupUsageV2
 
   """Largest single-agent free resources."""
   maxPerNode: [ResourceSlotEntry!]!
+}
+
+"""
+Added in 26.9.0. Entities whose use of a resource group narrows the read.
+"""
+input ResourceGroupUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Sessions the resource group runs."""
+  session: [UUID!] = null
+
+  """Deployments the resource group runs."""
+  deployment: [UUID!] = null
 }
 
 """
@@ -20762,6 +20883,24 @@ enum RolePresetOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.9.0. Uses narrowing a role preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
+"""
+input RolePresetUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the preset narrows the read."""
+  usedBy: RolePresetUsedBy = null
+}
+
+"""Added in 26.9.0. Entities whose use of a role preset narrows the read."""
+input RolePresetUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Roles instantiated from the preset."""
+  role: [ID!] = null
+}
+
 """Added in 26.3.0. Role definition source"""
 enum RoleSource
   @join__type(graph: STRAWBERRY)
@@ -20818,13 +20957,13 @@ input RoleStatusFilter
 }
 
 """
-Added in 26.9.0. Entities whose use narrows a role query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only roles the caller can read are returned, even when a listed entity uses others.
+Added in 26.9.0. Uses narrowing a role query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only roles the caller can read are returned, even when a listed entity is tied to others.
 """
-input RoleUsedBy
+input RoleUsage
   @join__type(graph: STRAWBERRY)
 {
-  """Role presets the roles were instantiated from."""
-  rolePreset: [UUID!] = null
+  """Entities the role uses, whose ids narrow the read."""
+  uses: RoleUses = null
 }
 
 """Added in 26.4.4. Filter roles by their user assignments."""
@@ -20835,6 +20974,14 @@ input RoleUserNestedFilter
   AND: [RoleUserNestedFilter!] = null
   OR: [RoleUserNestedFilter!] = null
   NOT: [RoleUserNestedFilter!] = null
+}
+
+"""Added in 26.9.0. Entities a role uses, whose ids narrow the read."""
+input RoleUses
+  @join__type(graph: STRAWBERRY)
+{
+  """Role presets the roles were instantiated from."""
+  rolePreset: [UUID!] = null
 }
 
 """
@@ -21596,7 +21743,17 @@ input RuntimeVariantPresetValueInput
 }
 
 """
-Added in 26.9.0. Entities whose use narrows a runtime variant query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused.
+Added in 26.9.0. Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only runtime variants the caller can read are returned, even when a listed entity is tied to others.
+"""
+input RuntimeVariantUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the runtime variant narrows the read."""
+  usedBy: RuntimeVariantUsedBy = null
+}
+
+"""
+Added in 26.9.0. Entities whose use of a runtime variant narrows the read.
 """
 input RuntimeVariantUsedBy
   @join__type(graph: STRAWBERRY)
@@ -22516,13 +22673,32 @@ enum SessionTypes
 }
 
 """
-Added in 26.9.0. Entities whose use narrows a session query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only sessions the caller can read are returned, even when a listed entity uses others.
+Added in 26.9.0. Uses narrowing a session query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only sessions the caller can read are returned, even when a listed entity is tied to others.
 """
+input SessionUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the session narrows the read."""
+  usedBy: SessionUsedBy = null
+
+  """Entities the session uses, whose ids narrow the read."""
+  uses: SessionUses = null
+}
+
+"""Added in 26.9.0. Entities whose use of a session narrows the read."""
 input SessionUsedBy
   @join__type(graph: STRAWBERRY)
 {
   """Deployments whose route rows the session serves as a replica."""
   deployment: [UUID!] = null
+}
+
+"""Added in 26.9.0. Entities a session uses, whose ids narrow the read."""
+input SessionUses
+  @join__type(graph: STRAWBERRY)
+{
+  """Images the session's kernels run."""
+  image: [UUID!] = null
 
   """Agents running a kernel of the session."""
   agent: [UUID!] = null
@@ -26673,6 +26849,16 @@ input VFolderScope
 }
 
 """
+Added in 26.9.0. Uses narrowing a vfolder query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only vfolders the caller can read are returned, even when a listed entity is tied to others.
+"""
+input VFolderUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the vfolder narrows the read."""
+  usedBy: VFolderUsedBy = null
+}
+
+"""
 Added in 26.4.4. Usage statistics for a virtual folder, measured live through the storage proxy.
 """
 type VFolderUsageInfo
@@ -26718,9 +26904,7 @@ input VFolderUsageModeFilter
   notIn: [VFolderUsageMode!] = null
 }
 
-"""
-Added in 26.9.0. Entities whose use narrows a vfolder query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only vfolders the caller can read are returned, even when a listed entity uses others.
-"""
+"""Added in 26.9.0. Entities whose use of a vfolder narrows the read."""
 input VFolderUsedBy
   @join__type(graph: STRAWBERRY)
 {

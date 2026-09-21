@@ -109,7 +109,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleOrderBy as RoleOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    RoleUsedBy as RoleUsedByDTO,
+    RoleUsage as RoleUsageDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
@@ -629,9 +629,7 @@ class RBACAdapter(BaseAdapter):
         )
         raw = await self._permission_controller.global_search_roles.run(
             GlobalSearchRolesAction(
-                searcher=GlobalSearcher(
-                    used_by=self._role_used_by(input.used_by), searcher=searcher
-                )
+                searcher=GlobalSearcher(used_by=self._role_usage(input.usage), searcher=searcher)
             )
         )
         return SearchResult(
@@ -672,7 +670,7 @@ class RBACAdapter(BaseAdapter):
             SearchRolesInScopeAction(
                 searcher=ScopedSearcher(
                     scopes=targets,
-                    used_by=self._role_used_by(input.used_by),
+                    used_by=self._role_usage(input.usage),
                     searcher=searcher,
                 )
             )
@@ -1043,14 +1041,14 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers (GQL layer)
 
-    def _role_used_by(self, used_by: RoleUsedByDTO | None) -> list[UsedBy]:
-        """The entities whose use narrows the roles read."""
-        if used_by is None:
+    def _role_usage(self, usage: RoleUsageDTO | None) -> list[UsedBy]:
+        """The uses narrowing the roles read."""
+        if usage is None or usage.uses is None:
             return []
-        linked = RoleSearchableFields.linked
+        linked = RoleSearchableFields.linked.usage
         return [
-            linked.role_presets.used_by(RolePresetID(preset_id))
-            for preset_id in used_by.role_preset or ()
+            linked.role_presets.uses(RolePresetID(preset_id))
+            for preset_id in usage.uses.role_preset or ()
         ]
 
     def _convert_permission_bit_filter(

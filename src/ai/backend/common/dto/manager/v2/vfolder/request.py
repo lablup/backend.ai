@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsedBy
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName
 
@@ -416,11 +416,11 @@ class VFolderOrder(BaseRequestModel):
 class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
-    used_by: VFolderUsedBy | None = Field(
+    usage: VFolderUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; vfolders the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "vfolders the caller cannot read are left out."
         ),
     )
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")

@@ -46,7 +46,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
-    DeploymentRevisionPresetUsedBy,
+    DeploymentRevisionPresetUsage,
     PresetModelConfigInfoDTO,
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
@@ -239,7 +239,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             ScopedSearchDeploymentPresetsAction(
                 searcher=ScopedSearcher(
                     scopes=[PublicDeploymentPresetTarget()],
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=searcher,
                 )
             )
@@ -448,14 +448,14 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conds))
         return conditions
 
-    def _used_by(self, used_by: DeploymentRevisionPresetUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: DeploymentRevisionPresetUsage | None) -> list[UsedBy]:
         """The uses the request named, each of which the caller must be able to read."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = DeploymentPresetSearchableFields.linked
+        linked = DeploymentPresetSearchableFields.linked.usage
         return [
             linked.deployments.used_by(DeploymentID(entity_id))
-            for entity_id in used_by.deployment or ()
+            for entity_id in usage.used_by.deployment or ()
         ]
 
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -24,7 +26,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
-from .scopes import ResourceGroupScopeGQL
+from .scopes import ResourceGroupScopeGQL, ResourceGroupUsageGQL
 from .types import (
     AllowedDomainsPayloadGQL,
     AllowedProjectsPayloadGQL,
@@ -66,6 +68,16 @@ from .types import (
 async def scoped_resource_groups(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupScopeGQL,
+    usage: Annotated[
+        ResourceGroupUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; resource groups the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
     filter: ResourceGroupFilterGQL | None = None,
     order_by: list[ResourceGroupOrderByGQL] | None = None,
     before: str | None = None,
@@ -78,6 +90,7 @@ async def scoped_resource_groups(
     payload = await info.context.adapters.resource_group.scoped_search(
         ScopedSearchResourceGroupsInput(
             scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -107,6 +120,16 @@ async def scoped_resource_groups(
 )  # type: ignore[misc]
 async def admin_resource_groups(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        ResourceGroupUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; resource groups the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
     filter: ResourceGroupFilterGQL | None = None,
     order_by: list[ResourceGroupOrderByGQL] | None = None,
     before: str | None = None,
@@ -123,6 +146,7 @@ async def admin_resource_groups(
 
     payload = await info.context.adapters.resource_group.search(
         AdminSearchResourceGroupsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,

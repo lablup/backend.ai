@@ -83,7 +83,9 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionScope,
     SessionStatusFilter,
     SessionTypeFilter,
+    SessionUsage,
     SessionUsedBy,
+    SessionUses,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
@@ -1207,11 +1209,7 @@ class SessionScopeGQL(PydanticInputMixin[SessionScope]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description=(
-            "Entities whose use narrows a session query; every id is AND-ed. The caller must "
-            "be able to read each listed entity, or the request is refused. Only sessions the "
-            "caller can read are returned, even when a listed entity uses others."
-        ),
+        description="Entities whose use of a session narrows the read.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="SessionUsedBy",
@@ -1222,9 +1220,46 @@ class SessionUsedByGQL(PydanticInputMixin[SessionUsedBy]):
     deployment: list[UUID] | None = gql_field(
         default=None, description="Deployments whose route rows the session serves as a replica."
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities a session uses, whose ids narrow the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionUses",
+)
+class SessionUsesGQL(PydanticInputMixin[SessionUses]):
+    """The entities a session uses, whose ids narrow the read."""
+
+    image: list[UUID] | None = gql_field(
+        default=None, description="Images the session's kernels run."
+    )
     agent: list[UUID] | None = gql_field(
         default=None, description="Agents running a kernel of the session."
     )
     resource_group: list[UUID] | None = gql_field(
         default=None, description="Resource groups the session runs in."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing a session query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only sessions the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionUsage",
+)
+class SessionUsageGQL(PydanticInputMixin[SessionUsage]):
+    """The uses that narrow a session read."""
+
+    used_by: SessionUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the session narrows the read."
+    )
+    uses: SessionUsesGQL | None = gql_field(
+        default=None, description="Entities the session uses, whose ids narrow the read."
     )

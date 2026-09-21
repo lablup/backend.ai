@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     PreemptionConfig,
@@ -16,14 +18,18 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupStatus,
     SchedulerType,
 )
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 
 class _ResourceGroupOwnFields(RowDataConverter[ResourceGroupRow, ResourceGroupData]):
@@ -152,5 +158,31 @@ class _ResourceGroupOwnFields(RowDataConverter[ResourceGroupRow, ResourceGroupDa
         )
 
 
+class _ResourceGroupUsage:
+    """Uses between a resource group and other entities."""
+
+    sessions = UsedByConditions[SessionID](
+        ToManyCorrelation(
+            SessionRow, ResourceGroupRow, SessionRow.resource_group_id == ResourceGroupRow.id
+        ),
+        SessionRow.id,
+    )
+    """Resource groups the session runs in."""
+    deployments = UsedByConditions[DeploymentID](
+        ToManyCorrelation(
+            EndpointRow, ResourceGroupRow, EndpointRow.resource_group == ResourceGroupRow.name
+        ),
+        EndpointRow.id,
+    )
+    """Resource groups the deployment runs in."""
+
+
+class _ResourceGroupLinkedEntities:
+    """How a resource group connects to other entities; the other entity's permission governs."""
+
+    usage = _ResourceGroupUsage
+
+
 class ResourceGroupSearchableFields:
     own = _ResourceGroupOwnFields()
+    linked = _ResourceGroupLinkedEntities

@@ -16,7 +16,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 
 class _RuntimeVariantOwnFields(RowDataConverter[RuntimeVariantRow, RuntimeVariantData]):
@@ -69,10 +69,10 @@ class _RuntimeVariantOwnFields(RowDataConverter[RuntimeVariantRow, RuntimeVarian
         )
 
 
-class _RuntimeVariantLinkedEntities:
-    """How a runtime variant connects to other entities; the other entity's permission governs."""
+class _RuntimeVariantUsage:
+    """Uses between a runtime variant and other entities."""
 
-    deployments = UsageConditions[DeploymentID](
+    deployments = UsedByConditions[DeploymentID](
         ToManyCorrelation(
             DeploymentRevisionRow,
             RuntimeVariantRow,
@@ -81,6 +81,12 @@ class _RuntimeVariantLinkedEntities:
         DeploymentRevisionRow.endpoint,
     )
     """Runtime variants a deployment's revisions name."""
+
+
+class _RuntimeVariantLinkedEntities:
+    """How a runtime variant connects to other entities; the other entity's permission governs."""
+
+    usage = _RuntimeVariantUsage
 
 
 class RuntimeVariantSearchableFields:

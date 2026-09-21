@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
-    DeploymentRevisionPresetUsedBy,
+    DeploymentRevisionPresetUsage,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -299,11 +299,10 @@ class DeploymentRevisionPresetOrder(BaseRequestModel):
 
 
 class SearchDeploymentRevisionPresetsInput(BaseRequestModel):
-    used_by: DeploymentRevisionPresetUsedBy | None = Field(
+    usage: DeploymentRevisionPresetUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller."
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
         ),
     )
     filter: DeploymentRevisionPresetFilter | None = Field(default=None)

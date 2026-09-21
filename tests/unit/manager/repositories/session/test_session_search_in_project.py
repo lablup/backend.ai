@@ -385,42 +385,44 @@ class TestSessionSearchInProject:
             rows = await sess.scalars(sa.select(SessionRow.id).where(used_by.condition()))
             return set(rows)
 
-    async def test_used_by_agent_narrows_to_the_sessions_it_runs(
+    async def test_uses_agent_narrows_to_the_sessions_it_runs(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """Only the session whose kernel sits on the agent comes back."""
-        used_by = SessionSearchableFields.linked.agents.used_by(AgentUUID(test_data["agent_uuid"]))
+        used_by = SessionSearchableFields.linked.usage.agents.uses(
+            AgentUUID(test_data["agent_uuid"])
+        )
         assert await self._used_by_ids(db_with_cleanup, used_by) == {test_data["session_a1_id"]}
 
-    async def test_used_by_another_agent_returns_none(
+    async def test_uses_another_agent_returns_none(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        used_by = SessionSearchableFields.linked.agents.used_by(AgentUUID(uuid.uuid4()))
+        used_by = SessionSearchableFields.linked.usage.agents.uses(AgentUUID(uuid.uuid4()))
         assert await self._used_by_ids(db_with_cleanup, used_by) == set()
 
-    async def test_used_by_resource_group_narrows_to_the_sessions_it_runs(
+    async def test_uses_resource_group_narrows_to_the_sessions_it_runs(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
         test_scaling_group_id: ResourceGroupID,
     ) -> None:
-        used_by = SessionSearchableFields.linked.resource_groups.used_by(test_scaling_group_id)
+        used_by = SessionSearchableFields.linked.usage.resource_groups.uses(test_scaling_group_id)
         assert await self._used_by_ids(db_with_cleanup, used_by) == {
             test_data["session_a1_id"],
             test_data["session_a2_id"],
             test_data["session_b1_id"],
         }
 
-    async def test_used_by_another_resource_group_returns_none(
+    async def test_uses_another_resource_group_returns_none(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        used_by = SessionSearchableFields.linked.resource_groups.used_by(
+        used_by = SessionSearchableFields.linked.usage.resource_groups.uses(
             ResourceGroupID(uuid.uuid4())
         )
         assert await self._used_by_ids(db_with_cleanup, used_by) == set()

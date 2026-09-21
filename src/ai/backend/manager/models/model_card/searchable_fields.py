@@ -23,7 +23,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsesConditions
 from ai.backend.manager.models.vfolder.row import VFolderRow
 
 
@@ -200,19 +200,23 @@ class _ModelCardNestedFields:
     )
 
 
-class _ModelCardLinkedEntities:
-    """How a model card connects to other entities; the other entity's permission governs."""
+class _ModelCardUsage:
+    """Uses between a model card and other entities."""
 
-    vfolders = UsageConditions[VFolderUUID](
+    vfolders = UsesConditions[VFolderUUID](
         ToManyCorrelation(VFolderRow, ModelCardRow, VFolderRow.id == ModelCardRow.vfolder),
         VFolderRow.id,
     )
-    """The vfolder a card names as its model.
+    """Model cards built on the vfolder.
 
-    Read the other way round from the vfolder side's ``model_cards``: there the card is
-    the using entity, here the vfolder is what is named. Both answer over the same
-    foreign key, and both require the caller to read the entity they name.
+    The same foreign key answers the vfolder side's ``usage.model_cards``.
     """
+
+
+class _ModelCardLinkedEntities:
+    """How a model card connects to other entities; the other entity's permission governs."""
+
+    usage = _ModelCardUsage
 
 
 class ModelCardSearchableFields:

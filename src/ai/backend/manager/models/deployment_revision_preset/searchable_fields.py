@@ -24,7 +24,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 
 class _DeploymentPresetOwnFields(
@@ -152,10 +152,10 @@ class _DeploymentPresetOwnFields(
         )
 
 
-class _DeploymentPresetLinkedEntities:
-    """How a preset connects to other entities; the other entity's permission governs."""
+class _DeploymentPresetUsage:
+    """Uses between a preset and other entities."""
 
-    deployments = UsageConditions[DeploymentID](
+    deployments = UsedByConditions[DeploymentID](
         ToManyCorrelation(
             DeploymentRevisionRow,
             DeploymentRevisionPresetRow,
@@ -164,6 +164,12 @@ class _DeploymentPresetLinkedEntities:
         DeploymentRevisionRow.endpoint,
     )
     """Presets a deployment's revisions name."""
+
+
+class _DeploymentPresetLinkedEntities:
+    """How a preset connects to other entities; the other entity's permission governs."""
+
+    usage = _DeploymentPresetUsage
 
 
 class DeploymentPresetSearchableFields:

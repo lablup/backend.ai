@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
@@ -13,6 +15,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetOrder,
     SearchRolePresetsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -24,6 +27,7 @@ from ai.backend.manager.api.gql.role_preset.types import (
     RolePresetFilterGQL,
     RolePresetGQL,
     RolePresetOrderByGQL,
+    RolePresetUsageGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -52,6 +56,15 @@ async def admin_role_preset(
 )  # type: ignore[misc]
 async def admin_role_presets(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        RolePresetUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller."
+            )
+        ),
+    ] = None,
     filter: RolePresetFilterGQL | None = None,
     order_by: list[RolePresetOrderByGQL] | None = None,
     before: str | None = None,
@@ -67,6 +80,7 @@ async def admin_role_presets(
         [o.to_pydantic() for o in order_by] if order_by else None
     )
     search_input = SearchRolePresetsInput(
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,
