@@ -59,7 +59,7 @@ class BulkVFolderQuerier(BulkEntityQuerier[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass
