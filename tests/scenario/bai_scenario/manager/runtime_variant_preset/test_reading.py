@@ -1,6 +1,6 @@
 """프리셋 조회 — 하나 또는 여러 ID로 조회한다.
 
-여러 ID 조회는 ID마다 응답하고 인증 여부만 확인하므로, 존재하지 않는 ID는 빈 항목으로 반환된다.
+여러 ID 조회는 ID마다 권한을 검사하므로, 존재하지 않는 ID는 거부로 반환된다.
 """
 
 from __future__ import annotations
@@ -209,7 +209,7 @@ class MixedIdsComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다"
+        return "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치에는 거부가 담긴다"
 
     @override
     def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:

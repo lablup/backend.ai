@@ -67,7 +67,7 @@ from ai.backend.manager.models.prometheus_query_preset.updaters import (
 )
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.prometheus_query_preset.actions.bulk_get import (
-    PublicBulkGetPresetsAction,
+    BulkGetPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
 from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
@@ -101,13 +101,13 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
     ) -> list[QueryDefinitionNode | Exception | None]:
         """Batch load presets by id for DataLoader use.
 
-        One answer per id in the given order: the node, or ``None`` for an id matching
-        no row.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        result = await self._prometheus_query_preset.public_bulk_get_presets.run(
-            PublicBulkGetPresetsAction(ids=list(ids))
+        result = await self._prometheus_query_preset.bulk_get_presets.run(
+            BulkGetPresetsAction(ids=list(ids))
         )
         return [
             self._data_to_dto(item.value)

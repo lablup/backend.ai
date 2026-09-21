@@ -15,17 +15,17 @@ from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQuer
 
 
 @dataclass
-class PublicBulkGetPresetsAction(
+class BulkGetPresetsAction(
     PartialBulkGetEntityOpsAction[PrometheusQueryPresetRow, PrometheusQueryPresetData]
 ):
-    """Read the prometheus query presets the caller named, answering for each id."""
+    """Read the prometheus query presets the caller named, one permission check per preset."""
 
     ids: Sequence[PrometheusQueryPresetID]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_bulk_get_prometheus_query_presets"
+        return "bulk_get_prometheus_query_presets"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:

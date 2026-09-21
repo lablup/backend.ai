@@ -1,6 +1,6 @@
 """여러 id로 조회 — id마다 응답한다.
 
-인증만 확인하므로 거부 원소는 생기지 않는다. 없는 id만 빈 항목으로 반환된다.
+id마다 권한을 검사하므로, 없는 id는 거부로 반환된다.
 """
 
 from __future__ import annotations
@@ -83,13 +83,13 @@ class TheLaidAndTheUnknownComeBackInOrder(
 ):
     @override
     def summary(self) -> str:
-        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap"
+        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal"
 
     @override
     def describe(self) -> str:
         return (
             "프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
-            "빈 항목으로 반환되고 순서가 요청한 순서와 같다"
+            "거부로 반환되고 순서가 요청한 순서와 같다"
         )
 
     @override

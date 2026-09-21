@@ -23,8 +23,10 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericForbidden
 
 READABLE = RuntimeVariantPresetID(uuid4())
+DENIED = RuntimeVariantPresetID(uuid4())
 ABSENT = RuntimeVariantPresetID(uuid4())
 
 
@@ -53,12 +55,18 @@ def readable() -> RuntimeVariantPresetData:
 
 
 @pytest.fixture
-def processors(readable: RuntimeVariantPresetData) -> MagicMock:
+def denial() -> GenericForbidden:
+    return GenericForbidden("no read on this preset")
+
+
+@pytest.fixture
+def processors(readable: RuntimeVariantPresetData, denial: GenericForbidden) -> MagicMock:
     processors = MagicMock()
-    processors.public_bulk_get.run = AsyncMock(
+    processors.bulk_get.run = AsyncMock(
         return_value=PartialBulkResult(
             items=[
                 PartialBulkEntityResult[RuntimeVariantPresetData].succeeded(READABLE, readable),
+                PartialBulkEntityResult[RuntimeVariantPresetData].denied(DENIED, denial),
                 PartialBulkEntityResult[RuntimeVariantPresetData].failed(
                     ABSENT, EntityNotFoundError(entity_type=RuntimeVariantPresetEntityType())
                 ),
@@ -74,19 +82,20 @@ def adapter(processors: MagicMock) -> RuntimeVariantPresetAdapter:
 
 
 async def test_batch_load_answers_per_id(
-    adapter: RuntimeVariantPresetAdapter, processors: MagicMock
+    adapter: RuntimeVariantPresetAdapter, processors: MagicMock, denial: GenericForbidden
 ) -> None:
-    node, missing = await adapter.batch_load_by_ids([READABLE, ABSENT])
+    node, refused, missing = await adapter.batch_load_by_ids([READABLE, DENIED, ABSENT])
 
     assert node is not None and not isinstance(node, Exception)
     assert node.id == READABLE
+    assert refused is denial
     assert missing is None
-    action = processors.public_bulk_get.run.await_args.args[0]
-    assert list(action.ids) == [READABLE, ABSENT]
+    action = processors.bulk_get.run.await_args.args[0]
+    assert list(action.ids) == [READABLE, DENIED, ABSENT]
 
 
 async def test_no_ids_read_nothing(
     adapter: RuntimeVariantPresetAdapter, processors: MagicMock
 ) -> None:
     assert await adapter.batch_load_by_ids([]) == []
-    processors.public_bulk_get.run.assert_not_awaited()
+    processors.bulk_get.run.assert_not_awaited()

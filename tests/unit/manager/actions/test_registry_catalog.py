@@ -280,7 +280,7 @@ from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.bulk_get import (
-    PublicBulkGetPresetsAction,
+    BulkGetPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.processors import (
     PrometheusQueryPresetProcessors,
@@ -311,7 +311,7 @@ from ai.backend.manager.services.retention_policy.processors import RetentionPol
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant_preset.actions.bulk_get import (
-    PublicBulkGetRuntimeVariantPresetsAction,
+    BulkGetRuntimeVariantPresetsAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
@@ -1154,8 +1154,8 @@ def test_vfolder_allowed_types_read_is_public() -> None:
     )
 
 
-def test_preset_loader_reads_are_public_partial_reads() -> None:
-    """The two preset DataLoaders read per named preset, checked for login only."""
+def test_preset_loader_reads_are_partial_permission_reads() -> None:
+    """The two preset DataLoaders read per named preset, not through a search."""
     registry = _ops_registry()
     RuntimeVariantPresetProcessors(
         registry.group(GroupMeta(RuntimeVariantPresetEntityType())), MagicMock()
@@ -1168,15 +1168,15 @@ def test_preset_loader_reads_are_public_partial_reads() -> None:
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
-    assert recorded[PublicBulkGetRuntimeVariantPresetsAction] == (
+    assert recorded[BulkGetRuntimeVariantPresetsAction] == (
         RuntimeVariantPresetEntityType(),
         ActionKind.BULK,
-        ActionGate.PUBLIC,
+        ActionGate.PERMISSION,
     )
-    assert recorded[PublicBulkGetPresetsAction] == (
+    assert recorded[BulkGetPresetsAction] == (
         PrometheusQueryPresetEntityType(),
         ActionKind.BULK,
-        ActionGate.PUBLIC,
+        ActionGate.PERMISSION,
     )
 
 

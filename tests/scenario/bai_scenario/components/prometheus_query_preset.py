@@ -34,6 +34,7 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -458,11 +459,11 @@ def node_of(seeded: PrometheusQueryPresetData) -> QueryDefinitionNode:
 
 @dataclass(frozen=True)
 class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[LoadedPreset]]):
-    """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 빈 항목으로."""
+    """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 거부로."""
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다"
 
     @override
     def look(
@@ -484,7 +485,8 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[LoadedPreset]]):
                     ),
                 )
             )
-        seen.append(Same(f"[{len(laid.laid)}]", answer[-1], None))
+        last = answer[-1]
+        seen.append(Refused(NotEnoughPermission, last if isinstance(last, BaseException) else None))
         return seen
 
 

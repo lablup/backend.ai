@@ -18,8 +18,10 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
 )
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericForbidden
 
 READABLE = PrometheusQueryPresetID(uuid4())
+DENIED = PrometheusQueryPresetID(uuid4())
 ABSENT = PrometheusQueryPresetID(uuid4())
 
 
@@ -42,12 +44,18 @@ def readable() -> PrometheusQueryPresetData:
 
 
 @pytest.fixture
-def processors(readable: PrometheusQueryPresetData) -> MagicMock:
+def denial() -> GenericForbidden:
+    return GenericForbidden("no read on this preset")
+
+
+@pytest.fixture
+def processors(readable: PrometheusQueryPresetData, denial: GenericForbidden) -> MagicMock:
     processors = MagicMock()
-    processors.public_bulk_get_presets.run = AsyncMock(
+    processors.bulk_get_presets.run = AsyncMock(
         return_value=PartialBulkResult(
             items=[
                 PartialBulkEntityResult[PrometheusQueryPresetData].succeeded(READABLE, readable),
+                PartialBulkEntityResult[PrometheusQueryPresetData].denied(DENIED, denial),
                 PartialBulkEntityResult[PrometheusQueryPresetData].failed(
                     ABSENT, EntityNotFoundError(entity_type=PrometheusQueryPresetEntityType())
                 ),
@@ -63,19 +71,20 @@ def adapter(processors: MagicMock) -> PrometheusQueryPresetAdapter:
 
 
 async def test_batch_load_answers_per_id(
-    adapter: PrometheusQueryPresetAdapter, processors: MagicMock
+    adapter: PrometheusQueryPresetAdapter, processors: MagicMock, denial: GenericForbidden
 ) -> None:
-    node, missing = await adapter.batch_load_by_ids([READABLE, ABSENT])
+    node, refused, missing = await adapter.batch_load_by_ids([READABLE, DENIED, ABSENT])
 
     assert node is not None and not isinstance(node, Exception)
     assert node.id == READABLE
+    assert refused is denial
     assert missing is None
-    action = processors.public_bulk_get_presets.run.await_args.args[0]
-    assert list(action.ids) == [READABLE, ABSENT]
+    action = processors.bulk_get_presets.run.await_args.args[0]
+    assert list(action.ids) == [READABLE, DENIED, ABSENT]
 
 
 async def test_no_ids_read_nothing(
     adapter: PrometheusQueryPresetAdapter, processors: MagicMock
 ) -> None:
     assert await adapter.batch_load_by_ids([]) == []
-    processors.public_bulk_get_presets.run.assert_not_awaited()
+    processors.bulk_get_presets.run.assert_not_awaited()

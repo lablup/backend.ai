@@ -15,17 +15,17 @@ from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantP
 
 
 @dataclass
-class PublicBulkGetRuntimeVariantPresetsAction(
+class BulkGetRuntimeVariantPresetsAction(
     PartialBulkGetEntityOpsAction[RuntimeVariantPresetRow, RuntimeVariantPresetData]
 ):
-    """Read the runtime variant presets the caller named, answering for each id."""
+    """Read the runtime variant presets the caller named, one permission check per preset."""
 
     ids: Sequence[RuntimeVariantPresetID]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_bulk_get_runtime_variant_presets"
+        return "bulk_get_runtime_variant_presets"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:

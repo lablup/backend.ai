@@ -56,7 +56,7 @@ from ai.backend.manager.models.runtime_variant_preset.updaters import (
 )
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.runtime_variant_preset.actions.bulk_get import (
-    PublicBulkGetRuntimeVariantPresetsAction,
+    BulkGetRuntimeVariantPresetsAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
@@ -149,13 +149,13 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     ) -> list[RuntimeVariantPresetNode | Exception | None]:
         """Batch load presets by id for DataLoader use.
 
-        One answer per id in the given order: the node, or ``None`` for an id matching
-        no row.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        result = await self._runtime_variant_preset.public_bulk_get.run(
-            PublicBulkGetRuntimeVariantPresetsAction(ids=list(ids))
+        result = await self._runtime_variant_preset.bulk_get.run(
+            BulkGetRuntimeVariantPresetsAction(ids=list(ids))
         )
         return [
             self._data_to_node(item.value)

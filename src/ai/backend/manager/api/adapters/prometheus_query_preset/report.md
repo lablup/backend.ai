@@ -820,9 +820,9 @@ Then
 - 빈 응답이 반환된다
   - answer = []
 
-#### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_loading.py) — pass
+#### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_loading.py) — pass
 
-프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다
+프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다
 
 Given
 
@@ -846,11 +846,11 @@ When
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다
+- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다
   - len = 3
   - [0]: 1번째로 요청한 id의 프리셋 전체와 같다
   - [1]: 2번째로 요청한 id의 프리셋 전체와 같다
-  - [2] = None
+  - 거부: NotEnoughPermission
 
 ### previewing
 
