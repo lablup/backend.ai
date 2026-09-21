@@ -42,6 +42,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -82,7 +83,7 @@ def server_module_registries(
     v2_ops = V2DBOpsProvider(database_engine)
     domain = DomainProcessors(
         config_registry.group(GroupMeta(DomainEntityType())),
-        DomainService(DomainRepository(database_engine, v2_ops)),
+        DomainService(DomainRepository(database_engine, RelationOpsProvider(database_engine))),
     )
     project = ProjectProcessors(
         config_registry.group(GroupMeta(ProjectEntityType())),

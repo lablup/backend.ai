@@ -491,6 +491,12 @@
         {
             "virtual_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
             "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f"
+        },
+        {
+            "id": "24972a0e-a72e-53f4-8fb4-caebe6c3c4d4",
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "member_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "capped": true
         }
     ],
     "scope_bindings": [
@@ -597,6 +603,18 @@
         {
             "virtual_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
             "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "permission_cap": 1
+        }
+    ],
+    "entity_membership_caps": [
+        {
+            "membership_id": "24972a0e-a72e-53f4-8fb4-caebe6c3c4d4",
+            "permission": 1,
+            "all_fields": true
         }
     ]
 }
