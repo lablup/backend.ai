@@ -19,6 +19,7 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
@@ -31,6 +32,7 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.permission_reach import user_permission_reaches
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
@@ -40,6 +42,7 @@ __all__ = (
     "ProjectImageTarget",
     "PublicImageTarget",
     "UserImageTarget",
+    "VisibleImageTarget",
 )
 
 
@@ -206,3 +209,36 @@ class PublicImageTarget(ImageTarget):
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return []
+
+
+@dataclass(frozen=True)
+class VisibleImageTarget(ImageTarget):
+    """Every image the caller reads: the images owned or governed by a scope that
+    grants them image READ.
+
+    One scope rather than several the caller ORs together, so a read that names no
+    project still answers with everything the caller reaches -- their own images, the
+    registries registered in `public`, and the registries their projects are linked to.
+    The read is answered for at the caller, so no scope of theirs can refuse it.
+    """
+
+    user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return user_permission_reaches(user_id, Permission.READ, ImageEntityType(), ImageRow.id)
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        # The id comes from the session, and the RBAC gate already answered for it.
+        return ()
