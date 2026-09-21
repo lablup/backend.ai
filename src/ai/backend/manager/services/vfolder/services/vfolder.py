@@ -103,10 +103,6 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    GlobalBatchLoadVFoldersAction,
-    GlobalBatchLoadVFoldersActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
     BulkLoadVFolderMountLevelsAction,
 )
@@ -232,16 +228,6 @@ class VFolderService:
         self._background_task_manager = background_task_manager
         self._valkey_stat_client = valkey_stat_client
         self._own_check = own_check
-
-    async def batch_load_by_ids(
-        self, action: GlobalBatchLoadVFoldersAction
-    ) -> GlobalBatchLoadVFoldersActionResult:
-        """Batch fetch vfolders by IDs for cross-entity reference resolution.
-
-        Audit log records this as ``vfolder.GET`` (not as a search).
-        """
-        data = await self._vfolder_repository.batch_load_by_ids(action.ids)
-        return GlobalBatchLoadVFoldersActionResult(data=data)
 
     async def bulk_load_permissions(
         self, action: BulkLoadVFolderPermissionsAction

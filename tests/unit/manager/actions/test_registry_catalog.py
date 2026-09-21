@@ -349,6 +349,7 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.mount_policy import (
@@ -1078,6 +1079,22 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     )
     assert recorded[BulkGetProjectsAction] == (
         ProjectEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_vfolder_loader_read_is_a_partial_permission_read() -> None:
+    """The vfolder DataLoader reads per named folder, not superadmin-only."""
+    registry = _ops_registry()
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFoldersAction] == (
+        VFolderEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
