@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import override
+from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
@@ -87,7 +88,11 @@ class ServiceCatalogEndpointSearchableFields:
 
 
 class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalogData]):
-    """The registered service's own columns. ``endpoints`` are declared in ``nested``."""
+    """The registered service's own columns.
+
+    ``endpoints`` come back through ``endpoint_rows``, a JSON aggregate the searcher
+    loads; filtering by them goes through ``nested.endpoints``.
+    """
 
     id = SearchableField(
         ServiceCatalogRow.id,
@@ -141,10 +146,25 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
         StringConditions(ServiceCatalogRow.config_hash),
         ColumnOrder(ServiceCatalogRow.config_hash),
     )
+    endpoint_rows = SearchableField(ServiceCatalogRow.endpoint_rows, None, None)
+    """Derived: the endpoint rows as JSON, aggregated by the searcher's subquery."""
+
+    @staticmethod
+    def _endpoint_from_json(endpoint: dict[str, Any]) -> ServiceCatalogEndpointData:
+        """One element of ``ServiceCatalogRow.endpoint_rows``, keyed by column name."""
+        return ServiceCatalogEndpointData(
+            id=ServiceCatalogID(UUID(endpoint["id"])),
+            service_id=ServiceCatalogID(UUID(endpoint["service_id"])),
+            role=endpoint["role"],
+            scope=endpoint["scope"],
+            address=endpoint["address"],
+            port=endpoint["port"],
+            protocol=endpoint["protocol"],
+            metadata=endpoint["metadata"],
+        )
 
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
-        endpoints = ServiceCatalogEndpointSearchableFields.own
         return ServiceCatalogData(
             id=ServiceCatalogID(self.id.read(row)),
             service_group=self.service_group.read(row),
@@ -157,7 +177,10 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
             registered_at=self.registered_at.read(row),
             last_heartbeat=self.last_heartbeat.read(row),
             config_hash=self.config_hash.read(row),
-            endpoints=[endpoints.to_data(endpoint) for endpoint in row.endpoints],
+            endpoints=[
+                self._endpoint_from_json(endpoint)
+                for endpoint in self.endpoint_rows.read(row) or []
+            ],
         )
 
 
