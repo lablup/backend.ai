@@ -20,6 +20,9 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
@@ -83,7 +86,7 @@ class ContainerRegistryCreator(EntityCreator[ContainerRegistryRow, ContainerRegi
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return row.to_dataclass()
+        return ContainerRegistrySearchableFields.own.to_data(row)
 
 
 @dataclass

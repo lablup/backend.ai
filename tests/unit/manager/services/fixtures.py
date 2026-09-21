@@ -6,6 +6,9 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
@@ -28,9 +31,11 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
     extra=None,
 )
 
-CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
+CONTAINER_REGISTRY_FIXTURE_DATA = ContainerRegistrySearchableFields.own.to_data(
+    CONTAINER_REGISTRY_ROW_FIXTURE
+)
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
+    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER)
 )
 
 

@@ -9,6 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -22,4 +25,4 @@ class ContainerRegistrySearcher(Searcher[ContainerRegistryRow, ContainerRegistry
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return row.to_dataclass()
+        return ContainerRegistrySearchableFields.own.to_data(row)

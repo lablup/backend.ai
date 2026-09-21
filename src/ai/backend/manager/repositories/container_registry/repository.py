@@ -27,6 +27,9 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
@@ -180,7 +183,7 @@ class ContainerRegistryRepository:
             )
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
+            return [ContainerRegistrySearchableFields.own.to_data(row) for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def get_all(self) -> list[ContainerRegistryData]:
@@ -188,7 +191,7 @@ class ContainerRegistryRepository:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
+            return [ContainerRegistrySearchableFields.own.to_data(row) for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def clear_images(
@@ -283,4 +286,4 @@ class ContainerRegistryRepository:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
         row: ContainerRegistryRow | None = await session.scalar(stmt)
-        return row.to_dataclass() if row else None
+        return ContainerRegistrySearchableFields.own.to_data(row) if row else None
