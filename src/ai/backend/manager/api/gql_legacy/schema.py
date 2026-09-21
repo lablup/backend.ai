@@ -26,6 +26,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -39,12 +40,18 @@ from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
+    SearchKeypairResourcePoliciesAction,
+)
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.lookup import (
     LookupUserResourcePolicyAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
+    SearchUserResourcePoliciesAction,
 )
 
 from .audit_log import (
@@ -143,6 +150,20 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
+from ai.backend.manager.models.resource_policy.scopes import (
+    UserKeypairResourcePolicyTarget,
+    UserResourcePolicyTarget,
+)
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
+from ai.backend.manager.models.resource_policy.searchers import (
+    KeyPairResourcePolicySearcher,
+    UserResourcePolicySearcher,
+)
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -2138,11 +2159,28 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 "KeyPairResourcePolicy.by_ak",
             )
             return cast(KeyPairResourcePolicy, await loader.load(client_access_key))
-        # The lookup answers for the policy the name resolves to, so reading someone
-        # else's tier is a read permission on that policy rather than a role check.
-        await ctx.processors.keypair_resource_policy.lookup.run(
-            LookupKeypairResourcePolicyAction(name=name)
+        # The caller's own policy is read within their user scope, as the v2 own-policy
+        # read is; any other name answers for the policy it resolves to.
+        own = await ctx.processors.keypair_resource_policy.search.run(
+            SearchKeypairResourcePoliciesAction(
+                searcher=ScopedSearcher(
+                    scopes=[UserKeypairResourcePolicyTarget(user_id=UserID(ctx.user["uuid"]))],
+                    used_by=(),
+                    searcher=KeyPairResourcePolicySearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            KeyPairResourcePolicySearchableFields.own.name.filter.equals(
+                                StringMatchSpec(name, case_insensitive=False, negated=False)
+                            )
+                        ],
+                    ),
+                )
+            )
         )
+        if not own.items:
+            await ctx.processors.keypair_resource_policy.lookup.run(
+                LookupKeypairResourcePolicyAction(name=name)
+            )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "KeyPairResourcePolicy.by_name",
@@ -2177,17 +2215,34 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
         user_uuid = ctx.user["uuid"]
-        if name is not None:
-            # Same rule as the keypair policy: the resolved policy answers for the read.
-            await ctx.processors.user_resource_policy.lookup.run(
-                LookupUserResourcePolicyAction(name=name)
-            )
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "UserResourcePolicy.by_user",
             )
             return cast(UserResourcePolicy, await loader.load(user_uuid))
+        # Same rule as the keypair policy: the caller's own policy is read within their
+        # user scope, and any other name answers for the policy it resolves to.
+        own = await ctx.processors.user_resource_policy.search.run(
+            SearchUserResourcePoliciesAction(
+                searcher=ScopedSearcher(
+                    scopes=[UserResourcePolicyTarget(user_id=UserID(user_uuid))],
+                    used_by=(),
+                    searcher=UserResourcePolicySearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            UserResourcePolicySearchableFields.own.name.filter.equals(
+                                StringMatchSpec(name, case_insensitive=False, negated=False)
+                            )
+                        ],
+                    ),
+                )
+            )
+        )
+        if not own.items:
+            await ctx.processors.user_resource_policy.lookup.run(
+                LookupUserResourcePolicyAction(name=name)
+            )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "UserResourcePolicy.by_name",

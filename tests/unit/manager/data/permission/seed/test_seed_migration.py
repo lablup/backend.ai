@@ -22,6 +22,7 @@ _DOMAIN_MEMBER_READ_REVISION = "c4a71e0d5b38_grant_domain_members_read_on_their_
 _DOMAIN_MEMBER_PRESET_REVISION = "a3f60d2b7c19_grant_domain_members_read_on_resource_presets"
 _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _MEMBER_READS_REVISION = "a1f6b7c4d902_grant_image_and_project_reads_to_members"
+_KEYPAIR_POLICY_READ_REVISION = "f46f55fed5a6_grant_user_owners_read_on_their_keypair_policy"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -65,6 +66,11 @@ def public_member_migration() -> Any:
 @pytest.fixture(scope="module")
 def member_reads_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_MEMBER_READS_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def keypair_policy_read_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_KEYPAIR_POLICY_READ_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -124,6 +130,7 @@ class TestMigrationMatchesFixture:
         project_member_read_migration: Any,
         public_member_migration: Any,
         member_reads_migration: Any,
+        keypair_policy_read_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         written = {
@@ -214,6 +221,17 @@ class TestMigrationMatchesFixture:
             )
             for preset_id, entity_type in member_reads_migration._GRANTS
         }
+        written.add((
+            keypair_policy_read_migration._identify(
+                "role_permission_preset",
+                keypair_policy_read_migration._PRESET_ID,
+                keypair_policy_read_migration._ENTITY_TYPE,
+                str(keypair_policy_read_migration._READ),
+            ),
+            keypair_policy_read_migration._PRESET_ID,
+            keypair_policy_read_migration._ENTITY_TYPE,
+            keypair_policy_read_migration._READ,
+        ))
         seeded = {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
             for row in fixture["role_permission_presets"]

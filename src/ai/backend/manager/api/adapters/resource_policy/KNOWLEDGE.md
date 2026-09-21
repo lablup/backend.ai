@@ -3,10 +3,13 @@ name: resource-policy-adapter-scenarios
 type: reference
 description: what the resource policy adapter guarantees, as scenarios, one chapter per policy — the project, keypair and user policies; the tests in tests/scenario/bai_scenario/manager/resource_policy match these one for one
 scope: src/ai/backend/manager/api/adapters/resource_policy
-keywords: [resource policy, keypair resource policy, user resource policy, project resource policy, scenario, adapter, superadmin, lookup, scope]
+keywords: [resource policy, keypair resource policy, user resource policy, project resource policy, scenario, adapter, superadmin, lookup, scope, user_owner, own policy]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-09-21
 status: draft
 ---
 # resource_policy 어댑터 — 시나리오
@@ -18,9 +21,15 @@ status: draft
 하나씩 두고, 같은 호출이라도 절마다 따로 적는다. 아래 문단들은 프로젝트 정책·키페어 정책·사용자
 정책 절에 공통이다.
 
-정책은 어느 스코프에도 속하지 않게 만들어지므로 개별 정책에 권한을 부여할 수 없다. 생성과 전체
-검색은 호출한 사용자가 슈퍼관리자인지 검사하고, 이름으로 조회·수정·삭제하는 호출은 권한 검사를
-거치지만 권한 그래프의 어느 역할도 정책에 권한이 없으므로 결국 슈퍼관리자만 통과한다.
+정책은 `global` 스코프에 만들어지고, 그 스코프에는 어느 역할도 놓이지 않는다. 생성과 전체
+검색은 호출한 사용자가 슈퍼관리자인지 검사하고, 이름으로 조회·수정·삭제하는 호출은 정책 노드에
+대한 권한을 검사하므로 결국 슈퍼관리자만 통과한다.
+
+자기에게 적용되는 정책은 호출자의 user 스코프에서 읽는다. 검사 대상은 정책 노드가 아니라 그
+스코프에 부여된 정책 종류의 읽기 권한이고, 시드 역할 `user_owner`가 키페어 정책과 사용자 정책
+둘 다에 그 권한을 준다. 이름으로 조회하는 legacy GraphQL 필드(`keypair_resource_policy(name:)`,
+`user_resource_policy(name:)`)도 이름이 호출자 자신의 정책이면 이 경로로 읽고, 다른 이름이면
+이름으로 조회하는 호출과 같이 정책 노드에 대한 권한을 검사한다.
 
 정책은 id가 아니라 이름으로 지정한다. 이름으로 정책을 찾는 단계가 먼저 실행되고, 권한이 없는
 사용자는 그 이름이 존재하는지와 무관하게 같은 이유("찾을 수 없음")로 거부된다. 슈퍼관리자가
