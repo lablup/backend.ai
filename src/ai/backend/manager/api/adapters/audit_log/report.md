@@ -647,9 +647,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [the-superadmin-naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
-슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 없는 엔티티에는 슈퍼관리자도 권한이 없으므로 권한 부족으로 거부된다. 대상 없음으로 거부하는 경우가 아니다
+슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 지나가므로 거부되지 않고 빈 페이지가 온다
 
 Given
 
@@ -671,8 +671,11 @@ When
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- 답이 비어 있다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
 
 #### [turning-enforcement-off-reads-a-named-entitys-records-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
 
