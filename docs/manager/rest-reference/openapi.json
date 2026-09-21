@@ -2086,7 +2086,7 @@
         "properties": {
           "field": {
             "$ref": "#/components/schemas/ArtifactOrderField",
-            "description": "Field to order by."
+            "description": "Field to order by. `SIZE` is deprecated since 26.9.0: it is not used for ordering and is removed in the next release."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -16956,7 +16956,7 @@
         "properties": {
           "field": {
             "$ref": "#/components/schemas/ObjectStorageOrderField",
-            "description": "Field to order by."
+            "description": "Field to order by. `CREATED_AT` is deprecated since 26.9.0: it is not used for ordering and is removed in the next release."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -16971,7 +16971,7 @@
         "type": "object"
       },
       "ObjectStorageOrderField": {
-        "description": "Fields available for ordering object storages.",
+        "description": "Fields available for ordering object storages.\n\n``CREATED_AT`` is deprecated since 26.9.0: the table has no such column, so the\nvalue is not used for ordering. It is removed in the next release.",
         "enum": [
           "name",
           "host",
