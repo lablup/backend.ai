@@ -45,6 +45,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
     GetAutoScalingRuleAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.global_search_auto_scaling_rules import (
+    GlobalSearchAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -133,24 +136,34 @@ class AutoScalingRuleHandler:
         """Search auto-scaling rules with filters, orders, and pagination."""
 
         querier = self._adapter.build_querier(body.parsed)
-
-        action_result = await self._deployment.search_auto_scaling_rules.run(
-            SearchAutoScalingRulesAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=AutoScalingRuleSearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
-            )
+        searcher = AutoScalingRuleSearcher(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
         )
 
+        deployment_id = body.parsed.filter.model_deployment_id if body.parsed.filter else None
+        if deployment_id is not None:
+            scoped_result = await self._deployment.search_auto_scaling_rules.run(
+                SearchAutoScalingRulesAction(
+                    deployment_ids=[DeploymentID(deployment_id)], searcher=searcher
+                )
+            )
+            rules = scoped_result.items
+            total_count = scoped_result.total_count
+        else:
+            global_result = await self._deployment.global_search_auto_scaling_rules.run(
+                GlobalSearchAutoScalingRulesAction(
+                    searcher=GlobalSearcher(used_by=(), searcher=searcher)
+                )
+            )
+            rules = global_result.items
+            total_count = global_result.total_count
+
         resp = SearchAutoScalingRulesResponse(
-            auto_scaling_rules=[self._adapter.convert_to_dto(rule) for rule in action_result.items],
+            auto_scaling_rules=[self._adapter.convert_to_dto(rule) for rule in rules],
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=total_count,
                 offset=body.parsed.offset,
                 limit=body.parsed.limit,
             ),

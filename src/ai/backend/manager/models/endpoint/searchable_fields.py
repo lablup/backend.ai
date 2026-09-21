@@ -8,8 +8,13 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -22,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
+    ReplicaGroupLifecycle,
     ReplicaStateData,
 )
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
@@ -55,7 +61,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsesConditions
 
 
 class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
@@ -406,16 +412,77 @@ class _DeploymentNestedFields:
     )
 
 
-class _DeploymentLinkedEntities:
-    """How a deployment connects to other entities; the other entity's permission governs."""
+class _DeploymentUsage:
+    """Uses between a deployment and other entities."""
 
-    resource_groups = UsageConditions[ResourceGroupID](
+    resource_groups = UsesConditions[ResourceGroupID](
         ToManyCorrelation(
             ResourceGroupRow, EndpointRow, ResourceGroupRow.name == EndpointRow.resource_group
         ),
         ResourceGroupRow.id,
     )
     """Deployments a resource group runs."""
+    images = UsesConditions[ImageID](
+        ToManyCorrelation(
+            sa.join(
+                ReplicaGroupRow,
+                DeploymentRevisionRow,
+                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
+            ),
+            EndpointRow,
+            sa.and_(
+                ReplicaGroupRow.lifecycle.not_in(ReplicaGroupLifecycle.terminal_statuses()),
+                ReplicaGroupRow.deployment_id == EndpointRow.id,
+            ),
+        ),
+        DeploymentRevisionRow.image,
+    )
+    """Deployments whose live replica group's current revision names the image."""
+    vfolders = UsesConditions[VFolderUUID](
+        ToManyCorrelation(
+            sa.join(
+                ReplicaGroupRow,
+                DeploymentRevisionRow,
+                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
+            ),
+            EndpointRow,
+            sa.and_(
+                ReplicaGroupRow.lifecycle.not_in(ReplicaGroupLifecycle.terminal_statuses()),
+                ReplicaGroupRow.deployment_id == EndpointRow.id,
+            ),
+        ),
+        DeploymentRevisionRow.model,
+    )
+    """Deployments whose live replica group's current revision names the vfolder as its model."""
+    sessions = UsesConditions[SessionID](
+        ToManyCorrelation(RoutingRow, EndpointRow, RoutingRow.endpoint == EndpointRow.id),
+        RoutingRow.session,
+    )
+    """Deployments whose route rows the session serves as a replica."""
+    runtime_variants = UsesConditions[RuntimeVariantID](
+        ToManyCorrelation(
+            DeploymentRevisionRow,
+            EndpointRow,
+            DeploymentRevisionRow.endpoint == EndpointRow.id,
+        ),
+        DeploymentRevisionRow.runtime_variant_id,
+    )
+    """Deployments whose revisions name the runtime variant."""
+    deployment_presets = UsesConditions[DeploymentPresetID](
+        ToManyCorrelation(
+            DeploymentRevisionRow,
+            EndpointRow,
+            DeploymentRevisionRow.endpoint == EndpointRow.id,
+        ),
+        DeploymentRevisionRow.revision_preset_id,
+    )
+    """Deployments whose revisions name the preset."""
+
+
+class _DeploymentLinkedEntities:
+    """How a deployment connects to other entities; the other entity's permission governs."""
+
+    usage = _DeploymentUsage
 
 
 class DeploymentSearchableFields:

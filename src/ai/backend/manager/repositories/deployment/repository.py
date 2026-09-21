@@ -91,18 +91,25 @@ from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermission
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchers import (
+    DeploymentAccessTokenSearcher,
+    DeploymentIDSearcher,
+    DeploymentInfoSearcher,
+)
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentUpdater,
     EndpointLifecycleBatchUpdater,
 )
+from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment.types import (
     DeploymentHistoryToCreate,
     RouteData,
@@ -339,10 +346,10 @@ class DeploymentRepository:
     async def search_deployments_with_last_history(
         self,
         *,
-        querier: BatchQuerier,
+        searcher: DeploymentInfoSearcher,
         category: DeploymentHandlerCategory,
     ) -> list[DeploymentWithHistory]:
-        """Search deployments via ``querier`` and attach the last history
+        """Search deployments via ``searcher`` and attach the last history
         row scoped to ``category`` (or ``None``) to each result.
 
         The coordinator compares ``last_history.phase`` with the current
@@ -350,7 +357,7 @@ class DeploymentRepository:
         carry retry counts forward.
         """
         return await self._db_source.search_deployments_with_last_history(
-            querier=querier,
+            searcher=searcher,
             category=category,
         )
 
@@ -690,25 +697,25 @@ class DeploymentRepository:
     async def search_route_datas(
         self,
         *,
-        querier: BatchQuerier,
+        searcher: RouteDataSearcher,
     ) -> list[RouteData]:
-        """Search routes via :class:`BatchQuerier`.
+        """Search routes.
 
-        The caller composes ``querier`` with every filter that applies;
-        pagination is part of the querier (use ``NoPagination`` for
+        The caller composes ``searcher`` with every filter that applies;
+        pagination is part of the searcher (use ``NoPagination`` for
         unbounded scans).
         """
-        return await self._db_source.search_route_datas(querier=querier)
+        return await self._db_source.search_route_datas(searcher=searcher)
 
     async def search_route_datas_with_last_history(
         self,
         *,
-        querier: BatchQuerier,
+        searcher: RouteDataSearcher,
         category: RouteHandlerCategory,
     ) -> list[RouteData]:
         """Search routes with last history per category attached."""
         return await self._db_source.search_route_datas_with_last_history(
-            querier=querier, category=category
+            searcher=searcher, category=category
         )
 
     @deployment_repository_resilience.apply()
@@ -1198,22 +1205,22 @@ class DeploymentRepository:
     async def fetch_route_connection_infos(
         self,
         *,
-        route_querier: BatchQuerier,
+        route_searcher: RouteInfoSearcher,
     ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
-        """Resolve routing-table entries per endpoint via a caller-composed querier."""
+        """Resolve routing-table entries per endpoint via a caller-composed searcher."""
         return await self._db_source.fetch_route_connection_infos(
-            route_querier=route_querier,
+            route_searcher=route_searcher,
         )
 
     @deployment_repository_resilience.apply()
-    async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:
-        """Search deployment ids using ``BatchQuerier``.
+    async def search_deployment_ids(self, *, searcher: DeploymentIDSearcher) -> list[DeploymentID]:
+        """Search deployment ids.
 
         Filter composition is moved to the call site via
         the deployment's searchable fields so the selection criteria
         (e.g. active-lifecycle filter) is explicit.
         """
-        return await self._db_source.search_deployment_ids(querier=querier)
+        return await self._db_source.search_deployment_ids(searcher=searcher)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_id_by_session(
@@ -1364,10 +1371,10 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_revisions(
         self,
-        querier: BatchQuerier,
+        searcher: ModelRevisionSearcher,
     ) -> RevisionSearchResult:
         """Search deployment revisions with pagination and filtering."""
-        return await self._db_source.search_revisions(querier)
+        return await self._db_source.search_revisions(searcher)
 
     @deployment_repository_resilience.apply()
     async def get_latest_revision_number(
@@ -1500,26 +1507,18 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_routes(
         self,
-        querier: BatchQuerier,
+        searcher: RouteInfoSearcher,
     ) -> RouteSearchResult:
-        """Search routes with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-
-        Returns:
-            RouteSearchResult with items, total_count, and pagination info
-        """
-        return await self._db_source.search_routes(querier)
+        """Search routes with pagination and filtering."""
+        return await self._db_source.search_routes(searcher)
 
     @deployment_repository_resilience.apply()
     async def search_revision_resource_slots(
         self,
-        revision_id: DeploymentRevisionID,
-        querier: BatchQuerier,
+        searcher: RevisionResourceSlotSearcher,
     ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
         """Search resource slots allocated to a deployment revision."""
-        return await self._db_source.search_revision_resource_slots(revision_id, querier)
+        return await self._db_source.search_revision_resource_slots(searcher)
 
     @deployment_repository_resilience.apply()
     async def get_route(
@@ -1539,13 +1538,13 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_legacy_endpoints(
         self,
-        querier: BatchQuerier,
+        searcher: DeploymentInfoSearcher,
     ) -> DeploymentInfoSearchResult:
         """Search endpoints (legacy, full: includes the current/deploying
         revision data). DO NOT USE in new code — the v2 surface reads through
         ``DeploymentSearcher``.
         """
-        return await self._db_source.search_legacy_endpoints(querier)
+        return await self._db_source.search_legacy_endpoints(searcher)
 
     # ========== Access Token Operations ==========
 
@@ -1587,17 +1586,10 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_access_tokens(
         self,
-        querier: BatchQuerier,
+        searcher: DeploymentAccessTokenSearcher,
     ) -> AccessTokenSearchResult:
-        """Search access tokens with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            AccessTokenSearchResult with items, total_count, and pagination info.
-        """
-        return await self._db_source.search_access_tokens(querier)
+        """Search access tokens with pagination and filtering."""
+        return await self._db_source.search_access_tokens(searcher)
 
     @deployment_repository_resilience.apply()
     @deployment_repository_resilience.apply()

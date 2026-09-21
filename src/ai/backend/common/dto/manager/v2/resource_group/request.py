@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
     ResourceGroupScope,
+    ResourceGroupUsage,
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
@@ -177,6 +178,13 @@ class ResourceGroupOrder(BaseRequestModel):
 class AdminSearchResourceGroupsInput(BaseRequestModel):
     """Input for admin search of resource groups with cursor and offset pagination."""
 
+    usage: ResourceGroupUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "resource groups the caller cannot read are left out."
+        ),
+    )
     filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ResourceGroupOrder] | None = Field(
         default=None, description="Order specifications."
@@ -193,6 +201,13 @@ class ScopedSearchResourceGroupsInput(BaseRequestModel):
     """Input for searching the resource groups the named scopes reach."""
 
     scope: ResourceGroupScope = Field(description="Scope (OR across all items).")
+    usage: ResourceGroupUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "resource groups the caller cannot read are left out."
+        ),
+    )
     filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ResourceGroupOrder] | None = Field(
         default=None, description="Order specifications."

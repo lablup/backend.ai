@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import (
     RuntimeVariantOrderField,
-    RuntimeVariantUsedBy,
+    RuntimeVariantUsage,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -118,7 +118,7 @@ class RuntimeVariantAdapter(BaseAdapter):
             ScopedSearchRuntimeVariantsAction(
                 searcher=ScopedSearcher(
                     scopes=[PublicRuntimeVariantTarget()],
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=searcher,
                 )
             )
@@ -202,14 +202,14 @@ class RuntimeVariantAdapter(BaseAdapter):
         result = await self._runtime_variant.lookup.run(LookupRuntimeVariantAction(name=name))
         return result.entity_id()
 
-    def _used_by(self, used_by: RuntimeVariantUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: RuntimeVariantUsage | None) -> list[UsedBy]:
         """The uses the request named, each of which the caller must be able to read."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = RuntimeVariantSearchableFields.linked
+        linked = RuntimeVariantSearchableFields.linked.usage
         return [
             linked.deployments.used_by(DeploymentID(entity_id))
-            for entity_id in used_by.deployment or ()
+            for entity_id in usage.used_by.deployment or ()
         ]
 
     def _convert_filter(self, filter_: RuntimeVariantFilter) -> list[QueryCondition]:

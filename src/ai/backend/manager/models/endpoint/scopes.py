@@ -19,7 +19,11 @@ from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.endpoint.row import (
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.queries import user_scope_reaches
@@ -147,6 +151,31 @@ class DeploymentAccessTokenTarget(ScopeTarget):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointTokenRow.endpoint == deployment_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
+@dataclass(frozen=True)
+class DeploymentAutoScalingRuleTarget(ScopeTarget):
+    """The auto-scaling rules one deployment holds."""
+
+    deployment_id: DeploymentID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.deployment_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        deployment_id = self.deployment_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.endpoint == deployment_id
 
         return inner
 

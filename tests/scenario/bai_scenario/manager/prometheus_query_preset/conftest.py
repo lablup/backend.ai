@@ -66,7 +66,7 @@ async def adapter(
         )
     )
     service = PrometheusQueryPresetService(
-        repository=PrometheusQueryPresetRepository(engine, prometheus),
+        repository=PrometheusQueryPresetRepository(engine, prometheus, provider),
         prometheus_client=prometheus,
         default_timewindow=config.config.metric.timewindow,
         template_renderer=PromQLTemplateRenderer(),

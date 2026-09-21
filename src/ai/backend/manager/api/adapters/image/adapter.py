@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     PurgeImageInput,
     RestoreImageInput,
     ScopedSearchImagesInput,
+    SearchImageAliasesInput,
     UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -43,6 +44,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     PurgeImagePayload,
     RestoreImagePayload,
     ScopedSearchImagesPayload,
+    SearchImageAliasesPayload,
     UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -55,7 +57,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageStatusType,
     ImageTagInfo,
     ImageTypeEnum,
-    ImageUsedBy,
+    ImageUsage,
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
@@ -81,7 +83,7 @@ from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
     ImageSearchableFields,
 )
-from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -96,6 +98,9 @@ from ai.backend.manager.services.image.actions.scoped_search import (
     ScopedSearchImagesAction,
 )
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
+from ai.backend.manager.services.image.actions.search_image_aliases import (
+    SearchImageAliasesAction,
+)
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
 from ai.backend.manager.services.image.processors import ImageProcessors
@@ -176,7 +181,7 @@ class ImageAdapter(BaseAdapter):
         action_result = await self._image.search_images.run(
             SearchImagesAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_image_searcher(input, limit=limit),
                 )
             )
@@ -206,11 +211,12 @@ class ImageAdapter(BaseAdapter):
             targets.append(PublicImageTarget())
         return targets
 
-    def _used_by(self, used_by: ImageUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: ImageUsage | None) -> list[UsedBy]:
         """The uses the request named, sessions before deployments."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = ImageSearchableFields.linked
+        used_by = usage.used_by
+        linked = ImageSearchableFields.linked.usage
         return [
             *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
             *(
@@ -247,7 +253,7 @@ class ImageAdapter(BaseAdapter):
             ScopedSearchImagesAction(
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(input.scope),
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_image_searcher(input),
                 )
             )
@@ -268,7 +274,7 @@ class ImageAdapter(BaseAdapter):
         action_result = await self._image.search_images.run(
             SearchImagesAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_image_searcher(input, base_conditions=base_conditions),
                 )
             )
@@ -306,6 +312,32 @@ class ImageAdapter(BaseAdapter):
 
         return AdminSearchImageAliasesPayload(
             items=[self._alias_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def scoped_search_aliases(
+        self, image_id: ImageID, input: SearchImageAliasesInput
+    ) -> SearchImageAliasesPayload:
+        """Search the aliases of one image, answered for by the caller's read on it."""
+        searcher = self._build_searcher(
+            ImageAliasSearcher,
+            conditions=self._convert_alias_filter(input.filter) if input.filter else [],
+            orders=self._convert_alias_orders(input.order) if input.order else [],
+            pagination_spec=_get_alias_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._image.search_image_aliases.run(
+            SearchImageAliasesAction(image_id=image_id, searcher=searcher)
+        )
+        return SearchImageAliasesPayload(
+            items=[self._alias_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

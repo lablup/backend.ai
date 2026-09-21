@@ -22,7 +22,6 @@ from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -36,14 +35,13 @@ from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data
-from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
@@ -238,16 +236,9 @@ class UserRepository:
         return await self._db_source.delete_keypairs_with_valkey(user_uuid, valkey_stat_client)
 
     @user_repository_resilience.apply()
-    async def search_users(self, querier: BatchQuerier) -> UserSearchResult:
-        """Search all users with pagination and filters (admin only).
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        return await self._db_source.search_users(querier=querier)
+    async def search_users(self, searcher: UserSearcher) -> UserSearchResult:
+        """Search all users with pagination and filters (admin only)."""
+        return await self._db_source.search_users(searcher=searcher)
 
     @user_repository_resilience.apply()
     async def issue_my_keypair(self, user_id: UserID) -> GeneratedKeyPairData:
@@ -306,23 +297,6 @@ class UserRepository:
     async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
         """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         await self._db_source.switch_default_access_key(user_id, access_key)
-
-    @user_repository_resilience.apply()
-    async def search_my_keypairs(
-        self,
-        scope: UserKeypairTarget,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs owned by the scoped user.
-
-        Args:
-            scope: Search scope containing the user UUID whose keypairs to retrieve.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        return await self._db_source.search_my_keypairs(scope, querier)
 
     @user_repository_resilience.apply()
     @user_repository_resilience.apply()

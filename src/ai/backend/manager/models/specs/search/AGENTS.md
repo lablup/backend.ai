@@ -162,11 +162,30 @@ Depth follows the permission axis, not the foreign keys.
 | `used_by` | The used side | The using entity's id | The images this deployment uses |
 | `uses` | The using side | The used entity's id | The sessions using this agent, the roles using this role preset |
 
-- Declare them under `linked.usage.used_by.<entities>` and `linked.usage.uses.<entities>`, named after the other entity in the plural (`deployments`, `model_cards`).
+- Declare them under `linked.usage.<entities>`, named after the other entity in the plural
+  (`deployments`, `model_cards`). The declaration's type states the direction —
+  `UsedByConditions` or `UsesConditions`. Do not put the direction on the path as well.
+- That type's one method builds the condition, and its name is the direction.
+
+| Declared as | Call | Reads as |
+|---|---|---|
+| `UsedByConditions` | `linked.usage.sessions.used_by(session_id)` | The images this session uses |
+| `UsesConditions` | `linked.usage.agents.uses(agent_id)` | The sessions using this agent |
+
+- One declaration answers one direction, because the correlation is built around the searched
+  row. The other direction is declared on the other entity. Do not leave a usage declared from
+  one side only.
+- Do not declare `UsageConditions` itself. Only the two subtypes that name a direction.
 - The API input carries one `usage` per search, holding `usedBy` and `uses`.
-- The rules are the same both ways: narrow with AND, require the caller to be able to read the entity the condition names, grant no permission, and pull in no row the scopes disallow.
-- A scoped search passes them through `ScopedSearcher`; one named entity the caller cannot read refuses the whole search. A global search passes them through `GlobalSearcher`, where the SUPERADMIN gate answers, so the named entities are not checked.
-- Both directions go out under the name `used_by` today. Moving them over is separate work.
+- The rules are the same both ways: narrow with AND, require the caller to be able to read the
+  entity the condition names, grant no permission, and pull in no row the scopes disallow.
+- A scoped search passes them through `ScopedSearcher`; one named entity the caller cannot read
+  refuses the whole search. A global search passes them through `GlobalSearcher`, where the
+  SUPERADMIN gate answers, so the named entities are not checked.
+- What the search carries is one list either way: `ScopedSearcher.used_by` and
+  `GlobalSearcher.used_by` take both directions' conditions, and one condition is a `UsedBy`.
+- The agent has no `searchable_fields.py` yet, so `used_by.sessions` cannot be declared on it.
+  Fill it in when the agent moves onto the v2 declarations.
 
 ## Scopes a search accepts
 

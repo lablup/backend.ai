@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
@@ -25,6 +25,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -46,6 +47,10 @@ from ai.backend.manager.models.rbac_models.role.searchable_fields import (
 )
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.role_preset.searchers import RolePresetSearcher
 from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
     RoleAssignmentSearchableFields,
 )
@@ -397,7 +402,7 @@ class TestSearchRoles:
         assert [item.id for item in result.items] == [created_roles[0].role_id]
 
 
-class TestSearchRolesUsedByRolePreset:
+class TestSearchRolesUsingRolePreset:
     """The preset a role was instantiated from narrows the read to that preset's roles."""
 
     @pytest.fixture
@@ -455,7 +460,35 @@ class TestSearchRolesUsedByRolePreset:
             await db_sess.flush()
             return presets[0].id, roles[0].id, roles[1].id
 
-    async def test_used_by_returns_only_the_preset_s_roles(
+    @pytest.fixture
+    def preset_repository(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[RolePresetData]:
+        return OpsRepository[RolePresetData](V2DBOpsProvider(db_with_rbac_tables))
+
+    async def test_used_by_returns_only_the_role_s_preset(
+        self,
+        preset_repository: OpsRepository[RolePresetData],
+        roles_of_two_presets: tuple[RolePresetID, uuid.UUID, uuid.UUID],
+    ) -> None:
+        preset_id, role_of_preset, _ = roles_of_two_presets
+
+        result = await preset_repository.global_search(
+            GlobalSearcher(
+                used_by=[
+                    RolePresetSearchableFields.linked.usage.roles.used_by(RoleID(role_of_preset))
+                ],
+                searcher=RolePresetSearcher(
+                    conditions=[], orders=[], pagination=OffsetPagination(limit=10, offset=0)
+                ),
+            )
+        )
+
+        assert [item.id for item in result.items] == [preset_id]
+        assert result.total_count == 1
+
+    async def test_uses_returns_only_the_preset_s_roles(
         self,
         repository: OpsRepository[RoleData],
         roles_of_two_presets: tuple[RolePresetID, uuid.UUID, uuid.UUID],
@@ -469,7 +502,7 @@ class TestSearchRolesUsedByRolePreset:
 
         result = await repository.global_search(
             GlobalSearcher(
-                used_by=[RoleSearchableFields.linked.role_presets.used_by(preset_id)],
+                used_by=[RoleSearchableFields.linked.usage.role_presets.uses(preset_id)],
                 searcher=searcher,
             )
         )

@@ -16,6 +16,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
     OwnedFieldsOpsResult,
     ScopedBatchOpsResult,
+    ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
@@ -73,7 +74,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     PurgeKeypairAction,
     PurgeKeypairActionResult,
     SearchMyKeypairsAction,
-    SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
     UpdateKeypairAction,
@@ -156,7 +156,9 @@ class UserProcessors:
         GetDefaultKeypairsAction, OwnedFieldsOpsResult[UserID, KeyPairData]
     ]
     update_keypair: SingleFieldActionProcessor[UpdateKeypairAction, UpdateKeypairActionResult]
-    search_my_keypairs: ScopeActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
+    search_my_keypairs: ScopeActionProcessor[
+        SearchMyKeypairsAction, ScopedFieldsOpsResult[KeyPairData]
+    ]
     admin_create_keypair: SingleEntityActionProcessor[
         AdminCreateKeypairAction, AdminCreateKeypairActionResult
     ]
@@ -225,9 +227,6 @@ class UserProcessors:
         self.switch_default_access_key = group.single_entity(
             SwitchDefaultAccessKeyAction, user_service.switch_default_access_key
         )
-        self.search_my_keypairs = group.scope(
-            SearchMyKeypairsAction, user_service.search_my_keypairs
-        )
         self.admin_create_keypair = group.single_entity(
             AdminCreateKeypairAction, user_service.admin_create_keypair
         )
@@ -265,6 +264,7 @@ class UserProcessors:
         self.admin_search_keypairs = self.keypair_group.global_searcher_ops(
             AdminSearchKeypairsAction
         )
+        self.search_my_keypairs = self.keypair_group.search_ops(SearchMyKeypairsAction)
         self.get_default_keypairs = self.keypair_group.atomic_bulk_get_ops(GetDefaultKeypairsAction)
         self.lookup_keypair = group.key_field_lookup_ops(LookupKeypairByAccessKeyAction)
         self.get_keypair = self.keypair_group.single_field(

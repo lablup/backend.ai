@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
-from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
 
 __all__ = (
     "BulkDeleteRolePresetsInput",
@@ -130,6 +130,12 @@ class RolePresetOrder(BaseRequestModel):
 class SearchRolePresetsInput(BaseRequestModel):
     """Input for paginated search of role presets."""
 
+    usage: RolePresetUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
+        ),
+    )
     filter: RolePresetFilter | None = Field(default=None, description="Filter conditions.")
     order: list[RolePresetOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")

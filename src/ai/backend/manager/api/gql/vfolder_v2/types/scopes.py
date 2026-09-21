@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsedBy
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderScope,
+    VFolderUsage,
+    VFolderUsedBy,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -41,11 +45,7 @@ class VFolderScopeGQL(PydanticInputMixin[VFolderScope]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description=(
-            "Entities whose use narrows a vfolder query; every id is AND-ed. The caller must "
-            "be able to read each listed entity, or the request is refused. Only vfolders the "
-            "caller can read are returned, even when a listed entity uses others."
-        ),
+        description="Entities whose use of a vfolder narrows the read.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="VFolderUsedBy",
@@ -59,4 +59,23 @@ class VFolderUsedByGQL(PydanticInputMixin[VFolderUsedBy]):
     )
     model_card: list[UUID] | None = gql_field(
         default=None, description="Model cards built on the vfolder."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing a vfolder query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only vfolders the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="VFolderUsage",
+)
+class VFolderUsageGQL(PydanticInputMixin[VFolderUsage]):
+    """The uses that narrow a vfolder read."""
+
+    used_by: VFolderUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the vfolder narrows the read."
     )

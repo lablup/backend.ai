@@ -68,10 +68,10 @@ from ai.backend.manager.models.endpoint.creators import (
 )
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaUpdater
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.exceptions import (
     InvalidEndpointState,
@@ -823,7 +823,7 @@ class DeploymentController:
         success = await self._deployment_repository.update_route(updater)
         if not success:
             return None
-        querier = BatchQuerier(
+        searcher = RouteInfoSearcher(
             pagination=OffsetPagination(limit=1),
             conditions=[
                 ReplicaSearchableFields.own.field_id.filter.in_(
@@ -831,5 +831,5 @@ class DeploymentController:
                 )
             ],
         )
-        result = await self._deployment_repository.search_routes(querier)
+        result = await self._deployment_repository.search_routes(searcher)
         return result.items[0] if result.items else None

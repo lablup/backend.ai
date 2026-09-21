@@ -29,7 +29,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.image_request import GetImagePathParam
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.models.image.scopes import PublicImageTarget, UserImageTarget
+from ai.backend.manager.models.image.scopes import VisibleImageTarget
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -88,10 +88,7 @@ class ImageHandler:
         """Get a single image by ID."""
         action_result = await self._image.search_with_install_status.run(
             SearchImagesWithInstallStatusAction(
-                targets=[
-                    PublicImageTarget(),
-                    UserImageTarget(user_id=UserID(ctx.user_uuid)),
-                ],
+                targets=[VisibleImageTarget(user_id=UserID(ctx.user_uuid))],
                 searcher=ImageSearcher(
                     pagination=NoPagination(),
                     conditions=[

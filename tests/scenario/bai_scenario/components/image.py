@@ -360,6 +360,33 @@ class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
 
 
 @dataclass(frozen=True)
+class AnAliasAndAPlainUser(Given[Any, AnAliasAndACaller]):
+    """별칭이 등록된 이미지 1개와, 그 이미지에 권한을 받았거나 받지 않은 일반 사용자."""
+
+    granted: bool = True
+
+    @override
+    def describe(self) -> str:
+        holds = "그 이미지에 권한 있음" if self.granted else "아무 권한도 없음"
+        return f"별칭이 등록된 이미지 1개, {holds}인 사용자 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> AnAliasAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        image = await seeding.creating_from(SeedImage(), registry)
+        alias = await seeding.adding(SeedAlias(), image)
+        caller = await seeding.within(SomeoneOf(domain))
+        if self.granted:
+            await seeding.within(SomeoneReachingImages(registry, caller))
+        return AnAliasAndACaller(
+            image=seeding.made(image),
+            alias=seeding.made(alias),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
     """이미지 2개에 별칭 3개가 나뉘어 등록된 상태와 슈퍼관리자."""
 

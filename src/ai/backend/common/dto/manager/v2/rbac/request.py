@@ -11,7 +11,12 @@ from pydantic import Field, field_validator, model_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -53,7 +58,9 @@ __all__ = (
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
-    "RoleUsedBy",
+    "RolePermissionNestedFilter",
+    "RoleUsage",
+    "RoleUses",
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
@@ -296,6 +303,31 @@ class PermissionNestedFilter(BaseRequestModel):
 PermissionNestedFilter.model_rebuild()
 
 
+class PermissionFilter(BaseRequestModel):
+    """Filter for scoped permissions."""
+
+    role_id: UUIDFilter | None = None
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = Field(
+        default=None, description="Filter by the permission bit the entry grants."
+    )
+    created_at: DateTimeFilter | None = None
+    AND: list[PermissionFilter] | None = None
+    OR: list[PermissionFilter] | None = None
+    NOT: list[PermissionFilter] | None = None
+
+
+PermissionFilter.model_rebuild()
+
+
+class RolePermissionNestedFilter(ToManyFilter[PermissionFilter]):
+    """The `permissions` field of a role filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the role filter's own `AND`.
+    """
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
@@ -311,6 +343,9 @@ class RoleFilter(BaseRequestModel):
         deprecated=True,
     )
     mapped_scope: MappedScopeNestedFilter | None = None
+    permissions: RolePermissionNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the role's permission entries."
+    )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -378,20 +413,6 @@ class EntityFilter(BaseRequestModel):
 EntityFilter.model_rebuild()
 
 
-class PermissionFilter(BaseRequestModel):
-    """Filter for scoped permissions."""
-
-    role_id: UUIDFilter | None = None
-    entity_type: StringFilter | None = None
-    created_at: DateTimeFilter | None = None
-    AND: list[PermissionFilter] | None = None
-    OR: list[PermissionFilter] | None = None
-    NOT: list[PermissionFilter] | None = None
-
-
-PermissionFilter.model_rebuild()
-
-
 class RoleOrderBy(BaseRequestModel):
     """Order by specification for roles."""
 
@@ -433,22 +454,30 @@ class AdminSearchPermissionsGQLInput(BaseRequestModel):
     offset: int | None = None
 
 
-class RoleUsedBy(BaseRequestModel):
-    """Entities whose use narrows the roles read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Roles the caller cannot read
-    are left out even when a listed entity uses them.
-    """
+class RoleUses(BaseRequestModel):
+    """Entities the role uses, whose ids narrow the result."""
 
     role_preset: list[UUID] | None = Field(
         default=None, description="Role presets the roles were instantiated from"
     )
 
 
+class RoleUsage(BaseRequestModel):
+    """Uses narrowing the roles read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Roles the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    uses: RoleUses | None = Field(
+        default=None, description="Entities the role uses, whose ids narrow the result"
+    )
+
+
 class SearchRolesInput(BaseRequestModel):
     """Pagination search input for roles."""
 
-    used_by: RoleUsedBy | None = None
+    usage: RoleUsage | None = None
     filter: RoleFilter | None = None
     order: list[RoleOrderBy] | None = None
     first: int | None = None

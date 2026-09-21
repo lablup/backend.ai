@@ -18,9 +18,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.image.request import (
-    AdminSearchImageAliasesInput,
     ContainerRegistryScopeInputDTO,
     ImageAliasFilterInputDTO,
     ImageAliasNestedFilterInputDTO,
@@ -30,6 +28,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageScopeInputDTO,
     ImageStatusFilterInputDTO,
     ImageTypeFilterInputDTO,
+    SearchImageAliasesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     ImageAliasNode,
@@ -44,6 +43,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageScope,
     ImageTagInfo,
+    ImageUsage,
     ImageUsedBy,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -73,7 +73,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.models.image.searchable_fields import ImageAliasSearchableFields
 
 # =============================================================================
 # Enums
@@ -326,13 +325,9 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-        base_conditions = [
-            ImageAliasSearchableFields.own.image_id.filter.in_(
-                UUIDInMatchSpec(values=[ImageID(self.id)], negated=False)
-            )
-        ]
-        payload = await info.context.adapters.image.admin_search_image_aliases(
-            AdminSearchImageAliasesInput(
+        payload = await info.context.adapters.image.scoped_search_aliases(
+            ImageID(self.id),
+            SearchImageAliasesInput(
                 filter=pydantic_filter,
                 order=pydantic_orders,
                 first=first,
@@ -340,7 +335,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
                 last=last,
                 before=before,
             ),
-            base_conditions=base_conditions,
         )
         edges = [
             ImageV2AliasEdgeGQL(
@@ -456,11 +450,7 @@ class ImageSearchScopeGQL(PydanticInputMixin[ImageScope]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description=(
-            "Entities whose use narrows an image query; every id is AND-ed. The caller must "
-            "be able to read each listed entity, or the request is refused. Only images the "
-            "caller can read are returned, even when a listed entity uses others."
-        ),
+        description="Entities whose use of an image narrows the read.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="ImageUsedBy",
@@ -476,6 +466,25 @@ class ImageUsedByGQL(PydanticInputMixin[ImageUsedBy]):
         description=(
             "Deployments whose live replica groups name the image in their current revision."
         ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing an image query; every id is AND-ed. The caller must be able to "
+            "read each listed entity, or the request is refused. Only images the caller can "
+            "read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ImageUsage",
+)
+class ImageUsageGQL(PydanticInputMixin[ImageUsage]):
+    """The uses that narrow an image read."""
+
+    used_by: ImageUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the image narrows the read."
     )
 
 

@@ -37,7 +37,7 @@ from ai.backend.manager.models.image.searchable_fields import (
 from .types import (
     ContainerRegistryScopeGQL,
     ImageSearchScopeGQL,
-    ImageUsedByGQL,
+    ImageUsageGQL,
     ImageV2AliasConnectionGQL,
     ImageV2AliasEdgeGQL,
     ImageV2AliasFilterGQL,
@@ -61,12 +61,12 @@ from .types import (
 )  # type: ignore[misc]
 async def admin_images_v2(
     info: Info[StrawberryGQLContext],
-    used_by: Annotated[
-        ImageUsedByGQL | None,
+    usage: Annotated[
+        ImageUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; images the caller cannot read "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; images the caller cannot read "
                 "are left out."
             )
         ),
@@ -85,7 +85,7 @@ async def admin_images_v2(
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.image.admin_search_images_gql(
         AdminSearchImagesInput(
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_orders,
             first=first,
@@ -125,12 +125,12 @@ async def admin_images_v2(
 async def scoped_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ImageSearchScopeGQL,
-    used_by: Annotated[
-        ImageUsedByGQL | None,
+    usage: Annotated[
+        ImageUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller; images the caller cannot read "
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; images the caller cannot read "
                 "are left out."
             )
         ),
@@ -147,7 +147,7 @@ async def scoped_images_v2(
     payload = await info.context.adapters.image.scoped_search(
         ScopedSearchImagesInput(
             scope=scope.to_pydantic(),
-            used_by=used_by.to_pydantic() if used_by else None,
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

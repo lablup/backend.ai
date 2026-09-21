@@ -167,7 +167,7 @@ class UserSearchableFields:
 
     There is no ``linked``. A column naming a user (``groups.creator_id``,
     ``error_logs.user``, ``entity_shares.sharer_user_id``) records provenance or
-    ownership, not a use, so no entity answers a ``used_by``.
+    ownership, not a use, so no entity answers a ``usage``.
     """
 
     own = _UserOwnFields()

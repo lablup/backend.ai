@@ -28,7 +28,7 @@ from ai.backend.manager.api.gql.runtime_variant.types import (
     RuntimeVariantFilterGQL,
     RuntimeVariantGQL,
     RuntimeVariantOrderByGQL,
-    RuntimeVariantUsedByGQL,
+    RuntimeVariantUsageGQL,
     UpdateRuntimeVariantInputGQL,
     UpdateRuntimeVariantPayloadGQL,
 )
@@ -44,12 +44,12 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def runtime_variants(
     info: Info[StrawberryGQLContext],
-    used_by: Annotated[
-        RuntimeVariantUsedByGQL | None,
+    usage: Annotated[
+        RuntimeVariantUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller."
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller."
             )
         ),
     ] = None,
@@ -74,7 +74,7 @@ async def runtime_variants(
         ]
 
     search_input = SearchRuntimeVariantsInput(
-        used_by=used_by.to_pydantic() if used_by else None,
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,

@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
-from uuid import UUID
 
 import pytest
 
@@ -15,29 +14,24 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     VFolderNode,
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
-from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Held,
     Same,
-    SameAs,
     Scenario,
-    Skipped,
     Then,
     Verdict,
     When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.vfolder import (
-    STORAGE_HOST,
     AFolderAndItsReader,
     AFolderOfferedToSomeone,
     AProjectFolderAndSomeone,
     SomeoneWithAFolderOfTheirOwn,
+    VFolderNodeLook,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
@@ -100,7 +94,7 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
         answer = answered.response
         if isinstance(answer, VFolderNode):
-            return self._node("", answer, laid.folder)
+            return VFolderNodeLook(self.started).verdicts(answer, laid.folder)
         if isinstance(answer, SearchVFoldersPayload):
             page: list[Verdict] = [
                 Same("total_count", answer.total_count, 1),
@@ -109,49 +103,14 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
                 Same("items.length", len(answer.items), 1),
             ]
             if answer.items:
-                page.extend(self._node("items[0].", answer.items[0], laid.folder))
+                page.extend(
+                    VFolderNodeLook(self.started).verdicts(
+                        answer.items[0], laid.folder, at="items[0]."
+                    )
+                )
             return page
         raised = type(answered.raised).__name__ if answered.raised is not None else None
         return [Same("answer", raised, "VFolderNode")]
-
-    def _node(self, at: str, node: VFolderNode, folder: VFolderData) -> list[Verdict]:
-        return [
-            Held(f"{at}id", node.id, SameAs[UUID](folder.id, "심은 폴더")),
-            Same(f"{at}host", node.host, STORAGE_HOST),
-            Same(f"{at}status", node.status, "ready"),
-            Same(f"{at}metadata.name", node.metadata.name, folder.name),
-            Same(f"{at}metadata.cloneable", node.metadata.cloneable, False),
-            Same(f"{at}metadata.last_used", node.metadata.last_used, None),
-            Same(
-                f"{at}access_control.ownership_type",
-                node.access_control.ownership_type,
-                folder.ownership_type.value,
-            ),
-            Held(
-                f"{at}ownership.user_id",
-                node.ownership.user_id,
-                SameAs[UUID | None](folder.user, "폴더 주인"),
-            ),
-            Held(
-                f"{at}ownership.project_id",
-                node.ownership.project_id,
-                SameAs[UUID | None](folder.group, "폴더가 놓인 프로젝트"),
-            ),
-            Held(
-                f"{at}ownership.creator_id",
-                node.ownership.creator_id,
-                SameAs[UUID | None](folder.creator_id, "만든 사람"),
-            ),
-            Same(f"{at}ownership.creator_email", node.ownership.creator_email, folder.creator),
-            Same(f"{at}unmanaged_path", node.unmanaged_path, None),
-            Skipped(f"{at}metadata.usage_mode", "타입이 이미 값을 못박는다"),
-            Skipped(f"{at}metadata.quota_scope_id", "주인의 id로 만들어져 실행마다 다르다"),
-            Skipped(f"{at}access_control.permission", "마운트 권한이라 이 표가 묻는 것이 아니다"),
-            Skipped(f"{at}quota", "저장소가 답하는 값이라 여기서 말할 수 없다"),
-            Held(
-                f"{at}metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)
-            ),
-        ]
 
 
 @dataclass(frozen=True)

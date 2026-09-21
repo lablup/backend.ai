@@ -113,6 +113,7 @@ class TestPrometheusQueryPresetRepository:
         return PrometheusQueryPresetRepository(
             db=db_with_cleanup,
             prometheus_client=MagicMock(spec=PrometheusClient),
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
 
     @pytest.fixture
@@ -346,6 +347,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
         return PrometheusQueryPresetRepository(
             db=MagicMock(),
             prometheus_client=prometheus_client,
+            v2_ops_provider=MagicMock(spec=V2DBOpsProvider),
         )
 
     async def test_delegates_to_client_with_template_and_window(

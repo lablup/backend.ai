@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
     ModelCardScope,
-    ModelCardUsedBy,
+    ModelCardUsage,
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -159,7 +159,7 @@ class ModelCardFilter(BaseRequestModel):
         description=(
             "Filter by the storage host backing the model card's VFolder. "
             "Deprecated: search vfolders by host first, then pass their ids as "
-            "`used_by.vfolder`."
+            "`usage.uses.vfolder`."
         ),
         deprecated=True,
     )
@@ -187,11 +187,11 @@ class ScopedSearchModelCardsInput(BaseRequestModel):
     """Input for searching the model cards the named scopes reach."""
 
     scope: ModelCardScope = Field(description="Scope (OR across all items).")
-    used_by: ModelCardUsedBy | None = Field(
+    usage: ModelCardUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; model cards the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "model cards the caller cannot read are left out."
         ),
     )
     filter: ModelCardFilter | None = Field(default=None)
@@ -205,11 +205,11 @@ class ScopedSearchModelCardsInput(BaseRequestModel):
 
 
 class SearchModelCardsInput(BaseRequestModel):
-    used_by: ModelCardUsedBy | None = Field(
+    usage: ModelCardUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; model cards the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "model cards the caller cannot read are left out."
         ),
     )
     filter: ModelCardFilter | None = Field(default=None)

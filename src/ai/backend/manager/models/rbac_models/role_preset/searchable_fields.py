@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
@@ -15,7 +17,9 @@ from ai.backend.manager.models.specs.conditions.string import (
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 __all__ = ("RolePresetSearchableFields",)
 
@@ -85,5 +89,22 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
         )
 
 
+class _RolePresetUsage:
+    """Uses between a preset and other entities."""
+
+    roles = UsedByConditions[RoleID](
+        ToManyCorrelation(RoleRow, RolePresetRow, RoleRow.role_preset_id == RolePresetRow.id),
+        RoleRow.id,
+    )
+    """Presets a role was instantiated from."""
+
+
+class _RolePresetLinkedEntities:
+    """How a preset connects to other entities; the other entity's permission governs."""
+
+    usage = _RolePresetUsage
+
+
 class RolePresetSearchableFields:
     own = _RolePresetOwnFields()
+    linked = _RolePresetLinkedEntities

@@ -46,12 +46,12 @@ from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
+from ai.backend.manager.models.rbac_models.user_role.scopes import RoleRoleAssignmentTarget
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.permission_contoller.actions import (
     CreateRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
-    GlobalSearchRoleAssignmentsAction,
     GlobalSearchRolesAction,
     UpdateRoleAction,
 )
@@ -62,6 +62,9 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     PublicGetScopeTypesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
+from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
+    ScopedSearchRoleAssignmentsAction,
+)
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
@@ -233,9 +236,12 @@ class RBACHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search users assigned to a specific role with filters and pagination."""
-        searcher = self._assigned_user_adapter.build_searcher(path.parsed, body.parsed)
-        action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(searcher=searcher)
+        searcher = self._assigned_user_adapter.build_searcher(body.parsed)
+        action_result = await self._permission_controller.scoped_search_role_assignments.run(
+            ScopedSearchRoleAssignmentsAction(
+                targets=[RoleRoleAssignmentTarget(role_id=RoleID(path.parsed.role_id))],
+                searcher=searcher,
+            )
         )
         resp = SearchUsersAssignedToRoleResponse(
             users=[

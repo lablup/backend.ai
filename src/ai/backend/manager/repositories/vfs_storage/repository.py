@@ -7,7 +7,8 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfs_storage.db_source.db_source import VFSStorageDBSource
 
 vfs_storage_repository_resilience = Resilience(
@@ -32,8 +33,8 @@ class VFSStorageRepository:
 
     _db_source: VFSStorageDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = VFSStorageDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+        self._db_source = VFSStorageDBSource(db, v2_ops_provider)
 
     @vfs_storage_repository_resilience.apply()
     async def get_by_name(self, storage_name: str) -> VFSStorageData:
@@ -50,6 +51,6 @@ class VFSStorageRepository:
     @vfs_storage_repository_resilience.apply()
     async def search(
         self,
-        querier: BatchQuerier,
+        searcher: VFSStorageSearcher,
     ) -> VFSStorageListResult:
-        return await self._db_source.search(querier)
+        return await self._db_source.search(searcher)

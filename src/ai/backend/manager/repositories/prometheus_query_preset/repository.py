@@ -22,6 +22,7 @@ from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source import PrometheusQueryPresetDBSource
 
@@ -61,8 +62,9 @@ class PrometheusQueryPresetRepository:
         self,
         db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = PrometheusQueryPresetDBSource(db)
+        self._db_source = PrometheusQueryPresetDBSource(db, v2_ops_provider)
         self._prometheus_client = prometheus_client
 
     @prometheus_query_preset_repository_resilience.apply()

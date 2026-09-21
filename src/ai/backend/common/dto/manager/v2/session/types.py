@@ -26,7 +26,9 @@ __all__ = (
     "SessionStatusFilter",
     "SessionTypeEnum",
     "SessionTypeFilter",
+    "SessionUsage",
     "SessionUsedBy",
+    "SessionUses",
 )
 
 
@@ -139,20 +141,37 @@ class NetworkTypeFilter(EnumFilter[NetworkTypeEnum]):
 
 
 class SessionUsedBy(BaseRequestModel):
-    """Entities whose use narrows the sessions read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Sessions the caller cannot read
-    are left out even when a listed entity uses them.
-    """
+    """Entities whose use of the session narrows the result."""
 
     deployment: list[UUID] | None = Field(
         default=None, description="Deployments whose route rows the session serves as a replica"
     )
+
+
+class SessionUses(BaseRequestModel):
+    """Entities the session uses, whose ids narrow the result."""
+
+    image: list[UUID] | None = Field(default=None, description="Images the session's kernels run")
     agent: list[UUID] | None = Field(
         default=None, description="Agents running a kernel of the session"
     )
     resource_group: list[UUID] | None = Field(
         default=None, description="Resource groups the session runs in"
+    )
+
+
+class SessionUsage(BaseRequestModel):
+    """Uses narrowing the sessions read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Sessions the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    used_by: SessionUsedBy | None = Field(
+        default=None, description="Entities whose use of the session narrows the result"
+    )
+    uses: SessionUses | None = Field(
+        default=None, description="Entities the session uses, whose ids narrow the result"
     )
 
 

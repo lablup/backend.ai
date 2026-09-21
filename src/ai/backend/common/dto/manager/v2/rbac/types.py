@@ -14,6 +14,7 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     RoleStatus,
 )
+from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
@@ -118,13 +119,8 @@ class RoleStatusFilter(BaseRequestModel):
     not_in: list[str] | None = None
 
 
-class PermissionBitFilter(BaseRequestModel):
+class PermissionBitFilter(EnumFilter[PermissionBitDTO]):
     """Filter for a permission-bit column over ``PermissionBitDTO``."""
-
-    equals: PermissionBitDTO | None = None
-    in_: list[PermissionBitDTO] | None = None
-    not_equals: PermissionBitDTO | None = None
-    not_in: list[PermissionBitDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):

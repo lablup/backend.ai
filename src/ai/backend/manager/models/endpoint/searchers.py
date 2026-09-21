@@ -8,7 +8,9 @@ from typing import Any, override
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
@@ -86,3 +88,37 @@ class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
             revision_history_ids=[current_revision_id] if current_revision_id is not None else [],
             policy=policy,
         )
+
+
+@dataclass
+class DeploymentIDSearcher(Searcher[EndpointRow, DeploymentID]):
+    """Deployment rows read as their ids alone."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(EndpointRow)
+
+    @override
+    def to_data(self, row: EndpointRow) -> DeploymentID:
+        return DeploymentSearchableFields.own.entity_id.read(row)
+
+
+@dataclass
+class DeploymentInfoSearcher(Searcher[EndpointRow, DeploymentInfo]):
+    """Deployment rows read with the revision rows embedded.
+
+    The REST v1 surface and the reconcilers need the current and deploying revision
+    themselves, so both are loaded with the page.
+    """
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(EndpointRow).options(
+            selectinload(EndpointRow.current_revision_row),
+            selectinload(EndpointRow.deploying_revision_row),
+            selectinload(EndpointRow.deployment_policy),
+        )
+
+    @override
+    def to_data(self, row: EndpointRow) -> DeploymentInfo:
+        return row.to_deployment_info()
