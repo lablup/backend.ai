@@ -11,7 +11,12 @@ from pydantic import Field, field_validator, model_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -53,6 +58,7 @@ __all__ = (
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
+    "RolePermissionNestedFilter",
     "RoleUsage",
     "RoleUses",
     "RoleOrderBy",
@@ -297,6 +303,31 @@ class PermissionNestedFilter(BaseRequestModel):
 PermissionNestedFilter.model_rebuild()
 
 
+class PermissionFilter(BaseRequestModel):
+    """Filter for scoped permissions."""
+
+    role_id: UUIDFilter | None = None
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = Field(
+        default=None, description="Filter by the permission bit the entry grants."
+    )
+    created_at: DateTimeFilter | None = None
+    AND: list[PermissionFilter] | None = None
+    OR: list[PermissionFilter] | None = None
+    NOT: list[PermissionFilter] | None = None
+
+
+PermissionFilter.model_rebuild()
+
+
+class RolePermissionNestedFilter(ToManyFilter[PermissionFilter]):
+    """The `permissions` field of a role filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the role filter's own `AND`.
+    """
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
@@ -312,6 +343,9 @@ class RoleFilter(BaseRequestModel):
         deprecated=True,
     )
     mapped_scope: MappedScopeNestedFilter | None = None
+    permissions: RolePermissionNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the role's permission entries."
+    )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -377,20 +411,6 @@ class EntityFilter(BaseRequestModel):
 
 
 EntityFilter.model_rebuild()
-
-
-class PermissionFilter(BaseRequestModel):
-    """Filter for scoped permissions."""
-
-    role_id: UUIDFilter | None = None
-    entity_type: StringFilter | None = None
-    created_at: DateTimeFilter | None = None
-    AND: list[PermissionFilter] | None = None
-    OR: list[PermissionFilter] | None = None
-    NOT: list[PermissionFilter] | None = None
-
-
-PermissionFilter.model_rebuild()
 
 
 class RoleOrderBy(BaseRequestModel):

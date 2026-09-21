@@ -51,6 +51,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     ReplaceRolePermissionsInput as ReplaceRolePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    RolePermissionNestedFilter as RolePermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -338,6 +341,13 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
     entity_type: StringFilter | None = None
+    permission: PermissionBitFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the permission bit the entry grants.",
+        ),
+        default=None,
+    )
     created_at: DateTimeFilter | None = None
     scope_type: RBACElementTypeFilterGQL | None = gql_field(
         description="Scope type.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
@@ -348,6 +358,38 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter roles by conditions on the permission entries they carry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RolePermissionNestedFilter",
+)
+class RolePermissionNestedFilterGQL(PydanticInputMixin[RolePermissionNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "Matches roles that carry at least one permission entry when true, and roles "
+            "carrying none when false. Says nothing about what the entries hold."
+        ),
+        default=None,
+    )
+    some: PermissionFilter | None = gql_field(
+        description="Matches roles with at least one permission entry satisfying all conditions.",
+        default=None,
+    )
+    every: PermissionFilter | None = gql_field(
+        description=(
+            "Matches roles whose every permission entry satisfies all conditions "
+            "(also true when the role carries none)."
+        ),
+        default=None,
+    )
+    none: PermissionFilter | None = gql_field(
+        description="Matches roles with no permission entry satisfying all conditions.",
+        default=None,
+    )
 
 
 # ==================== OrderBy Types ====================

@@ -10663,6 +10663,9 @@ type PermissionEdge {
 input PermissionFilter {
   roleId: UUIDFilter = null
   entityType: StringFilter = null
+
+  """Added in 26.9.0. Filter by the permission bit the entry grants."""
+  permission: PermissionBitFilter = null
   createdAt: DateTimeFilter = null
 
   """Scope type."""
@@ -14869,6 +14872,11 @@ input RoleFilter {
   """Filter roles by the users holding them."""
   assignedUser: RoleUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter reaching the rows that join a role to a user cannot check whether the caller may read that user. Search roles within that user's scope instead.")
   mappedScope: RoleMappedScopeNestedFilter = null
+
+  """
+  Added in 26.9.0. Filter by conditions on the role's permission entries.
+  """
+  permissions: RolePermissionNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -15027,6 +15035,29 @@ enum RoleOrderField {
   NAME
   CREATED_AT
   UPDATED_AT
+}
+
+"""
+Added in 26.9.0. Filter roles by conditions on the permission entries they carry.
+"""
+input RolePermissionNestedFilter {
+  """
+  Matches roles that carry at least one permission entry when true, and roles carrying none when false. Says nothing about what the entries hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches roles with at least one permission entry satisfying all conditions.
+  """
+  some: PermissionFilter = null
+
+  """
+  Matches roles whose every permission entry satisfies all conditions (also true when the role carries none).
+  """
+  every: PermissionFilter = null
+
+  """Matches roles with no permission entry satisfying all conditions."""
+  none: PermissionFilter = null
 }
 
 """Added in 26.4.4. A stored permission entry under a role preset."""

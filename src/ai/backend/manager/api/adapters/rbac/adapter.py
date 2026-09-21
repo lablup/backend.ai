@@ -1075,6 +1075,10 @@ class RBACAdapter(BaseAdapter):
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
         ]
+        if f.permission is not None:
+            conditions.extend(
+                self._convert_permission_bit_filter(f.permission, fields.permission.filter)
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -1113,6 +1117,11 @@ class RBACAdapter(BaseAdapter):
             *self._convert_role_status_filter(f.status, fields.status.filter),
             *self._convert_assigned_user_nested_filter(f.assigned_user),
             *self._convert_mapped_scope_nested_filter(f.mapped_scope),
+            *self.apply_to_many_filter(
+                f.permissions,
+                RoleSearchableFields.nested.permissions.correlation,
+                self._convert_permission_filter,
+            ),
         ]
         if f.AND:
             for sub in f.AND:
