@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import abc
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,8 +23,8 @@ class ContainerRegistryAuthArgs:
         return {"auth": aiohttp.BasicAuth(self.username, self.password)}
 
 
-class AbstractContainerRegistryQuotaClient(abc.ABC):
-    @abc.abstractmethod
+class AbstractContainerRegistryQuotaClient(ABC):
+    @abstractmethod
     async def create_quota(
         self,
         project_info: ContainerRegistryProjectInfo,
@@ -33,7 +33,7 @@ class AbstractContainerRegistryQuotaClient(abc.ABC):
     ) -> None:
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     async def update_quota(
         self,
         project_info: ContainerRegistryProjectInfo,
@@ -42,13 +42,13 @@ class AbstractContainerRegistryQuotaClient(abc.ABC):
     ) -> None:
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     async def delete_quota(
         self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> None:
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     async def read_quota(
         self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> int:
