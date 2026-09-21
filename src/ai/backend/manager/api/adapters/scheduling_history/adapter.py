@@ -48,8 +48,12 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    DeploymentHistoryOrderField,
+    KernelHistoryOrderField,
     OrderDirection,
     ReplicaGroupHistoryOrderField,
+    RouteHistoryOrderField,
+    SessionHistoryOrderField,
     SubStepResultInfo,
 )
 from ai.backend.common.types import KernelId, SessionId
@@ -78,21 +82,11 @@ from ai.backend.manager.models.replica_group_history.searchable_fields import (
     ReplicaGroupHistorySearchableFields,
 )
 from ai.backend.manager.models.replica_group_history.searchers import ReplicaGroupHistorySearcher
-from ai.backend.manager.models.scheduling_history.conditions import (
-    DeploymentHistoryConditions,
-    KernelSchedulingHistoryConditions,
-    RouteHistoryConditions,
-    SessionSchedulingHistoryConditions,
-)
-from ai.backend.manager.models.scheduling_history.orders import (
-    DEPLOYMENT_DEFAULT_FORWARD_ORDER,
-    KERNEL_DEFAULT_FORWARD_ORDER,
-    ROUTE_DEFAULT_FORWARD_ORDER,
-    SESSION_DEFAULT_FORWARD_ORDER,
-    resolve_deployment_order,
-    resolve_kernel_order,
-    resolve_route_order,
-    resolve_session_order,
+from ai.backend.manager.models.scheduling_history.deprecated_search import (
+    DeprecatedDeploymentHistoryConditions,
+    DeprecatedKernelSchedulingHistoryConditions,
+    DeprecatedRouteHistoryConditions,
+    DeprecatedSessionSchedulingHistoryConditions,
 )
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
@@ -107,6 +101,12 @@ from ai.backend.manager.models.scheduling_history.scopes import (
     SessionKernelHistoryTarget,
     SessionSchedulingHistoryTarget,
 )
+from ai.backend.manager.models.scheduling_history.searchable_fields import (
+    DeploymentHistorySearchableFields,
+    KernelSchedulingHistorySearchableFields,
+    RouteHistorySearchableFields,
+    SessionSchedulingHistorySearchableFields,
+)
 from ai.backend.manager.models.scheduling_history.searchers import (
     DeploymentHistorySearcher,
     KernelSchedulingHistorySearcher,
@@ -116,7 +116,6 @@ from ai.backend.manager.models.scheduling_history.searchers import (
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
 )
@@ -135,6 +134,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_his
 )
 from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.lookup_replica_deployment import (
+    LookupReplicaDeploymentAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
@@ -166,29 +168,31 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_scope
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 
 _SESSION_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=SESSION_DEFAULT_FORWARD_ORDER,
+    forward_order=SessionSchedulingHistorySearchableFields.own.created_at.order.apply(
+        ascending=False
+    ),
     cursor_column=SessionSchedulingHistoryRow.id,
 )
 
 _KERNEL_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
+    forward_order=KernelSchedulingHistorySearchableFields.own.created_at.order.apply(
+        ascending=False
+    ),
     cursor_column=KernelSchedulingHistoryRow.id,
 )
 
 _DEPLOYMENT_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=DEPLOYMENT_DEFAULT_FORWARD_ORDER,
+    forward_order=DeploymentHistorySearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=DeploymentHistoryRow.id,
 )
 
 _REPLICA_GROUP_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ReplicaGroupHistorySearchableFields.own.created_at.order.apply(
-        ascending=False
-    ),
+    forward_order=ReplicaGroupHistorySearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=ReplicaGroupHistoryRow.id,
 )
 
 _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ROUTE_DEFAULT_FORWARD_ORDER,
+    forward_order=RouteHistorySearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=RouteHistoryRow.id,
 )
 
@@ -271,17 +275,9 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchSessionHistoriesInput,
     ) -> AdminSearchSessionHistoriesPayload:
         """Search session scheduling histories (admin, no scope)."""
-        querier = self._build_session_querier(input)
         action_result = await self._scheduling_history.search_session_history.run(
             SearchSessionHistoryAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=SessionSchedulingHistorySearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+                searcher=GlobalSearcher(used_by=(), searcher=self._build_session_searcher(input))
             )
         )
         return AdminSearchSessionHistoriesPayload(
@@ -298,10 +294,11 @@ class SchedulingHistoryAdapter(BaseAdapter):
     ) -> AdminSearchSessionHistoriesPayload:
         """Search session scheduling histories scoped to a session."""
         scope = SessionSchedulingHistoryTarget(session_id=session_id)
-        querier = self._build_session_querier(input)
         action_result = await self._scheduling_history.search_session_scoped_history.run(
             SearchSessionScopedHistoryAction(
-                session_id=SessionID(session_id), scope=scope, querier=querier
+                session_id=SessionID(session_id),
+                scope=scope,
+                searcher=self._build_session_searcher(input),
             )
         )
         return AdminSearchSessionHistoriesPayload(
@@ -311,12 +308,13 @@ class SchedulingHistoryAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_session_querier(self, input: AdminSearchSessionHistoriesInput) -> BatchQuerier:
-        conditions = self._convert_session_filter(input.filter) if input.filter else []
-        orders = self._convert_session_orders(input.order) if input.order else []
-        return self._build_querier(
-            conditions=conditions,
-            orders=orders,
+    def _build_session_searcher(
+        self, input: AdminSearchSessionHistoriesInput
+    ) -> SessionSchedulingHistorySearcher:
+        return self._build_searcher(
+            SessionSchedulingHistorySearcher,
+            conditions=self._convert_session_filter(input.filter) if input.filter else [],
+            orders=self._convert_session_orders(input.order) if input.order else [],
             pagination_spec=_SESSION_HISTORY_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -327,102 +325,21 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     def _convert_session_filter(self, filter: SessionHistoryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.id is not None:
-            condition = self.convert_uuid_filter(
-                filter.id,
-                equals_factory=SessionSchedulingHistoryConditions.by_id_filter,
-                in_factory=SessionSchedulingHistoryConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.session_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.session_id,
-                equals_factory=SessionSchedulingHistoryConditions.by_session_id_filter,
-                in_factory=SessionSchedulingHistoryConditions.by_session_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=SessionSchedulingHistoryConditions.by_phase_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
-                in_factory=SessionSchedulingHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.from_status is not None and filter.from_status:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_from_statuses(filter.from_status)
-            )
-        if filter.to_status is not None and filter.to_status:
-            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(filter.to_status))
-        if filter.result is not None:
-            r = filter.result
-            if r.equals is not None:
-                conditions.append(
-                    SessionSchedulingHistoryConditions.by_result(SchedulingResult(r.equals))
-                )
-            if r.in_ is not None and r.in_:
-                conditions.append(
-                    SessionSchedulingHistoryConditions.by_results([
-                        SchedulingResult(v) for v in r.in_
-                    ])
-                )
-            if r.not_equals is not None:
-                conditions.append(
-                    SessionSchedulingHistoryConditions.by_result_not_equals(
-                        SchedulingResult(r.not_equals)
-                    )
-                )
-            if r.not_in is not None and r.not_in:
-                conditions.append(
-                    SessionSchedulingHistoryConditions.by_result_not_in([
-                        SchedulingResult(v) for v in r.not_in
-                    ])
-                )
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=SessionSchedulingHistoryConditions.by_error_code_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
-                in_factory=SessionSchedulingHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=SessionSchedulingHistoryConditions.by_message_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
-                in_factory=SessionSchedulingHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=SessionSchedulingHistoryConditions.by_created_at_before,
-                after_factory=SessionSchedulingHistoryConditions.by_created_at_after,
-                equals_factory=SessionSchedulingHistoryConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.updated_at is not None:
-            condition = filter.updated_at.build_query_condition(
-                before_factory=SessionSchedulingHistoryConditions.by_updated_at_before,
-                after_factory=SessionSchedulingHistoryConditions.by_updated_at_after,
-                equals_factory=SessionSchedulingHistoryConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = SessionSchedulingHistorySearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._convert_result_filter(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(
+                filter.message, DeprecatedSessionSchedulingHistoryConditions.message
+            ),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.updated_at, fields.updated_at.filter),
+        ]
         if filter.AND:
             for sub in filter.AND:
                 conditions.extend(self._convert_session_filter(sub))
@@ -442,7 +359,18 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_session_orders(order: list[SessionHistoryOrder]) -> list[QueryOrder]:
-        return [resolve_session_order(o.field, o.direction) for o in order]
+        fields = SessionSchedulingHistorySearchableFields.own
+        orders: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case SessionHistoryOrderField.CREATED_AT:
+                    orders.append(fields.created_at.order.apply(ascending))
+                case SessionHistoryOrderField.UPDATED_AT:
+                    orders.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return orders
 
     # ========== Kernel History ==========
 
@@ -451,30 +379,13 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchKernelHistoriesInput,
     ) -> SearchKernelHistoriesPayload:
         """Search kernel scheduling histories (admin, no scope)."""
-        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
-        orders = self._convert_kernel_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_KERNEL_HISTORY_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
+        searcher = self._build_kernel_searcher(
+            self._convert_kernel_filter(input.filter) if input.filter else [],
+            self._convert_kernel_orders(input.order) if input.order else [],
+            input,
         )
         action_result = await self._scheduling_history.search_kernel_history.run(
-            SearchKernelHistoryAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=KernelSchedulingHistorySearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
-            )
+            SearchKernelHistoryAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchKernelHistoriesPayload(
             items=[self._kernel_data_to_dto(h) for h in action_result.items],
@@ -511,13 +422,33 @@ class SchedulingHistoryAdapter(BaseAdapter):
             )
             session_id = SessionId(owner.entity_id())
             conditions.append(
-                KernelSchedulingHistoryConditions.by_kernel_id_filter(
+                KernelSchedulingHistorySearchableFields.own.kernel_id.filter.equals(
                     UUIDEqualMatchSpec(value=kernel_id, negated=False)
                 )
             )
         else:
             session_id = SessionId(session_items[0].value)
-        querier = self._build_querier(
+        action_result = await self._scheduling_history.search_kernel_scoped_history.run(
+            SearchKernelScopedHistoryAction(
+                target=SessionKernelHistoryTarget(session_id=session_id),
+                searcher=self._build_kernel_searcher(conditions, orders, input),
+            )
+        )
+        return SearchKernelHistoriesPayload(
+            items=[self._kernel_data_to_dto(h) for h in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_kernel_searcher(
+        self,
+        conditions: list[QueryCondition],
+        orders: list[QueryOrder],
+        input: AdminSearchKernelHistoriesInput | ScopedSearchKernelHistoriesInput,
+    ) -> KernelSchedulingHistorySearcher:
+        return self._build_searcher(
+            KernelSchedulingHistorySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_KERNEL_HISTORY_PAGINATION_SPEC,
@@ -528,124 +459,24 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._scheduling_history.search_kernel_scoped_history.run(
-            SearchKernelScopedHistoryAction(
-                target=SessionKernelHistoryTarget(session_id=session_id),
-                querier=querier,
-            )
-        )
-        return SearchKernelHistoriesPayload(
-            items=[self._kernel_data_to_dto(h) for h in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
 
     def _convert_kernel_filter(self, filter: KernelHistoryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.id is not None:
-            condition = self.convert_uuid_filter(
-                filter.id,
-                equals_factory=KernelSchedulingHistoryConditions.by_id_filter,
-                in_factory=KernelSchedulingHistoryConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.kernel_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.kernel_id,
-                equals_factory=KernelSchedulingHistoryConditions.by_kernel_id_filter,
-                in_factory=KernelSchedulingHistoryConditions.by_kernel_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.session_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.session_id,
-                equals_factory=KernelSchedulingHistoryConditions.by_session_id_filter,
-                in_factory=KernelSchedulingHistoryConditions.by_session_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=KernelSchedulingHistoryConditions.by_phase_contains,
-                equals_factory=KernelSchedulingHistoryConditions.by_phase_equals,
-                starts_with_factory=KernelSchedulingHistoryConditions.by_phase_starts_with,
-                ends_with_factory=KernelSchedulingHistoryConditions.by_phase_ends_with,
-                in_factory=KernelSchedulingHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.from_status is not None and filter.from_status:
-            conditions.append(
-                KernelSchedulingHistoryConditions.by_from_statuses(filter.from_status)
-            )
-        if filter.to_status is not None and filter.to_status:
-            conditions.append(KernelSchedulingHistoryConditions.by_to_statuses(filter.to_status))
-        if filter.result is not None:
-            r = filter.result
-            if r.equals is not None:
-                conditions.append(
-                    KernelSchedulingHistoryConditions.by_result(SchedulingResult(r.equals))
-                )
-            if r.in_ is not None and r.in_:
-                conditions.append(
-                    KernelSchedulingHistoryConditions.by_results([
-                        SchedulingResult(v) for v in r.in_
-                    ])
-                )
-            if r.not_equals is not None:
-                conditions.append(
-                    KernelSchedulingHistoryConditions.by_result_not_equals(
-                        SchedulingResult(r.not_equals)
-                    )
-                )
-            if r.not_in is not None and r.not_in:
-                conditions.append(
-                    KernelSchedulingHistoryConditions.by_result_not_in([
-                        SchedulingResult(v) for v in r.not_in
-                    ])
-                )
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=KernelSchedulingHistoryConditions.by_error_code_contains,
-                equals_factory=KernelSchedulingHistoryConditions.by_error_code_equals,
-                starts_with_factory=KernelSchedulingHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=KernelSchedulingHistoryConditions.by_error_code_ends_with,
-                in_factory=KernelSchedulingHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=KernelSchedulingHistoryConditions.by_message_contains,
-                equals_factory=KernelSchedulingHistoryConditions.by_message_equals,
-                starts_with_factory=KernelSchedulingHistoryConditions.by_message_starts_with,
-                ends_with_factory=KernelSchedulingHistoryConditions.by_message_ends_with,
-                in_factory=KernelSchedulingHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=KernelSchedulingHistoryConditions.by_created_at_before,
-                after_factory=KernelSchedulingHistoryConditions.by_created_at_after,
-                equals_factory=KernelSchedulingHistoryConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.updated_at is not None:
-            condition = filter.updated_at.build_query_condition(
-                before_factory=KernelSchedulingHistoryConditions.by_updated_at_before,
-                after_factory=KernelSchedulingHistoryConditions.by_updated_at_after,
-                equals_factory=KernelSchedulingHistoryConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = KernelSchedulingHistorySearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
+            *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._convert_result_filter(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(
+                filter.message, DeprecatedKernelSchedulingHistoryConditions.message
+            ),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.updated_at, fields.updated_at.filter),
+        ]
         if filter.AND:
             for sub in filter.AND:
                 conditions.extend(self._convert_kernel_filter(sub))
@@ -665,7 +496,28 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_kernel_orders(order: list[KernelHistoryOrder]) -> list[QueryOrder]:
-        return [resolve_kernel_order(o.field, o.direction) for o in order]
+        fields = KernelSchedulingHistorySearchableFields.own
+        orders: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case KernelHistoryOrderField.CREATED_AT:
+                    orders.append(fields.created_at.order.apply(ascending))
+                case KernelHistoryOrderField.UPDATED_AT:
+                    orders.append(fields.updated_at.order.apply(ascending))
+                case KernelHistoryOrderField.PHASE:
+                    orders.append(fields.phase.order.apply(ascending))
+                case KernelHistoryOrderField.FROM_STATUS:
+                    orders.append(fields.from_status.order.apply(ascending))
+                case KernelHistoryOrderField.TO_STATUS:
+                    orders.append(fields.to_status.order.apply(ascending))
+                case KernelHistoryOrderField.RESULT:
+                    orders.append(fields.result.order.apply(ascending))
+                case KernelHistoryOrderField.ATTEMPTS:
+                    orders.append(fields.attempts.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return orders
 
     # ========== Deployment History ==========
 
@@ -674,17 +526,9 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchDeploymentHistoriesInput,
     ) -> AdminSearchDeploymentHistoriesPayload:
         """Search deployment histories (admin, no scope)."""
-        querier = self._build_deployment_querier(input)
         action_result = await self._scheduling_history.search_deployment_history.run(
             SearchDeploymentHistoryAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=DeploymentHistorySearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+                searcher=GlobalSearcher(used_by=(), searcher=self._build_deployment_searcher(input))
             )
         )
         return AdminSearchDeploymentHistoriesPayload(
@@ -701,10 +545,11 @@ class SchedulingHistoryAdapter(BaseAdapter):
     ) -> AdminSearchDeploymentHistoriesPayload:
         """Search deployment histories scoped to a deployment."""
         scope = DeploymentHistoryTarget(deployment_id=deployment_id)
-        querier = self._build_deployment_querier(input)
         action_result = await self._scheduling_history.search_deployment_scoped_history.run(
             SearchDeploymentScopedHistoryAction(
-                deployment_id=DeploymentID(deployment_id), scope=scope, querier=querier
+                deployment_id=DeploymentID(deployment_id),
+                scope=scope,
+                searcher=self._build_deployment_searcher(input),
             )
         )
         return AdminSearchDeploymentHistoriesPayload(
@@ -714,12 +559,13 @@ class SchedulingHistoryAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_deployment_querier(self, input: AdminSearchDeploymentHistoriesInput) -> BatchQuerier:
-        conditions = self._convert_deployment_filter(input.filter) if input.filter else []
-        orders = self._convert_deployment_orders(input.order) if input.order else []
-        return self._build_querier(
-            conditions=conditions,
-            orders=orders,
+    def _build_deployment_searcher(
+        self, input: AdminSearchDeploymentHistoriesInput
+    ) -> DeploymentHistorySearcher:
+        return self._build_searcher(
+            DeploymentHistorySearcher,
+            conditions=self._convert_deployment_filter(input.filter) if input.filter else [],
+            orders=self._convert_deployment_orders(input.order) if input.order else [],
             pagination_spec=_DEPLOYMENT_HISTORY_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -730,94 +576,21 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
 
     def _convert_deployment_filter(self, filter: DeploymentHistoryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.id is not None:
-            condition = self.convert_uuid_filter(
-                filter.id,
-                equals_factory=DeploymentHistoryConditions.by_id_filter,
-                in_factory=DeploymentHistoryConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.deployment_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.deployment_id,
-                equals_factory=DeploymentHistoryConditions.by_deployment_id_filter,
-                in_factory=DeploymentHistoryConditions.by_deployment_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=DeploymentHistoryConditions.by_phase_contains,
-                equals_factory=DeploymentHistoryConditions.by_phase_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
-                in_factory=DeploymentHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.from_status is not None and filter.from_status:
-            conditions.append(DeploymentHistoryConditions.by_from_statuses(filter.from_status))
-        if filter.to_status is not None and filter.to_status:
-            conditions.append(DeploymentHistoryConditions.by_to_statuses(filter.to_status))
-        if filter.result is not None:
-            r = filter.result
-            if r.equals is not None:
-                conditions.append(DeploymentHistoryConditions.by_result(SchedulingResult(r.equals)))
-            if r.in_ is not None and r.in_:
-                conditions.append(
-                    DeploymentHistoryConditions.by_results([SchedulingResult(v) for v in r.in_])
-                )
-            if r.not_equals is not None:
-                conditions.append(
-                    DeploymentHistoryConditions.by_result_not_equals(SchedulingResult(r.not_equals))
-                )
-            if r.not_in is not None and r.not_in:
-                conditions.append(
-                    DeploymentHistoryConditions.by_result_not_in([
-                        SchedulingResult(v) for v in r.not_in
-                    ])
-                )
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=DeploymentHistoryConditions.by_error_code_contains,
-                equals_factory=DeploymentHistoryConditions.by_error_code_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
-                in_factory=DeploymentHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=DeploymentHistoryConditions.by_message_contains,
-                equals_factory=DeploymentHistoryConditions.by_message_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
-                in_factory=DeploymentHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=DeploymentHistoryConditions.by_created_at_before,
-                after_factory=DeploymentHistoryConditions.by_created_at_after,
-                equals_factory=DeploymentHistoryConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.updated_at is not None:
-            condition = filter.updated_at.build_query_condition(
-                before_factory=DeploymentHistoryConditions.by_updated_at_before,
-                after_factory=DeploymentHistoryConditions.by_updated_at_after,
-                equals_factory=DeploymentHistoryConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = DeploymentHistorySearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._convert_result_filter(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(
+                filter.message, DeprecatedDeploymentHistoryConditions.message
+            ),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.updated_at, fields.updated_at.filter),
+        ]
         if filter.AND:
             for sub in filter.AND:
                 conditions.extend(self._convert_deployment_filter(sub))
@@ -837,7 +610,18 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_deployment_orders(order: list[DeploymentHistoryOrder]) -> list[QueryOrder]:
-        return [resolve_deployment_order(o.field, o.direction) for o in order]
+        fields = DeploymentHistorySearchableFields.own
+        orders: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case DeploymentHistoryOrderField.CREATED_AT:
+                    orders.append(fields.created_at.order.apply(ascending))
+                case DeploymentHistoryOrderField.UPDATED_AT:
+                    orders.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return orders
 
     # ========== Replica Group History ==========
 
@@ -846,28 +630,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchReplicaGroupHistoriesInput,
     ) -> SearchReplicaGroupHistoriesPayload:
         """Search replica-group scheduling histories (admin, no scope)."""
-        conditions = self._convert_replica_group_filter(input.filter) if input.filter else []
-        orders = self._convert_replica_group_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_REPLICA_GROUP_HISTORY_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
         action_result = await self._scheduling_history.global_search_replica_group_history.run(
             GlobalSearchReplicaGroupHistoryAction(
                 searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=ReplicaGroupHistorySearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
+                    used_by=(), searcher=self._build_replica_group_searcher(input)
                 )
             )
         )
@@ -883,8 +649,6 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: ScopedSearchReplicaGroupHistoriesInput,
     ) -> SearchReplicaGroupHistoriesPayload:
         """Search replica-group scheduling histories under a non-admin scope."""
-        conditions = self._convert_replica_group_filter(input.filter) if input.filter else []
-        orders = self._convert_replica_group_orders(input.order) if input.order else []
         deployment_items = input.scope.deployment or []
         # TODO: Drop this rejection once the scoped search becomes a bulk action.
         # The scope input is already list-shaped and its items are meant to be
@@ -897,21 +661,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
         # A replica group is not an RBAC scope of its own, so its history is scoped by
         # the owning deployment.
         deployment_id = DeploymentID(deployment_items[0].value)
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_REPLICA_GROUP_HISTORY_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
         action_result = await self._scheduling_history.scoped_search_replica_group_history.run(
             ScopedSearchReplicaGroupHistoryAction(
                 target=DeploymentReplicaGroupHistoryTarget(deployment_id=deployment_id),
-                querier=querier,
+                searcher=self._build_replica_group_searcher(input),
             )
         )
         return SearchReplicaGroupHistoriesPayload(
@@ -919,6 +672,23 @@ class SchedulingHistoryAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_replica_group_searcher(
+        self,
+        input: AdminSearchReplicaGroupHistoriesInput | ScopedSearchReplicaGroupHistoriesInput,
+    ) -> ReplicaGroupHistorySearcher:
+        return self._build_searcher(
+            ReplicaGroupHistorySearcher,
+            conditions=self._convert_replica_group_filter(input.filter) if input.filter else [],
+            orders=self._convert_replica_group_orders(input.order) if input.order else [],
+            pagination_spec=_REPLICA_GROUP_HISTORY_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
 
     def _convert_replica_group_filter(
@@ -987,6 +757,115 @@ class SchedulingHistoryAdapter(BaseAdapter):
                     assert_never(o.field)
         return orders
 
+    # ========== Route History ==========
+
+    async def admin_search_route_history(
+        self,
+        input: AdminSearchRouteHistoriesInput,
+    ) -> AdminSearchRouteHistoriesPayload:
+        """Search route histories (admin, no scope)."""
+        action_result = await self._scheduling_history.search_route_history.run(
+            SearchRouteHistoryAction(
+                searcher=GlobalSearcher(used_by=(), searcher=self._build_route_searcher(input))
+            )
+        )
+        return AdminSearchRouteHistoriesPayload(
+            items=[self._route_data_to_dto(h) for h in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def route_scoped_search(
+        self,
+        route_id: UUID,
+        input: AdminSearchRouteHistoriesInput,
+    ) -> AdminSearchRouteHistoriesPayload:
+        """Search route histories scoped to a route.
+
+        A replica carries no permission of its own, so the deployment it serves is read
+        first and the read is answered for by that deployment.
+        """
+        replica_id = ReplicaID(route_id)
+        owner = await self._scheduling_history.lookup_replica_deployment.run(
+            LookupReplicaDeploymentAction(replica_id=replica_id)
+        )
+        scope = RouteHistoryTarget(
+            deployment_id=DeploymentID(owner.entity_id()), route_id=replica_id
+        )
+        action_result = await self._scheduling_history.search_route_scoped_history.run(
+            SearchRouteScopedHistoryAction(scope=scope, searcher=self._build_route_searcher(input))
+        )
+        return AdminSearchRouteHistoriesPayload(
+            items=[self._route_data_to_dto(h) for h in action_result.histories],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_route_searcher(self, input: AdminSearchRouteHistoriesInput) -> RouteHistorySearcher:
+        return self._build_searcher(
+            RouteHistorySearcher,
+            conditions=self._convert_route_filter(input.filter) if input.filter else [],
+            orders=self._convert_route_orders(input.order) if input.order else [],
+            pagination_spec=_ROUTE_HISTORY_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+
+    def _convert_route_filter(self, filter: RouteHistoryFilter) -> list[QueryCondition]:
+        fields = RouteHistorySearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.route_id, fields.route_id.filter),
+            *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._convert_result_filter(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(filter.message, DeprecatedRouteHistoryConditions.message),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.updated_at, fields.updated_at.filter),
+        ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_route_filter(sub))
+        if filter.OR:
+            or_conds: list[QueryCondition] = []
+            for sub in filter.OR:
+                or_conds.extend(self._convert_route_filter(sub))
+            if or_conds:
+                conditions.append(combine_conditions_or(or_conds))
+        if filter.NOT:
+            not_conds: list[QueryCondition] = []
+            for sub in filter.NOT:
+                not_conds.extend(self._convert_route_filter(sub))
+            if not_conds:
+                conditions.append(negate_conditions(not_conds))
+        return conditions
+
+    @staticmethod
+    def _convert_route_orders(order: list[RouteHistoryOrder]) -> list[QueryOrder]:
+        fields = RouteHistorySearchableFields.own
+        orders: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case RouteHistoryOrderField.CREATED_AT:
+                    orders.append(fields.created_at.order.apply(ascending))
+                case RouteHistoryOrderField.UPDATED_AT:
+                    orders.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return orders
+
+    # ========== Shared filter conversion ==========
+
     @staticmethod
     def _status_in(
         statuses: list[str] | None, conditions: StringConditions
@@ -1018,182 +897,6 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if result.not_in:
             applied.append(conditions.not_in([SchedulingResult(v) for v in result.not_in]))
         return applied
-
-    # ========== Route History ==========
-
-    async def admin_search_route_history(
-        self,
-        input: AdminSearchRouteHistoriesInput,
-    ) -> AdminSearchRouteHistoriesPayload:
-        """Search route histories (admin, no scope)."""
-        querier = self._build_route_querier(input)
-        action_result = await self._scheduling_history.search_route_history.run(
-            SearchRouteHistoryAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=RouteHistorySearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
-            )
-        )
-        return AdminSearchRouteHistoriesPayload(
-            items=[self._route_data_to_dto(h) for h in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def route_scoped_search(
-        self,
-        route_id: UUID,
-        input: AdminSearchRouteHistoriesInput,
-    ) -> AdminSearchRouteHistoriesPayload:
-        """Search route histories scoped to a route."""
-        scope = RouteHistoryTarget(route_id=ReplicaID(route_id))
-        querier = self._build_route_querier(input)
-        action_result = await self._scheduling_history.search_route_scoped_history.run(
-            SearchRouteScopedHistoryAction(scope=scope, querier=querier)
-        )
-        return AdminSearchRouteHistoriesPayload(
-            items=[self._route_data_to_dto(h) for h in action_result.histories],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    def _build_route_querier(self, input: AdminSearchRouteHistoriesInput) -> BatchQuerier:
-        conditions = self._convert_route_filter(input.filter) if input.filter else []
-        orders = self._convert_route_orders(input.order) if input.order else []
-        return self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_ROUTE_HISTORY_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-
-    def _convert_route_filter(self, filter: RouteHistoryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.id is not None:
-            condition = self.convert_uuid_filter(
-                filter.id,
-                equals_factory=RouteHistoryConditions.by_id_filter,
-                in_factory=RouteHistoryConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.route_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.route_id,
-                equals_factory=RouteHistoryConditions.by_route_id_filter,
-                in_factory=RouteHistoryConditions.by_route_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.deployment_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.deployment_id,
-                equals_factory=RouteHistoryConditions.by_deployment_id_filter,
-                in_factory=RouteHistoryConditions.by_deployment_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=RouteHistoryConditions.by_phase_contains,
-                equals_factory=RouteHistoryConditions.by_phase_equals,
-                starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
-                in_factory=RouteHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.from_status is not None and filter.from_status:
-            conditions.append(RouteHistoryConditions.by_from_statuses(filter.from_status))
-        if filter.to_status is not None and filter.to_status:
-            conditions.append(RouteHistoryConditions.by_to_statuses(filter.to_status))
-        if filter.result is not None:
-            r = filter.result
-            if r.equals is not None:
-                conditions.append(RouteHistoryConditions.by_result(SchedulingResult(r.equals)))
-            if r.in_ is not None and r.in_:
-                conditions.append(
-                    RouteHistoryConditions.by_results([SchedulingResult(v) for v in r.in_])
-                )
-            if r.not_equals is not None:
-                conditions.append(
-                    RouteHistoryConditions.by_result_not_equals(SchedulingResult(r.not_equals))
-                )
-            if r.not_in is not None and r.not_in:
-                conditions.append(
-                    RouteHistoryConditions.by_result_not_in([SchedulingResult(v) for v in r.not_in])
-                )
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=RouteHistoryConditions.by_error_code_contains,
-                equals_factory=RouteHistoryConditions.by_error_code_equals,
-                starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
-                in_factory=RouteHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=RouteHistoryConditions.by_message_contains,
-                equals_factory=RouteHistoryConditions.by_message_equals,
-                starts_with_factory=RouteHistoryConditions.by_message_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_message_ends_with,
-                in_factory=RouteHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=RouteHistoryConditions.by_created_at_before,
-                after_factory=RouteHistoryConditions.by_created_at_after,
-                equals_factory=RouteHistoryConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.updated_at is not None:
-            condition = filter.updated_at.build_query_condition(
-                before_factory=RouteHistoryConditions.by_updated_at_before,
-                after_factory=RouteHistoryConditions.by_updated_at_after,
-                equals_factory=RouteHistoryConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.AND:
-            for sub in filter.AND:
-                conditions.extend(self._convert_route_filter(sub))
-        if filter.OR:
-            or_conds: list[QueryCondition] = []
-            for sub in filter.OR:
-                or_conds.extend(self._convert_route_filter(sub))
-            if or_conds:
-                conditions.append(combine_conditions_or(or_conds))
-        if filter.NOT:
-            not_conds: list[QueryCondition] = []
-            for sub in filter.NOT:
-                not_conds.extend(self._convert_route_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
-        return conditions
-
-    @staticmethod
-    def _convert_route_orders(order: list[RouteHistoryOrder]) -> list[QueryOrder]:
-        return [resolve_route_order(o.field, o.direction) for o in order]
 
     # ========== Data → DTO Conversion ==========
 

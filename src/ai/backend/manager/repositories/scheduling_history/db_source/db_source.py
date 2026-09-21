@@ -21,26 +21,20 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.kernel import KernelNotFound
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.searchable_fields import (
-    ReplicaGroupHistorySearchableFields,
-)
-from ai.backend.manager.models.scheduling_history import (
-    DeploymentHistoryRow,
-    KernelSchedulingHistoryRow,
-    RouteHistoryRow,
-    SessionSchedulingHistoryRow,
-)
+from ai.backend.manager.models.replica_group_history.searchers import ReplicaGroupHistorySearcher
 from ai.backend.manager.models.scheduling_history.scopes import (
     DeploymentHistoryTarget,
     RouteHistoryTarget,
     SessionSchedulingHistoryTarget,
 )
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
+from ai.backend.manager.models.scheduling_history.searchers import (
+    DeploymentHistorySearcher,
+    KernelSchedulingHistorySearcher,
+    RouteHistorySearcher,
+    SessionSchedulingHistorySearcher,
 )
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -53,31 +47,28 @@ class SchedulingHistoryDBSource:
     """Database source for scheduling history operations (read-only)."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     # ========== Session History (Admin) ==========
 
     async def search_session_scoped_history(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSchedulingHistorySearcher,
         scope: SessionSchedulingHistoryTarget,
     ) -> SessionSchedulingHistoryListResult:
         """Search session scheduling history within scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionSchedulingHistoryRow)
-
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.SessionSchedulingHistoryRow.to_data() for row in result.rows]
-
-            return SessionSchedulingHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return SessionSchedulingHistoryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ========== Kernel History (Admin) ==========
 
@@ -96,89 +87,66 @@ class SchedulingHistoryDBSource:
 
     async def search_kernel_scoped_history(
         self,
-        querier: BatchQuerier,
+        searcher: KernelSchedulingHistorySearcher,
         scopes: Sequence[OperationScope],
     ) -> KernelSchedulingHistoryListResult:
-        """Search kernel history whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelSchedulingHistoryRow)
-
-            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
-
-            items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
-
-            return KernelSchedulingHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search kernel history whose rows match any of ``scopes`` (OR)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes(scopes, searcher)
+        return KernelSchedulingHistoryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ========== Deployment History (Admin) ==========
 
     async def search_deployment_scoped_history(
         self,
-        querier: BatchQuerier,
+        searcher: DeploymentHistorySearcher,
         scope: DeploymentHistoryTarget,
     ) -> DeploymentHistoryListResult:
         """Search deployment history within scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DeploymentHistoryRow)
-
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.DeploymentHistoryRow.to_data() for row in result.rows]
-
-            return DeploymentHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return DeploymentHistoryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ========== Replica Group History (Scoped) ==========
 
     async def scoped_search_replica_group_history(
         self,
-        querier: BatchQuerier,
+        searcher: ReplicaGroupHistorySearcher,
         scopes: Sequence[OperationScope],
     ) -> ReplicaGroupHistoryListResult:
-        """Search replica-group history whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ReplicaGroupHistoryRow)
+        """Search replica-group history whose rows match any of ``scopes`` (OR)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes(scopes, searcher)
+        return ReplicaGroupHistoryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
-            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
-
-            items = [
-                ReplicaGroupHistorySearchableFields.own.to_data(row.ReplicaGroupHistoryRow)
-                for row in result.rows
-            ]
-
-            return ReplicaGroupHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ========== Route History (Admin) ==========
+    # ========== Route History (Scoped) ==========
 
     async def search_route_scoped_history(
         self,
-        querier: BatchQuerier,
+        searcher: RouteHistorySearcher,
         scope: RouteHistoryTarget,
     ) -> RouteHistoryListResult:
         """Search route history within scope."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(RouteHistoryRow)
-
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.RouteHistoryRow.to_data() for row in result.rows]
-
-            return RouteHistoryListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return RouteHistoryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

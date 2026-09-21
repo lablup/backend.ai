@@ -40,6 +40,9 @@ from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryR
 from ai.backend.manager.models.replica_group_history.searchable_fields import (
     ReplicaGroupHistorySearchableFields,
 )
+from ai.backend.manager.models.replica_group_history.searchers import (
+    ReplicaGroupHistorySearcher,
+)
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -53,9 +56,9 @@ from ai.backend.manager.models.scheduling_history.scopes import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.testutils.db import with_tables
 
@@ -119,7 +122,7 @@ class TestReplicaGroupHistoryRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[SchedulingHistoryRepository, None]:
         """Create SchedulingHistoryRepository instance with database"""
-        repo = SchedulingHistoryRepository(db=db_with_cleanup)
+        repo = SchedulingHistoryRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
 
     @pytest.fixture
@@ -306,13 +309,13 @@ class TestReplicaGroupHistoryRepository:
     ) -> None:
         """Test that the deployment scope returns every replica group's rows under it"""
         seed = replica_group_history_seed
-        querier = BatchQuerier(
+        searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier,
+            searcher,
             [DeploymentReplicaGroupHistoryTarget(deployment_id=seed.deployment_id)],
         )
 
@@ -324,10 +327,10 @@ class TestReplicaGroupHistoryRepository:
         scheduling_history_repository: SchedulingHistoryRepository,
         replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
-        """Test that a querier condition narrows further, still bounded by the scope"""
+        """Test that a searcher condition narrows further, still bounded by the scope"""
         seed = replica_group_history_seed
 
-        querier = BatchQuerier(
+        searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
                 ReplicaGroupHistorySearchableFields.own.category.filter.equals(
@@ -337,7 +340,7 @@ class TestReplicaGroupHistoryRepository:
             orders=[],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier,
+            searcher,
             [DeploymentReplicaGroupHistoryTarget(deployment_id=seed.deployment_id)],
         )
 
@@ -362,7 +365,7 @@ class TestReplicaGroupHistoryRepository:
         """
         seed = replica_group_history_seed
 
-        querier = BatchQuerier(
+        searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
                 ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.equals(
@@ -372,7 +375,7 @@ class TestReplicaGroupHistoryRepository:
             orders=[],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier,
+            searcher,
             [DeploymentReplicaGroupHistoryTarget(deployment_id=seed.deployment_id)],
         )
 
@@ -387,13 +390,13 @@ class TestReplicaGroupHistoryRepository:
         """Test that the requested order reaches the query"""
         seed = replica_group_history_seed
 
-        querier = BatchQuerier(
+        searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[ReplicaGroupHistorySearchableFields.own.attempts.order.apply(ascending=True)],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier,
+            searcher,
             [DeploymentReplicaGroupHistoryTarget(deployment_id=seed.deployment_id)],
         )
 
@@ -407,7 +410,7 @@ class TestReplicaGroupHistoryRepository:
         scheduling_history_repository: SchedulingHistoryRepository,
     ) -> None:
         """Test that the scope's existence check rejects a non-existent deployment"""
-        querier = BatchQuerier(
+        searcher = ReplicaGroupHistorySearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
@@ -415,6 +418,6 @@ class TestReplicaGroupHistoryRepository:
 
         with pytest.raises(EndpointNotFound):
             await scheduling_history_repository.scoped_search_replica_group_history(
-                querier,
+                searcher,
                 [DeploymentReplicaGroupHistoryTarget(deployment_id=DeploymentID(uuid.uuid4()))],
             )

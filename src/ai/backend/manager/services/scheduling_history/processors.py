@@ -14,7 +14,8 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, FieldOwnerLookupOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
@@ -47,6 +48,9 @@ from ai.backend.manager.services.scheduling_history.actions.lookup_owner import 
     LookupReplicaGroupHistoryOwnerAction,
     LookupRouteHistoryOwnerAction,
     LookupSessionSchedulingHistoryOwnerAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.lookup_replica_deployment import (
+    LookupReplicaDeploymentAction,
 )
 
 from .actions import (
@@ -116,8 +120,11 @@ class SchedulingHistoryProcessors:
     scoped_search_replica_group_history: ScopeActionProcessor[
         ScopedSearchReplicaGroupHistoryAction, ScopedSearchReplicaGroupHistoryActionResult
     ]
-    search_route_scoped_history: GlobalActionProcessor[
+    search_route_scoped_history: ScopeActionProcessor[
         SearchRouteScopedHistoryAction, SearchRouteScopedHistoryActionResult
+    ]
+    lookup_replica_deployment: LookupActionProcessor[
+        LookupReplicaDeploymentAction, FieldOwnerLookupOpsResult
     ]
 
     def __init__(
@@ -198,6 +205,9 @@ class SchedulingHistoryProcessors:
         self.scoped_search_replica_group_history = replica_group.scope(
             ScopedSearchReplicaGroupHistoryAction, service.scoped_search_replica_group_history
         )
-        self.search_route_scoped_history = deployment.global_scope(
+        self.search_route_scoped_history = deployment.scope(
             SearchRouteScopedHistoryAction, service.search_route_scoped_history
+        )
+        self.lookup_replica_deployment = deployment.key_owner_lookup_ops(
+            LookupReplicaDeploymentAction
         )

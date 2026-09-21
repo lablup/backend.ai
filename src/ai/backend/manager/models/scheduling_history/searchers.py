@@ -16,6 +16,12 @@ from ai.backend.manager.models.scheduling_history.row import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.scheduling_history.searchable_fields import (
+    DeploymentHistorySearchableFields,
+    KernelSchedulingHistorySearchableFields,
+    RouteHistorySearchableFields,
+    SessionSchedulingHistorySearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -31,7 +37,7 @@ class SessionSchedulingHistorySearcher(
 
     @override
     def to_data(self, row: SessionSchedulingHistoryRow) -> SessionSchedulingHistoryData:
-        return row.to_data()
+        return SessionSchedulingHistorySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -46,7 +52,7 @@ class KernelSchedulingHistorySearcher(
 
     @override
     def to_data(self, row: KernelSchedulingHistoryRow) -> KernelSchedulingHistoryData:
-        return row.to_data()
+        return KernelSchedulingHistorySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -59,7 +65,7 @@ class DeploymentHistorySearcher(Searcher[DeploymentHistoryRow, DeploymentHistory
 
     @override
     def to_data(self, row: DeploymentHistoryRow) -> DeploymentHistoryData:
-        return row.to_data()
+        return DeploymentHistorySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -72,4 +78,4 @@ class RouteHistorySearcher(Searcher[RouteHistoryRow, RouteHistoryData]):
 
     @override
     def to_data(self, row: RouteHistoryRow) -> RouteHistoryData:
-        return row.to_data()
+        return RouteHistorySearchableFields.own.to_data(row)
