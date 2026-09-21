@@ -1635,26 +1635,32 @@ class DeploymentAdapter(BaseAdapter):
         """
         if not endpoint_ids:
             return []
-        ids = [DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
-        got = await self._deployment.bulk_get.run(BulkGetDeploymentsAction(ids=ids))
-        readable = got.values()
-        errors = got.errors()
-        permitted = [deployment_id for deployment_id in ids if deployment_id in readable]
-        designated: Mapping[DeploymentID, DeploymentPolicyData] = {}
-        if permitted:
-            result = await self._deployment.bulk_get_deployment_policies.run(
-                BulkGetDeploymentPoliciesAction(deployment_ids=permitted)
+        deployment_ids = [DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
+        deployment_result = await self._deployment.bulk_get.run(
+            BulkGetDeploymentsAction(ids=deployment_ids)
+        )
+        readable_deployments = deployment_result.values()
+        deployment_failures = deployment_result.errors()
+        readable_deployment_ids = [
+            deployment_id
+            for deployment_id in deployment_ids
+            if deployment_id in readable_deployments
+        ]
+        policies_by_deployment: Mapping[DeploymentID, DeploymentPolicyData] = {}
+        if readable_deployment_ids:
+            policy_result = await self._deployment.bulk_get_deployment_policies.run(
+                BulkGetDeploymentPoliciesAction(deployment_ids=readable_deployment_ids)
             )
-            designated = result.designated
-        answers: list[DeploymentPolicyNode | Exception | None] = []
-        for deployment_id in ids:
-            error = self.batch_load_failure(errors.get(deployment_id))
-            if error is not None:
-                answers.append(error)
+            policies_by_deployment = policy_result.designated
+        policy_nodes: list[DeploymentPolicyNode | Exception | None] = []
+        for deployment_id in deployment_ids:
+            deployment_failure = self.batch_load_failure(deployment_failures.get(deployment_id))
+            if deployment_failure is not None:
+                policy_nodes.append(deployment_failure)
                 continue
-            policy = designated.get(deployment_id)
-            answers.append(self._policy_data_to_dto(policy) if policy is not None else None)
-        return answers
+            policy = policies_by_deployment.get(deployment_id)
+            policy_nodes.append(self._policy_data_to_dto(policy) if policy is not None else None)
+        return policy_nodes
 
     # ------------------------------------------------------------------
     # Querier builders
