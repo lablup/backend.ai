@@ -153,14 +153,14 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GlobalGetVolumePerfMetricActionResult,
     GlobalListAllHostsAction,
     GlobalListAllHostsActionResult,
-    GlobalListAllowedTypesAction,
-    GlobalListAllowedTypesActionResult,
     GlobalListMountsAction,
     GlobalListMountsActionResult,
     GlobalMountHostAction,
     GlobalMountHostActionResult,
     GlobalUmountHostAction,
     GlobalUmountHostActionResult,
+    PublicListAllowedTypesAction,
+    PublicListAllowedTypesActionResult,
     MountResultData,
     SearchHostsAction,
     SearchHostsActionResult,
@@ -632,13 +632,13 @@ class VFolderService:
                 await response.write_eof()
         return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder_data)
 
-    async def list_allowed_types(
-        self, action: GlobalListAllowedTypesAction
-    ) -> GlobalListAllowedTypesActionResult:
+    async def public_list_allowed_types(
+        self, action: PublicListAllowedTypesAction
+    ) -> PublicListAllowedTypesActionResult:
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
-        return GlobalListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
+        return PublicListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
 
     async def list_all_hosts(
         self, action: GlobalListAllHostsAction

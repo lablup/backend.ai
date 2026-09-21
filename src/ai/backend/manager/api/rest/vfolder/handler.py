@@ -208,10 +208,10 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GlobalGetFstabContentsAction,
     GlobalGetVolumePerfMetricAction,
     GlobalListAllHostsAction,
-    GlobalListAllowedTypesAction,
     GlobalListMountsAction,
     GlobalMountHostAction,
     GlobalUmountHostAction,
+    PublicListAllowedTypesAction,
     SearchHostsAction,
     UpdateQuotaAction,
 )
@@ -519,7 +519,7 @@ class VFolderHandler:
         self,
         ctx: UserContext,
     ) -> APIResponse:
-        result = await self._vfolder.list_allowed_types.run(GlobalListAllowedTypesAction())
+        result = await self._vfolder.public_list_allowed_types.run(PublicListAllowedTypesAction())
         resp = ListAllowedTypesResponse(result.allowed_types)
         return APIResponse.build(HTTPStatus.OK, resp)
 
