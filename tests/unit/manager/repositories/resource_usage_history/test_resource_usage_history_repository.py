@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -40,6 +41,10 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    DomainUsageBucketSearchableFields,
+    KernelUsageRecordSearchableFields,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -54,10 +59,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history import (
-    DomainUsageBucketConditions,
-    DomainUsageBucketOrders,
-    KernelUsageRecordConditions,
-    KernelUsageRecordOrders,
     ResourceUsageHistoryRepository,
 )
 from ai.backend.testutils.db import with_tables
@@ -398,8 +399,12 @@ class TestResourceUsageHistoryRepository:
         # Search by kernel using BatchQuerier
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[KernelUsageRecordConditions.by_kernel_id(kernel_id)],
-            orders=[KernelUsageRecordOrders.by_period_start()],
+            conditions=[
+                KernelUsageRecordSearchableFields.own.kernel_id.filter.equals(
+                    UUIDEqualMatchSpec(value=kernel_id, negated=False)
+                )
+            ],
+            orders=[KernelUsageRecordSearchableFields.own.period_start.order.apply(True)],
         )
         result = await resource_usage_history_repository.search_kernel_usage_records(querier)
 
@@ -444,10 +449,17 @@ class TestResourceUsageHistoryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                DomainUsageBucketConditions.by_resource_group(test_scaling_group),
-                DomainUsageBucketConditions.by_period_range(lookback_start, lookback_end),
+                DomainUsageBucketSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(test_scaling_group, case_insensitive=False, negated=False)
+                ),
+                DomainUsageBucketSearchableFields.own.period_start.filter.on_or_after(
+                    lookback_start
+                ),
+                DomainUsageBucketSearchableFields.own.period_start.filter.on_or_before(
+                    lookback_end
+                ),
             ],
-            orders=[DomainUsageBucketOrders.by_period_start()],
+            orders=[DomainUsageBucketSearchableFields.own.period_start.order.apply(True)],
         )
         result = await resource_usage_history_repository.search_domain_usage_buckets(querier)
 

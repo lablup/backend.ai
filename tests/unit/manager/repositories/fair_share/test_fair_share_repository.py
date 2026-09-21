@@ -14,6 +14,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -23,6 +24,9 @@ from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
+)
+from ai.backend.manager.models.fair_share.searchable_fields import (
+    DomainFairShareSearchableFields,
 )
 from ai.backend.manager.models.fair_share.upserters import (
     DomainFairShareUpserter,
@@ -59,8 +63,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareConditions,
-    DomainFairShareOrders,
     FairShareRepository,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -412,8 +414,12 @@ class TestFairShareRepository:
         # Search with BatchQuerier
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[DomainFairShareConditions.by_resource_group(test_scaling_group)],
-            orders=[DomainFairShareOrders.by_domain_name()],
+            conditions=[
+                DomainFairShareSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(test_scaling_group, case_insensitive=False, negated=False)
+                )
+            ],
+            orders=[DomainFairShareSearchableFields.own.domain_name.order.apply(True)],
         )
         result = await fair_share_repository.search_domain_fair_shares(querier)
 

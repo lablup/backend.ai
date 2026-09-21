@@ -10,7 +10,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     ProjectUsageBucketFilter as ProjectUsageBucketFilterDTO,
 )
@@ -38,8 +38,8 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.repositories.resource_usage_history.options import (
-    UserUsageBucketConditions,
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    UserUsageBucketSearchableFields,
 )
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
@@ -200,11 +200,15 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
 
         payload = await info.context.adapters.resource_usage.gql_search_user_unscoped(
             base_conditions=[
-                UserUsageBucketConditions.by_project_id(
+                UserUsageBucketSearchableFields.own.project_id.filter.equals(
                     UUIDEqualMatchSpec(value=self.project_id, negated=False)
                 ),
-                UserUsageBucketConditions.by_resource_group(self.resource_group_name),
-                UserUsageBucketConditions.by_period_start(self.metadata.period_start),
+                UserUsageBucketSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(self.resource_group_name, case_insensitive=False, negated=False)
+                ),
+                UserUsageBucketSearchableFields.own.period_start.filter.equals(
+                    self.metadata.period_start
+                ),
             ],
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

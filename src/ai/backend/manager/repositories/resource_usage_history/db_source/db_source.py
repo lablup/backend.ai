@@ -34,6 +34,12 @@ from ai.backend.manager.models.resource_usage_history.scopes import (
     ProjectUsageBucketTarget,
     UserUsageBucketTarget,
 )
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    DomainUsageBucketSearchableFields,
+    KernelUsageRecordSearchableFields,
+    ProjectUsageBucketSearchableFields,
+    UserUsageBucketSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -249,7 +255,10 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(KernelUsageRecordRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.KernelUsageRecordRow.to_data() for row in result.rows]
+            items = [
+                KernelUsageRecordSearchableFields.own.to_data(row.KernelUsageRecordRow)
+                for row in result.rows
+            ]
             return KernelUsageRecordSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -270,7 +279,10 @@ class ResourceUsageHistoryDBSource:
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope] if scope is not None else ()
             )
-            items = [row.DomainUsageBucketRow.to_data() for row in result.rows]
+            items = [
+                DomainUsageBucketSearchableFields.own.to_data(row.DomainUsageBucketRow)
+                for row in result.rows
+            ]
             return DomainUsageBucketSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -291,7 +303,10 @@ class ResourceUsageHistoryDBSource:
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope] if scope is not None else ()
             )
-            items = [row.ProjectUsageBucketRow.to_data() for row in result.rows]
+            items = [
+                ProjectUsageBucketSearchableFields.own.to_data(row.ProjectUsageBucketRow)
+                for row in result.rows
+            ]
             return ProjectUsageBucketSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -312,7 +327,10 @@ class ResourceUsageHistoryDBSource:
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope] if scope is not None else ()
             )
-            items = [row.UserUsageBucketRow.to_data() for row in result.rows]
+            items = [
+                UserUsageBucketSearchableFields.own.to_data(row.UserUsageBucketRow)
+                for row in result.rows
+            ]
             return UserUsageBucketSearchResult(
                 items=items,
                 total_count=result.total_count,

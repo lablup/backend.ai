@@ -17,6 +17,11 @@ from ai.backend.manager.models.resource_usage_history.row import (
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    DomainUsageBucketSearchableFields,
+    ProjectUsageBucketSearchableFields,
+    UserUsageBucketSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -28,7 +33,7 @@ class DomainUsageBucketSearcher(Searcher[DomainUsageBucketRow, DomainUsageBucket
 
     @override
     def to_data(self, row: DomainUsageBucketRow) -> DomainUsageBucketData:
-        return row.to_data()
+        return DomainUsageBucketSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -39,7 +44,7 @@ class ProjectUsageBucketSearcher(Searcher[ProjectUsageBucketRow, ProjectUsageBuc
 
     @override
     def to_data(self, row: ProjectUsageBucketRow) -> ProjectUsageBucketData:
-        return row.to_data()
+        return ProjectUsageBucketSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -50,4 +55,4 @@ class UserUsageBucketSearcher(Searcher[UserUsageBucketRow, UserUsageBucketData])
 
     @override
     def to_data(self, row: UserUsageBucketRow) -> UserUsageBucketData:
-        return row.to_data()
+        return UserUsageBucketSearchableFields.own.to_data(row)

@@ -33,10 +33,10 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.fair_share.conditions import (
-    RGDomainFairShareConditions,
-    RGProjectFairShareConditions,
-    RGUserFairShareConditions,
+from ai.backend.manager.models.fair_share.deprecated_search import (
+    DeprecatedDomainFairShareFields,
+    DeprecatedProjectFairShareFields,
+    DeprecatedUserFairShareFields,
 )
 from ai.backend.manager.models.fair_share.scopes import (
     DomainFairShareTarget,
@@ -553,7 +553,7 @@ class TestSearchDomainFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(
+                DeprecatedDomainFairShareFields.name.filter.equals(
                     StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
                 ),
             ],
@@ -581,7 +581,7 @@ class TestSearchDomainFairSharesEntityBased:
         querier_without = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(
+                DeprecatedDomainFairShareFields.name.filter.equals(
                     StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
                 ),
             ],
@@ -598,7 +598,7 @@ class TestSearchDomainFairSharesEntityBased:
         querier_with = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(
+                DeprecatedDomainFairShareFields.name.filter.equals(
                     StringMatchSpec(
                         domain_with_record.domain_name, case_insensitive=False, negated=False
                     )
@@ -989,7 +989,7 @@ class TestSearchProjectFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGProjectFairShareConditions.by_project_id(
+                DeprecatedProjectFairShareFields.id.filter.equals(
                     UUIDEqualMatchSpec(value=project_without_record, negated=False)
                 ),
             ],
@@ -1469,7 +1469,7 @@ class TestSearchUserFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGUserFairShareConditions.by_user_uuid(
+                DeprecatedUserFairShareFields.membership_user_id.filter.equals(
                     UUIDEqualMatchSpec(value=user_without_record, negated=False)
                 ),
             ],

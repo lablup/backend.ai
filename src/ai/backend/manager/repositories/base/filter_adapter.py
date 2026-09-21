@@ -6,6 +6,7 @@ Provides reusable conversion logic for common patterns.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from decimal import Decimal
 from typing import Any, final
 
@@ -17,6 +18,8 @@ from ai.backend.common.data.filter_specs import (
 )
 from ai.backend.common.dto.manager.query import (
     ArrayFilter,
+    DateFilter,
+    DateRangeFilter,
     DateTimeFilter,
     DecimalFilter,
     EnumFilter,
@@ -29,6 +32,7 @@ from ai.backend.common.dto.manager.query import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
+from ai.backend.manager.models.specs.conditions.date import DateConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
@@ -332,6 +336,38 @@ class BaseFilterAdapter:
         if datetime_filter.after is not None:
             return [conditions.after(datetime_filter.after)]
         return []
+
+    @final
+    def apply_date_filter(
+        self, date_filter: DateFilter | None, conditions: DateConditions
+    ) -> list[QueryCondition]:
+        """Apply the first of ``not_equals``, ``equals``, ``before``, ``after``."""
+        if date_filter is None:
+            return []
+        operations: list[tuple[date | None, Callable[[date], QueryCondition]]] = [
+            (date_filter.not_equals, conditions.not_equals),
+            (date_filter.equals, conditions.equals),
+            (date_filter.before, conditions.before),
+            (date_filter.after, conditions.after),
+        ]
+        for value, operation in operations:
+            if value is not None:
+                return [operation(value)]
+        return []
+
+    @final
+    def apply_date_range_filter(
+        self, date_filter: DateRangeFilter | None, conditions: DateConditions
+    ) -> list[QueryCondition]:
+        """Apply both bounds ``date_filter`` sets, inclusively."""
+        if date_filter is None:
+            return []
+        applied: list[QueryCondition] = []
+        if date_filter.after is not None:
+            applied.append(conditions.on_or_after(date_filter.after))
+        if date_filter.before is not None:
+            applied.append(conditions.on_or_before(date_filter.before))
+        return applied
 
     @final
     def apply_nullable_datetime_filter(
