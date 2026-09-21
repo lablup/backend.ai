@@ -15,18 +15,16 @@ from typing import Any
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.object_storage.response import (
     ObjectStorageAllBucketsResponse,
     ObjectStorageBucketsResponse,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
-from ai.backend.manager.models.storage_namespace.searchable_fields import (
-    StorageNamespaceSearchableFields,
-)
+from ai.backend.manager.models.storage_namespace.scopes import ObjectStorageNamespaceTarget
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
@@ -146,19 +144,13 @@ class TestStorageNamespace:
 
         # Verify it exists first
         get_action = GetNamespacesAction(
-            searcher=GlobalSearcher(
+            searcher=ScopedSearcher(
+                scopes=[ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage["id"]))],
                 used_by=(),
-                searcher=StorageNamespaceSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                            UUIDEqualMatchSpec(value=storage["id"], negated=False)
-                        )
-                    ],
-                ),
+                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
             )
         )
-        before = await storage_namespace_processors.global_get_namespaces.run(get_action)
+        before = await storage_namespace_processors.get_namespaces.run(get_action)
         ns_names = [n.namespace for n in before.items]
         assert "to-unregister" in ns_names
 
@@ -173,7 +165,7 @@ class TestStorageNamespace:
         assert unregister_result.data.storage_id == ns["storage_id"]
 
         # Verify removed
-        after = await storage_namespace_processors.global_get_namespaces.run(get_action)
+        after = await storage_namespace_processors.get_namespaces.run(get_action)
         ns_names_after = [n.namespace for n in after.items]
         assert "to-unregister" not in ns_names_after
 
@@ -192,19 +184,13 @@ class TestStorageNamespace:
 
         # List storage_a namespaces
         action_a = GetNamespacesAction(
-            searcher=GlobalSearcher(
+            searcher=ScopedSearcher(
+                scopes=[ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage_a["id"]))],
                 used_by=(),
-                searcher=StorageNamespaceSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                            UUIDEqualMatchSpec(value=storage_a["id"], negated=False)
-                        )
-                    ],
-                ),
+                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
             )
         )
-        result_a = await storage_namespace_processors.global_get_namespaces.run(action_a)
+        result_a = await storage_namespace_processors.get_namespaces.run(action_a)
         names_a = [n.namespace for n in result_a.items]
         assert "ns-alpha" in names_a
         assert "ns-beta" in names_a
@@ -212,19 +198,13 @@ class TestStorageNamespace:
 
         # List storage_b namespaces
         action_b = GetNamespacesAction(
-            searcher=GlobalSearcher(
+            searcher=ScopedSearcher(
+                scopes=[ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage_b["id"]))],
                 used_by=(),
-                searcher=StorageNamespaceSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                            UUIDEqualMatchSpec(value=storage_b["id"], negated=False)
-                        )
-                    ],
-                ),
+                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
             )
         )
-        result_b = await storage_namespace_processors.global_get_namespaces.run(action_b)
+        result_b = await storage_namespace_processors.get_namespaces.run(action_b)
         names_b = [n.namespace for n in result_b.items]
         assert "ns-gamma" in names_b
         assert "ns-alpha" not in names_b
@@ -277,18 +257,14 @@ class TestStorageNamespace:
         assert register_result.data.namespace == "lifecycle-ns"
 
         # Verify listed
-        list_result = await storage_namespace_processors.global_get_namespaces.run(
+        list_result = await storage_namespace_processors.get_namespaces.run(
             GetNamespacesAction(
-                searcher=GlobalSearcher(
+                searcher=ScopedSearcher(
+                    scopes=[
+                        ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage["id"]))
+                    ],
                     used_by=(),
-                    searcher=StorageNamespaceSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                                UUIDEqualMatchSpec(value=storage["id"], negated=False)
-                            )
-                        ],
-                    ),
+                    searcher=StorageNamespaceSearcher(pagination=NoPagination()),
                 )
             )
         )
@@ -303,18 +279,14 @@ class TestStorageNamespace:
         )
 
         # Verify gone from per-storage listing
-        after = await storage_namespace_processors.global_get_namespaces.run(
+        after = await storage_namespace_processors.get_namespaces.run(
             GetNamespacesAction(
-                searcher=GlobalSearcher(
+                searcher=ScopedSearcher(
+                    scopes=[
+                        ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage["id"]))
+                    ],
                     used_by=(),
-                    searcher=StorageNamespaceSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                                UUIDEqualMatchSpec(value=storage["id"], negated=False)
-                            )
-                        ],
-                    ),
+                    searcher=StorageNamespaceSearcher(pagination=NoPagination()),
                 )
             )
         )

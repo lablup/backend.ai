@@ -483,10 +483,14 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
         searcher = self._build_search_searcher(input)
-        role_target = RoleUserTarget(role_id=RoleID(role_id))
-        searcher.conditions = [*searcher.conditions, role_target.to_condition()]
-        result = await self._user.global_search.run(
-            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[RoleUserTarget(role_id=RoleID(role_id))],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),

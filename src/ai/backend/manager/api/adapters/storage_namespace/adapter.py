@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     AdminSearchStorageNamespacesInput,
     RegisterStorageNamespaceInput,
@@ -21,11 +21,9 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
-from ai.backend.manager.models.storage_namespace.searchable_fields import (
-    StorageNamespaceSearchableFields,
-)
+from ai.backend.manager.models.storage_namespace.scopes import ObjectStorageNamespaceTarget
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.bulk_get import (
     BulkGetStorageNamespacesAction,
@@ -89,18 +87,12 @@ class StorageNamespaceAdapter(BaseAdapter):
 
     async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceNode]:
         """Retrieve all namespaces for a given storage."""
-        action_result = await self._storage_namespace.global_get_namespaces.run(
+        action_result = await self._storage_namespace.get_namespaces.run(
             GetNamespacesAction(
-                searcher=GlobalSearcher(
+                searcher=ScopedSearcher(
+                    scopes=[ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage_id))],
                     used_by=(),
-                    searcher=StorageNamespaceSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                                UUIDEqualMatchSpec(value=storage_id, negated=False)
-                            )
-                        ],
-                    ),
+                    searcher=StorageNamespaceSearcher(pagination=NoPagination()),
                 )
             )
         )

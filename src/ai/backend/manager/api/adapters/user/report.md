@@ -3579,6 +3579,37 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
+#### [a-user-granted-nothing-may-not-search-by-role](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+
+아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 holder-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 일반 사용자 user-1: 역할 holder-role-1 보유
+
+When
+
+- UserAdapter.role_search — user-3이 역할로 걸러 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
 #### [a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
 
 같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다
@@ -3729,36 +3760,9 @@ Then
   - pagination.offset = 0
   - pagination.limit = 50
 
-#### [a-user-who-is-not-the-superadmin-may-not-gql-search-every-user](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
 
-권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다
-
-Given
-
-- 도메인 하나와 부르는 사람, 부르는 사람은 그 도메인 스코프의 사용자 READ를 받았다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 READ 권한을 준 역할 배정
-    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.gql_admin_search — user-1이 페이지 인자 없이 GQL 전체 조회
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [a-user-who-is-not-the-superadmin-may-not-search-by-role](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
-
-그 역할의 스코프 권한을 받은 사용자라도 역할 검색을 하려 하면, 전역 역할 문이 막는다
+역할이 걸린 스코프의 사용자 READ를 받은 사용자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다
 
 Given
 
@@ -3785,6 +3789,36 @@ Given
 When
 
 - UserAdapter.role_search — user-3이 역할로 걸러 조회
+
+Then
+
+- 역할을 받은 사람만 온다
+  - items(이름순) = ['user-1']
+  - pagination.total = 1
+  - pagination.offset = 0
+  - pagination.limit = 50
+
+#### [a-user-who-is-not-the-superadmin-may-not-gql-search-every-user](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+
+권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와 부르는 사람, 부르는 사람은 그 도메인 스코프의 사용자 READ를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.gql_admin_search — user-1이 페이지 인자 없이 GQL 전체 조회
 
 Then
 

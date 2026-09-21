@@ -1190,9 +1190,33 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [a-user-granted-read-on-the-group-may-not-read-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
 
-그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 fair share 설정을 읽으려 하면 역할 부족으로 거부된다. 설정 조회는 그룹을 전체 검색으로 찾으므로 슈퍼관리자 검사를 먼저 거친다
+아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다
+
+Given
+
+- 리소스 그룹 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+#### [a-user-granted-read-on-the-group-reads-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+
+그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다
 
 Given
 
@@ -1215,8 +1239,12 @@ When
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 기본 fair share 설정이 반환되고 가중치 목록은 비어 있다
+  - half_life_days = 7
+  - lookback_days = 28
+  - decay_unit_days = 1
+  - default_weight = '1.0'
+  - resource_weights = []
 
 #### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
 
@@ -1309,7 +1337,7 @@ When
 Then
 
 - 거부된다
-  - 거부: ResourceGroupNotFound
+  - 거부: EntityNotFoundError
 
 #### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
 

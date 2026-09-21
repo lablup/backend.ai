@@ -10,7 +10,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
@@ -44,8 +46,8 @@ class StorageNamespaceProcessors:
     global_search: GlobalActionProcessor[
         SearchStorageNamespacesAction, BatchOpsResult[StorageNamespaceData]
     ]
-    global_get_namespaces: GlobalActionProcessor[
-        GetNamespacesAction, BatchOpsResult[StorageNamespaceData]
+    get_namespaces: ScopeActionProcessor[
+        GetNamespacesAction, ScopedBatchOpsResult[StorageNamespaceData]
     ]
     bulk_get: PartialBulkActionProcessor[BulkGetStorageNamespacesAction, StorageNamespaceData]
     lookup: LookupActionProcessor[LookupStorageNamespaceAction, LookupOpsResult[StorageNamespaceID]]
@@ -56,7 +58,7 @@ class StorageNamespaceProcessors:
     def __init__(self, group: ProcessorGroup[StorageNamespaceData]) -> None:
         self.global_register = group.global_create_ops(RegisterNamespaceAction)
         self.global_search = group.global_searcher_ops(SearchStorageNamespacesAction)
-        self.global_get_namespaces = group.global_searcher_ops(GetNamespacesAction)
+        self.get_namespaces = group.scoped_search_ops(GetNamespacesAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetStorageNamespacesAction)
         self.lookup = group.lookup_ops(LookupStorageNamespaceAction)
         self.unregister = group.entity_purge_ops(UnregisterNamespaceAction)

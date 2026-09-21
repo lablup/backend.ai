@@ -20,7 +20,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
@@ -559,27 +558,16 @@ class ResourceGroupAdapter(BaseAdapter):
             FairShareResourceGroupSpecInfo DTO with merged resource weights and
             uses_default indicators per resource type.
         """
-        name_spec = StringMatchSpec(
-            value=resource_group,
-            case_insensitive=False,
-            negated=False,
+        resource_group_id = await self._resolve_resource_group_id(resource_group)
+        got = await self._resource_group.bulk_get.run(
+            BulkGetResourceGroupsAction(ids=[resource_group_id])
         )
-        search_result = await self._resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=ResourceGroupSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            ResourceGroupSearchableFields.own.name.filter.equals(name_spec)
-                        ],
-                    ),
-                )
-            )
-        )
-        if not search_result.items:
+        sg_data = got.values().get(resource_group_id)
+        if sg_data is None:
+            error = got.errors().get(resource_group_id)
+            if error is not None:
+                raise error
             raise ResourceGroupNotFound(resource_group)
-        sg_data = search_result.items[0]
 
         resource_info = await self.get_resource_info(resource_group)
         capacity = resource_info.capacity
