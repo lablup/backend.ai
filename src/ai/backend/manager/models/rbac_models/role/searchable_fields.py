@@ -8,6 +8,10 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
@@ -21,7 +25,10 @@ from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.field import (
+    NestedSearchableField,
+    SearchableField,
+)
 from ai.backend.manager.models.specs.search.usage import UsesConditions
 
 __all__ = ("RoleSearchableFields",)
@@ -116,6 +123,18 @@ class _RoleOwnFields(RowDataConverter[RoleRow, RoleData]):
         )
 
 
+class _RoleNestedFields:
+    """The permission entries the role owns, read under the role's own permission.
+
+    A permission entry is the role's field row, so one permission answers for the pair.
+    """
+
+    permissions = NestedSearchableField(
+        PermissionSearchableFields.own,
+        ToManyCorrelation(PermissionRow, RoleRow, PermissionRow.role_id == RoleRow.id),
+    )
+
+
 class _RoleUsage:
     """Uses between a role and other entities."""
 
@@ -134,4 +153,5 @@ class _RoleLinkedEntities:
 
 class RoleSearchableFields:
     own = _RoleOwnFields()
+    nested = _RoleNestedFields
     linked = _RoleLinkedEntities

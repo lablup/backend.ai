@@ -22,11 +22,13 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     MappedScopeNestedFilter,
     MyAtomicBulkScopePermissionsInput,
     MyScopePermissionsInput,
+    PermissionFilter,
     PermissionNestedFilter,
     PermissionTarget,
     RoleAssignmentFilter,
     RoleFilter,
     RoleNestedFilter,
+    RolePermissionNestedFilter,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -193,6 +195,43 @@ class TestRoleListingFilters:
         compiled = _compiled(conditions)
         assert "roles.scope_type" in compiled
         assert "roles.scope_id" in compiled
+
+    def test_a_role_filter_matches_the_permission_entries_the_role_carries(
+        self, adapter: RBACAdapter
+    ) -> None:
+        conditions = adapter._convert_role_filter_gql(
+            RoleFilter(
+                permissions=RolePermissionNestedFilter(
+                    some=PermissionFilter(
+                        entity_type=StringFilter(equals="vfolder"),
+                        permission=PermissionBitFilter(equals=PermissionBitDTO.READ),
+                    ),
+                ),
+            )
+        )
+
+        compiled = _compiled(conditions)
+        assert "EXISTS" in compiled
+        assert "permissions.role_id = roles.id" in compiled
+        assert "permissions.entity_type" in compiled
+        assert "permissions.permission" in compiled
+
+    def test_a_role_filter_excludes_roles_carrying_a_matching_permission(
+        self, adapter: RBACAdapter
+    ) -> None:
+        conditions = adapter._convert_role_filter_gql(
+            RoleFilter(
+                permissions=RolePermissionNestedFilter(
+                    none=PermissionFilter(
+                        permission=PermissionBitFilter(equals=PermissionBitDTO.HARD_DELETE)
+                    ),
+                ),
+            )
+        )
+
+        compiled = _compiled(conditions)
+        assert "NOT (EXISTS" in compiled
+        assert "permissions.permission" in compiled
 
     def test_an_assignment_filter_expresses_role_and_permission_together(
         self, adapter: RBACAdapter

@@ -137,6 +137,7 @@ if TYPE_CHECKING:
         PermissionFilter,
         PermissionNestedFilterGQL,
         PermissionOrderBy,
+        RolePermissionNestedFilterGQL,
     )
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2GQL
@@ -702,6 +703,19 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
         ),
     )
     mapped_scope: RoleMappedScopeNestedFilterGQL | None = None
+    permissions: (
+        Annotated[
+            RolePermissionNestedFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None
+    ) = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by conditions on the role's permission entries.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
