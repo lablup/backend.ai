@@ -778,6 +778,13 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "01993d56-bb39-78b1-89b4-7d32b8fdcf49",
+            "role_preset_id": "76616aa7-6597-5b11-8629-adff5d5640c2",
+            "entity_type": "resource_preset",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "01993d56-bb39-768a-9929-c68ed1aec06c",
             "role_preset_id": "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
             "entity_type": "agent",

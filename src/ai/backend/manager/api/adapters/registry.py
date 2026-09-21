@@ -277,7 +277,9 @@ class Adapters:
                 processors.user_resource_policy,
                 processors.project_resource_policy,
             ),
-            resource_preset=ResourcePresetAdapter(processors.resource_preset),
+            resource_preset=ResourcePresetAdapter(
+                processors.resource_preset, processors.resource_group
+            ),
             resource_slot=ResourceSlotAdapter(
                 processors.resource_slot, processors.agent, processors.domain
             ),

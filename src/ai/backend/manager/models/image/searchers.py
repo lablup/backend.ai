@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Any, override
+from typing import Any, Final, override
 
 import sqlalchemy as sa
 
@@ -20,6 +20,9 @@ from ai.backend.manager.models.image.searchable_fields import (
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import Searcher
+
+AMBIGUITY_PROBE: Final[int] = 2
+"""One row more than a read expecting a single image needs."""
 
 
 @dataclass
@@ -53,6 +56,8 @@ class ImageLookupSearcher(ImageSearcher):
 
     ``images`` holds no unique key over a canonical name and architecture, so the order
     decides which row answers: a live image before a deleted one, an older before a newer.
+    The page holds :data:`AMBIGUITY_PROBE` rows rather than one, so a caller expecting a
+    single image can say the name matched several instead of answering as if it had not.
     """
 
     def _canonical_match(self, canonical: str, architecture: str) -> QueryCondition:
@@ -90,7 +95,7 @@ class CanonicalImageSearcher(ImageLookupSearcher):
         self, canonical: str, architecture: str, statuses: Collection[ImageStatus]
     ) -> None:
         super().__init__(
-            pagination=OffsetPagination(limit=1),
+            pagination=OffsetPagination(limit=AMBIGUITY_PROBE),
             conditions=[
                 self._canonical_match(canonical, architecture),
                 *self._status_conditions(statuses),
@@ -108,7 +113,7 @@ class ReferenceImageSearcher(ImageLookupSearcher):
     ) -> None:
         canonical_match = self._canonical_match(reference, architecture)
         super().__init__(
-            pagination=OffsetPagination(limit=1),
+            pagination=OffsetPagination(limit=AMBIGUITY_PROBE),
             conditions=[
                 combine_conditions_or([canonical_match, self._alias_match(reference)]),
                 *self._status_conditions(statuses),
@@ -122,7 +127,7 @@ class AliasedImageSearcher(ImageLookupSearcher):
 
     def __init__(self, alias: str, statuses: Collection[ImageStatus]) -> None:
         super().__init__(
-            pagination=OffsetPagination(limit=1),
+            pagination=OffsetPagination(limit=AMBIGUITY_PROBE),
             conditions=[self._alias_match(alias), *self._status_conditions(statuses)],
             orders=self._alive_then_oldest(),
         )

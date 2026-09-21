@@ -255,6 +255,7 @@ def server_module_registries(
         register_resource_routes(
             ResourceHandler(
                 resource_preset=resource_preset_processors,
+                resource_group=resource_group_processors,
                 agent=agent_processors,
                 project=project_processors,
                 user=user_processors,

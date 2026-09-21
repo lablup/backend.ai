@@ -14,7 +14,6 @@ from sqlalchemy.sql.selectable import Select
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -95,15 +94,6 @@ class ResourcePresetRow(Base):
             return result
         except sa.exc.IntegrityError:
             return None
-
-    def to_dataclass(self) -> ResourcePresetData:
-        return ResourcePresetData(
-            id=ResourcePresetID(self.id),
-            name=self.name,
-            resource_slots=self.resource_slots,
-            shared_memory=self.shared_memory,
-            resource_group_name=self.scaling_group_name,
-        )
 
 
 # For compatibility

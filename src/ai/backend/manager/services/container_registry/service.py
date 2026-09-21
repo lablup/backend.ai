@@ -13,6 +13,9 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryGlobalUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
@@ -142,7 +145,9 @@ class ContainerRegistryService:
         result = await scanner.rescan_single_registry(action.progress_reporter)
 
         return RescanImagesActionResult(
-            images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
+            images=result.images,
+            errors=result.errors,
+            registry=ContainerRegistrySearchableFields.own.to_data(registry_row),
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:

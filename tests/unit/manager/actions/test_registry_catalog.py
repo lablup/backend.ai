@@ -657,12 +657,13 @@ def test_action_name_is_unique_across_v2_actions() -> None:
 
 
 def test_resource_preset_reads_keep_their_judged_gates() -> None:
-    """Pins the three preset reads BA-7710 ruled on, so a rewiring has to restate them.
+    """Pins the three preset reads, so a rewiring has to restate them.
 
-    A preset is a catalog: its name, resource slots and shared memory hold no owner
-    and no secret. The two reads a session launcher makes start from a resource group
-    name and stay public; the read the admin route makes starts from the preset's id,
-    so it is judged on that entity like the update and the delete beside it.
+    The two reads a session launcher makes name the scopes they read from -- `public`
+    for the presets bound to no resource group, the group itself for the ones bound to
+    it -- so naming a group the caller holds nothing at refuses the read. The read the
+    admin route makes starts from the preset's id, so it is judged on that entity like
+    the update and the delete beside it.
     """
     registry = _ops_registry()
     ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())
@@ -670,13 +671,13 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
     judged = {
         ListResourcePresetsAction: (
             ResourcePresetEntityType(),
-            ActionKind.GLOBAL,
-            ActionGate.PUBLIC,
+            ActionKind.SCOPE,
+            ActionGate.PERMISSION,
         ),
         CheckResourcePresetsAction: (
             ResourcePresetEntityType(),
-            ActionKind.GLOBAL,
-            ActionGate.PUBLIC,
+            ActionKind.SCOPE,
+            ActionGate.PERMISSION,
         ),
         GetResourcePresetAction: (
             ResourcePresetEntityType(),

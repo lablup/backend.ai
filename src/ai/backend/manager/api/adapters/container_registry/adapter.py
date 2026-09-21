@@ -8,7 +8,6 @@ from collections.abc import Sequence
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
     ContainerRegistryFilter,
@@ -24,27 +23,29 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     DeleteContainerRegistryPayload,
     UpdateContainerRegistryPayload,
 )
-from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
+from ai.backend.common.dto.manager.v2.container_registry.types import (
+    ContainerRegistryOrderField,
+    ContainerRegistryTypeFilter,
+    OrderDirection,
+)
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
-)
-from ai.backend.manager.models.container_registry.orders import (
-    DEFAULT_FORWARD_ORDER,
-    resolve_order,
 )
 from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -78,7 +79,7 @@ from ai.backend.manager.types import OptionalState, TriState
 def _pagination_spec() -> PaginationSpec:
     """How a page of registries is cut, in either mode. The order runs by id."""
     return PaginationSpec(
-        forward_order=DEFAULT_FORWARD_ORDER,
+        forward_order=ContainerRegistrySearchableFields.own.id.order.apply(ascending=False),
         cursor_column=ContainerRegistryRow.id,
     )
 
@@ -296,15 +297,14 @@ class ContainerRegistryAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter: ContainerRegistryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.registry_name is not None:
-            condition = self._convert_string_filter(filter.registry_name)
-            if condition is not None:
-                conditions.append(condition)
+        fields = ContainerRegistrySearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter.registry_name, fields.registry_name.filter),
+        ]
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.is_global is not None:
-            conditions.append(ContainerRegistryConditions.by_is_global(filter.is_global))
+            conditions.append(fields.is_global.filter.equals(filter.is_global))
         if filter.AND:
             for sub_filter in filter.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -322,32 +322,30 @@ class ContainerRegistryAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ContainerRegistryConditions.by_registry_name_contains,
-            equals_factory=ContainerRegistryConditions.by_registry_name_equals,
-            starts_with_factory=ContainerRegistryConditions.by_registry_name_starts_with,
-            ends_with_factory=ContainerRegistryConditions.by_registry_name_ends_with,
-            in_factory=ContainerRegistryConditions.by_registry_name_in,
-        )
-
     @staticmethod
     def _convert_type_filter(tf: ContainerRegistryTypeFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+        conditions = ContainerRegistrySearchableFields.own.type.filter
+        result: list[QueryCondition] = []
         if tf.equals is not None:
-            conditions.append(ContainerRegistryConditions.by_type_equals(tf.equals))
+            result.append(conditions.equals(tf.equals))
         if tf.in_ is not None:
-            conditions.append(ContainerRegistryConditions.by_type_in(tf.in_))
+            result.append(conditions.in_(tf.in_))
         if tf.not_equals is not None:
-            conditions.append(ContainerRegistryConditions.by_type_not_equals(tf.not_equals))
+            result.append(conditions.not_equals(tf.not_equals))
         if tf.not_in is not None:
-            conditions.append(ContainerRegistryConditions.by_type_not_in(tf.not_in))
-        return conditions
+            result.append(conditions.not_in(tf.not_in))
+        return result
 
     @staticmethod
     def _convert_orders(order: list[ContainerRegistryOrder]) -> list[QueryOrder]:
-        return [resolve_order(o.field, o.direction) for o in order]
+        fields = ContainerRegistrySearchableFields.own
+        columns = {
+            ContainerRegistryOrderField.REGISTRY_NAME: fields.registry_name.order,
+            ContainerRegistryOrderField.URL: fields.url.order,
+            ContainerRegistryOrderField.TYPE: fields.type.order,
+            ContainerRegistryOrderField.IS_GLOBAL: fields.is_global.order,
+        }
+        return [columns[o.field].apply(ascending=o.direction != OrderDirection.DESC) for o in order]
 
     async def batch_load_by_ids(
         self, ids: Sequence[ContainerRegistryID]

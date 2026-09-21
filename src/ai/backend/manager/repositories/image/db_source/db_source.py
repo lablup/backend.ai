@@ -48,6 +48,7 @@ from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.lookups import ImageAliasOwnerLookup
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.queriers import ImageQuerier
+from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
     ImageSearchableFields,
@@ -172,70 +173,21 @@ class ImageDBSource:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
 
-    async def query_images_by_canonicals(
+    async def search_image_details(
         self,
-        canonicals: list[str],
-        status_filter: list[ImageStatus] | None = None,
-    ) -> dict[ImageID, ImageDataWithDetails]:
-        """
-        Deprecated. Use query_images_by_ids instead.
-        """
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.name.in_(canonicals))
-            .options(selectinload(ImageRow.aliases))
-        )
-        if status_filter:
-            query = query.where(ImageRow.status.in_(status_filter))
-
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(query)
-            image_rows = list(result.scalars().all())
-            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
-
-    async def query_image_details_by_identifier(
-        self,
-        identifier: ImageIdentifier,
-        status_filter: list[ImageStatus] | None = None,
-    ) -> ImageDataWithDetails:
-        """
-        Deprecated. Use query_image_details_by_id instead.
-        """
-        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
+        scopes: Sequence[ImageTarget],
+        searcher: ImageSearcher,
+    ) -> list[ImageDataWithDetails]:
+        """The images the searcher matches within the scopes, each with its aliases.
+        Naming no scope reads the whole table."""
         async with self._ops_provider.read_ops() as r:
-            result = await r.search_in_global(
-                self._reference_searcher(identifier.canonical, identifier.architecture, statuses)
-            )
-        image = self._first_image(result)
-        aliases = await self._aliases_by_image([image.id])
-        return image.to_detailed(aliases.get(image.id, []))
-
-    async def query_image_details_by_id(
-        self,
-        image_id: ImageID,
-        load_aliases: bool = False,
-        status_filter: list[ImageStatus] | None = None,
-    ) -> ImageDataWithDetails:
-        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
-        image = await self._fetch_image(image_id, statuses)
-        if not load_aliases:
-            return image.to_detailed([])
-        aliases = await self._aliases_by_image([image.id])
-        return image.to_detailed(aliases.get(image.id, []))
-
-    async def query_all_images(
-        self, status_filter: list[ImageStatus] | None = None
-    ) -> Mapping[ImageID, ImageDataWithDetails]:
-        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
-        async with self._ops_provider.read_ops() as r:
-            result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=NoPagination(),
-                    conditions=[ImageSearchableFields.own.status.filter.in_(statuses)],
-                )
+            result = (
+                await r.search_with_scopes(scopes, searcher)
+                if scopes
+                else await r.search_in_global(searcher)
             )
         aliases = await self._aliases_by_image([image.id for image in result.items])
-        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in result.items}
+        return [image.to_detailed(aliases.get(image.id, [])) for image in result.items]
 
     async def mark_image_deleted(self, reference: str, architecture: str) -> ImageData:
         """

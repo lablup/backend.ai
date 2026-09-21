@@ -30,7 +30,13 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
+from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
@@ -159,15 +165,18 @@ def sample_registries() -> list[ContainerRegistryData]:
 
 
 @pytest.fixture
-def sample_registry_row() -> MagicMock:
-    """Create sample container registry row."""
-    row = MagicMock(spec=ContainerRegistryRow)
-    row.id = UUID("12345678-1234-5678-1234-567812345678")
-    row.url = "https://registry.example.com"
-    row.registry_name = "registry.example.com"
-    row.type = ContainerRegistryType.DOCKER
-    row.project = "test-project"
-    return row
+def sample_registry_row() -> ContainerRegistryRow:
+    """Create sample container registry row.
+
+    A real row rather than a mock: the service reads it through the field declaration,
+    which goes through the column descriptors."""
+    return ContainerRegistryRow(
+        id=ContainerRegistryID(UUID("12345678-1234-5678-1234-567812345678")),
+        url="https://registry.example.com",
+        registry_name="registry.example.com",
+        type=ContainerRegistryType.DOCKER,
+        project="test-project",
+    )
 
 
 @pytest.fixture
@@ -210,6 +219,11 @@ def sample_known_registries() -> dict[str, str]:
 
 
 # ==================== GetContainerRegistries Tests ====================
+
+
+# ORM cluster registration: building a real registry row configures the mappers, and the
+# relationships resolve these classes by name.
+_ORM_CLUSTER = (AgentRow, ResourceGroupForProjectRow, SessionRow)
 
 
 class TestGetContainerRegistries:
@@ -576,7 +590,7 @@ class TestRescanImages:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
         sample_image_data: ImageData,
     ) -> None:
         """Test successful image rescan"""
@@ -599,7 +613,9 @@ class TestRescanImages:
             )
             result = await container_registry_service.rescan_images(action)
 
-            assert result.registry == sample_registry_row.to_dataclass()
+            assert result.registry == ContainerRegistrySearchableFields.own.to_data(
+                sample_registry_row
+            )
             assert len(result.images) == 1
             assert result.images[0] == sample_image_data
             assert result.errors == []
@@ -629,7 +645,7 @@ class TestRescanImages:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
         sample_image_data: ImageData,
     ) -> None:
         """Test rescan with some errors from scanner"""
@@ -660,7 +676,7 @@ class TestRescanImages:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Test rescan without project parameter"""
         mock_container_registry_repository.get_registry_row_for_scanner.return_value = (
@@ -686,7 +702,7 @@ class TestRescanImages:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
         mock_db_engine: MagicMock,
     ) -> None:
         """Test that scanner is properly initialized"""
@@ -727,7 +743,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """PUSH_ARTIFACT with valid auth triggers image scan."""
         sample_registry_row.extra = {"webhook_auth_header": "Bearer secret123"}
@@ -763,7 +779,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """No auth header proceeds if auth is not required."""
         sample_registry_row.extra = {}
@@ -799,7 +815,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Invalid auth header raises ContainerRegistryWebhookAuthorizationFailed."""
         sample_registry_row.extra = {"webhook_auth_header": "Bearer correct-token"}
@@ -827,7 +843,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Omitting the auth header must not bypass a configured secret."""
         sample_registry_row.extra = {"webhook_auth_header": "Bearer correct-token"}
@@ -855,7 +871,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """A non-ASCII header must fail cleanly, not raise TypeError from compare_digest."""
         sample_registry_row.extra = {"webhook_auth_header": "Bearer correct-token"}
@@ -883,7 +899,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Non-PUSH_ARTIFACT events are ignored (log only)."""
         sample_registry_row.extra = {}
@@ -936,7 +952,7 @@ class TestHandleHarborWebhook:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_registry_row: MagicMock,
+        sample_registry_row: ContainerRegistryRow,
     ) -> None:
         """Multiple resources are processed sequentially."""
         sample_registry_row.extra = {}

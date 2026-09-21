@@ -9,6 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.searchable_fields import (
+    ResourcePresetSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -22,4 +25,4 @@ class ResourcePresetSearcher(Searcher[ResourcePresetRow, ResourcePresetData]):
 
     @override
     def to_data(self, row: ResourcePresetRow) -> ResourcePresetData:
-        return row.to_dataclass()
+        return ResourcePresetSearchableFields.own.to_data(row)

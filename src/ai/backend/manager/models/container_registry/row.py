@@ -249,17 +249,3 @@ class ContainerRegistryRow(Base):
         )
         instance.id = data.id
         return instance
-
-    def to_dataclass(self) -> ContainerRegistryData:
-        return ContainerRegistryData(
-            id=self.id,
-            url=self.url,
-            registry_name=self.registry_name,
-            type=self.type,
-            project=self.project,
-            username=self.username,
-            password=self.password,
-            ssl_verify=self.ssl_verify,
-            is_global=self.is_global,
-            extra=self.extra,
-        )
