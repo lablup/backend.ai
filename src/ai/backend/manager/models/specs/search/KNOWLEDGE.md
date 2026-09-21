@@ -1,9 +1,9 @@
 ---
 name: search-field-declarations
 type: design-rationale
-description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why an unreadable using entity refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters, which scopes a search accepts, why public is a scope rather than a login-only processor, membership versus relation into public, why global reads keep the action shape
+description: why a filter or order slot is left empty on three axes (impossible by type, sensitive values recoverable by repeated filtering, query cost by column kind and index), why a to-many opens some/every/none as filters but declares no order at all, and why a rolled-up child value becomes a parent column instead, why search filters and orders are declared per field instead of per-entity condition functions, why the declaration builds the data type from a row, why condition classes do not know filter DTOs, why operations reject None, the own / nested / linked split and its permission axes, nested versus flattened fields of other tables, the Correlation naming, why usage relations between entities stay out of the ownership graph, why a condition naming an entity the caller cannot read refuses the search, why scopes and uses travel on the searcher, what field caps need from the declarations, how other services bound relational filters, which scopes a search accepts, why usage is one bundle with used_by and uses as its two directions, why public is a scope rather than a login-only processor, the two kinds of membership in public, why global reads keep the action shape
 scope: src/ai/backend/manager/models/specs/search
-keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, secret_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by, PublicImageTarget, CreatedInPublic, is_global, public scope, global scope, search scope table]
+keywords: [ToManyCorrelation, order_by_aggregate, relation count order, EndpointStatus, RouteHealthStatus, endpoint_tokens.token, secret_key, bootstrap_script, startup_command, callback_url, allowed_client_ip, SecretColumn, DecimalType, SearchableField, NestedSearchableField, RowDataConverter, ToOneCorrelation, StringConditions, EnumConditions, MembershipConditions, ConditionOrder, apply_string_filter, apply_to_many_filter, UsageConditions, UsedBy, uses, usage direction, ScopeTarget, ScopedSearcher, GlobalSearcher, used_by, PublicImageTarget, CreatedInPublic, is_global, public scope, global scope, search scope table]
 sources:
   - src/ai/backend/manager/models/specs/search
   - src/ai/backend/manager/models/specs/conditions
@@ -70,7 +70,7 @@ This package replaces the condition functions and order methods written by hand 
 - So masking a value behind a field cap means nothing while its filter and order stay open. It is why caps check orders too.
 - Leaving equality alone as a compromise is not used. A token has a narrow candidate set, so repeated equality confirms it.
 - An access key is an identifier the response already carries, and the credential is its pair `keypairs.secret_key`, a `SecretColumn`. A value the response ships has nothing for a repeated filter to recover, so it does not belong on this axis.
-- The rows of the table are the cases found in the survey. `endpoint_tokens.token` is `sa.String`, not `SecretColumn`, so the type axis does not catch it. `sessions.bootstrap_script` and `startup_command` are scripts the user wrote and can hold credentials verbatim.
+- The rows of the table are the cases found in the survey. `endpoint_tokens.token` is `sa.String`, not `SecretColumn`, so the type axis does not catch it. `huggingface_registries.token`, `reservoir_registries.secret_key` and `object_storages.secret_key` are the same case. `sessions.bootstrap_script` and `startup_command` are scripts the user wrote and can hold credentials verbatim.
 - `users.allowed_client_ip` is caught by the type axis as well, being an array. It is listed as sensitive too so that it stays closed if it ever stops being an array.
 
 ## Cost is settled by column kind and index
@@ -191,23 +191,26 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 
 - govern means "the scope's roles reach everything the target owns", so a project role governing a session would reach the vfolders it mounts.
 - own + cap (a share) does not spread for per-entity permission, but a scoped search's reach ignores caps, so the listing would leak.
-- So a usage only narrows and grants nothing. Its source of truth stays one foreign key column on the using side.
+- So a usage only narrows and grants nothing. Its source of truth stays one foreign key column.
+- Which table the column sits on does not decide whether it is a usage. `roles.role_preset_id` sits on the searched row and is one.
 - An id inside a JSON value (`extra_mounts`, `vfolder_mounts`) is not a foreign key and is not a usage. It becomes one after it is normalized into rows with a foreign key.
 
-## An unreadable using entity refuses the search
+## A condition naming an entity the caller cannot read refuses the search
 
 | Input | Check | Effect on the result |
 |---|---|---|
 | scope | Permission to read the result entity within the scope (govern) | Widens (OR) |
-| used_by | Permission to read the using entity itself (own READ) | Narrows (AND) |
+| usage (`used_by`, `uses`) | Permission to read the entity the condition names (own READ) | Narrows (AND) |
 | filter | None | Narrows |
 
-- Results only come from rows the scopes allow, so a row a using entity uses is still left out when the caller cannot read it.
+- Results only come from rows the scopes allow, so a row reached through a usage is still left out when the caller cannot read it.
 - Search APIs with a permission model (GitHub search `repo:`, GCP Cloud Asset scopes) refuse a condition target the caller cannot read and limit results to what the caller can read. This follows them.
-- The using side's permission is checked before the query, so SQL carries only the usage condition.
+- The named entity's permission is checked before the query, so SQL carries only the usage condition.
 - used_by exists only on searches and means nothing to other scope actions such as create, so it started as a separate validator. BA-8024 merged it into the scope validator, which now reads both in one database round trip.
-- A global search does not check using entities: the SUPERADMIN gate answers for the unscoped read.
-- This does not answer an owner asking "who uses my resource". That needs a limited usage listing on the result entity's side.
+- A global search does not check the named entities: the SUPERADMIN gate answers for the unscoped read.
+- The two directions sit in one bundle because the check and the narrowing are the same. Either way the named entity's READ is checked and the result is narrowed with AND. What the direction settles is which column the condition lands on.
+- A plain column filter does not replace this. It checks no permission on the named entity, so whether a result comes back tells the caller that a row they cannot read exists.
+- "Who uses my resource" is answered by `uses`: the using side is searched, narrowed by the used entity's id.
 
 ## Scopes and uses travel on the searcher
 
@@ -257,14 +260,16 @@ The tables below state, for each entity package under `models/`, which scopes it
 - A public processor asks for no permission, so a read still passes after READ is taken out of the public role. It has no row condition either: the four public reads of `image` return the images of registries not registered in public.
 - As a scope, what is checked and the row condition sit in one class, for the reason in `Scopes and uses travel on the searcher`.
 
-### Two ways into public
+### Two kinds of membership in public
 
-| Way | Applies to | Written by | Row condition |
+| Kind | Applies to | Written by | Row condition |
 |---|---|---|---|
-| Membership | An entity whose whole type is public | `CreatedInPublic` | None |
-| Relation | An entity switched per row. Today only container registry | A relation to public, purged when switched off | A column (`is_global`) |
+| Whole type | An entity whose whole type is public | `CreatedInPublic` | None |
+| Per row | An entity switched per row — container registry, image, resource preset | The creator's `created_in`, and the switching action | A column (`container_registries.is_global`, `resource_presets.scaling_group_name`) |
 
-- The source of a relation into public is the column. Recovery and query conditions read it (BEP-1077 5.8).
+- Public owns and governs the row either way. What differs is whether a row condition applies.
+- The row condition's source is the column. Recovery and query conditions read it (BEP-1077 5.8).
+- An image's row condition is not its own column but the `is_global` of the registry it belongs to.
 - `is_global` keeps its name: renaming it moves the API and a migration with it. It does not mean the global singleton, so code calls it public.
 
 ### Why a global read keeps the action shape
@@ -278,28 +283,13 @@ The tables below state, for each entity package under `models/`, which scopes it
 |---|---|---|
 | Owning scopes | The scopes that own and govern the row when it is created | `created_in` in `creators.py` and `upserters.py` |
 | READ relations | Links that are not ownership and still grant READ | `RelationCreator` declarations, share writes |
-| public | Membership (the whole type is in public) / relation (registered in public per row) / n/a | The classification table in BEP-1077 5.8, columns |
+| public | Membership: whole type / per row (registered rows only) / n/a | The classification table in BEP-1077 5.8, columns |
 | Existing Targets | Classes declared in `scopes.py` | `scopes.py` |
 | Missing Targets | What the rules call for and is absent | The difference from the three columns above |
 
 - A `global` row is one created through `CreatedInGlobal`. A global read keeps the action shape, so a Target for global is not counted as missing.
 - A domain governs its projects and users. An entity owned by a project or a user also gets a Domain Target, as the pilots (vfolder, session, deployment, model card) do.
 - A package with no search yet says "no search" under missing Targets, followed by the scopes to accept once a search is added.
-
-### Cells still to be decided
-
-| No. | Subject | Question | Options |
-|---|---|---|---|
-| 1 | resource preset | Whether a preset whose `scaling_group_name` is NULL is a relation to public | A relation to public (the BEP-1077 5.8 classification; migration step 8 already links them) / a global read only |
-| 2 | resource preset | Whether a preset bound to a resource group is accepted under that resource group's scope. Ownership is global and the link is one column | `ResourceGroupResourcePresetTarget` with a column condition / a filter only |
-| 3 | The 7 types that are public as a whole (runtime variant, runtime variant preset, prometheus query preset, prometheus query preset category, resource slot type, login client type, deployment preset) | BEP-1077 puts them in global and public, but their creators are `CreatedInGlobal`. A newly created row has no public membership | Change the creators to `CreatedInPublic` / let the public Target read the whole type with no condition |
-| 4 | project resource policy | The user and keypair policies have a Target for "the policy this user is subject to". Whether the project policy gets the same shape | Add `ProjectResourcePolicyTarget` / a global read only |
-| 5 | fair share, usage bucket | The Targets are authorized against a resource group while the rows name a domain, project or user. Which side is the owning entity | Keep the resource group / accept the domain, project or user the row names / accept both |
-| 6 | idle checker | A relation (binding) grants the scope READ on the checker. Today's Target reads binding rows and the checker is read through global only | Add per-scope checker Targets / the binding Target is enough |
-| 7 | `is_public` on resource group | No search or permission path reads the column (only export reports do). Its name overlaps with registration in public | Move it to a relation to public / leave it as an unrelated column |
-| 8 | route history | `RouteHistoryTarget` cannot declare what it is authorized against (keyed by a replica, with no owning deployment id) | The Target also takes the deployment id / replace it with a deployment-keyed Target |
-| 9 | `bulk_get` of domain | The public processor is the only way a regular user reads their own domain | Grant a user READ on their domain and move it to the domain scope / split off a read carrying only the fields to expose and keep it in public / do not move it |
-| 10 | `lookup` of user | Whether resolving an email to an id stays a login-only read | Do not move it / move it to the domain and project scopes |
 
 ### Entities owned by a domain, project, user or another entity
 
@@ -309,11 +299,11 @@ The tables below state, for each entity package under `models/`, which scopes it
 | `endpoint` (deployment) | project, user | None | n/a | `DomainDeploymentTarget`, `ProjectDeploymentTarget`, `UserDeploymentTarget` | None |
 | `vfolder` | project (a personal folder is in a personal project) | Users and projects it is shared to | n/a | `DomainVFolderTarget`, `ProjectVFolderTarget`, `UserVFolderTarget` | The shared ABC `VFolderTarget` |
 | `model_card` | project, user | None | n/a | `DomainModelCardTarget`, `UserModelCardTarget`, `ProjectModelCardTarget` | None |
-| `image` | container registry, project (optional) | Projects linked to the registry | Relation (the registry's `is_global`) | `DomainImageTarget`, `ProjectImageTarget`, `UserImageTarget`, `ContainerRegistryImageTarget`, `PublicImageTarget` | None |
+| `image` | container registry, project (optional) | Projects linked to the registry | Membership (per row, the registry's `is_global`) | `DomainImageTarget`, `ProjectImageTarget`, `UserImageTarget`, `ContainerRegistryImageTarget`, `PublicImageTarget` | None |
 | `project` | domain, global | Users on its roster, linked resource groups | n/a | `DomainProjectTarget`, `UserProjectTarget`, `ResourceGroupProjectTarget` | None |
 | `user` | domain, global | Projects whose roster it is on, roles | n/a | `DomainUserTarget`, `ProjectUserTarget`, `RoleUserTarget` | None |
 | `agent` | resource group | Domains, projects and users linked to the resource group | n/a | None (global search only) | `ResourceGroupAgentTarget`, `DomainAgentTarget`, `ProjectAgentTarget`, `UserAgentTarget` |
-| `app_config_fragment` | The row's owner (domain, user), or global and public | None | Membership (rows with `scope_type='public'`) | `AppConfigFragmentTarget`, `VisibleAppConfigFragmentTarget`, `PublicAppConfigFragmentTarget` | None |
+| `app_config_fragment` | The row's owner (domain, user), or global and public | None | Membership (per row, rows with `scope_type='public'`) | `AppConfigFragmentTarget`, `VisibleAppConfigFragmentTarget`, `PublicAppConfigFragmentTarget` | None |
 | `entity_share` | The entity the offer is attached to | The receiving user or project | n/a | `RecipientUserEntityShareTarget`, `RecipientProjectEntityShareTarget`, `OwningEntityShareTarget` | None |
 | `rbac_models/role` | The scope the role is placed in | Users holding the role | n/a | `ScopedRoleTarget`, `HeldRoleTarget` | None |
 | `network` | project | None | n/a | None | No search. `ProjectNetworkTarget`, `DomainNetworkTarget` |
@@ -325,18 +315,18 @@ The tables below state, for each entity package under `models/`, which scopes it
 | Package | READ relations | public | Existing Targets | Missing Targets |
 |---|---|---|---|---|
 | `domain` | Linked resource groups | n/a | `ResourceGroupDomainTarget` | None |
-| `resource_group` | Linked domains, projects and users (through keypairs) | n/a (decision 7) | `DomainResourceGroupTarget`, `ProjectResourceGroupTarget`, `UserResourceGroupTarget` | None |
-| `container_registry` | Linked projects | Relation (`is_global`) | None | `ProjectContainerRegistryTarget`, `PublicContainerRegistryTarget` |
-| `resource_preset` | None (decision 2) | Decision 1 | None | Decisions 1, 2 |
-| `idle_checker` | Domains, projects, resource groups and users linked by a binding, sessions | n/a | `IdleCheckerAssignmentTarget` (binding rows) | Decision 6 |
-| `resource_policy` | None. The user and keypair policies are read through a column on the user row | n/a | `UserKeypairResourcePolicyTarget`, `UserResourcePolicyTarget` | Decision 4 |
-| `runtime_variant` | None | Membership (decision 3) | None | `PublicRuntimeVariantTarget` |
-| `runtime_variant_preset` | None | Membership (decision 3) | None | `PublicRuntimeVariantPresetTarget` |
-| `prometheus_query_preset` | None | Membership (decision 3) | None | `PublicPrometheusQueryPresetTarget` |
-| `prometheus_query_preset_category` | None | Membership (decision 3) | None | `PublicPrometheusQueryPresetCategoryTarget` |
-| `resource_slot` (slot type) | None | Membership (decision 3) | None | `PublicResourceSlotTypeTarget` |
-| `login_client_type` | None | Membership (decision 3) | None | `PublicLoginClientTypeTarget` |
-| `deployment_revision_preset` | None | Membership (decision 3). Read through the global search only today, with no public wiring | None (a field Target only) | `PublicDeploymentPresetTarget` |
+| `resource_group` | Linked domains, projects and users (through keypairs) | n/a. `is_public` is a hiding filter column, unrelated to membership in public | `DomainResourceGroupTarget`, `ProjectResourceGroupTarget`, `UserResourceGroupTarget` | None |
+| `container_registry` | Linked projects | Membership (per row, `is_global`) | None | `ProjectContainerRegistryTarget`, `PublicContainerRegistryTarget` |
+| `resource_preset` | None | Membership (per row, the rows whose `scaling_group_name` is NULL) | None | `PublicResourcePresetTarget`, and a `ResourceGroupResourcePresetTarget` taking the bound rows (planned) |
+| `idle_checker` | Domains, projects, resource groups and users linked by a binding, sessions | n/a | `IdleCheckerAssignmentTarget` (binding rows) | None. The binding Target is how a scope reaches the checker |
+| `resource_policy` | None. A policy row is picked by the column naming it on the user row or the project row | n/a | `UserKeypairResourcePolicyTarget`, `UserResourcePolicyTarget`, `ProjectResourcePolicyTarget` | None |
+| `runtime_variant` | None | Membership (whole type) | None | `PublicRuntimeVariantTarget` |
+| `runtime_variant_preset` | None | Membership (whole type) | None | `PublicRuntimeVariantPresetTarget` |
+| `prometheus_query_preset` | None | Membership (whole type) | None | `PublicPrometheusQueryPresetTarget` |
+| `prometheus_query_preset_category` | None | Membership (whole type) | None | `PublicPrometheusQueryPresetCategoryTarget` |
+| `resource_slot` (slot type) | None | Membership (whole type) | None | `PublicResourceSlotTypeTarget` |
+| `login_client_type` | None | Membership (whole type) | None | `PublicLoginClientTypeTarget` |
+| `deployment_revision_preset` | None | Membership (whole type). Read through the global search only today | None (a field Target only) | `PublicDeploymentPresetTarget` |
 | `app_config_allow_list`, `app_config_definition` | None | n/a | None | None |
 | `artifact`, `artifact_registries`, `huggingface_registry`, `reservoir_registry` | None | n/a | None | None |
 | `object_storage`, `vfs_storage`, `storage_namespace` | None | n/a | None | None |
@@ -353,13 +343,13 @@ The tables below state, for each entity package under `models/`, which scopes it
 | `scheduling_history` (session) | session | `SessionSchedulingHistoryTarget` | None |
 | `scheduling_history` (kernel) | session | `SessionKernelHistoryTarget`, `KernelKernelHistoryTarget` | None |
 | `scheduling_history` (deployment) | deployment | `DeploymentHistoryTarget` | None |
-| `scheduling_history` (route) | deployment | `RouteHistoryTarget` (`OperationScope`) | Decision 8 |
+| `scheduling_history` (route) | deployment | `RouteHistoryTarget` (`OperationScope`) | A Target that finds the owning deployment through the replica and checks against it (planned) |
 | `replica_group_history` | deployment | `DeploymentReplicaGroupHistoryTarget` | None |
 | `deployment_revision` | deployment | `DeploymentRevisionTarget` | None |
 | `endpoint` (access token) | deployment | `DeploymentAccessTokenTarget` | None |
 | `routing` (replica) | deployment | `DeploymentReplicaTarget` | None |
 | `replica_group` | deployment | None (read as `nested` on the deployment declaration) | None |
-| `deployment_policy` | deployment | None | `DeploymentPolicyTarget` |
+| `deployment_policy` | deployment | `DeploymentPolicyTarget` | None |
 | `deployment_auto_scaling_policy` | deployment | None | No search |
 | `keypair` | user | `UserKeypairTarget` | None |
 | `login_session` (session, history) | user | `MyLoginSessionTarget`, `MyLoginHistoryTarget` | None |
@@ -373,8 +363,8 @@ The tables below state, for each entity package under `models/`, which scopes it
 | `resource_slot` (agent resource) | agent | `AgentResourceTarget` | None |
 | `resource_slot` (allocation) | session, through its kernel | None | No search |
 | `resource_usage_history` (kernel usage record) | session, through its kernel | None | No search |
-| `resource_usage_history` (usage bucket) | Decision 5 | `DomainUsageBucketTarget`, `ProjectUsageBucketTarget`, `UserUsageBucketTarget` (authorized against the resource group) | Decision 5 |
-| `fair_share` | Decision 5 | `DomainFairShareTarget`, `ProjectFairShareTarget`, `UserFairShareTarget` (authorized against the resource group) | Decision 5 |
+| `resource_usage_history` (usage bucket) | resource group | `DomainUsageBucketTarget`, `ProjectUsageBucketTarget`, `UserUsageBucketTarget` (checked against the resource group) | None |
+| `fair_share` | resource group | `DomainFairShareTarget`, `ProjectFairShareTarget`, `UserFairShareTarget` (checked against the resource group) | None |
 | `entity_label` | The entity the label is on | `EntityLabelTarget` | None |
 | `audit_log` | The entity the record names. A record naming none is in global | `EntityAuditLogTarget`, `ScopeAuditLogTarget`, `TriggeredByAuditLogTarget` | None |
 | `rbac_models/permission` | role | `RolePermissionTarget` | None |
@@ -403,21 +393,18 @@ Every read `services/*/processors.py` wires to a public processor. A public proc
 
 | Service | Wiring | Reads | Scope to move to | Why |
 |---|---|---|---|---|
-| `login_client_type` | `public_get`, `public_search` | All of `login_client_types` | public | The whole type is in public (decision 3) |
+| `login_client_type` | `public_get`, `public_search` | All of `login_client_types` | public | The whole type is in public |
 | `prometheus_query_preset` | `public_get_preset`, `public_search_presets` | All of `prometheus_query_presets` | public | Same |
 | `prometheus_query_preset_category` | `public_get_category`, `public_bulk_get_categories`, `public_search_categories` | All of `prometheus_query_preset_categories` | public | Same |
 | `resource_slot` | `public_get_resource_slot_type`, `public_search_resource_slot_types`, `public_lookup_resource_slot_type` | All of `resource_slot_types`; a name to its id | public | Same |
 | `runtime_variant` | `public_get`, `public_bulk_get`, `public_search`, `public_lookup` | All of `runtime_variants`; a name to its id | public | Same |
 | `runtime_variant_preset` | `public_get`, `public_search` | All of `runtime_variant_presets` | public | Same |
 | `image` | `public_get_all_images`, `public_get_image_by_id`, `public_get_image_by_identifier`, `public_get_images_by_canonicals` | All of `images`. A status condition only; neither the registry's `is_global` nor ownership is looked at | public and the owning scopes (the `ImageTarget` list) | Images of registries not registered in public are read on login alone. Called by the legacy GQL and REST v1 |
-| `resource_preset` | `list_presets`, `check_presets`, `lookup` | `resource_presets`. Without a resource group, the rows with `scaling_group_name IS NULL`; with one, those rows too. `list_presets` and `lookup` do not check permission on the resource group given | Decisions 1, 2 | The NULL rows are candidates for public, the bound rows for the resource group's scope |
+| `resource_preset` | `list_presets`, `check_presets`, `lookup` | `resource_presets`. Without a resource group, the rows whose `scaling_group_name` is NULL; with one, those rows too. `list_presets` and `lookup` do not check permission on the resource group given | public, and the resource group's scope for the bound rows (planned) | The NULL rows are in public, the bound rows in that resource group |
 
 #### Reads that belong to an owning scope
 
-| Service | Wiring | Reads | Scope to move to | Why |
-|---|---|---|---|---|
-| `resource_group` | `get_wsproxy_version` | One `scaling_groups` row narrowed by the caller's domain, project and user Targets, and the AppProxy status | The owning scopes (the `ResourceGroupTarget` list) | The service already narrows by the same Targets. The check moves up to the processor |
-| `domain` | `bulk_get` | The full `DomainData` by `domains` id (resource limits, allowed registries and dotfiles included) | Decision 9 | Opened as public because a regular user holds no READ on their domain. Other domains are read the same way |
+Nothing is left. `resource_group.get_wsproxy_version` became a scope action taking the `ResourceGroupTarget` list, and `domain.bulk_get` moved to a read that checks READ per domain.
 
 #### Login only
 
@@ -429,7 +416,6 @@ Every read `services/*/processors.py` wires to a public processor. A public proc
 | `project` | `lookup` | A (domain name, name) pair in `groups` to its id | Not moved | Same |
 | `resource_group` | `lookup`, `bulk_lookup` | A name in `scaling_groups` to its id | Not moved | Same |
 | `session` | `lookup` | A (user, name, non-terminal status) in `sessions` to its id | Not moved | Same. The handler decides the user |
-| `user` | `lookup` | An email in `users` to its id | Decision 10 | Returns the id only, but anyone logged in can confirm that an email is an account |
 | `etcd_config` | `get_resource_slots`, `get_resource_metadata`, `get_vfolder_types` | etcd settings, device metadata in valkey | Not moved | Not an entity |
 | `manager_admin` | `get_announcement` | The announcement in etcd | Not moved | Not an entity |
 | `metric` | `metadata_public_search` | Container metric names in Prometheus | Not moved | Not an entity |
