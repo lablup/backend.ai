@@ -240,14 +240,13 @@ class VFolderInvitationData:
 class VFolderCreation:
     """A vfolder row that landed, and what making its storage folder needs.
 
-    The quota the folder is made with and the uid its files take belong to the owner's
-    resource policy, which the row does not carry; they are read where the row is
-    written so the storage step needs nothing more.
+    The quota the folder is made with belongs to the owner's resource policy, which the
+    row does not carry; it is read where the row is written so the storage step needs
+    nothing more.
     """
 
     vfolder: VFolderData
     max_quota_scope_size: int
-    container_uid: int | None
 
 
 @dataclass

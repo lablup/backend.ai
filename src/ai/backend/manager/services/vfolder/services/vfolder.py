@@ -18,7 +18,6 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
@@ -332,7 +331,6 @@ class VFolderService:
                 volume_name,
                 str(vfid),
                 creation.max_quota_scope_size,
-                VFOLDER_GROUP_PERMISSION_MODE if creation.container_uid is not None else None,
             )
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailure from e

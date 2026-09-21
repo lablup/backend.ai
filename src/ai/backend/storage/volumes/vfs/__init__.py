@@ -452,10 +452,8 @@ class BaseVolume(AbstractVolume):
             raise QuotaScopeNotFoundError
         vfpath = self.mangle_vfpath(vfid)
         await aiofiles.os.makedirs(vfpath, mode, exist_ok=exist_ok)
-        if mode != DEFAULT_VFOLDER_PERMISSION_MODE:
-            # The mode parameter in os.makedirs() sometimes fails to set directory permissions correctly.
-            # Calling Path.chmod() afterward ensures the desired permissions are properly applied.
-            vfpath.chmod(mode)
+        # makedirs() masks mode with the process umask, so set the mode explicitly.
+        vfpath.chmod(mode)
 
     @final
     @override

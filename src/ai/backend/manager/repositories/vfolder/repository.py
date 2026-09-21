@@ -453,7 +453,7 @@ class VfolderRepository:
             user_uuid=creator.creator_id,
             group_id=creator.project if isinstance(creator, ProjectVFolderCreator) else None,
         )
-        limits = await self._storage_limits(creator)
+        max_quota_scope_size = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)
             if isinstance(creator, ProjectVFolderCreator):
@@ -468,22 +468,21 @@ class VfolderRepository:
                 )
             return VFolderCreation(
                 vfolder=created,
-                max_quota_scope_size=limits[0],
-                container_uid=limits[1],
+                max_quota_scope_size=max_quota_scope_size,
             )
 
-    async def _storage_limits(self, creator: VFolderBaseCreator) -> tuple[int, int | None]:
-        """The quota scope size the folder is made with, and the uid its files take."""
+    async def _storage_limits(self, creator: VFolderBaseCreator) -> int:
+        """The quota scope size the folder is made with."""
         if isinstance(creator, ProjectVFolderCreator):
             project = await self.get_group_resource_info(creator.project, creator.domain_name)
             if project is None:
                 raise ProjectNotFound(f"Project with {creator.project} not found.")
-            return project.max_quota_scope_size, None
+            return project.max_quota_scope_size
         user_info = await self.get_user_resource_info(creator.creator_id)
         if user_info is None:
             raise UserNotFound(f"User with {creator.creator_id} not found.")
-        _, max_quota_scope_size, container_uid = user_info
-        return max_quota_scope_size, container_uid
+        _, max_quota_scope_size, _ = user_info
+        return max_quota_scope_size
 
     @vfolder_repository_resilience.apply()
     async def mark_vfolder_ready(self, vfolder_id: VFolderUUID) -> VFolderData:
