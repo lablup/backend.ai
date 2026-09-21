@@ -7,8 +7,11 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
+    RolePermissionPresetFilter,
+)
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
@@ -21,6 +24,7 @@ __all__ = (
     "CreateRolePresetInput",
     "RolePresetFilter",
     "RolePresetOrder",
+    "RolePresetPermissionNestedFilter",
     "SearchRolePresetsInput",
     "UpdateRolePresetBody",
     "UpdateRolePresetInput",
@@ -99,6 +103,14 @@ class BulkPurgeRolePresetsInput(BaseRequestModel):
     )
 
 
+class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter]):
+    """The `permissions` field of a role preset filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the preset filter's own `AND`.
+    """
+
+
 class RolePresetFilter(BaseRequestModel):
     """Filter criteria for searching role presets."""
 
@@ -111,6 +123,10 @@ class RolePresetFilter(BaseRequestModel):
             "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
             "set this explicitly to ``true`` to inspect archived presets."
         ),
+    )
+    permissions: RolePresetPermissionNestedFilter | None = Field(
+        default=None,
+        description="Filter by conditions on the permission entries the preset carries.",
     )
     AND: list[RolePresetFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[RolePresetFilter] | None = Field(default=None, description="OR conjunction.")

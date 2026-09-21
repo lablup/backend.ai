@@ -20914,6 +20914,11 @@ input RolePresetFilter
   """
   deleted: Boolean = null
 
+  """
+  Added in 26.9.0. Filter by conditions on the permission entries the preset carries.
+  """
+  permissions: RolePresetPermissionNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [RolePresetFilter!] = null
 
@@ -20945,6 +20950,31 @@ enum RolePresetOrderField
   SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. Filter role presets by conditions on the permission entries they carry.
+"""
+input RolePresetPermissionNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Matches presets carrying at least one permission entry when true, and presets carrying none when false. Says nothing about what the entries hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches presets with at least one permission entry satisfying all conditions.
+  """
+  some: RolePermissionPresetFilter = null
+
+  """
+  Matches presets whose every permission entry satisfies all conditions (also true when the preset carries none).
+  """
+  every: RolePermissionPresetFilter = null
+
+  """Matches presets with no permission entry satisfying all conditions."""
+  none: RolePermissionPresetFilter = null
 }
 
 """
