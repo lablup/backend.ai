@@ -5,6 +5,7 @@ Tests the service layer with mocked repository.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
@@ -13,9 +14,13 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.clients.container_registry.harbor import (
+    AbstractContainerRegistryQuotaClient,
     ContainerRegistryQuotaClientPool,
+    HarborAuthArgs,
+    HarborProjectInfo,
 )
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
@@ -30,6 +35,7 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
+    ContainerRegistryQuotaNotConfigurable,
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
@@ -38,6 +44,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -57,6 +64,9 @@ from ai.backend.manager.services.container_registry.actions.load_all_container_r
 )
 from ai.backend.manager.services.container_registry.actions.load_container_registries import (
     LoadContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
+    ReadRegistryQuotaAction,
 )
 from ai.backend.manager.services.container_registry.actions.rescan_images import (
     RescanImagesAction,
@@ -79,15 +89,48 @@ def mock_container_registry_repository() -> MagicMock:
 
 
 @pytest.fixture
+def mock_quota_client() -> MagicMock:
+    """Harbor quota client handed out by the pool."""
+    client = MagicMock(spec=AbstractContainerRegistryQuotaClient)
+    client.read_quota = AsyncMock(return_value=1024)
+    return client
+
+
+@pytest.fixture
+def mock_quota_client_pool(mock_quota_client: MagicMock) -> MagicMock:
+    pool = MagicMock(spec=ContainerRegistryQuotaClientPool)
+    pool.make_client.return_value = mock_quota_client
+    return pool
+
+
+@pytest.fixture
 def container_registry_service(
     mock_db_engine: MagicMock,
     mock_container_registry_repository: MagicMock,
+    mock_quota_client_pool: MagicMock,
 ) -> ContainerRegistryService:
     """Create ContainerRegistryService with mocked dependencies."""
     return ContainerRegistryService(
         db=mock_db_engine,
         container_registry_repository=mock_container_registry_repository,
-        quota_client_pool=MagicMock(spec=ContainerRegistryQuotaClientPool),
+        quota_client_pool=mock_quota_client_pool,
+    )
+
+
+@pytest.fixture
+def harbor_registry_data() -> ContainerRegistryData:
+    """A Harbor registry with everything the quota client needs."""
+    return ContainerRegistryData(
+        id=ContainerRegistryID(UUID("11111111-2222-3333-4444-555555555555")),
+        url="https://harbor.example.com",
+        registry_name="harbor.example.com",
+        type=ContainerRegistryType.HARBOR2,
+        project="harbor-project",
+        username="robot$quota",
+        password="secret",
+        ssl_verify=None,
+        is_global=True,
+        extra=None,
     )
 
 
@@ -738,6 +781,76 @@ class TestRescanImages:
 
 
 # ==================== HandleHarborWebhook Tests ====================
+
+
+@dataclass(frozen=True)
+class _MissingQuotaFieldCase:
+    field: str
+
+
+class TestReadRegistryQuota:
+    """Test cases for ContainerRegistryService.read_registry_quota"""
+
+    async def test_calls_client_with_project_registry(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        mock_quota_client_pool: MagicMock,
+        mock_quota_client: MagicMock,
+        harbor_registry_data: ContainerRegistryData,
+    ) -> None:
+        """The client gets the project's registry as Harbor project info and credentials."""
+        mock_container_registry_repository.get_project_registry = AsyncMock(
+            return_value=harbor_registry_data
+        )
+        scope_id = ProjectScope(project_id=ProjectID(UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")))
+
+        result = await container_registry_service.read_registry_quota(
+            ReadRegistryQuotaAction(scope_id=scope_id)
+        )
+
+        assert result.quota == 1024
+        mock_container_registry_repository.get_project_registry.assert_awaited_once_with(scope_id)
+        mock_quota_client_pool.make_client.assert_called_once_with(ContainerRegistryType.HARBOR2)
+        mock_quota_client.read_quota.assert_awaited_once_with(
+            HarborProjectInfo(
+                url="https://harbor.example.com", project="harbor-project", ssl_verify=True
+            ),
+            HarborAuthArgs(username="robot$quota", password="secret"),
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _MissingQuotaFieldCase(field="project"),
+            _MissingQuotaFieldCase(field="username"),
+            _MissingQuotaFieldCase(field="password"),
+        ],
+        ids=lambda case: case.field,
+    )
+    async def test_rejects_registry_missing_quota_field(
+        self,
+        case: _MissingQuotaFieldCase,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        mock_quota_client: MagicMock,
+        harbor_registry_data: ContainerRegistryData,
+    ) -> None:
+        """A registry without a project or credentials is rejected before Harbor is called."""
+        mock_container_registry_repository.get_project_registry = AsyncMock(
+            return_value=replace(harbor_registry_data, **{case.field: None})
+        )
+
+        with pytest.raises(ContainerRegistryQuotaNotConfigurable):
+            await container_registry_service.read_registry_quota(
+                ReadRegistryQuotaAction(
+                    scope_id=ProjectScope(
+                        project_id=ProjectID(UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
+                    )
+                )
+            )
+
+        mock_quota_client.read_quota.assert_not_awaited()
 
 
 class TestHandleHarborWebhook:

@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.container_registry.types import ContainerRegistryInfo
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.agent import AgentRow
 
@@ -54,11 +54,11 @@ class _ProjectWithRegistry:
     project_name: str
     registry_url: str
     type: ContainerRegistryType
-    username: str
-    password: str
+    username: str | None
+    password: str | None
     ssl_verify: bool
     is_global: bool
-    extra: dict[str, str]
+    extra: dict[str, str] | None
 
 
 @dataclass
@@ -313,11 +313,11 @@ class TestGetProjectRegistry:
             project_name=registry_project,
             registry_url=f"https://{registry_name}",
             type=registry_type,
-            username="",
-            password="",
+            username=None,
+            password=None,
             ssl_verify=True,
             is_global=True,
-            extra={},
+            extra=None,
         )
 
     async def test_get_project_registry_success(
@@ -331,7 +331,7 @@ class TestGetProjectRegistry:
         result = await repository.get_project_registry(scope_id)
 
         # Then
-        assert isinstance(result, ContainerRegistryInfo)
+        assert isinstance(result, ContainerRegistryData)
         assert result.id == project_with_registry.registry_id
         assert result.url == project_with_registry.registry_url
         assert result.registry_name == project_with_registry.registry_name
@@ -391,7 +391,6 @@ class TestGetProjectRegistry:
         scope_id = ProjectScope(project_id=project_with_minimal_registry.project_id)
         result = await repository.get_project_registry(scope_id)
 
-        # Verify fallback defaults for nullable text fields and server_default columns
         assert result.username == project_with_minimal_registry.username
         assert result.password == project_with_minimal_registry.password
         assert result.extra == project_with_minimal_registry.extra

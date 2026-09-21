@@ -35,26 +35,6 @@ class ContainerRegistrySearchResult:
     has_previous_page: bool
 
 
-@dataclass
-class ContainerRegistryInfo:
-    """Container registry info resolved from a project's container_registry config.
-
-    Unlike ContainerRegistryData, all fields are non-nullable because
-    the data is validated during the lookup process (ProjectRow → ContainerRegistryRow).
-    """
-
-    id: ContainerRegistryID
-    url: str
-    registry_name: str
-    type: ContainerRegistryType
-    project: str
-    username: str
-    password: str
-    ssl_verify: bool
-    is_global: bool
-    extra: dict[str, Any]
-
-
 @dataclass(frozen=True)
 class ImageCommitRegistry:
     registry_name: str

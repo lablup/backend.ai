@@ -5,6 +5,7 @@ import secrets
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.container_registry.harbor import (
     AbstractContainerRegistryQuotaClient,
@@ -17,6 +18,7 @@ from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
+    ContainerRegistryQuotaNotConfigurable,
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
@@ -251,15 +253,22 @@ class ContainerRegistryService:
         return HandleHarborWebhookActionResult()
 
     async def _registry_quota_target(self, scope_id: ProjectScope) -> _RegistryQuotaTarget:
-        registry_info = await self._container_registry_repository.get_project_registry(scope_id)
+        project_id = ProjectID(scope_id.project_id)
+        registry = await self._container_registry_repository.get_project_registry(scope_id)
+        if registry.project is None or registry.username is None or registry.password is None:
+            raise ContainerRegistryQuotaNotConfigurable(
+                f"Container registry {registry.registry_name} has no project or credentials"
+                f" for quota management. (project: {project_id})"
+            )
+        ssl_verify = registry.ssl_verify if registry.ssl_verify is not None else True
         return _RegistryQuotaTarget(
-            client=self._quota_client_pool.make_client(registry_info.type),
+            client=self._quota_client_pool.make_client(registry.type),
             project=HarborProjectInfo(
-                url=registry_info.url,
-                project=registry_info.project,
-                ssl_verify=registry_info.ssl_verify,
+                url=registry.url,
+                project=registry.project,
+                ssl_verify=ssl_verify,
             ),
-            auth=HarborAuthArgs(username=registry_info.username, password=registry_info.password),
+            auth=HarborAuthArgs(username=registry.username, password=registry.password),
         )
 
     async def create_registry_quota(
