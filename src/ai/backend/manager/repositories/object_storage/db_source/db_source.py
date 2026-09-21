@@ -10,6 +10,9 @@ from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
 from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.searchable_fields import (
+    ObjectStorageSearchableFields,
+)
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
@@ -35,7 +38,7 @@ class ObjectStorageDBSource:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with name {storage_name} not found."
                 )
-            return row.to_dataclass()
+            return ObjectStorageSearchableFields.own.to_data(row)
 
     async def get_by_id(self, storage_id: uuid.UUID) -> ObjectStorageData:
         """
@@ -47,7 +50,7 @@ class ObjectStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-            return row.to_dataclass()
+            return ObjectStorageSearchableFields.own.to_data(row)
 
     async def get_by_namespace_id(self, storage_namespace_id: uuid.UUID) -> ObjectStorageData:
         """
@@ -69,7 +72,7 @@ class ObjectStorageDBSource:
                 raise ObjectStorageNotFoundError(
                     f"Object storage not found for namespace ID {storage_namespace_id}."
                 )
-            return row.object_storage_row.to_dataclass()
+            return ObjectStorageSearchableFields.own.to_data(row.object_storage_row)
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """
@@ -79,7 +82,7 @@ class ObjectStorageDBSource:
             query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
+            return [ObjectStorageSearchableFields.own.to_data(row) for row in rows]
 
     async def search(
         self,
@@ -95,7 +98,10 @@ class ObjectStorageDBSource:
                 querier,
             )
 
-            items = [row.ObjectStorageRow.to_dataclass() for row in result.rows]
+            items = [
+                ObjectStorageSearchableFields.own.to_data(row.ObjectStorageRow)
+                for row in result.rows
+            ]
 
             return ObjectStorageListResult(
                 items=items,

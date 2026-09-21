@@ -33,7 +33,6 @@ from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerAssignmentCreator,
     IdleCheckerCreator,
@@ -41,6 +40,9 @@ from ai.backend.manager.models.idle_checker.creators import (
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentTarget
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerAssignmentSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -525,7 +527,7 @@ class TestIdleCheckerAssignmentRepository:
 
         result = await repository.admin_search_assignments(
             IdleCheckerAssignmentSearcher(
-                conditions=[IdleCheckerAssignmentConditions.by_enabled_equals(False)],
+                conditions=[IdleCheckerAssignmentSearchableFields.own.enabled.filter.equals(False)],
                 pagination=NoPagination(),
             )
         )

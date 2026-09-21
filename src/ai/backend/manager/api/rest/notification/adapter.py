@@ -38,13 +38,9 @@ from ai.backend.manager.data.notification import (
 )
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
-from ai.backend.manager.models.notification.orders import (
-    NotificationChannelOrders,
-    NotificationRuleOrders,
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
 )
 from ai.backend.manager.models.notification.searchers import (
     NotificationChannelSearcher,
@@ -161,22 +157,28 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                contains_factory=NotificationChannelConditions.by_name_contains,
-                equals_factory=NotificationChannelConditions.by_name_equals,
-                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
-                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
-                in_factory=NotificationChannelConditions.by_name_in,
+                contains_factory=NotificationChannelSearchableFields.own.name.filter.contains,
+                equals_factory=NotificationChannelSearchableFields.own.name.filter.equals,
+                starts_with_factory=NotificationChannelSearchableFields.own.name.filter.starts_with,
+                ends_with_factory=NotificationChannelSearchableFields.own.name.filter.ends_with,
+                in_factory=NotificationChannelSearchableFields.own.name.filter.in_,
             )
             if condition is not None:
                 conditions.append(condition)
 
         # Channel types filter
         if filter.channel_types is not None and len(filter.channel_types) > 0:
-            conditions.append(NotificationChannelConditions.by_channel_types(filter.channel_types))
+            conditions.append(
+                NotificationChannelSearchableFields.own.channel_type.filter.in_(
+                    filter.channel_types
+                )
+            )
 
         # Enabled filter
         if filter.enabled is not None:
-            conditions.append(NotificationChannelConditions.by_enabled(filter.enabled))
+            conditions.append(
+                NotificationChannelSearchableFields.own.enabled.filter.equals(filter.enabled)
+            )
 
         return conditions
 
@@ -185,11 +187,15 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == NotificationChannelOrderField.NAME:
-            return NotificationChannelOrders.name(ascending=ascending)
+            return NotificationChannelSearchableFields.own.name.order.apply(ascending=ascending)
         if order.field == NotificationChannelOrderField.CREATED_AT:
-            return NotificationChannelOrders.created_at(ascending=ascending)
+            return NotificationChannelSearchableFields.own.created_at.order.apply(
+                ascending=ascending
+            )
         if order.field == NotificationChannelOrderField.UPDATED_AT:
-            return NotificationChannelOrders.updated_at(ascending=ascending)
+            return NotificationChannelSearchableFields.own.updated_at.order.apply(
+                ascending=ascending
+            )
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
@@ -268,22 +274,26 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
-                contains_factory=NotificationRuleConditions.by_name_contains,
-                equals_factory=NotificationRuleConditions.by_name_equals,
-                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
-                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
-                in_factory=NotificationRuleConditions.by_name_in,
+                contains_factory=NotificationRuleSearchableFields.own.name.filter.contains,
+                equals_factory=NotificationRuleSearchableFields.own.name.filter.equals,
+                starts_with_factory=NotificationRuleSearchableFields.own.name.filter.starts_with,
+                ends_with_factory=NotificationRuleSearchableFields.own.name.filter.ends_with,
+                in_factory=NotificationRuleSearchableFields.own.name.filter.in_,
             )
             if condition is not None:
                 conditions.append(condition)
 
         # Rule types filter
         if filter.rule_types is not None and len(filter.rule_types) > 0:
-            conditions.append(NotificationRuleConditions.by_rule_types(filter.rule_types))
+            conditions.append(
+                NotificationRuleSearchableFields.own.rule_type.filter.in_(filter.rule_types)
+            )
 
         # Enabled filter
         if filter.enabled is not None:
-            conditions.append(NotificationRuleConditions.by_enabled(filter.enabled))
+            conditions.append(
+                NotificationRuleSearchableFields.own.enabled.filter.equals(filter.enabled)
+            )
 
         return conditions
 
@@ -292,11 +302,11 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == NotificationRuleOrderField.NAME:
-            return NotificationRuleOrders.name(ascending=ascending)
+            return NotificationRuleSearchableFields.own.name.order.apply(ascending=ascending)
         if order.field == NotificationRuleOrderField.CREATED_AT:
-            return NotificationRuleOrders.created_at(ascending=ascending)
+            return NotificationRuleSearchableFields.own.created_at.order.apply(ascending=ascending)
         if order.field == NotificationRuleOrderField.UPDATED_AT:
-            return NotificationRuleOrders.updated_at(ascending=ascending)
+            return NotificationRuleSearchableFields.own.updated_at.order.apply(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

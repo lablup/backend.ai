@@ -5,6 +5,7 @@ from ai.backend.common.data.entity.login_session import LoginSessionFieldType
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
@@ -15,7 +16,6 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     ScopedFieldsOpsResult,
 )
-from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.services.auth.actions.authorize import (
@@ -132,10 +132,10 @@ class AuthProcessors:
     ]
     login_sessions: LookupFieldGroup[LoginSessionData]
     login_history: LookupFieldGroup[LoginHistoryData]
-    search_login_sessions: ScopeActionProcessor[
+    search_login_sessions: BulkActionProcessor[
         SearchLoginSessionsAction, ScopedFieldsOpsResult[LoginSessionData]
     ]
-    search_login_history: ScopeActionProcessor[
+    search_login_history: BulkActionProcessor[
         SearchLoginHistoryAction, ScopedFieldsOpsResult[LoginHistoryData]
     ]
     global_search_login_sessions: GlobalActionProcessor[
@@ -198,8 +198,12 @@ class AuthProcessors:
         self.revoke_login_session = self.login_sessions.single_field(
             RevokeLoginSessionAction, service.revoke_login_session
         )
-        self.search_login_sessions = self.login_sessions.search_ops(SearchLoginSessionsAction)
-        self.search_login_history = self.login_history.search_ops(SearchLoginHistoryAction)
+        self.search_login_sessions = self.login_sessions.atomic_bulk_scoped_search_ops(
+            SearchLoginSessionsAction
+        )
+        self.search_login_history = self.login_history.atomic_bulk_scoped_search_ops(
+            SearchLoginHistoryAction
+        )
         self.global_search_login_sessions = self.login_sessions.global_searcher_ops(
             GlobalSearchLoginSessionsAction
         )

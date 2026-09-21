@@ -11,6 +11,9 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
 from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact.searchable_fields import (
+    ArtifactSearchableFields,
+)
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -58,4 +61,4 @@ class ArtifactCreator(CreatedInGlobal[ArtifactRow], EntityCreator[ArtifactRow, A
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return row.to_dataclass()
+        return ArtifactSearchableFields.own.to_data(row)

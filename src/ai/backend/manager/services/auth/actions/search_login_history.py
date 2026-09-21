@@ -5,8 +5,8 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.ops.base import (
+    BulkScopedSearchOpsAction,
     GlobalSearcherOpsAction,
-    OperationScopeOpsAction,
 )
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
@@ -31,24 +31,19 @@ class GlobalSearchLoginHistoryAction(GlobalSearcherOpsAction[LoginHistoryRow, Lo
 
 
 @dataclass(frozen=True)
-class SearchLoginHistoryAction(OperationScopeOpsAction[LoginHistoryRow, LoginHistoryData]):
-    """Page through the login attempts one user made."""
+class SearchLoginHistoryAction(BulkScopedSearchOpsAction[LoginHistoryRow, LoginHistoryData]):
+    """Page through the login attempts of the users named, combined with OR."""
 
-    user_id: UserID
+    user_ids: Sequence[UserID]
     searcher: LoginHistorySearcher
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return UserEntityType()
-
-    @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.user_id,)
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.user_ids)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (MyLoginHistoryTarget(user_id=self.user_id),)
+        return [MyLoginHistoryTarget(user_id=user_id) for user_id in self.user_ids]
 
     @override
     @classmethod

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import assert_never
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
@@ -23,11 +24,12 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.retention.conditions import RetentionPolicyConditions
 from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
-from ai.backend.manager.models.retention.orders import RetentionPolicyOrders
 from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.retention.searchable_fields import (
+    RetentionPolicySearchableFields,
+)
 from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -53,7 +55,7 @@ from ai.backend.manager.types import OptionalState
 
 def _retention_policy_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RetentionPolicyOrders.category(ascending=True),
+        forward_order=RetentionPolicySearchableFields.own.category.order.apply(ascending=True),
         cursor_column=RetentionPolicyRow.id,
     )
 
@@ -147,24 +149,28 @@ class RetentionPolicyAdapter(BaseAdapter):
         return PurgeRetentionPolicyPayload(id=result.data.id)
 
     def _convert_filter(self, filter_: RetentionPolicyFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+        fields = RetentionPolicySearchableFields.own
+        conditions: list[QueryCondition] = list(
+            self.apply_bool_filter(filter_.enabled, fields.enabled.filter)
+        )
         if filter_.category is not None:
-            conditions.append(RetentionPolicyConditions.by_category_equals(filter_.category))
-        if filter_.enabled is not None:
-            conditions.append(RetentionPolicyConditions.by_enabled(filter_.enabled))
+            conditions.append(fields.category.filter.equals(filter_.category))
         return conditions
 
     def _convert_orders(self, orders: list[RetentionPolicyOrder]) -> list[QueryOrder]:
+        fields = RetentionPolicySearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction.value == "ASC"
             match order.field:
                 case RetentionPolicyOrderField.CATEGORY:
-                    result.append(RetentionPolicyOrders.category(ascending))
+                    result.append(fields.category.order.apply(ascending))
                 case RetentionPolicyOrderField.CREATED_AT:
-                    result.append(RetentionPolicyOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case RetentionPolicyOrderField.LAST_SWEPT_AT:
-                    result.append(RetentionPolicyOrders.last_swept_at(ascending))
+                    result.append(fields.last_swept_at.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
         return result
 
     @staticmethod

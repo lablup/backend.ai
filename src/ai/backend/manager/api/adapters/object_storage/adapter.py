@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
@@ -26,13 +27,17 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     PresignedUploadURLPayload,
     UpdateObjectStoragePayload,
 )
-from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
+from ai.backend.common.dto.manager.v2.object_storage.types import (
+    ObjectStorageOrderField,
+    OrderDirection,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.object_storage.conditions import ObjectStorageConditions
 from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
-from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
+from ai.backend.manager.models.object_storage.searchable_fields import (
+    ObjectStorageSearchableFields,
+)
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -96,46 +101,30 @@ class ObjectStorageAdapter(BaseAdapter):
         return ObjectStorageSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: ObjectStorageFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=ObjectStorageConditions.by_name_contains,
-                equals_factory=ObjectStorageConditions.by_name_equals,
-                starts_with_factory=ObjectStorageConditions.by_name_starts_with,
-                ends_with_factory=ObjectStorageConditions.by_name_ends_with,
-                in_factory=ObjectStorageConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.host is not None:
-            condition = self.convert_string_filter(
-                filter.host,
-                contains_factory=ObjectStorageConditions.by_host_contains,
-                equals_factory=ObjectStorageConditions.by_host_equals,
-                starts_with_factory=ObjectStorageConditions.by_host_starts_with,
-                ends_with_factory=ObjectStorageConditions.by_host_ends_with,
-                in_factory=ObjectStorageConditions.by_host_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = ObjectStorageSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(filter.host, fields.host.filter),
+        ]
 
     @staticmethod
     def _convert_orders(orders: list[ObjectStorageOrder]) -> list[QueryOrder]:
+        """``created_at`` has no column on the table, so it orders by nothing."""
+        fields = ObjectStorageSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
-            match order.field.value:
-                case "name":
-                    result.append(ObjectStorageOrders.name(ascending))
-                case "host":
-                    result.append(ObjectStorageOrders.host(ascending))
-                case "region":
-                    result.append(ObjectStorageOrders.region(ascending))
+            match order.field:
+                case ObjectStorageOrderField.NAME:
+                    result.append(fields.name.order.apply(ascending))
+                case ObjectStorageOrderField.HOST:
+                    result.append(fields.host.order.apply(ascending))
+                case ObjectStorageOrderField.REGION:
+                    result.append(fields.region.order.apply(ascending))
+                case ObjectStorageOrderField.CREATED_AT:
+                    continue
+                case _:
+                    assert_never(order.field)
         return result
 
     @staticmethod

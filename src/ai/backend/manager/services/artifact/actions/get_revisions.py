@@ -4,9 +4,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.artifact import ArtifactEntityType, ArtifactID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.artifact_revision.scopes import ArtifactRevisionTarget
@@ -16,20 +16,15 @@ from ai.backend.manager.models.scopes import OperationScope
 
 @dataclass
 class GetArtifactRevisionsAction(
-    OperationScopeOpsAction[ArtifactRevisionRow, ArtifactRevisionData]
+    BulkScopedSearchOpsAction[ArtifactRevisionRow, ArtifactRevisionData]
 ):
-    """Page through the revisions of one artifact.
+    """Page through the revisions of the artifacts named, combined with OR.
 
-    The artifact is the scope, so ops applies that condition.
+    Every artifact is authorized before the read runs.
     """
 
-    artifact_id: ArtifactID
+    artifact_ids: Sequence[ArtifactID]
     searcher: ArtifactRevisionSearcher
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ArtifactEntityType()
 
     @override
     @classmethod
@@ -37,12 +32,14 @@ class GetArtifactRevisionsAction(
         return "get_artifact_revisions"
 
     @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.artifact_id,)
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.artifact_ids)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (ArtifactRevisionTarget(artifact_id=self.artifact_id),)
+        return [
+            ArtifactRevisionTarget(artifact_id=artifact_id) for artifact_id in self.artifact_ids
+        ]
 
     @override
     def to_searcher(self) -> ArtifactRevisionSearcher:

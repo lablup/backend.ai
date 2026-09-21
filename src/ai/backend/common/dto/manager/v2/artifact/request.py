@@ -123,7 +123,12 @@ class ArtifactFilter(BaseRequestModel):
 class ArtifactOrder(BaseRequestModel):
     """Order specification for artifact search."""
 
-    field: ArtifactOrderField = Field(description="Field to order by.")
+    field: ArtifactOrderField = Field(
+        description=(
+            "Field to order by. `SIZE` is deprecated since 26.9.0: it is not used for"
+            " ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
@@ -311,7 +316,12 @@ ArtifactGQLFilterInputDTO.model_rebuild()
 class ArtifactGQLOrderByInputDTO(BaseRequestModel):
     """GQL-facing order by for artifacts."""
 
-    field: ArtifactOrderField = Field(description="Field to order by.")
+    field: ArtifactOrderField = Field(
+        description=(
+            "Field to order by. `SIZE` is deprecated since 26.9.0: it is not used for"
+            " ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC)
 
 

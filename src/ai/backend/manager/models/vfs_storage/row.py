@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import override
 
 import sqlalchemy as sa
@@ -9,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -49,11 +47,3 @@ class VFSStorageRow(Base):
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> VFSStorageData:
-        return VFSStorageData(
-            id=self.id,
-            name=self.name,
-            host=self.host,
-            base_path=Path(self.base_path),
-        )

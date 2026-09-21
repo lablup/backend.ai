@@ -8,6 +8,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.artifact_registries.searchable_fields import (
+    ArtifactRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -24,4 +27,4 @@ class BulkArtifactRegistryQuerier(BulkEntityQuerier[ArtifactRegistryRow, Artifac
 
     @override
     def to_data(self, row: ArtifactRegistryRow) -> ArtifactRegistryData:
-        return row.to_dataclass()
+        return ArtifactRegistrySearchableFields.own.to_data(row)

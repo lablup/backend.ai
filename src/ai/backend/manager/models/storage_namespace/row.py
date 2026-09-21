@@ -9,7 +9,6 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -53,10 +52,3 @@ class StorageNamespaceRow(Base):
         "ObjectStorageRow",
         primaryjoin=_get_storage_namespace_join_cond,
     )
-
-    def to_dataclass(self) -> StorageNamespaceData:
-        return StorageNamespaceData(
-            id=StorageNamespaceID(self.id),
-            storage_id=self.storage_id,
-            namespace=self.namespace,
-        )

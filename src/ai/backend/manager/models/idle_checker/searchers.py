@@ -9,6 +9,10 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerAssignmentSearchableFields,
+    IdleCheckerSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,7 +24,7 @@ class IdleCheckerSearcher(Searcher[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return row.to_data()
+        return IdleCheckerSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -31,4 +35,4 @@ class IdleCheckerAssignmentSearcher(Searcher[IdleCheckerBindingRow, IdleCheckerA
 
     @override
     def to_data(self, row: IdleCheckerBindingRow) -> IdleCheckerAssignmentData:
-        return row.to_data()
+        return IdleCheckerAssignmentSearchableFields.own.to_data(row)

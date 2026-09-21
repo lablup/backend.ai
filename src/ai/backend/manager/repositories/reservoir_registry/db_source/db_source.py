@@ -11,6 +11,9 @@ from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFound
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry.searchable_fields import (
+    ReservoirRegistrySearchableFields,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -34,7 +37,7 @@ class ReservoirDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
-            return row.to_dataclass()
+            return ReservoirRegistrySearchableFields.own.to_data(row)
 
     async def get_registries_by_ids(
         self, reservoir_ids: list[uuid.UUID]
@@ -49,7 +52,7 @@ class ReservoirDBSource:
                 .options(selectinload(ReservoirRegistryRow.meta))
             )
             rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
+            return [ReservoirRegistrySearchableFields.own.to_data(row) for row in rows]
 
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -69,7 +72,7 @@ class ReservoirDBSource:
                 raise ArtifactRegistryNotFoundError(
                     f"Reservoir registry not found for registry {name}"
                 )
-            return row.reservoir_registries.to_dataclass()
+            return ReservoirRegistrySearchableFields.own.to_data(row.reservoir_registries)
 
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
@@ -91,7 +94,7 @@ class ReservoirDBSource:
                 raise ArtifactRegistryNotFoundError(
                     f"Reservoir registry not found for artifact {artifact_id}"
                 )
-            return row.reservoir_registry.to_dataclass()
+            return ReservoirRegistrySearchableFields.own.to_data(row.reservoir_registry)
 
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
         """
@@ -101,4 +104,4 @@ class ReservoirDBSource:
             query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
+            return [ReservoirRegistrySearchableFields.own.to_data(row) for row in rows]

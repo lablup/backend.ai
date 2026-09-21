@@ -20,6 +20,10 @@ from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -57,7 +61,7 @@ class NotificationChannelUpdater(DataUpdater[NotificationChannelRow, Notificatio
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return row.to_data()
+        return NotificationChannelSearchableFields.own.to_data(row)
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -101,7 +105,7 @@ class NotificationRuleUpdater(DataUpdater[NotificationRuleRow, NotificationRuleD
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return row.to_data()
+        return NotificationRuleSearchableFields.own.to_data(row)
 
     @override
     def build_values(self) -> dict[str, Any]:

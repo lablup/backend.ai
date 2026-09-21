@@ -7,13 +7,16 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryConnectionData
 from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry.searchable_fields import (
+    ReservoirRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
 class BulkReservoirRegistryQuerier(
     BulkEntityQuerier[ReservoirRegistryRow, ReservoirRegistryConnectionData]
 ):
-    """The Reservoir registries the caller named."""
+    """The Reservoir registries the caller named, without the name the meta row holds."""
 
     @override
     def row_class(self) -> type[ReservoirRegistryRow]:
@@ -25,10 +28,11 @@ class BulkReservoirRegistryQuerier(
 
     @override
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryConnectionData:
+        own = ReservoirRegistrySearchableFields.own
         return ReservoirRegistryConnectionData(
-            id=ArtifactRegistryID(row.id),
-            endpoint=row.endpoint,
-            access_key=row.access_key,
-            secret_key=row.secret_key,
-            api_version=row.api_version,
+            id=ArtifactRegistryID(own.id.read(row)),
+            endpoint=own.endpoint.read(row),
+            access_key=own.access_key.read(row),
+            secret_key=own.secret_key.read(row),
+            api_version=own.api_version.read(row),
         )
