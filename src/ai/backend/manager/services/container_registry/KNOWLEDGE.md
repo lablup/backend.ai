@@ -17,40 +17,38 @@ generated:
 status: stable
 ---
 
-# Container registry service — Knowledge
+# 컨테이너 레지스트리 서비스 — 배경
 
-> Rules: `../AGENTS.md`. Action shapes and gates: `../../actions/KNOWLEDGE.md`.
+> 규칙: `../AGENTS.md`. 액션 shape와 게이트: `../../actions/KNOWLEDGE.md`.
 
-A container registry is a global entity the manager scans images from. The service also
-manages the storage quota Harbor keeps per project, reached through the project that names
-the registry rather than through the registry itself.
+컨테이너 레지스트리는 매니저가 이미지를 스캔해 오는 전역 엔티티다. 이 서비스는 Harbor가
+프로젝트마다 두는 스토리지 quota도 다루는데, 그 quota에는 레지스트리가 아니라 레지스트리를
+가리키는 프로젝트를 통해 닿는다.
 
-## The quota operations are gated at the API layer, not by the processor
+## quota 연산의 권한은 processor가 아니라 API단이 거른다
 
-| Entry point | Gate | Who passes |
+| 진입점 | 게이트 | 통과하는 역할 |
 |---|---|---|
-| REST v1 `/group/registry-quota` | `superadmin_required` middleware on the route | SUPERADMIN |
-| Legacy GraphQL quota mutations | `allowed_roles` on the mutation class | SUPERADMIN, ADMIN |
-| Legacy GraphQL `GroupNode.registry_quota` | none | anyone who resolves the node |
+| REST v1 `/group/registry-quota` | route의 `superadmin_required` middleware | SUPERADMIN |
+| 레거시 GraphQL quota mutation | mutation 클래스의 `allowed_roles` | SUPERADMIN, ADMIN |
+| 레거시 GraphQL `GroupNode.registry_quota` | 없음 | 노드를 조회할 수 있는 누구나 |
 
-- The four quota processors are wired `anonymous_global`, so the processor runs the
-  monitors and no validator; the catalog lists them with an anonymous gate.
-- The `global` shape was not used because its SUPERADMIN gate would cut the ADMIN access
-  the legacy GraphQL mutations grant.
-- The `scope` shape over the project is the intended end state; it waits on the seed
-  roles, which grant `container_registry: [read]` only, to grant the write operations.
-- The webhook processor is the other anonymous wiring here: Harbor holds no keypair, and
-  the service checks the webhook secret itself.
+- quota processor 넷은 `anonymous_global`로 배선돼 monitor만 돌고 validator는 없다. 카탈로그에는
+  anonymous 게이트로 잡힌다.
+- `global` shape를 쓰지 않은 이유는 그 SUPERADMIN 게이트가 레거시 GraphQL mutation이 허용하는
+  ADMIN을 잘라내기 때문이다.
+- 최종 형태는 프로젝트를 스코프로 삼는 `scope` shape다. seed role이 `container_registry: [read]`만
+  주고 있어, 쓰기 권한이 role에 들어가기를 기다린다.
+- webhook processor도 같은 anonymous 배선이다. Harbor는 keypair가 없고, 서비스가 webhook secret을
+  직접 검사한다.
 
-## A quota operation reaches the registry through the project
+## quota 연산은 프로젝트를 거쳐 레지스트리에 닿는다
 
-- `get_project_registry` reads `ProjectRow.container_registry` for a registry name and
-  project, then the `ContainerRegistryRow` they name; any missing step is
-  `ContainerRegistryNotFound`.
-- The client pool picks a client by registry type; only `HARBOR2` has one, and any other
-  type is `ContainerRegistryQuotaNotSupported`.
-- A registry whose `project`, `username` or `password` is null is
-  `ContainerRegistryQuotaNotConfigurable` before Harbor is called; `ssl_verify` null
-  means verify.
-- `HarborQuotaClient` opens a session per call, so the pool holds no connection state and
-  needs no close.
+- `get_project_registry`는 `ProjectRow.container_registry`에서 레지스트리 이름과 프로젝트를
+  읽고, 그 둘이 가리키는 `ContainerRegistryRow`를 찾는다. 어느 단계가 비어도
+  `ContainerRegistryNotFound`다.
+- 클라이언트 pool은 레지스트리 타입으로 클라이언트를 고른다. `HARBOR2`만 있고, 다른 타입은
+  `ContainerRegistryQuotaNotSupported`다.
+- `project`·`username`·`password` 중 하나라도 null인 레지스트리는 Harbor를 부르기 전에
+  `ContainerRegistryQuotaNotConfigurable`로 거부된다. `ssl_verify`의 null은 검증함으로 본다.
+- `HarborQuotaClient`는 호출마다 세션을 열므로 pool은 연결 상태를 갖지 않고 close도 필요 없다.
