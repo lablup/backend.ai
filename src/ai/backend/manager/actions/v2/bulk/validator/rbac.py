@@ -53,7 +53,8 @@ class VirtualEntityAtomicBulkActionRBACValidator(AtomicBulkActionValidator):
     """The check applied to the run: one target lacking the permission rejects it all.
 
     For the per-entity answer see :class:`VirtualEntityPartialBulkActionRBACValidator`; both
-    ask the same own check.
+    ask the same own check. A superadmin is refused nothing, so an id that matched no
+    row reaches the operation and comes back as the miss it is.
     """
 
     _check: BulkOwnCheck
@@ -63,6 +64,11 @@ class VirtualEntityAtomicBulkActionRBACValidator(AtomicBulkActionValidator):
 
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> None:
+        user = current_user()
+        if user is None:
+            raise UnreachableError("User context is not available")
+        if user.is_superadmin:
+            return
         owned = await self._check.check(meta)
         denied = [entity_id for entity_id, is_owned in owned.items() if not is_owned]
         if denied:
