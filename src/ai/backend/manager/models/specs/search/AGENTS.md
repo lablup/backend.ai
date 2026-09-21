@@ -38,6 +38,9 @@ A slot is emptied for one of three reasons. Do not empty one for a reason that i
 | `DecimalType` (stored as VARCHAR) | Numeric cast | Numeric cast |
 | To-many child (order) | Filter with some / every / none | None |
 
+- Leave the filter empty when no shared condition class takes the column's type. Today that is interval (`retention_policies.retention_period`, `audit_logs.duration`).
+- Adding a shared condition class adds that type's scenarios to the shared declaration DB test in the same change.
+
 ### Sensitive — it works, but the value leaks
 
 Repeating a partial-match filter recovers the value one character at a time even when it is not in the response. An order does the same.
@@ -50,6 +53,9 @@ Empty both slots for the values below. Do not leave equality either.
 | `sessions.callback_url`, `deployment_revisions.callback_url` | External callback address |
 | `sessions.bootstrap_script`, `sessions.startup_command` | User-written script |
 | `deployment_revisions.bootstrap_script`, `deployment_revisions.startup_command` | User-written script |
+| `huggingface_registries.token` | Plaintext token. `sa.String`, so the type axis does not catch it |
+| `reservoir_registries.secret_key`, `object_storages.secret_key` | Plaintext credential. `sa.String` for the same reason |
+| `audit_logs.client_ip` | The address a call came from |
 
 - To narrow by ownership, use the owner identifier (`user_id`, `creator_id`) instead of the value.
 - A new column of the same kind as a row here gets a row of its own and empty slots.
@@ -85,6 +91,8 @@ A filled slot is not an API surface by itself.
 - A value the API reports through another shape is exposed under that shape or not at
   all. One deployment status covers several lifecycle stages, so `lifecycle_stage`
   carries a filter and no order.
+- An order enum value with no column behind it is not deleted. Mark it deprecated, ignore
+  the value, and remove it in the next release.
 
 ## Conditions and orders
 
@@ -145,11 +153,20 @@ Depth follows the permission axis, not the foreign keys.
 
 ## Usage between entities
 
-- A usage that is not ownership, such as session → vfolder, stays out of the ownership graph. It is decided from the using side's table columns.
-- Only a foreign key column counts as a usage. An id inside a JSON value does not.
-- Declare it in `linked` as `UsageConditions[{using entity}ID]`, named after the using entity in the plural (`deployments`, `model_cards`). `used_by(id)` returns a `UsedBy`.
-- A scoped search passes `UsedBy` through `ScopedSearcher`. The caller must be able to read each using entity, or the whole search is refused. Results stay within the rows the scopes allow; a usage grants nothing.
-- A global search passes `UsedBy` through `GlobalSearcher`. The SUPERADMIN gate answers for the unscoped read, so using entities are not checked.
+- A usage that is not ownership, such as session → vfolder, stays out of the ownership graph. It is decided from a table column.
+- Only a foreign key column counts as a usage. An id inside a JSON value does not. A key sitting on the searched row (`roles.role_preset_id`) is a usage too.
+- There is one bundle, usage, and two directions inside it.
+
+| Direction | Side searched | Narrowed by | Example |
+|---|---|---|---|
+| `used_by` | The used side | The using entity's id | The images this deployment uses |
+| `uses` | The using side | The used entity's id | The sessions using this agent, the roles using this role preset |
+
+- Declare them under `linked.usage.used_by.<entities>` and `linked.usage.uses.<entities>`, named after the other entity in the plural (`deployments`, `model_cards`).
+- The API input carries one `usage` per search, holding `usedBy` and `uses`.
+- The rules are the same both ways: narrow with AND, require the caller to be able to read the entity the condition names, grant no permission, and pull in no row the scopes disallow.
+- A scoped search passes them through `ScopedSearcher`; one named entity the caller cannot read refuses the whole search. A global search passes them through `GlobalSearcher`, where the SUPERADMIN gate answers, so the named entities are not checked.
+- Both directions go out under the name `used_by` today. Moving them over is separate work.
 
 ## Scopes a search accepts
 
@@ -160,9 +177,10 @@ The per-entity tables are under `Scopes a search accepts` in `KNOWLEDGE.md`. Add
 | Entity | Every scope entity that can own it, and the scope of every relation that grants READ |
 | Field | The entity that owns the field |
 
+- A field search is the bulk shape that checks permission per owning entity. Its execution path is to move onto the new search path.
 - Read the owning scopes off `created_in` on the creator and the upserter. Read the READ-granting relations off the `RelationCreator` declarations and the share writes.
 - public is a scope like any other. A public read is a scope action, and one Target declares both what is authorized against (the public singleton) and the row condition (rows registered in public). Precedent: `PublicImageTarget` (`models/image/scopes.py`).
 - The `is_global` column keeps its name. It means "registered in public". Names in code say public.
-- A global entity belongs to global and may additionally be shared to public through a relation. Today only the container registry is.
+- Registration in public is membership. An entity whose whole type is public and an entity switched per row by a column (container registry, image, resource preset) both name public in `created_in`. For the per-row kind, its Target puts that column on as the row condition.
 - A global read keeps the action shape. It checks the entity type and operation at the global singleton and adds no scope condition to the query. Permission is per type.
 - The superadmin and monitor bypass stays as it is.
