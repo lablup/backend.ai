@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-Not exercised by any scenario: activate_revision, admin_refresh_deployment_revisions, admin_search_replicas, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_policies_by_endpoint_ids, batch_load_replicas_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_rule, scoped_search, search_access_tokens, search_policies, search_replicas, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
+Not exercised by any scenario: activate_revision, admin_refresh_deployment_revisions, admin_search_replicas, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_replicas_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_rule, scoped_search, search_access_tokens, search_policies, search_replicas, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
 
 ### adding_revisions
 
@@ -1044,6 +1044,211 @@ Then
 
 - 거부된다
   - 거부: EndpointNotFound
+
+### loading_policies
+
+#### [a-batch-load-answers-a-policy-or-a-refusal-for-each-deployment-in-order](/tests/scenario/bai_scenario/manager/deployment/test_loading_policies.py) — pass
+
+한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 자기 프로젝트의 배포, 다른 프로젝트의 배포, 없는 id로 정책을 한 번에 읽으면, 입력 순서대로 그 정책, 거부, 거부가 온다
+
+Given
+
+- 두 프로젝트에 정책이 딸린 배포가 하나씩 있고, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 프로젝트 other-1
+  - 배포 readable-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 unreadable-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 readable-1: 순차 배포 정책을 갖는다 — 한 번에 2개까지 더 띄우고 1개까지 내린다
+  - 배포 unreadable-1: 순차 배포 정책을 갖는다 — 한 번에 2개까지 더 띄우고 1개까지 내린다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_endpoint_ids — user-1이 readable-1, unreadable-1, 없는 id 순으로 정책을 일괄 읽음
+
+Then
+
+- 입력 순서대로 자리마다 정책 또는 거부가 온다
+  - length = 3
+  - [0].id: 심은 정책와 같다
+  - [0].field_id: 심은 정책와 같다
+  - [0].deployment_id: 심은 배포와 같다
+  - [0].strategy_spec = RollingUpdateStrategySpecInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, max_surge=IntOrPercent(count=2, percent=None), max_unavailable=IntOrPercent(count=1, percent=None))
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
+#### [a-batch-load-of-no-deployment-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/deployment/test_loading_policies.py) — pass
+
+아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다
+
+Given
+
+- 배포를 놓을 수 있는 프로젝트와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_endpoint_ids — user-1이 빈 목록으로 정책을 일괄 읽음
+
+Then
+
+- 빈 목록이 온다
+  - loaded = []
+
+#### [a-deployment-carrying-no-policy-answers-an-empty-slot](/tests/scenario/bai_scenario/manager/deployment/test_loading_policies.py) — pass
+
+배포 읽기 권한을 받은 사용자가 정책이 딸리지 않은 자기 배포의 id로 정책을 일괄 읽으면, 호출은 성공하되 그 자리는 빈 값으로 온다
+
+Given
+
+- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_endpoint_ids — user-1이 deployment-1의 id로 정책을 일괄 읽음
+
+Then
+
+- 그 자리는 빈 값으로 온다
+  - loaded = [None]
+
+#### [a-user-granted-nothing-gets-a-refusal-in-place-of-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_loading_policies.py) — pass
+
+아무 배포 권한도 받지 않은 사용자가 정책이 딸린 자기 배포의 id로 정책을 일괄 읽으면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
+
+Given
+
+- 정책이 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 순차 배포 정책을 갖는다 — 한 번에 2개까지 더 띄우고 1개까지 내린다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_endpoint_ids — user-1이 deployment-1의 id로 정책을 일괄 읽음
+
+Then
+
+- 그 자리는 권한 부족으로 거부된다
+  - length = 1
+  - 거부: NotEnoughPermission
+
+#### [a-user-granted-read-loads-the-policy-of-their-deployment](/tests/scenario/bai_scenario/manager/deployment/test_loading_policies.py) — pass
+
+배포 읽기 권한을 받은 사용자가 정책이 딸린 자기 배포의 id로 정책을 일괄 읽으면, 그 정책이 온다
+
+Given
+
+- 정책이 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 순차 배포 정책을 갖는다 — 한 번에 2개까지 더 띄우고 1개까지 내린다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_endpoint_ids — user-1이 deployment-1의 id로 정책을 일괄 읽음
+
+Then
+
+- 심은 정책 하나가 통째로 온다
+  - length = 1
+  - [0].id: 심은 정책와 같다
+  - [0].field_id: 심은 정책와 같다
+  - [0].deployment_id: 심은 배포와 같다
+  - [0].strategy_spec = RollingUpdateStrategySpecInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, max_surge=IntOrPercent(count=2, percent=None), max_unavailable=IntOrPercent(count=1, percent=None))
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+
+#### [the-superadmin-batch-load-leaves-a-missing-deployment-id-empty](/tests/scenario/bai_scenario/manager/deployment/test_loading_policies.py) — pass
+
+슈퍼관리자가 남의 배포와 없는 id로 정책을 한 번에 읽으면, 그 정책은 노드로, 없는 id 자리는 빈 값으로 온다
+
+Given
+
+- 다른 사람이 만든, 정책이 딸린 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 theirs-1: 순차 배포 정책을 갖는다 — 한 번에 2개까지 더 띄우고 1개까지 내린다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_endpoint_ids — user-1이 theirs-1의 id와 없는 id로 정책을 일괄 읽음
+
+Then
+
+- 있는 배포의 정책은 노드로, 없는 id 자리는 빈 값으로 온다
+  - length = 2
+  - [0].id: 심은 정책와 같다
+  - [0].field_id: 심은 정책와 같다
+  - [0].deployment_id: 심은 배포와 같다
+  - [0].strategy_spec = RollingUpdateStrategySpecInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, max_surge=IntOrPercent(count=2, percent=None), max_unavailable=IntOrPercent(count=1, percent=None))
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+  - [1] = None
 
 ### options
 
