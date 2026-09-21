@@ -592,6 +592,23 @@ class BaseVolume(AbstractVolume):
         exist_ok: bool = False,
     ) -> None:
         target_path = self.sanitize_vfpath(vfid, relpath)
+<<<<<<< HEAD
+=======
+
+        def _mkdir() -> None:
+            missing_parents: list[Path] = []
+            if parents:
+                for parent in target_path.parents:
+                    if parent.exists():
+                        break
+                    missing_parents.append(parent)
+            target_path.mkdir(DEFAULT_VFOLDER_PERMISSION_MODE, parents=parents, exist_ok=exist_ok)
+            # mkdir() masks mode with the process umask, so set the mode explicitly
+            # on the target and on every parent it implicitly created.
+            for created in (target_path, *missing_parents):
+                created.chmod(DEFAULT_VFOLDER_PERMISSION_MODE)
+
+>>>>>>> 198517e9 (fix(BA-8085): apply the vfolder mode to parents created by mkdir (#14893))
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,

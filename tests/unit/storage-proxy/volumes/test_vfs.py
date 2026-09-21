@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 import tempfile
 import uuid
 from collections.abc import AsyncIterator, Iterator
@@ -9,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
 from ai.backend.storage.errors import QuotaScopeCreationFailedError
 from ai.backend.storage.types import VFolderID
@@ -110,6 +112,28 @@ class TestBaseVolume:
         written_path = base_volume.sanitize_vfpath(sample_vfolder, relpath)
         assert written_path.exists()
         assert written_path.read_bytes() == test_content
+
+    async def test_mkdir_with_parents_applies_mode_to_intermediate_dirs(
+        self,
+        base_volume: BaseVolume,
+        sample_vfolder: VFolderID,
+    ) -> None:
+        """
+        Every directory implicitly created by mkdir(parents=True) gets the
+        default vfolder mode, not only the leaf.
+        """
+        vfpath = base_volume.mangle_vfpath(sample_vfolder)
+        pre_existing = vfpath / "a"
+        pre_existing.mkdir(0o700)
+        pre_existing.chmod(0o700)
+
+        await base_volume.mkdir(sample_vfolder, PurePosixPath("a/b/c/d"), parents=True)
+
+        for created in ("a/b", "a/b/c", "a/b/c/d"):
+            mode = stat.S_IMODE((vfpath / created).stat().st_mode)
+            assert mode == DEFAULT_VFOLDER_PERMISSION_MODE, created
+        # A directory that already existed keeps its mode.
+        assert stat.S_IMODE(pre_existing.stat().st_mode) == 0o700
 
     @pytest.mark.parametrize(
         "file_name, file_content",
