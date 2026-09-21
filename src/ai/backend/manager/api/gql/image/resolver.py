@@ -14,12 +14,14 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
     ScopedSearchImagesInput,
+    SearchImageAliasesInput,
 )
+from ai.backend.common.dto.manager.v2.image.types import ImageScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -29,10 +31,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.image.searchable_fields import (
-    ImageAliasSearchableFields,
-    ImageSearchableFields,
-)
 
 from .types import (
     ContainerRegistryScopeGQL,
@@ -205,17 +203,11 @@ async def container_registry_images_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageV2ConnectionGQL | None:
-    pydantic_filter = filter.to_pydantic() if filter else None
-    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-    base_conditions = [
-        ImageSearchableFields.own.registry_id.filter.equals(
-            UUIDEqualMatchSpec(value=scope.registry_id, negated=False)
-        )
-    ]
-    payload = await info.context.adapters.image.admin_search_images_gql(
-        AdminSearchImagesInput(
-            filter=pydantic_filter,
-            order=pydantic_orders,
+    payload = await info.context.adapters.image.scoped_search(
+        ScopedSearchImagesInput(
+            scope=ImageScope(container_registry=[UUIDScope(value=scope.registry_id)]),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,
@@ -223,7 +215,6 @@ async def container_registry_images_v2(
             limit=limit,
             offset=offset,
         ),
-        base_conditions=base_conditions,
     )
     edges = [
         ImageV2EdgeGQL(
@@ -323,17 +314,11 @@ async def image_scoped_aliases(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageV2AliasConnectionGQL | None:
-    pydantic_filter = filter.to_pydantic() if filter else None
-    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-    base_conditions = [
-        ImageAliasSearchableFields.own.image_id.filter.in_(
-            UUIDInMatchSpec(values=[ImageID(scope.image_id)], negated=False)
-        )
-    ]
-    payload = await info.context.adapters.image.admin_search_image_aliases(
-        AdminSearchImageAliasesInput(
-            filter=pydantic_filter,
-            order=pydantic_orders,
+    payload = await info.context.adapters.image.scoped_search_aliases(
+        ImageID(scope.image_id),
+        SearchImageAliasesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,
@@ -341,7 +326,6 @@ async def image_scoped_aliases(
             limit=limit,
             offset=offset,
         ),
-        base_conditions=base_conditions,
     )
     edges = [
         ImageV2AliasEdgeGQL(

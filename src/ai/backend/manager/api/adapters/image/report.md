@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/image/adapter.py)
 
-Not exercised by any scenario: batch_load_fields, scoped_search.
+Not exercised by any scenario: batch_load_fields.
 
 ### aliasing
 
@@ -1436,38 +1436,6 @@ Then
 
 ### searching
 
-#### [a-condition-given-from-outside-narrows-before-the-callers-filter](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
-
-이미지가 레지스트리 2개에 나뉘어 있을 때 호출 측이 한쪽으로 좁혀 주면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다
-
-Given
-
-- 레지스트리 2개, 한쪽에 이미지 2개와 다른 쪽에 2개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
-  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
-  - 이미지 here-0-1: x86_64 이미지
-  - 이미지 here-1-1: x86_64 이미지
-  - 이미지 there-0-1: x86_64 이미지
-  - 이미지 there-1-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_search_images_gql — user-1이 한 레지스트리로 좁혀 한 페이지에 50개씩 검색함
-
-Then
-
-- 미리 만들어 둔 이미지가 모두 집계된다
-  - items = ['here-0-1', 'here-1-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
 #### [a-cursor-alone-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
 슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
@@ -1580,6 +1548,44 @@ Then
 - 거부된다
   - 거부: InvalidGraphQLParameters
 
+#### [a-user-granted-on-a-registry-reads-the-images-it-holds](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다
+
+Given
+
+- 레지스트리 2개, 한쪽에 이미지 2개와 다른 쪽에 2개, 한쪽 레지스트리에 권한을 받은 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 이미지 here-0-1: x86_64 이미지
+  - 이미지 here-1-1: x86_64 이미지
+  - 이미지 there-0-1: x86_64 이미지
+  - 이미지 there-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 image-keeper-1: image 전체에 READ 허용
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.scoped_search — user-1이 한 레지스트리를 스코프로 이미지를 검색함
+
+Then
+
+- 미리 만들어 둔 이미지가 모두 집계된다
+  - items = ['here-0-1', 'here-1-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
 #### [a-user-who-can-read-the-image-gets-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
 
 그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다
@@ -1635,6 +1641,35 @@ Given
 When
 
 - ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+#### [a-user-who-cannot-read-the-registry-is-refused-its-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 레지스트리 2개, 한쪽에 이미지 2개와 다른 쪽에 2개, 아무 권한도 받지 않은 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 이미지 here-0-1: x86_64 이미지
+  - 이미지 here-1-1: x86_64 이미지
+  - 이미지 there-0-1: x86_64 이미지
+  - 이미지 there-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.scoped_search — user-1이 한 레지스트리를 스코프로 이미지를 검색함
 
 Then
 
