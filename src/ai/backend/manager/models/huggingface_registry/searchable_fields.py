@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNameNotLoadedError
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_registries.searchable_fields import (
     ArtifactRegistrySearchableFields,
@@ -47,7 +47,9 @@ class _HuggingFaceRegistryOwnFields(
     def to_data(self, row: HuggingFaceRegistryRow) -> HuggingFaceRegistryData:
         name = self.name.read(row)
         if name is None:
-            raise RelationNotLoadedError()
+            raise ArtifactRegistryNameNotLoadedError(
+                f"HuggingFaceRegistryRow.registry_name was read without joining artifact_registries (id={row.id})."
+            )
         return HuggingFaceRegistryData(
             id=self.id.read(row),
             name=name,

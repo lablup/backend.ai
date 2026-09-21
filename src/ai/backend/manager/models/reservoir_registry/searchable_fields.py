@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNameNotLoadedError
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_registries.searchable_fields import (
     ArtifactRegistrySearchableFields,
@@ -55,7 +55,9 @@ class _ReservoirRegistryOwnFields(RowDataConverter[ReservoirRegistryRow, Reservo
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryData:
         name = self.name.read(row)
         if name is None:
-            raise RelationNotLoadedError()
+            raise ArtifactRegistryNameNotLoadedError(
+                f"ReservoirRegistryRow.registry_name was read without joining artifact_registries (id={row.id})."
+            )
         return ReservoirRegistryData(
             id=self.id.read(row),
             name=name,

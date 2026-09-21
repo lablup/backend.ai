@@ -73,3 +73,18 @@ class RemoteReservoirScanError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ArtifactRegistryNameNotLoadedError(BackendAIError, web.HTTPInternalServerError):
+    """A registry row was converted without the artifact_registries name joined onto it."""
+
+    error_type = "https://api.backend.ai/probs/artifact-registry-name-not-loaded"
+    error_title = "Artifact Registry Name Not Loaded"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
