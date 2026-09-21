@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.image import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.image_request import GetImagePathParam
 from ai.backend.manager.errors.image import ImageNotFound
@@ -94,7 +95,9 @@ class ImageHandler:
                     conditions=[
                         ImageSearchableFields.own.id.filter.equals(
                             UUIDEqualMatchSpec(value=path.parsed.image_id, negated=False)
-                        )
+                        ),
+                        # A forgotten image is soft-deleted, so the row outlives it.
+                        ImageSearchableFields.own.status.filter.in_([ImageStatus.ALIVE]),
                     ],
                 ),
             )
