@@ -99,7 +99,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @dataclass(frozen=True)
 class _RegistryQuotaTarget:
     client: AbstractContainerRegistryQuotaClient
-    project: ContainerRegistryProjectInfo
+    registry_info: ContainerRegistryProjectInfo
     auth: ContainerRegistryAuthArgs
 
 
@@ -265,7 +265,7 @@ class ContainerRegistryService:
         ssl_verify = registry.ssl_verify if registry.ssl_verify is not None else True
         return _RegistryQuotaTarget(
             client=self._quota_client_pool.make_client(registry.type),
-            project=ContainerRegistryProjectInfo(
+            registry_info=ContainerRegistryProjectInfo(
                 url=registry.url,
                 project=registry.project,
                 ssl_verify=ssl_verify,
@@ -277,26 +277,26 @@ class ContainerRegistryService:
         self, action: CreateRegistryQuotaAction
     ) -> CreateRegistryQuotaActionResult:
         target = await self._registry_quota_target(action.scope_id)
-        await target.client.create_quota(target.project, action.quota, target.auth)
+        await target.client.create_quota(target.registry_info, action.quota, target.auth)
         return CreateRegistryQuotaActionResult()
 
     async def read_registry_quota(
         self, action: ReadRegistryQuotaAction
     ) -> ReadRegistryQuotaActionResult:
         target = await self._registry_quota_target(action.scope_id)
-        quota = await target.client.read_quota(target.project, target.auth)
+        quota = await target.client.read_quota(target.registry_info, target.auth)
         return ReadRegistryQuotaActionResult(quota=quota)
 
     async def update_registry_quota(
         self, action: UpdateRegistryQuotaAction
     ) -> UpdateRegistryQuotaActionResult:
         target = await self._registry_quota_target(action.scope_id)
-        await target.client.update_quota(target.project, action.quota, target.auth)
+        await target.client.update_quota(target.registry_info, action.quota, target.auth)
         return UpdateRegistryQuotaActionResult()
 
     async def delete_registry_quota(
         self, action: DeleteRegistryQuotaAction
     ) -> DeleteRegistryQuotaActionResult:
         target = await self._registry_quota_target(action.scope_id)
-        await target.client.delete_quota(target.project, target.auth)
+        await target.client.delete_quota(target.registry_info, target.auth)
         return DeleteRegistryQuotaActionResult()

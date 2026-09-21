@@ -65,29 +65,29 @@ class InMemoryQuotaClient:
 
     async def create_quota(
         self,
-        project_info: ContainerRegistryProjectInfo,
+        registry_info: ContainerRegistryProjectInfo,
         quota: int,
         auth_args: ContainerRegistryAuthArgs,
     ) -> None:
-        self._store[project_info.project] = quota
+        self._store[registry_info.project] = quota
 
     async def read_quota(
-        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
+        self, registry_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> int | None:
-        return self._store.get(project_info.project)
+        return self._store.get(registry_info.project)
 
     async def update_quota(
         self,
-        project_info: ContainerRegistryProjectInfo,
+        registry_info: ContainerRegistryProjectInfo,
         quota: int,
         auth_args: ContainerRegistryAuthArgs,
     ) -> None:
-        self._store[project_info.project] = quota
+        self._store[registry_info.project] = quota
 
     async def delete_quota(
-        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
+        self, registry_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> None:
-        self._store.pop(project_info.project, None)
+        self._store.pop(registry_info.project, None)
 
 
 class InMemoryQuotaClientPool(ContainerRegistryQuotaClientPool):

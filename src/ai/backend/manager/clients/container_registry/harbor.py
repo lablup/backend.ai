@@ -30,11 +30,11 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     async def _get_harbor_project_id(
         self,
         sess: aiohttp.ClientSession,
-        project_info: ContainerRegistryProjectInfo,
+        registry_info: ContainerRegistryProjectInfo,
         rqst_args: dict[str, Any],
     ) -> str:
         get_project_id_api = (
-            yarl.URL(project_info.url) / "api" / "v2.0" / "projects" / project_info.project
+            yarl.URL(registry_info.url) / "api" / "v2.0" / "projects" / registry_info.project
         )
 
         async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
@@ -48,11 +48,11 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     async def _get_quota_info(
         self,
         sess: aiohttp.ClientSession,
-        project_info: ContainerRegistryProjectInfo,
+        registry_info: ContainerRegistryProjectInfo,
         rqst_args: dict[str, Any],
     ) -> HarborProjectQuotaInfo:
-        harbor_project_id = await self._get_harbor_project_id(sess, project_info, rqst_args)
-        get_quota_id_api = (yarl.URL(project_info.url) / "api" / "v2.0" / "quotas").with_query({
+        harbor_project_id = await self._get_harbor_project_id(sess, registry_info, rqst_args)
+        get_quota_id_api = (yarl.URL(registry_info.url) / "api" / "v2.0" / "quotas").with_query({
             "reference": "project",
             "reference_id": harbor_project_id,
         })
@@ -75,12 +75,12 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
 
     @override
     async def read_quota(
-        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
+        self, registry_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> int:
-        connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
+        connector = aiohttp.TCPConnector(ssl=registry_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
             rqst_args = auth_args.to_aiohttp_auth_args()
-            quota_info = await self._get_quota_info(sess, project_info, rqst_args)
+            quota_info = await self._get_quota_info(sess, registry_info, rqst_args)
             previous_quota = quota_info["previous_quota"]
             if previous_quota == -1:
                 raise ObjectNotFound(object_name="quota entity")
@@ -89,22 +89,22 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     @override
     async def create_quota(
         self,
-        project_info: ContainerRegistryProjectInfo,
+        registry_info: ContainerRegistryProjectInfo,
         quota: int,
         auth_args: ContainerRegistryAuthArgs,
     ) -> None:
-        connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
+        connector = aiohttp.TCPConnector(ssl=registry_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
             rqst_args = auth_args.to_aiohttp_auth_args()
-            quota_info = await self._get_quota_info(sess, project_info, rqst_args)
+            quota_info = await self._get_quota_info(sess, registry_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
             if previous_quota != -1:
                 raise ContainerRegistryQuotaAlreadyExists(
-                    f"Quota limit already exists. (project: {project_info.project})"
+                    f"Quota limit already exists. (project: {registry_info.project})"
                 )
 
-            put_quota_api = yarl.URL(project_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
+            put_quota_api = yarl.URL(registry_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
             payload = {"hard": {"storage": quota}}
 
             async with sess.put(
@@ -117,20 +117,20 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     @override
     async def update_quota(
         self,
-        project_info: ContainerRegistryProjectInfo,
+        registry_info: ContainerRegistryProjectInfo,
         quota: int,
         auth_args: ContainerRegistryAuthArgs,
     ) -> None:
-        connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
+        connector = aiohttp.TCPConnector(ssl=registry_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
             rqst_args = auth_args.to_aiohttp_auth_args()
-            quota_info = await self._get_quota_info(sess, project_info, rqst_args)
+            quota_info = await self._get_quota_info(sess, registry_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
             if previous_quota == -1:
                 raise ObjectNotFound(object_name="quota entity")
 
-            put_quota_api = yarl.URL(project_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
+            put_quota_api = yarl.URL(registry_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
             payload = {"hard": {"storage": quota}}
 
             async with sess.put(
@@ -142,18 +142,18 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
 
     @override
     async def delete_quota(
-        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
+        self, registry_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> None:
-        connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
+        connector = aiohttp.TCPConnector(ssl=registry_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
             rqst_args = auth_args.to_aiohttp_auth_args()
-            quota_info = await self._get_quota_info(sess, project_info, rqst_args)
+            quota_info = await self._get_quota_info(sess, registry_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
             if previous_quota == -1:
                 raise ObjectNotFound(object_name="quota entity")
 
-            put_quota_api = yarl.URL(project_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
+            put_quota_api = yarl.URL(registry_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
             payload = {"hard": {"storage": -1}}
 
             async with sess.put(
