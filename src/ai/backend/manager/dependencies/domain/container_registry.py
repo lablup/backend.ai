@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
 

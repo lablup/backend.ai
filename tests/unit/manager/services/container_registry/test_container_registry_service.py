@@ -16,11 +16,13 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ImageCanonical, ImageID
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
+    ContainerRegistryAuthArgs,
+    ContainerRegistryProjectInfo,
+)
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
-    HarborAuthArgs,
-    HarborProjectInfo,
 )
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
@@ -813,10 +815,10 @@ class TestReadRegistryQuota:
         mock_container_registry_repository.get_project_registry.assert_awaited_once_with(scope_id)
         mock_quota_client_pool.make_client.assert_called_once_with(ContainerRegistryType.HARBOR2)
         mock_quota_client.read_quota.assert_awaited_once_with(
-            HarborProjectInfo(
+            ContainerRegistryProjectInfo(
                 url="https://harbor.example.com", project="harbor-project", ssl_verify=True
             ),
-            HarborAuthArgs(username="robot$quota", password="secret"),
+            ContainerRegistryAuthArgs(username="robot$quota", password="secret"),
         )
 
     @pytest.mark.parametrize(

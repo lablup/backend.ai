@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import abc
 import logging
-from dataclasses import dataclass
 from typing import Any, TypedDict, override
 
 import aiohttp
 import yarl
 
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.container_registry.base import (
+    AbstractContainerRegistryQuotaClient,
+    ContainerRegistryAuthArgs,
+    ContainerRegistryProjectInfo,
+)
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
     InternalServerError,
@@ -19,52 +21,20 @@ from ai.backend.manager.errors.common import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class HarborProjectInfo:
-    url: str
-    project: str
-    ssl_verify: bool
-
-
-class HarborAuthArgs(TypedDict):
-    username: str
-    password: str
-
-
 class HarborProjectQuotaInfo(TypedDict):
     previous_quota: int
     quota_id: int
 
 
-def _get_harbor_auth_args(auth_args: HarborAuthArgs) -> dict[str, Any]:
+def _get_harbor_auth_args(auth_args: ContainerRegistryAuthArgs) -> dict[str, Any]:
     return {"auth": aiohttp.BasicAuth(auth_args["username"], auth_args["password"])}
-
-
-class AbstractContainerRegistryQuotaClient(abc.ABC):
-    async def create_quota(
-        self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
-    ) -> None:
-        raise NotImplementedError
-
-    async def update_quota(
-        self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
-    ) -> None:
-        raise NotImplementedError
-
-    async def delete_quota(
-        self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs
-    ) -> None:
-        raise NotImplementedError
-
-    async def read_quota(self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs) -> int:
-        raise NotImplementedError
 
 
 class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     async def _get_harbor_project_id(
         self,
         sess: aiohttp.ClientSession,
-        project_info: HarborProjectInfo,
+        project_info: ContainerRegistryProjectInfo,
         rqst_args: dict[str, Any],
     ) -> str:
         get_project_id_api = (
@@ -82,7 +52,7 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     async def _get_quota_info(
         self,
         sess: aiohttp.ClientSession,
-        project_info: HarborProjectInfo,
+        project_info: ContainerRegistryProjectInfo,
         rqst_args: dict[str, Any],
     ) -> HarborProjectQuotaInfo:
         harbor_project_id = await self._get_harbor_project_id(sess, project_info, rqst_args)
@@ -108,7 +78,9 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
             return HarborProjectQuotaInfo(previous_quota=previous_quota, quota_id=quota_id)
 
     @override
-    async def read_quota(self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs) -> int:
+    async def read_quota(
+        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
+    ) -> int:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
             rqst_args = _get_harbor_auth_args(auth_args)
@@ -120,7 +92,10 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
 
     @override
     async def create_quota(
-        self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
+        self,
+        project_info: ContainerRegistryProjectInfo,
+        quota: int,
+        auth_args: ContainerRegistryAuthArgs,
     ) -> None:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
@@ -143,7 +118,10 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
 
     @override
     async def update_quota(
-        self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
+        self,
+        project_info: ContainerRegistryProjectInfo,
+        quota: int,
+        auth_args: ContainerRegistryAuthArgs,
     ) -> None:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
@@ -166,7 +144,7 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
 
     @override
     async def delete_quota(
-        self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs
+        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> None:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
@@ -186,14 +164,3 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
                 if resp.status != 200:
                     log.error("Failed to delete quota! response: {}", resp)
                     raise InternalServerError(f"Failed to delete quota! response: {resp}")
-
-
-class ContainerRegistryQuotaClientPool:
-    def make_client(self, type_: ContainerRegistryType) -> AbstractContainerRegistryQuotaClient:
-        match type_:
-            case ContainerRegistryType.HARBOR2:
-                return HarborQuotaClient()
-            case _:
-                raise GenericBadRequest(
-                    f"{type_} does not support registry quota per project management."
-                )

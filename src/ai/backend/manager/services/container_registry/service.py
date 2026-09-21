@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
+    ContainerRegistryAuthArgs,
+    ContainerRegistryProjectInfo,
+)
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
-    HarborAuthArgs,
-    HarborProjectInfo,
 )
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
@@ -97,8 +99,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @dataclass(frozen=True)
 class _RegistryQuotaTarget:
     client: AbstractContainerRegistryQuotaClient
-    project: HarborProjectInfo
-    auth: HarborAuthArgs
+    project: ContainerRegistryProjectInfo
+    auth: ContainerRegistryAuthArgs
 
 
 class ContainerRegistryService:
@@ -263,12 +265,12 @@ class ContainerRegistryService:
         ssl_verify = registry.ssl_verify if registry.ssl_verify is not None else True
         return _RegistryQuotaTarget(
             client=self._quota_client_pool.make_client(registry.type),
-            project=HarborProjectInfo(
+            project=ContainerRegistryProjectInfo(
                 url=registry.url,
                 project=registry.project,
                 ssl_verify=ssl_verify,
             ),
-            auth=HarborAuthArgs(username=registry.username, password=registry.password),
+            auth=ContainerRegistryAuthArgs(username=registry.username, password=registry.password),
         )
 
     async def create_registry_quota(

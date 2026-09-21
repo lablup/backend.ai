@@ -18,11 +18,13 @@ from ai.backend.manager.api.rest.group.handler import GroupHandler
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
+    ContainerRegistryAuthArgs,
+    ContainerRegistryProjectInfo,
+)
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
-    HarborAuthArgs,
-    HarborProjectInfo,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -50,7 +52,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class InMemoryQuotaClient:
-    """In-memory Harbor quota client for component tests (duck-typed).
+    """In-memory registry quota client for component tests (duck-typed).
 
     Does not inherit AbstractContainerRegistryQuotaClient because the abstract
     read_quota() returns int, but the API response model
@@ -62,22 +64,28 @@ class InMemoryQuotaClient:
         self._store: dict[str, int] = {}
 
     async def create_quota(
-        self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
+        self,
+        project_info: ContainerRegistryProjectInfo,
+        quota: int,
+        auth_args: ContainerRegistryAuthArgs,
     ) -> None:
         self._store[project_info.project] = quota
 
     async def read_quota(
-        self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs
+        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> int | None:
         return self._store.get(project_info.project)
 
     async def update_quota(
-        self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
+        self,
+        project_info: ContainerRegistryProjectInfo,
+        quota: int,
+        auth_args: ContainerRegistryAuthArgs,
     ) -> None:
         self._store[project_info.project] = quota
 
     async def delete_quota(
-        self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs
+        self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> None:
         self._store.pop(project_info.project, None)
 

@@ -21,7 +21,7 @@ from ai.backend.manager.api.rest.container_registry.registry import (
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow

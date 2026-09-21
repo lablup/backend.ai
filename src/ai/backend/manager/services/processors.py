@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
-    from ai.backend.manager.clients.container_registry.harbor import (
+    from ai.backend.manager.clients.container_registry.pool import (
         ContainerRegistryQuotaClientPool,
     )
     from ai.backend.manager.clients.prometheus.client import PrometheusClient

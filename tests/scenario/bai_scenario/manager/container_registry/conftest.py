@@ -18,7 +18,7 @@ from ai.backend.manager.actions.registry.types import (
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

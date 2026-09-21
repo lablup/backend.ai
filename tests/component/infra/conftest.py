@@ -32,7 +32,7 @@ from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHand
 from ai.backend.manager.api.rest.resource_group.registry import register_resource_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.clients.container_registry.harbor import (
+from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
