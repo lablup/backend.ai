@@ -9,15 +9,18 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     AdminSearchArtifactsGQLInput,
     AdminSearchArtifactsInput,
 )
+from ai.backend.manager.actions.v2.ops.result import ScopedFieldsOpsResult
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
+    ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
 )
@@ -52,7 +55,11 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.services.artifact.actions.get_revisions import (
+    GetArtifactRevisionsAction,
+)
 from ai.backend.manager.services.artifact.actions.search import (
     SearchArtifactsAction,
     SearchArtifactsActionResult,
@@ -167,6 +174,25 @@ async def revision_ids(
 
 
 @pytest.fixture
+async def foreign_revision_id(
+    database: ExtendedAsyncSAEngine, artifact_ids: list[uuid.UUID]
+) -> uuid.UUID:
+    """A revision of another artifact, which a scoped read must not reach."""
+    revision_id = uuid.uuid4()
+    async with database.begin_session() as db_sess:
+        db_sess.add(
+            ArtifactRevisionRow(
+                id=revision_id,
+                artifact_id=artifact_ids[1],
+                version="v0",
+                size=1024,
+                status=ArtifactStatus.AVAILABLE.value,
+            )
+        )
+    return revision_id
+
+
+@pytest.fixture
 def adapter(database: ExtendedAsyncSAEngine) -> ArtifactAdapter:
     repository = ArtifactRepository(db=database, v2_ops_provider=V2DBOpsProvider(database))
 
@@ -190,9 +216,23 @@ def adapter(database: ExtendedAsyncSAEngine) -> ArtifactAdapter:
             has_previous_page=result.has_previous_page,
         )
 
+    ops = OpsRepository[ArtifactRevisionData](V2DBOpsProvider(database))
+
+    async def get_revisions(
+        action: GetArtifactRevisionsAction,
+    ) -> ScopedFieldsOpsResult[ArtifactRevisionData]:
+        result = await ops.search_in_scopes(action.operation_scopes(), action.to_searcher())
+        return ScopedFieldsOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     processors = MagicMock()
     processors.search_artifacts.run = search_artifacts
     processors.revision.search_revision.run = search_revisions
+    processors.get_revisions.run = get_revisions
     return ArtifactAdapter(processors)
 
 
@@ -304,3 +344,35 @@ class TestRevisionSearchPagination:
     async def test_mixing_cursor_and_offset_is_rejected(self, adapter: ArtifactAdapter) -> None:
         with pytest.raises(InvalidGraphQLParameters):
             await adapter.search_revisions_gql(AdminSearchArtifactRevisionsInput(first=2, offset=0))
+
+
+class TestRevisionsOfOneArtifact:
+    async def test_only_the_named_artifact_s_revisions_are_returned(
+        self,
+        adapter: ArtifactAdapter,
+        artifact_ids: list[uuid.UUID],
+        revision_ids: list[uuid.UUID],
+        foreign_revision_id: uuid.UUID,
+    ) -> None:
+        payload = await adapter.search_revisions_of_artifact_gql(
+            ArtifactID(artifact_ids[0]), AdminSearchArtifactRevisionsInput()
+        )
+
+        assert [item.field_id for item in payload.items] == revision_ids
+        assert payload.total_count == len(revision_ids)
+
+    async def test_pages_stay_within_the_named_artifact(
+        self,
+        adapter: ArtifactAdapter,
+        artifact_ids: list[uuid.UUID],
+        revision_ids: list[uuid.UUID],
+        foreign_revision_id: uuid.UUID,
+    ) -> None:
+        async def fetch(cursor: str | None) -> tuple[list[uuid.UUID], bool]:
+            payload = await adapter.search_revisions_of_artifact_gql(
+                ArtifactID(artifact_ids[0]),
+                AdminSearchArtifactRevisionsInput(first=_PAGE_SIZE, after=cursor),
+            )
+            return [item.field_id for item in payload.items], payload.has_next_page
+
+        assert await _walk(fetch) == revision_ids
