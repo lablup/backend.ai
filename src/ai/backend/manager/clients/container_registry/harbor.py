@@ -27,7 +27,7 @@ class HarborProjectQuotaInfo(TypedDict):
 
 
 def _get_harbor_auth_args(auth_args: ContainerRegistryAuthArgs) -> dict[str, Any]:
-    return {"auth": aiohttp.BasicAuth(auth_args["username"], auth_args["password"])}
+    return {"auth": aiohttp.BasicAuth(auth_args.username, auth_args.password)}
 
 
 class HarborQuotaClient(AbstractContainerRegistryQuotaClient):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass
-from typing import TypedDict
 
 
 @dataclass
@@ -12,7 +11,8 @@ class ContainerRegistryProjectInfo:
     ssl_verify: bool
 
 
-class ContainerRegistryAuthArgs(TypedDict):
+@dataclass
+class ContainerRegistryAuthArgs:
     username: str
     password: str
 
