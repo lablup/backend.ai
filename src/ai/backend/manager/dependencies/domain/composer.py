@@ -6,14 +6,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
-from ai.backend.manager.clients.container_registry.harbor import (
-    ContainerRegistryQuotaClientPool,
-)
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.types import DistributedLockFactory
 
-from .container_registry import ContainerRegistryDependency
+from .container_registry import ContainerRegistryClients, ContainerRegistryDependency
 from .distributed_lock import DistributedLockFactoryDependency, DistributedLockInput
 from .notification import NotificationCenterDependency
 from .repositories import RepositoriesDependency, RepositoriesInput
@@ -57,7 +54,7 @@ class DomainResources:
     """Container for all domain resources."""
 
     notification_center: NotificationCenter
-    registry_quota_client_pool: ContainerRegistryQuotaClientPool
+    container_registry: ContainerRegistryClients
     distributed_lock_factory: DistributedLockFactory
     repositories: Repositories
 
@@ -67,7 +64,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
 
     Composes repositories and domain objects at Layer 0+3:
     1. Notification center: HTTP client pool for notifications (no deps)
-    2. Container registry: HTTP client pool for Harbor project quotas (no deps)
+    2. Container registry clients: HTTP clients for registries (no deps)
     3. Distributed lock factory: Lock backend based on config
     4. Repositories: All repository instances
     """
@@ -97,10 +94,8 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
         notification_center_dep = NotificationCenterDependency()
         notification_center = await stack.enter_dependency(notification_center_dep, None)
 
-        # 2. Container registry (no dependencies)
-        registry_quota_client_pool = await stack.enter_dependency(
-            ContainerRegistryDependency(), None
-        )
+        # 2. Container registry clients (no dependencies)
+        container_registry = await stack.enter_dependency(ContainerRegistryDependency(), None)
 
         # 3. Distributed lock factory (depends on config, db, etcd)
         distributed_lock_dep = DistributedLockFactoryDependency()
@@ -130,7 +125,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
 
         yield DomainResources(
             notification_center=notification_center,
-            registry_quota_client_pool=registry_quota_client_pool,
+            container_registry=container_registry,
             distributed_lock_factory=distributed_lock_factory,
             repositories=repositories,
         )
