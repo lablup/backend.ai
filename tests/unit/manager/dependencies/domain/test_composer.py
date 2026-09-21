@@ -7,7 +7,7 @@ from ai.backend.manager.dependencies.domain.composer import (
     DomainComposer,
     DomainInput,
 )
-from ai.backend.manager.dependencies.domain.container_registry import ContainerRegistryClients
+from ai.backend.manager.dependencies.domain.container_registry import ContainerRegistryResources
 
 
 class TestDomainComposer:
@@ -52,7 +52,7 @@ class TestDomainComposer:
             resources = await stack.enter_composer(composer, domain_input)
 
             assert resources.notification_center is mock_nc
-            assert isinstance(resources.container_registry, ContainerRegistryClients)
+            assert isinstance(resources.container_registry, ContainerRegistryResources)
             assert resources.distributed_lock_factory is mock_factory
             assert resources.repositories is mock_repos
 

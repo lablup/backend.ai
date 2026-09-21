@@ -13,14 +13,14 @@ from .base import DomainDependency
 
 
 @dataclass
-class ContainerRegistryClients:
-    """Container for the clients the container registry domain talks to registries with."""
+class ContainerRegistryResources:
+    """Container for container registry resources."""
 
-    quota_pool: ContainerRegistryQuotaClientPool
+    quota_client_pool: ContainerRegistryQuotaClientPool
 
 
-class ContainerRegistryDependency(DomainDependency[None, ContainerRegistryClients]):
-    """Provides the container registry domain's clients."""
+class ContainerRegistryDependency(DomainDependency[None, ContainerRegistryResources]):
+    """Provides the container registry client pool."""
 
     @property
     @override
@@ -29,13 +29,13 @@ class ContainerRegistryDependency(DomainDependency[None, ContainerRegistryClient
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: None) -> AsyncIterator[ContainerRegistryClients]:
-        """Initialize and provide the container registry clients.
+    async def provide(self, setup_input: None) -> AsyncIterator[ContainerRegistryResources]:
+        """Initialize and provide the container registry resources.
 
         Args:
             setup_input: Not used (no dependencies required)
 
         Yields:
-            Initialized ContainerRegistryClients
+            Initialized ContainerRegistryResources
         """
-        yield ContainerRegistryClients(quota_pool=ContainerRegistryQuotaClientPool())
+        yield ContainerRegistryResources(quota_client_pool=ContainerRegistryQuotaClientPool())
