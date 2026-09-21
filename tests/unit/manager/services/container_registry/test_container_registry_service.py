@@ -44,9 +44,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry_quota.repository import (
-    PerProjectRegistryQuotaRepository,
-)
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
@@ -90,7 +87,6 @@ def container_registry_service(
     return ContainerRegistryService(
         db=mock_db_engine,
         container_registry_repository=mock_container_registry_repository,
-        quota_repository=MagicMock(spec=PerProjectRegistryQuotaRepository),
         quota_client_pool=MagicMock(spec=PerProjectContainerRegistryQuotaClientPool),
     )
 

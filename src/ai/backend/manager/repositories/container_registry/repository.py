@@ -8,6 +8,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -16,6 +17,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
+    PerProjectContainerRegistryInfo,
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
@@ -35,7 +37,9 @@ from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryUpdater,
 )
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -63,10 +67,12 @@ container_registry_repository_resilience = Resilience(
 class ContainerRegistryRepository:
     _db: ExtendedAsyncSAEngine
     _ops_provider: ShareOpsProvider
+    _db_source: ContainerRegistryDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: ShareOpsProvider) -> None:
         self._db = db
         self._ops_provider = ops_provider
+        self._db_source = ContainerRegistryDBSource(ops_provider)
 
     async def create_registry(
         self,
@@ -248,6 +254,29 @@ class ContainerRegistryRepository:
             )
             result = await session.execute(stmt)
             return result.scalars().one_or_none()
+
+    @container_registry_repository_resilience.apply()
+    async def get_by_project_scope(self, scope_id: ProjectScope) -> PerProjectContainerRegistryInfo:
+        registry_id = await self._db_source.lookup_image_commit_registry_id(
+            ProjectID(scope_id.project_id)
+        )
+        registry = await self._db_source.fetch_by_id(registry_id)
+        if not registry.project:
+            raise ContainerRegistryNotFound(
+                f"Container registry {registry.registry_name} carries no project to hold the quota. (project: {scope_id.project_id})"
+            )
+        return PerProjectContainerRegistryInfo(
+            id=registry.id,
+            url=registry.url,
+            registry_name=registry.registry_name,
+            type=registry.type,
+            project=registry.project,
+            username=registry.username or "",
+            password=registry.password or "",
+            ssl_verify=registry.ssl_verify if registry.ssl_verify is not None else True,
+            is_global=registry.is_global if registry.is_global is not None else False,
+            extra=registry.extra or {},
+        )
 
     @container_registry_repository_resilience.apply()
     async def get_registry_row_for_scanner(

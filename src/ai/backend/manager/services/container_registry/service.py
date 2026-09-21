@@ -29,9 +29,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry_quota.repository import (
-    PerProjectRegistryQuotaRepository,
-)
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -105,19 +102,16 @@ class _RegistryQuotaTarget:
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
     _container_registry_repository: ContainerRegistryRepository
-    _quota_repository: PerProjectRegistryQuotaRepository
     _quota_client_pool: PerProjectContainerRegistryQuotaClientPool
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         container_registry_repository: ContainerRegistryRepository,
-        quota_repository: PerProjectRegistryQuotaRepository,
         quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
     ) -> None:
         self._db = db
         self._container_registry_repository = container_registry_repository
-        self._quota_repository = quota_repository
         self._quota_client_pool = quota_client_pool
 
     async def create_container_registry(
@@ -257,7 +251,7 @@ class ContainerRegistryService:
         return HandleHarborWebhookActionResult()
 
     async def _registry_quota_target(self, scope_id: ProjectScope) -> _RegistryQuotaTarget:
-        registry_info = await self._quota_repository.fetch_container_registry_info(scope_id)
+        registry_info = await self._container_registry_repository.get_by_project_scope(scope_id)
         return _RegistryQuotaTarget(
             client=self._quota_client_pool.make_client(registry_info.type),
             project=HarborProjectInfo(

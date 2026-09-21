@@ -22,22 +22,12 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry_quota.repository import (
-    PerProjectRegistryQuotaRepository,
-)
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
-
-
-@pytest.fixture()
-def registry_quota_repository(
-    database_engine: ExtendedAsyncSAEngine,
-) -> PerProjectRegistryQuotaRepository:
-    return PerProjectRegistryQuotaRepository(database_engine)
 
 
 @pytest.fixture()
@@ -49,14 +39,12 @@ def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-    registry_quota_repository: PerProjectRegistryQuotaRepository,
     registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(
         database_engine,
         repo,
-        registry_quota_repository,
         registry_quota_client_pool,
     )
     return ContainerRegistryProcessors(

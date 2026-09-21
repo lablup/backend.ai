@@ -332,7 +332,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         container_registry=ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
-            repositories.container_registry_quota.repository,
             args.registry_quota_client_pool,
         ),
         vfolder=VFolderService(

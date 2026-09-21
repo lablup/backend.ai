@@ -14,9 +14,6 @@ from ai.backend.manager.repositories.client_ip_masking.repositories import (
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
-from ai.backend.manager.repositories.container_registry_quota.repositories import (
-    PerProjectRegistryQuotaRepositories,
-)
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.deployment_revision_preset.repositories import (
     DeploymentPresetRepositories,
@@ -96,7 +93,6 @@ class Repositories:
     v2_ops_provider: V2DBOpsProvider
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
-    container_registry_quota: PerProjectRegistryQuotaRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
     error_log: ErrorLogRepositories
@@ -151,7 +147,6 @@ class Repositories:
         app_config_repositories = AppConfigRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
-        container_registry_quota_repositories = PerProjectRegistryQuotaRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
@@ -206,7 +201,6 @@ class Repositories:
             v2_ops_provider=args.v2_ops_provider,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
-            container_registry_quota=container_registry_quota_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
             error_log=error_log_repositories,

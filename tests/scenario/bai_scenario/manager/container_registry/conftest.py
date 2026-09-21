@@ -25,9 +25,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry_quota.repository import (
-    PerProjectRegistryQuotaRepository,
-)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -72,7 +69,6 @@ async def adapter(
             ContainerRegistryService(
                 engine,
                 ContainerRegistryRepository(engine, shares),
-                PerProjectRegistryQuotaRepository(engine),
                 PerProjectContainerRegistryQuotaClientPool(),
             ),
         ),

@@ -40,9 +40,6 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry_quota.repository import (
-    PerProjectRegistryQuotaRepository,
-)
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
@@ -81,13 +78,6 @@ PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]
 
 
 @pytest.fixture()
-def registry_quota_repository(
-    database_engine: ExtendedAsyncSAEngine,
-) -> PerProjectRegistryQuotaRepository:
-    return PerProjectRegistryQuotaRepository(database_engine)
-
-
-@pytest.fixture()
 def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
     return PerProjectContainerRegistryQuotaClientPool()
 
@@ -96,14 +86,12 @@ def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-    registry_quota_repository: PerProjectRegistryQuotaRepository,
     registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(
         database_engine,
         repo,
-        registry_quota_repository,
         registry_quota_client_pool,
     )
     return ContainerRegistryProcessors(
