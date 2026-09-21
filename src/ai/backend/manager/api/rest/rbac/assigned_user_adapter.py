@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.rbac import (
     AssignedUserDTO,
     AssignedUserFilter,
@@ -17,10 +18,12 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.data.permission.role import AssignedUserData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
-from ai.backend.manager.models.rbac_models.orders import AssignedUserOrders
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("AssignedUserAdapter",)
@@ -55,60 +58,38 @@ class AssignedUserAdapter(BaseFilterAdapter):
         return RoleAssignmentSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _get_base_filter(self, param: SearchUsersAssignedToRolePathParam) -> QueryCondition:
-        return AssignedUserConditions.by_role_id(param.role_id)
+        return RoleAssignmentSearchableFields.own.role_id.filter.equals(
+            UUIDEqualMatchSpec(value=param.role_id, negated=False)
+        )
 
     def _convert_filter(self, filter: AssignedUserFilter) -> list[QueryCondition]:
-        """Convert assigned user filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        # Username and email filters → EXISTS subquery on users table
-        user_conditions: list[QueryCondition] = []
-
-        if filter.username is not None:
-            condition = self.convert_string_filter(
-                filter.username,
-                contains_factory=AssignedUserConditions.by_username_contains,
-                equals_factory=AssignedUserConditions.by_username_equals,
-                starts_with_factory=AssignedUserConditions.by_username_starts_with,
-                ends_with_factory=AssignedUserConditions.by_username_ends_with,
-                in_factory=AssignedUserConditions.by_username_in,
-            )
-            if condition is not None:
-                user_conditions.append(condition)
-
-        if filter.email is not None:
-            condition = self.convert_string_filter(
-                filter.email,
-                contains_factory=AssignedUserConditions.by_email_contains,
-                equals_factory=AssignedUserConditions.by_email_equals,
-                starts_with_factory=AssignedUserConditions.by_email_starts_with,
-                ends_with_factory=AssignedUserConditions.by_email_ends_with,
-                in_factory=AssignedUserConditions.by_email_in,
-            )
-            if condition is not None:
-                user_conditions.append(condition)
-
-        if user_conditions:
-            conditions.append(AssignedUserConditions.exists_user_combined(user_conditions))
-
-        # Granted by filter
+        """The searcher joins the assignment row to its user, so the user's columns
+        carry plain conditions rather than a subquery."""
+        user_fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.username, user_fields.username.filter),
+            *self.apply_string_filter(filter.email, user_fields.email.filter),
+        ]
         if filter.granted_by is not None:
-            condition = AssignedUserConditions.by_granted_by_equals(filter.granted_by)
-            conditions.append(condition)
-
+            conditions.append(
+                RoleAssignmentSearchableFields.own.granted_by.filter.equals(
+                    UUIDEqualMatchSpec(value=filter.granted_by, negated=False)
+                )
+            )
         return conditions
 
     def _convert_order(self, order: AssignedUserOrder) -> QueryOrder:
         """Convert assigned user order specification to query order."""
+        user_fields = UserSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
             case AssignedUserOrderField.USERNAME:
-                return AssignedUserOrders.username(ascending=ascending)
+                return user_fields.username.order.apply(ascending)
             case AssignedUserOrderField.EMAIL:
-                return AssignedUserOrders.email(ascending=ascending)
+                return user_fields.email.order.apply(ascending)
             case AssignedUserOrderField.GRANTED_AT:
-                return AssignedUserOrders.granted_at(ascending=ascending)
+                return RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending)
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""

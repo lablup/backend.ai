@@ -25,6 +25,9 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.searchable_fields import (
+    EntityShareSearchableFields,
+)
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -216,7 +219,7 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         ).scalar_one_or_none()
         if row is None:
             return None
-        data: EntityShareData = row.to_data()
+        data = EntityShareSearchableFields.own.to_data(row)
         if data.status is EntityShareStatus.ACCEPTED and data.recipient is not None:
             await self.replace_share(
                 await self._landing_scope(data.recipient),

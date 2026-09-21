@@ -25,6 +25,7 @@ from ai.backend.manager.errors.entity_share import (
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.searchable_fields import EntityShareSearchableFields
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.creator import GuardedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
@@ -140,4 +141,4 @@ class EntityShareCreator(GuardedEntityCreator[EntityShareRow, EntityShareData]):
 
     @override
     def to_data(self, row: EntityShareRow) -> EntityShareData:
-        return row.to_data()
+        return EntityShareSearchableFields.own.to_data(row)

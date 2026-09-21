@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
 import strawberry
 from strawberry import Info
@@ -40,6 +41,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     RoleFilter,
     RoleGQL,
     RoleOrderBy,
+    RoleUsedByGQL,
     UpdateRoleInput,
 )
 from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleEdge
@@ -71,6 +73,16 @@ async def admin_role(
 )  # type: ignore[misc]
 async def admin_roles(
     info: Info[StrawberryGQLContext],
+    used_by: Annotated[
+        RoleUsedByGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
+                "listed entity must be readable by the caller; roles the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: RoleFilter | None = None,
     order_by: list[RoleOrderBy] | None = None,
     before: str | None = None,
@@ -83,6 +95,7 @@ async def admin_roles(
     check_admin_only()
     result = await info.context.adapters.rbac.admin_search_roles_gql(
         SearchRolesInput(
+            used_by=used_by.to_pydantic() if used_by is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -229,6 +242,16 @@ async def my_roles(
 )  # type: ignore[misc]
 async def my_roles_v2(
     info: Info[StrawberryGQLContext],
+    used_by: Annotated[
+        RoleUsedByGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
+                "listed entity must be readable by the caller; roles the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: RoleFilter | None = None,
     order_by: list[RoleOrderBy] | None = None,
     before: str | None = None,
@@ -240,6 +263,7 @@ async def my_roles_v2(
 ) -> RoleConnection | None:
     result = await info.context.adapters.rbac.my_search_roles(
         SearchRolesInput(
+            used_by=used_by.to_pydantic() if used_by is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -275,6 +299,16 @@ async def my_roles_v2(
 async def project_roles(
     info: Info[StrawberryGQLContext],
     project_id: uuid.UUID,
+    used_by: Annotated[
+        RoleUsedByGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
+                "listed entity must be readable by the caller; roles the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: RoleFilter | None = None,
     order_by: list[RoleOrderBy] | None = None,
     before: str | None = None,
@@ -287,6 +321,7 @@ async def project_roles(
     result = await info.context.adapters.rbac.search_roles_in_scope(
         [ScopedRoleTarget(scope=ProjectID(project_id))],
         SearchRolesInput(
+            used_by=used_by.to_pydantic() if used_by is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,

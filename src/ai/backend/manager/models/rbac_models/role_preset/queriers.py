@@ -10,6 +10,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import DataQuerier
 
 
@@ -32,4 +35,4 @@ class RolePresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)

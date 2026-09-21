@@ -18,8 +18,8 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
-from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -54,7 +54,7 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=RoleConditions.by_source_equals(RoleSource.CUSTOM),
+                condition=RoleSearchableFields.own.source.filter.equals(RoleSource.CUSTOM),
                 error=SystemRoleNotEditable(f"Role {self.role_id} is a SYSTEM role."),
             ),
         )
@@ -74,7 +74,7 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -103,7 +103,7 @@ class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=RoleConditions.by_source_equals(RoleSource.CUSTOM),
+                condition=RoleSearchableFields.own.source.filter.equals(RoleSource.CUSTOM),
                 error=SystemRoleNotEditable(f"Role {self.role_id} is a SYSTEM role."),
             ),
         )
@@ -119,7 +119,7 @@ class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -152,4 +152,4 @@ class RoleRestoreUpdater(DataUpdater[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)

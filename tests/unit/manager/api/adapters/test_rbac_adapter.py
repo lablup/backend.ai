@@ -179,9 +179,7 @@ def _compiled(conditions: list[QueryCondition]) -> str:
 
 
 class TestRoleListingFilters:
-    def test_a_role_filter_expresses_scope_and_permission_together(
-        self, adapter: RBACAdapter
-    ) -> None:
+    def test_a_role_filter_reads_the_scope_off_the_role_row(self, adapter: RBACAdapter) -> None:
         scope_id = uuid.uuid4()
         conditions = adapter._convert_role_filter_gql(
             RoleFilter(
@@ -189,31 +187,19 @@ class TestRoleListingFilters:
                     scope_type=StringFilter(equals="project"),
                     scope_id=UUIDFilter(equals=scope_id),
                 ),
-                permission=PermissionNestedFilter(
-                    entity_type=StringFilter(equals=_SCOPE_ADMIN),
-                    permission=PermissionBitFilter(equals=PermissionBitDTO.READ),
-                ),
             )
         )
 
         compiled = _compiled(conditions)
         assert "roles.scope_type" in compiled
         assert "roles.scope_id" in compiled
-        assert "permissions.role_id = roles.id" in compiled
-        assert "permissions.entity_type" in compiled
 
-    def test_an_assignment_filter_expresses_scope_and_permission_together(
+    def test_an_assignment_filter_expresses_role_and_permission_together(
         self, adapter: RBACAdapter
     ) -> None:
-        scope_id = uuid.uuid4()
         conditions = adapter._convert_assignment_filter(
             RoleAssignmentFilter(
-                role=RoleNestedFilter(
-                    mapped_scope=MappedScopeNestedFilter(
-                        scope_type=StringFilter(equals="project"),
-                        scope_id=UUIDFilter(equals=scope_id),
-                    )
-                ),
+                role=RoleNestedFilter(name=StringFilter(equals="admin")),
                 permission=PermissionNestedFilter(
                     permission=PermissionBitFilter(equals=PermissionBitDTO.READ)
                 ),
@@ -222,6 +208,5 @@ class TestRoleListingFilters:
 
         compiled = _compiled(conditions)
         assert "roles.id = user_roles.role_id" in compiled
-        assert "roles.scope_type" in compiled
-        assert "roles.scope_id" in compiled
+        assert "roles.name" in compiled
         assert "permissions.role_id = user_roles.role_id" in compiled

@@ -21,7 +21,6 @@ from ai.backend.manager.data.permission.role import (
     BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
-    RoleListResult,
     RoleRevocationResult,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
@@ -30,11 +29,16 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
+from ai.backend.manager.models.rbac_models.role.searchable_fields import (
+    RoleSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 from .db_source.db_source import PermissionDBSource
 
@@ -118,7 +122,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
         result = await self._db_source.assign_role(data)
-        return result.to_data()
+        return RoleAssignmentSearchableFields.own.to_assignment_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -132,7 +136,9 @@ class PermissionControllerRepository:
         granted_by: UserID | None = None,
     ) -> BulkRoleAssignmentResultData:
         rows = await self._db_source.bulk_assign_role(role_id, user_ids, granted_by)
-        return BulkRoleAssignmentResultData(successes=[row.to_data() for row in rows])
+        return BulkRoleAssignmentResultData(
+            successes=[RoleAssignmentSearchableFields.own.to_assignment_data(row) for row in rows]
+        )
 
     @permission_controller_repository_resilience.apply()
     async def bulk_revoke_role(
@@ -143,22 +149,13 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> RoleData | None:
         result = await self._db_source.get_role(role_id)
-        return result.to_data() if result else None
-
-    @permission_controller_repository_resilience.apply()
-    async def search_roles_in_scope(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> RoleListResult:
-        """Search the roles the named scopes reach, combined with OR."""
-        return await self._db_source.search_roles_in_scope(querier=querier, scopes=scopes)
+        return RoleSearchableFields.own.to_data(result) if result else None
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
         """Get role with all permission details (without users)."""
         result = await self._db_source.get_role_with_permissions(role_id)
-        return result.to_detail_data_without_users()
+        return RoleSearchableFields.own.to_detail_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def search_role_assignments_in_global(

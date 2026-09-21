@@ -9,6 +9,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import FieldPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -38,4 +41,4 @@ class RolePermissionPurger(FieldPurger[PermissionRow, PermissionData]):
 
     @override
     def to_data(self, row: PermissionRow) -> PermissionData:
-        return row.to_data()
+        return PermissionSearchableFields.own.to_data(row)

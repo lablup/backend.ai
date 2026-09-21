@@ -7,6 +7,7 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     PartialBulkFieldActionProcessor,
 )
@@ -62,7 +63,7 @@ class RolePresetProcessors:
     it, wired through the field group the preset's group hands out.
     """
 
-    create: GlobalActionProcessor[
+    create: ScopeActionProcessor[
         CreateRolePresetAction,
         CreatedEntityWithFieldsOpsResult[RolePresetData, RolePermissionPresetData],
     ]
@@ -75,7 +76,7 @@ class RolePresetProcessors:
     bulk_purge: PartialBulkActionProcessor[BulkPurgeRolePresetsAction, RolePresetData]
 
     # Permission entries: field rows of a preset, answered for by the preset owning them
-    search_permission_presets: ScopeActionProcessor[
+    search_permission_presets: BulkActionProcessor[
         SearchRolePermissionPresetsAction, ScopedFieldsOpsResult[RolePermissionPresetData]
     ]
     bulk_add_permissions: SingleEntityActionProcessor[
@@ -90,7 +91,7 @@ class RolePresetProcessors:
         preset_group: ProcessorGroup[RolePresetData],
         service: RolePresetService,
     ) -> None:
-        self.create = preset_group.global_scope(CreateRolePresetAction, service.create)
+        self.create = preset_group.scope(CreateRolePresetAction, service.create)
         self.get = preset_group.single_get_ops(GetRolePresetAction)
         self.search = preset_group.global_searcher_ops(SearchRolePresetsAction)
         self.update = preset_group.single_entity(UpdateRolePresetAction, service.update)
@@ -105,7 +106,9 @@ class RolePresetProcessors:
             LookupRolePermissionPresetOwnerAction,
             LookupBulkRolePermissionPresetOwnerAction,
         )
-        self.search_permission_presets = permissions.search_ops(SearchRolePermissionPresetsAction)
+        self.search_permission_presets = permissions.atomic_bulk_scoped_search_ops(
+            SearchRolePermissionPresetsAction
+        )
         self.bulk_add_permissions = preset_group.single_entity(
             BulkAddRolePermissionPresetsAction, service.bulk_add_permissions
         )

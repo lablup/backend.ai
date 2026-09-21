@@ -68,6 +68,7 @@ from .role import (
     RoleSourceGQL,
     RoleStatusFilterGQL,
     RoleStatusGQL,
+    RoleUsedByGQL,
     RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
@@ -104,6 +105,7 @@ __all__ = [
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
+    "RoleUsedByGQL",
     "RoleAssignmentOrderBy",
     "EntityOrderByGQL",
     # Inputs
