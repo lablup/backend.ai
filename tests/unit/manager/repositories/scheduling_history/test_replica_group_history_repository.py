@@ -19,10 +19,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    OrderDirection,
-    ReplicaGroupHistoryOrderField,
-)
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -41,10 +37,9 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.conditions import (
-    ReplicaGroupHistoryConditions,
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
 )
-from ai.backend.manager.models.replica_group_history.orders import resolve_replica_group_order
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -58,9 +53,9 @@ from ai.backend.manager.models.scheduling_history.scopes import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.testutils.db import with_tables
 
@@ -335,7 +330,9 @@ class TestReplicaGroupHistoryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                ReplicaGroupHistoryConditions.by_category(ReplicaGroupHandlerCategory.SCALING)
+                ReplicaGroupHistorySearchableFields.own.category.filter.equals(
+                    ReplicaGroupHandlerCategory.SCALING
+                )
             ],
             orders=[],
         )
@@ -368,7 +365,7 @@ class TestReplicaGroupHistoryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                ReplicaGroupHistoryConditions.by_replica_group_id_filter(
+                ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.equals(
                     UUIDEqualMatchSpec(value=seed.replica_group_id, negated=False)
                 )
             ],
@@ -393,11 +390,7 @@ class TestReplicaGroupHistoryRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
-            orders=[
-                resolve_replica_group_order(
-                    ReplicaGroupHistoryOrderField.ATTEMPTS, OrderDirection.ASC
-                )
-            ],
+            orders=[ReplicaGroupHistorySearchableFields.own.attempts.order.apply(ascending=True)],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,

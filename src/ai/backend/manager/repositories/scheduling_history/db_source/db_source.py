@@ -22,6 +22,9 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.errors.kernel import KernelNotFound
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
+)
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
@@ -146,7 +149,10 @@ class SchedulingHistoryDBSource:
 
             result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
 
-            items = [row.ReplicaGroupHistoryRow.to_data() for row in result.rows]
+            items = [
+                ReplicaGroupHistorySearchableFields.own.to_data(row.ReplicaGroupHistoryRow)
+                for row in result.rows
+            ]
 
             return ReplicaGroupHistoryListResult(
                 items=items,
