@@ -1625,23 +1625,36 @@ class DeploymentAdapter(BaseAdapter):
     async def batch_load_policies_by_endpoint_ids(
         self,
         endpoint_ids: Sequence[DeploymentID],
-    ) -> list[DeploymentPolicyNode | None]:
+    ) -> list[DeploymentPolicyNode | Exception | None]:
         """Batch load deployment policies by deployment ID for DataLoader use.
 
-        Each deployment carries at most one policy; every named deployment is checked.
+        One answer per deployment in the given order: the policy, ``None`` for a
+        deployment carrying none or an id matching no row, and the denial for one the
+        caller may not read. Each deployment is checked through the bulk get; the
+        policies are read for the ones that passed.
         """
         if not endpoint_ids:
             return []
         ids = [DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
-        result = await self._deployment.bulk_get_deployment_policies.run(
-            BulkGetDeploymentPoliciesAction(deployment_ids=ids)
-        )
-        return [
-            self._policy_data_to_dto(policy)
-            if (policy := result.designated.get(deployment_id)) is not None
-            else None
-            for deployment_id in ids
-        ]
+        got = await self._deployment.bulk_get.run(BulkGetDeploymentsAction(ids=ids))
+        readable = got.values()
+        errors = got.errors()
+        permitted = [deployment_id for deployment_id in ids if deployment_id in readable]
+        designated: Mapping[DeploymentID, DeploymentPolicyData] = {}
+        if permitted:
+            result = await self._deployment.bulk_get_deployment_policies.run(
+                BulkGetDeploymentPoliciesAction(deployment_ids=permitted)
+            )
+            designated = result.designated
+        answers: list[DeploymentPolicyNode | Exception | None] = []
+        for deployment_id in ids:
+            error = self.batch_load_failure(errors.get(deployment_id))
+            if error is not None:
+                answers.append(error)
+                continue
+            policy = designated.get(deployment_id)
+            answers.append(self._policy_data_to_dto(policy) if policy is not None else None)
+        return answers
 
     # ------------------------------------------------------------------
     # Querier builders
