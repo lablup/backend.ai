@@ -220,7 +220,8 @@ class TestImageSearcherByReference:
         await add_alias(_CANONICAL, aliased_id)
         canonical_id = await add_image(_CANONICAL, created_at=_BASE_TIME + timedelta(hours=1))
 
-        assert await resolve_reference(_CANONICAL, "x86_64") == [canonical_id]
+        # Both rows are on the page; the order decides which one answers.
+        assert (await resolve_reference(_CANONICAL, "x86_64"))[0] == canonical_id
 
     async def test_alive_wins_over_an_older_deleted_duplicate(
         self, add_image: AddImage, resolve_reference: ResolveReference
@@ -230,9 +231,11 @@ class TestImageSearcherByReference:
             _CANONICAL, project=None, created_at=_BASE_TIME + timedelta(hours=1)
         )
 
-        assert await resolve_reference(
+        matched = await resolve_reference(
             _CANONICAL, "x86_64", (ImageStatus.ALIVE, ImageStatus.DELETED)
-        ) == [alive_id]
+        )
+
+        assert matched[0] == alive_id
 
     async def test_oldest_wins_among_alive_duplicates(
         self, add_image: AddImage, resolve_reference: ResolveReference
@@ -240,7 +243,7 @@ class TestImageSearcherByReference:
         await add_image(_CANONICAL, project=None, created_at=_BASE_TIME + timedelta(hours=1))
         oldest_id = await add_image(_CANONICAL, project=None)
 
-        assert await resolve_reference(_CANONICAL, "x86_64") == [oldest_id]
+        assert (await resolve_reference(_CANONICAL, "x86_64"))[0] == oldest_id
 
 
 class TestImageQuerier:

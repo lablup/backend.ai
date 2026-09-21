@@ -40,10 +40,12 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.get_images import PublicGetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
+from ai.backend.manager.services.image.actions.search_install_status import (
+    SearchImagesWithInstallStatusAction,
+)
 
 # ========== Test Data Factories ==========
 
@@ -346,13 +348,14 @@ class TestImageAPIHandler:
 
     @pytest.fixture
     def mock_get_result(self) -> MagicMock:
-        """Mock get image by ID action result."""
+        """Mock the scoped read of one image with its install status."""
         image = create_image_data_with_details(
             image_id=UUID("11111111-1111-1111-1111-111111111111"),
         )
+        item = MagicMock()
+        item.image = image
         result = MagicMock()
-        result.image_with_agent_install_status = MagicMock()
-        result.image_with_agent_install_status.image = image
+        result.items = [item]
         return result
 
     @pytest.fixture
@@ -412,7 +415,7 @@ class TestImageAPIHandler:
         processors.image.search_images.wait_for_complete = AsyncMock(
             return_value=mock_search_result
         )
-        processors.image.public_get_image_by_id.wait_for_complete = AsyncMock(
+        processors.image.search_with_install_status.wait_for_complete = AsyncMock(
             return_value=mock_get_result
         )
         processors.image.scan_image.wait_for_complete = AsyncMock(return_value=mock_scan_result)
@@ -469,24 +472,22 @@ class TestImageAPIHandler:
         self,
         mock_processors: MagicMock,
     ) -> None:
-        """Get handler should call get_image_by_id processor."""
-        image_id = ImageID(UUID("11111111-1111-1111-1111-111111111111"))
-        await mock_processors.image.public_get_image_by_id.wait_for_complete(
-            PublicGetImageByIdAction(image_id=image_id, image_status=None)
+        """Get handler should call the scoped install-status read."""
+        await mock_processors.image.search_with_install_status.wait_for_complete(
+            SearchImagesWithInstallStatusAction(targets=[], searcher=MagicMock())
         )
-        mock_processors.image.public_get_image_by_id.wait_for_complete.assert_called_once()
+        mock_processors.image.search_with_install_status.wait_for_complete.assert_called_once()
 
     async def test_get_image_converts_detailed_dto(
         self,
         mock_processors: MagicMock,
     ) -> None:
         """Get result should be convertible to detailed DTO."""
-        image_id = ImageID(UUID("11111111-1111-1111-1111-111111111111"))
-        result = await mock_processors.image.public_get_image_by_id.wait_for_complete(
-            PublicGetImageByIdAction(image_id=image_id, image_status=None)
+        result = await mock_processors.image.search_with_install_status.wait_for_complete(
+            SearchImagesWithInstallStatusAction(targets=[], searcher=MagicMock())
         )
         adapter = ImageAdapter()
-        dto = adapter.convert_detailed_to_dto(result.image_with_agent_install_status.image)
+        dto = adapter.convert_detailed_to_dto(result.items[0].image)
 
         assert isinstance(dto, ImageDTO)
         assert dto.id == UUID("11111111-1111-1111-1111-111111111111")

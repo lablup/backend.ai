@@ -2,10 +2,7 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
@@ -34,21 +31,9 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.get_all_images import (
-    PublicGetAllImagesAction,
-    PublicGetAllImagesActionResult,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
-)
-from ai.backend.manager.services.image.actions.get_images import (
-    PublicGetImageByIdAction,
-    PublicGetImageByIdActionResult,
-    PublicGetImageByIdentifierAction,
-    PublicGetImageByIdentifierActionResult,
-    PublicGetImagesByCanonicalsAction,
-    PublicGetImagesByCanonicalsActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -79,6 +64,10 @@ from ai.backend.manager.services.image.actions.search_aliases import (
 )
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
+)
+from ai.backend.manager.services.image.actions.search_install_status import (
+    SearchImagesWithInstallStatusAction,
+    SearchImagesWithInstallStatusActionResult,
 )
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
@@ -137,20 +126,13 @@ class ImageProcessors:
     set_image_resource_limit_by_id: GlobalActionProcessor[
         SetImageResourceLimitByIdAction, SetImageResourceLimitByIdActionResult
     ]
-    public_get_image_by_id: PublicActionProcessor[
-        PublicGetImageByIdAction, PublicGetImageByIdActionResult
-    ]
-    public_get_image_by_identifier: PublicActionProcessor[
-        PublicGetImageByIdentifierAction, PublicGetImageByIdentifierActionResult
-    ]
-    public_get_images_by_canonicals: PublicActionProcessor[
-        PublicGetImagesByCanonicalsAction, PublicGetImagesByCanonicalsActionResult
+    # Every scoped read of images with their install status: a read by id, by canonical
+    # name or across the catalog differ in the searcher alone.
+    search_with_install_status: ScopeActionProcessor[
+        SearchImagesWithInstallStatusAction, SearchImagesWithInstallStatusActionResult
     ]
     get_image_installed_agents: GlobalActionProcessor[
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
-    ]
-    public_get_all_images: PublicActionProcessor[
-        PublicGetAllImagesAction, PublicGetAllImagesActionResult
     ]
     search_images: GlobalActionProcessor[SearchImagesAction, BatchOpsResult[ImageData]]
     # What the DataLoader reads: checked per image.
@@ -166,15 +148,8 @@ class ImageProcessors:
         aliases: LookupFieldGroup[ImageAliasData],
         service: ImageService,
     ) -> None:
-        self.public_get_all_images = group.public(PublicGetAllImagesAction, service.get_all_images)
-        self.public_get_image_by_id = group.public(
-            PublicGetImageByIdAction, service.get_image_by_id
-        )
-        self.public_get_image_by_identifier = group.public(
-            PublicGetImageByIdentifierAction, service.get_image_by_identifier
-        )
-        self.public_get_images_by_canonicals = group.public(
-            PublicGetImagesByCanonicalsAction, service.get_images_by_canonicals
+        self.search_with_install_status = group.scope(
+            SearchImagesWithInstallStatusAction, service.search_images_with_install_status
         )
 
         self.get_image_installed_agents = group.global_scope(
