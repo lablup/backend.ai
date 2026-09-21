@@ -1,6 +1,6 @@
-"""프리셋 조회 — 하나 또는 여러 ID로 조회하며, 두 방식 모두 인증 여부만 확인한다.
+"""프리셋 조회 — 하나 또는 여러 ID로 조회한다.
 
-여러 ID 조회는 검색에 ID 조건을 지정하여 실행하므로 존재하지 않는 ID는 빈 항목으로 반환된다.
+여러 ID 조회는 ID마다 응답하고 인증 여부만 확인하므로, 존재하지 않는 ID는 빈 항목으로 반환된다.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Loaded = list[RuntimeVariantPresetNode | None]
+type Loaded = list[RuntimeVariantPresetNode | Exception | None]
 type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantPresetAdapter, Any]
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
@@ -10,6 +11,9 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
+from ai.backend.manager.services.runtime_variant_preset.actions.bulk_get import (
+    PublicBulkGetRuntimeVariantPresetsAction,
+)
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
 )
@@ -37,6 +41,9 @@ class RuntimeVariantPresetProcessors:
     get: SingleEntityActionProcessor[
         GetRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
     ]
+    public_bulk_get: PartialBulkActionProcessor[
+        PublicBulkGetRuntimeVariantPresetsAction, RuntimeVariantPresetData
+    ]
     global_create: GlobalActionProcessor[
         CreateRuntimeVariantPresetAction, CreatedEntityOpsResult[RuntimeVariantPresetData]
     ]
@@ -56,6 +63,9 @@ class RuntimeVariantPresetProcessors:
         service: RuntimeVariantPresetService,
     ) -> None:
         self.get = group.single_get_ops(GetRuntimeVariantPresetAction)
+        self.public_bulk_get = group.public_partial_bulk_get_ops(
+            PublicBulkGetRuntimeVariantPresetsAction
+        )
         self.global_create = group.global_create_ops(CreateRuntimeVariantPresetAction)
         self.update = group.single_entity(UpdateRuntimeVariantPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeRuntimeVariantPresetAction)

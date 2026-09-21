@@ -5,7 +5,6 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
     RuntimeVariantPresetFilter,
@@ -55,8 +54,10 @@ from ai.backend.manager.models.runtime_variant_preset.searchers import (
 from ai.backend.manager.models.runtime_variant_preset.updaters import (
     RuntimeVariantPresetUpdater,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.runtime_variant_preset.actions.bulk_get import (
+    PublicBulkGetRuntimeVariantPresetsAction,
+)
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
 )
@@ -145,21 +146,23 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
 
     async def batch_load_by_ids(
         self, ids: Sequence[RuntimeVariantPresetID]
-    ) -> list[RuntimeVariantPresetNode | None]:
-        """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
+    ) -> list[RuntimeVariantPresetNode | Exception | None]:
+        """Batch load presets by id for DataLoader use.
+
+        One answer per id in the given order: the node, or ``None`` for an id matching
+        no row.
+        """
         if not ids:
             return []
-        searcher = RuntimeVariantPresetSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[
-                RuntimeVariantPresetSearchableFields.own.id.filter.in_(
-                    UUIDInMatchSpec(values=list(ids), negated=False)
-                )
-            ],
+        result = await self._runtime_variant_preset.public_bulk_get.run(
+            PublicBulkGetRuntimeVariantPresetsAction(ids=list(ids))
         )
-        result = await self._runtime_variant_preset.scoped_search.run(self._scoped_search(searcher))
-        node_map = {item.id: self._data_to_node(item) for item in result.items}
-        return [node_map.get(RuntimeVariantPresetID(preset_id)) for preset_id in ids]
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(
         self,

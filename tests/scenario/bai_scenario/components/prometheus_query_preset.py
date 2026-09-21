@@ -61,6 +61,9 @@ from bai_scenario.seeds.seeder import Laid
 type PresetNodeAnswer = QueryDefinitionNode | None
 """The get payload may carry no node, so every step answering a node is typed by this."""
 
+type LoadedPreset = QueryDefinitionNode | Exception | None
+"""One answer of a batch load: the node, a failure for that id, or nothing."""
+
 PAGE = 10
 """How many a search answers when the request names no page size."""
 
@@ -454,7 +457,7 @@ def node_of(seeded: PrometheusQueryPresetData) -> QueryDefinitionNode:
 
 
 @dataclass(frozen=True)
-class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]):
+class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[LoadedPreset]]):
     """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 빈 항목으로."""
 
     @override
@@ -463,7 +466,7 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]
 
     @override
     def look(
-        self, laid: ManyPresetsAndACaller, answered: Answered[list[PresetNodeAnswer]]
+        self, laid: ManyPresetsAndACaller, answered: Answered[list[LoadedPreset]]
     ) -> list[Verdict]:
         answer = answered.response
         if answer is None:
@@ -476,7 +479,7 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]
                 Held(
                     f"[{at}]",
                     got,
-                    SameAs[PresetNodeAnswer](
+                    SameAs[LoadedPreset](
                         node_of(wanted), f"{at + 1}번째로 요청한 id의 프리셋 전체"
                     ),
                 )
@@ -486,7 +489,7 @@ class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]
 
 
 @dataclass(frozen=True)
-class NothingIsAnswered(Then[Any, list[PresetNodeAnswer]]):
+class NothingIsAnswered(Then[Any, list[LoadedPreset]]):
     """빈 목록에는 빈 응답이다."""
 
     @override
@@ -494,7 +497,7 @@ class NothingIsAnswered(Then[Any, list[PresetNodeAnswer]]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[PresetNodeAnswer]]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[list[LoadedPreset]]) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UserNotFound, answered.raised)]

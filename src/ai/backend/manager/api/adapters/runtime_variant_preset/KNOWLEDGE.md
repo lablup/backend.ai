@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-preset-adapter-scenarios
 type: reference
-description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the variant column with no foreign key in the ORM
+description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that answers per id and checks login only, the variant column with no foreign key in the ORM
 scope: src/ai/backend/manager/api/adapters/runtime_variant_preset
 keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read]
 generated:
@@ -61,15 +61,15 @@ status: draft
 |---|---|---|---|
 | public 에서 읽는 사용자가 ID로 조회한다 | 프리셋 하나, public 조회 권한만 있음 | ID로 조회 | 해당 프리셋 전체 |
 | 존재하지 않는 ID로 조회한다 | 다른 프리셋만 있음 | ID로 조회 | 권한 부족으로 거부 |
-| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 프리셋 둘, public 조회 권한만 있음 | 세 ID를 한 번에 조회 | 요청한 순서대로 반환되며, 존재하지 않는 ID 자리에는 거부가 담긴다 |
+| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 프리셋 둘, public 조회 권한만 있음 | 세 ID를 한 번에 조회 | 요청한 순서대로 반환되며, 존재하지 않는 ID 자리에는 빈 항목이 담긴다 |
 | 빈 목록으로 조회한다 | 프리셋 하나 | 빈 ID 목록으로 조회 | 빈 응답을 반환하고 하위 계층을 호출하지 않음 |
 
 조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자의 조회가 성공하는 시나리오로
 이를 검증한다. 반면 생성 요청은 슈퍼관리자가 아니면 거부된다. 존재하지 않는 ID와 닿을 수 없는 ID는
 같은 이유로 거부된다.
 
-여러 ID를 한 번에 조회할 때는 ID 조건을 지정한 검색으로 실행한다. ID마다 개별 조회하는 방식이
-아니므로 존재하지 않는 ID가 있어도 요청 전체를 거부하지 않고 해당 위치에 빈 항목을 반환한다.
+여러 ID를 한 번에 조회할 때는 ID마다 응답한다. 이 조회는 인증 여부만 확인하므로 거부되는 자리가
+없고, 존재하지 않는 ID가 있어도 요청 전체를 거부하지 않고 해당 위치에 빈 항목을 반환한다.
 
 인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
 

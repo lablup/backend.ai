@@ -479,7 +479,9 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 
 @dataclass(frozen=True)
-class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | None]]):
+class ThePresetsInTheOrderAsked(
+    Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | Exception | None]]
+):
     """요청한 순서대로 반환한다. 존재하지 않는 ID의 위치에는 빈 항목을 반환한다."""
 
     started: datetime
@@ -492,7 +494,7 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
     def look(
         self,
         laid: ManyPresetsAndACaller,
-        answered: Answered[list[RuntimeVariantPresetNode | None]],
+        answered: Answered[list[RuntimeVariantPresetNode | Exception | None]],
     ) -> list[Verdict]:
         items = answered.response
         if items is None:
@@ -502,7 +504,7 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
         seen: list[Verdict] = [Same("len(items)", len(items), asked)]
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
-            if got is None:
+            if not isinstance(got, RuntimeVariantPresetNode):
                 seen.append(Same(f"items[{i}]", got, "노드"))
                 continue
             seen.extend(laid_preset_verdicts(f"items[{i}].", got, expected, written))

@@ -9,7 +9,6 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -66,8 +65,10 @@ from ai.backend.manager.models.prometheus_query_preset.searchers import (
 from ai.backend.manager.models.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdater,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.prometheus_query_preset.actions.bulk_get import (
+    PublicBulkGetPresetsAction,
+)
 from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
 from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
@@ -97,22 +98,23 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def batch_load_by_ids(
         self, ids: Sequence[PrometheusQueryPresetID]
-    ) -> list[QueryDefinitionNode | None]:
+    ) -> list[QueryDefinitionNode | Exception | None]:
+        """Batch load presets by id for DataLoader use.
+
+        One answer per id in the given order: the node, or ``None`` for an id matching
+        no row.
+        """
         if not ids:
             return []
-        searcher = PrometheusQueryPresetSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[
-                PrometheusQueryPresetSearchableFields.own.id.filter.in_(
-                    UUIDInMatchSpec(values=list(ids), negated=False)
-                )
-            ],
+        result = await self._prometheus_query_preset.public_bulk_get_presets.run(
+            PublicBulkGetPresetsAction(ids=list(ids))
         )
-        action_result = await self._prometheus_query_preset.scoped_search_presets.run(
-            self._scoped_search(searcher)
-        )
-        preset_map = {item.id: self._data_to_dto(item) for item in action_result.items}
-        return [preset_map.get(PrometheusQueryPresetID(preset_id)) for preset_id in ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(self, input: CreateQueryDefinitionInput) -> CreateQueryDefinitionPayload:
         """Create a new prometheus query definition."""

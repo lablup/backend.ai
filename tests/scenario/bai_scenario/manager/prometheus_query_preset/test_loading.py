@@ -1,4 +1,4 @@
-"""여러 id로 조회 — 검색을 id 조건으로 호출하므로 권한 경로가 검색과 같다.
+"""여러 id로 조회 — id마다 응답한다.
 
 인증만 확인하므로 거부 원소는 생기지 않는다. 없는 id만 빈 항목으로 반환된다.
 """
@@ -18,17 +18,17 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.prometheus_query_preset import (
+    LoadedPreset,
     ManyPresetsAndACaller,
     ManyPresetsAndSomeone,
     NothingIsAnswered,
-    PresetNodeAnswer,
     TheBatchAnswersInOrder,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Loaded = list[PresetNodeAnswer]
+type Loaded = list[LoadedPreset]
 type LoadingStep = Scenario[
     SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded
 ]
