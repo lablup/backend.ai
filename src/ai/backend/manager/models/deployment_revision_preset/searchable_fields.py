@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
@@ -14,6 +17,11 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.resource_slot.row import (
+    ModelCardResourceRequirementRow,
+    PresetResourceSlotRow,
+)
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
@@ -152,8 +160,51 @@ class _DeploymentPresetOwnFields(
         )
 
 
+def _meets_every_minimum() -> sa.sql.expression.ColumnElement[bool]:
+    """The outer preset carries a slot row for every minimum the joined card requires.
+
+    Relational division: no required slot lacks a slot row whose quantity meets the
+    minimum. Each EXISTS correlates against the rows already in the enclosing FROM,
+    without which SQLAlchemy aliases the inner FROM and the predicates degenerate into
+    Cartesian matches that accept every preset.
+    """
+    preset = DeploymentRevisionPresetRow.__table__
+    card = ModelCardRow.__table__
+    requirement = ModelCardResourceRequirementRow.__table__
+    slot = PresetResourceSlotRow.__table__
+    return ~sa.exists(
+        sa.select(sa.literal(1))
+        .select_from(requirement)
+        .correlate(preset, card)
+        .where(
+            requirement.c.model_card_id == card.c.id,
+            ~sa.exists(
+                sa.select(sa.literal(1))
+                .select_from(slot)
+                .correlate(preset, requirement)
+                .where(
+                    slot.c.preset_id == preset.c.id,
+                    slot.c.slot_name == requirement.c.slot_name,
+                    slot.c.quantity >= requirement.c.min_quantity,
+                )
+            ),
+        )
+    )
+
+
 class _DeploymentPresetUsage:
     """Uses between a preset and other entities."""
+
+    model_cards = UsedByConditions[ModelCardID](
+        ToManyCorrelation(
+            ModelCardRow.__table__,
+            DeploymentRevisionPresetRow.__table__,
+            _meets_every_minimum(),
+        ),
+        ModelCardRow.__table__.c.id,
+    )
+    """Presets a model card can be deployed on: those meeting every minimum slot
+    quantity it requires."""
 
     deployments = UsedByConditions[DeploymentID](
         ToManyCorrelation(

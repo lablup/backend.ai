@@ -221,6 +221,10 @@ class Adapters:
         registrations.
         """
         entity_types = WiredEntityTypes(action_registry)
+        # The model card adapter reads presets through this one, so it is built first.
+        deployment_revision_preset = DeploymentRevisionPresetAdapter(
+            processors.deployment_revision_preset
+        )
         return cls(
             agent=AgentAdapter(processors.agent),
             app_config=AppConfigAdapter(processors.app_config),
@@ -287,10 +291,10 @@ class Adapters:
             retention_policy=RetentionPolicyAdapter(processors.retention_policy),
             runtime_variant=RuntimeVariantAdapter(processors.runtime_variant),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors.runtime_variant_preset),
-            deployment_revision_preset=DeploymentRevisionPresetAdapter(
-                processors.deployment_revision_preset
+            deployment_revision_preset=deployment_revision_preset,
+            model_card=ModelCardAdapter(
+                processors.model_card, processors.deployment, deployment_revision_preset
             ),
-            model_card=ModelCardAdapter(processors.model_card, processors.deployment),
             resource_usage=ResourceUsageAdapter(
                 processors.resource_usage, processors.resource_group
             ),

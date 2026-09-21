@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
 
-Not exercised by any scenario: admin_bulk_delete, available_presets, batch_load_fields, create, delete, deploy, get, min_resources, project_search, scan_project, scoped_search, update.
+Not exercised by any scenario: admin_bulk_delete, available_presets, batch_load_fields, create, delete, deploy, get, min_resources, ownership_search, project_search, scan_project, scoped_search, update.
 
 ### model_card
 

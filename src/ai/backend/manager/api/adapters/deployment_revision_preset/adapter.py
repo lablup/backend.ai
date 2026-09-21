@@ -15,6 +15,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -225,6 +226,30 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: SearchDeploymentRevisionPresetsInput,
     ) -> SearchDeploymentRevisionPresetsPayload:
+        return await self._search_in_public(input, self._usage(input.usage))
+
+    async def available_presets(
+        self,
+        model_card_id: ModelCardID,
+        input: SearchDeploymentRevisionPresetsInput,
+    ) -> SearchDeploymentRevisionPresetsPayload:
+        """The presets meeting every minimum the card requires.
+
+        The card narrows the search as a use, so the caller has to be able to read it.
+        """
+        return await self._search_in_public(
+            input,
+            [
+                *self._usage(input.usage),
+                DeploymentPresetSearchableFields.linked.usage.model_cards.used_by(model_card_id),
+            ],
+        )
+
+    async def _search_in_public(
+        self,
+        input: SearchDeploymentRevisionPresetsInput,
+        used_by: list[UsedBy],
+    ) -> SearchDeploymentRevisionPresetsPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         searcher = self._build_searcher(
@@ -243,7 +268,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             ScopedSearchDeploymentPresetsAction(
                 searcher=ScopedSearcher(
                     scopes=[PublicDeploymentPresetTarget()],
-                    used_by=self._usage(input.usage),
+                    used_by=used_by,
                     searcher=searcher,
                 )
             )
