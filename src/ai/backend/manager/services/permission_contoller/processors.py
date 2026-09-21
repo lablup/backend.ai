@@ -15,6 +15,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
+    ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -34,7 +35,6 @@ from .actions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
     SearchRolesInScopeAction,
-    SearchRolesInScopeActionResult,
     UpdateRoleAction,
 )
 from .actions.bulk_get_permissions import BulkGetPermissionsAction
@@ -86,7 +86,7 @@ class PermissionControllerProcessors:
     bulk_get_roles: PartialBulkActionProcessor[BulkGetRolesAction, RoleData]
     global_search_roles: GlobalActionProcessor[GlobalSearchRolesAction, BatchOpsResult[RoleData]]
     search_roles_in_scope: ScopeActionProcessor[
-        SearchRolesInScopeAction, SearchRolesInScopeActionResult
+        SearchRolesInScopeAction, ScopedBatchOpsResult[RoleData]
     ]
     scoped_search_role_assignments: ScopeActionProcessor[
         ScopedSearchRoleAssignmentsAction, ScopedSearchRoleAssignmentsActionResult
@@ -144,9 +144,7 @@ class PermissionControllerProcessors:
         )
         self.bulk_get_roles = role_group.partial_bulk_get_ops(BulkGetRolesAction)
         self.global_search_roles = role_group.global_searcher_ops(GlobalSearchRolesAction)
-        self.search_roles_in_scope = role_group.scope(
-            SearchRolesInScopeAction, service.search_roles_in_scope
-        )
+        self.search_roles_in_scope = role_group.scoped_search_ops(SearchRolesInScopeAction)
         self.scoped_search_role_assignments = user_group.scope(
             ScopedSearchRoleAssignmentsAction, service.scoped_search_role_assignments
         )

@@ -43,10 +43,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_my_role_ass
     ScopedSearchRoleAssignmentsAction,
     ScopedSearchRoleAssignmentsActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
-    SearchRolesInScopeAction,
-    SearchRolesInScopeActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     GlobalSearchRoleAssignmentsAction,
     GlobalSearchRoleAssignmentsActionResult,
@@ -81,15 +77,6 @@ class PermissionControllerService:
         """Get role with all permission details and assigned users."""
         role_data = await self._repository.get_role_with_permissions(action.role_id)
         return GetRoleDetailActionResult(role=role_data)
-
-    async def search_roles_in_scope(
-        self, action: SearchRolesInScopeAction
-    ) -> SearchRolesInScopeActionResult:
-        """Search the roles the named scopes reach."""
-        result = await self._repository.search_roles_in_scope(
-            action.querier, action.operation_scopes()
-        )
-        return SearchRolesInScopeActionResult(result=result)
 
     async def scoped_search_role_assignments(
         self, action: ScopedSearchRoleAssignmentsAction

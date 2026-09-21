@@ -10,7 +10,6 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -50,15 +49,3 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     deleted: Mapped[bool] = mapped_column(
         "deleted", sa.Boolean, nullable=False, server_default=sa.false()
     )
-
-    def to_data(self) -> RolePresetData:
-        return RolePresetData(
-            id=self.id,
-            name=self.name,
-            role_name_template=self.role_name_template,
-            scope_type=self.scope_type,
-            auto_assign=self.auto_assign,
-            deleted=self.deleted,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

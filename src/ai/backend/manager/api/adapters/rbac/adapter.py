@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
@@ -13,12 +13,14 @@ from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     RuntimeEntityID,
 )
 from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.rbac import (
     BulkAddRolePermissionFailureInfo,
@@ -107,6 +109,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleOrderBy as RoleOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleUsedBy as RoleUsedByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -125,6 +130,12 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionBitFilter,
     RoleSourceDTO,
     RoleStatusDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleSourceFilter as RoleSourceFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleStatusFilter as RoleStatusFilterDTO,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -157,39 +168,45 @@ from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac_models.conditions import (
-    AssignedUserConditions,
-)
-from ai.backend.manager.models.rbac_models.orders import (
-    AssignedUserOrders,
-)
-from ai.backend.manager.models.rbac_models.permission.conditions import (
-    ScopedPermissionConditions,
-)
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
-from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
-from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
+from ai.backend.manager.models.rbac_models.role.deprecated_search import (
+    DeprecatedRoleConditions,
+)
 from ai.backend.manager.models.rbac_models.role.scopes import (
     HeldRoleTarget,
     RoleTarget,
 )
+from ai.backend.manager.models.rbac_models.role.searchable_fields import (
+    RoleSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
+    DeprecatedRoleAssignmentConditions,
+)
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
     RoleAssignmentTarget,
     UserRoleAssignmentTarget,
 )
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
+from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
 )
@@ -234,7 +251,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
     SearchRolesInScopeAction,
-    SearchRolesInScopeActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     GlobalSearchRoleAssignmentsAction,
@@ -263,7 +279,7 @@ from ai.backend.manager.types import OptionalState, TriState
 @lru_cache(maxsize=1)
 def _permission_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ScopedPermissionOrders.created_at(ascending=False),
+        forward_order=PermissionSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=PermissionRow.id,
     )
 
@@ -271,7 +287,7 @@ def _permission_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _role_gql_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RoleOrders.created_at(ascending=False),
+        forward_order=RoleSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=RoleRow.id,
     )
 
@@ -279,7 +295,7 @@ def _role_gql_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AssignedUserOrders.granted_at(ascending=False),
+        forward_order=RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=False),
         cursor_column=UserRoleRow.id,
     )
 
@@ -379,7 +395,11 @@ class RBACAdapter(BaseAdapter):
         # and goes away with that node.
         searcher = RoleAssignmentSearcher(
             pagination=NoPagination(),
-            conditions=[AssignedUserConditions.by_ids(assignment_ids)],
+            conditions=[
+                RoleAssignmentSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=assignment_ids, negated=False)
+                )
+            ],
         )
         action_result = await self._permission_controller.global_search_role_assignments.run(
             GlobalSearchRoleAssignmentsAction(searcher=searcher)
@@ -608,7 +628,11 @@ class RBACAdapter(BaseAdapter):
             offset=input.offset,
         )
         raw = await self._permission_controller.global_search_roles.run(
-            GlobalSearchRolesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
+            GlobalSearchRolesAction(
+                searcher=GlobalSearcher(
+                    used_by=self._role_used_by(input.used_by), searcher=searcher
+                )
+            )
         )
         return SearchResult(
             items=[self._role_data_to_node(item) for item in raw.items],
@@ -632,7 +656,8 @@ class RBACAdapter(BaseAdapter):
         """Search the roles the named scopes reach."""
         conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
         orders = self._convert_role_orders_gql(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            RoleSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_role_gql_pagination_spec(),
@@ -643,12 +668,15 @@ class RBACAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result: SearchRolesInScopeActionResult = (
-            await self._permission_controller.search_roles_in_scope.run(
-                SearchRolesInScopeAction(targets=targets, querier=querier)
+        raw = await self._permission_controller.search_roles_in_scope.run(
+            SearchRolesInScopeAction(
+                searcher=ScopedSearcher(
+                    scopes=targets,
+                    used_by=self._role_used_by(input.used_by),
+                    searcher=searcher,
+                )
             )
         )
-        raw = action_result.result
         return SearchResult(
             items=[self._role_data_to_node(item) for item in raw.items],
             total_count=raw.total_count,
@@ -1015,56 +1043,40 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers (GQL layer)
 
+    def _role_used_by(self, used_by: RoleUsedByDTO | None) -> list[UsedBy]:
+        """The entities whose use narrows the roles read."""
+        if used_by is None:
+            return []
+        linked = RoleSearchableFields.linked
+        return [
+            linked.role_presets.used_by(RolePresetID(preset_id))
+            for preset_id in used_by.role_preset or ()
+        ]
+
     def _convert_permission_bit_filter(
         self,
         f: PermissionBitFilter,
-        *,
-        equals_factory: Callable[[Permission], QueryCondition],
-        not_equals_factory: Callable[[Permission], QueryCondition],
-        in_factory: Callable[[Collection[Permission]], QueryCondition],
-        not_in_factory: Callable[[Collection[Permission]], QueryCondition],
+        conditions: EnumConditions[Permission],
     ) -> list[QueryCondition]:
-        """Translate a ``PermissionBitFilter`` into conditions on the permission bit."""
-        conditions: list[QueryCondition] = []
+        """Each operation the caller set, on the entry's one permission bit."""
+        applied: list[QueryCondition] = []
         if f.equals is not None:
-            conditions.append(equals_factory(f.equals.to_permission()))
+            applied.append(conditions.equals(f.equals.to_permission()))
         if f.not_equals is not None:
-            conditions.append(not_equals_factory(f.not_equals.to_permission()))
+            applied.append(conditions.not_equals(f.not_equals.to_permission()))
         if f.in_:
-            conditions.append(in_factory([v.to_permission() for v in f.in_]))
+            applied.append(conditions.in_([v.to_permission() for v in f.in_]))
         if f.not_in:
-            conditions.append(not_in_factory([v.to_permission() for v in f.not_in]))
-        return conditions
+            applied.append(conditions.not_in([v.to_permission() for v in f.not_in]))
+        return applied
 
     def _convert_permission_filter(self, f: PermissionFilterDTO) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.role_id is not None:
-            condition = self.convert_uuid_filter(
-                f.role_id,
-                equals_factory=ScopedPermissionConditions.by_role_id_equals,
-                in_factory=ScopedPermissionConditions.by_role_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.entity_type is not None:
-            condition = self.convert_string_filter(
-                f.entity_type,
-                contains_factory=ScopedPermissionConditions.by_entity_type_match.contains,
-                equals_factory=ScopedPermissionConditions.by_entity_type_match.equals,
-                starts_with_factory=ScopedPermissionConditions.by_entity_type_match.starts_with,
-                ends_with_factory=ScopedPermissionConditions.by_entity_type_match.ends_with,
-                in_factory=ScopedPermissionConditions.by_entity_type_match.in_,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.created_at is not None:
-            cond = f.created_at.build_query_condition(
-                before_factory=ScopedPermissionConditions.by_created_at_before,
-                after_factory=ScopedPermissionConditions.by_created_at_after,
-                equals_factory=ScopedPermissionConditions.by_created_at_equals,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = PermissionSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.role_id, fields.role_id.filter),
+            *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -1082,74 +1094,28 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_permission_orders(orders: list[PermissionOrderByDTO]) -> list[QueryOrder]:
+    def _convert_permission_orders(self, orders: list[PermissionOrderByDTO]) -> list[QueryOrder]:
+        fields = PermissionSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "id":
-                result.append(ScopedPermissionOrders.id(ascending))
+                result.append(fields.id.order.apply(ascending))
             elif o.field == "entity_type":
-                result.append(ScopedPermissionOrders.entity_type(ascending))
+                result.append(fields.entity_type.order.apply(ascending))
             elif o.field == "created_at":
-                result.append(ScopedPermissionOrders.created_at(ascending))
+                result.append(fields.created_at.order.apply(ascending))
         return result
 
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.name is not None:
-            condition = self.convert_string_filter(
-                f.name,
-                contains_factory=RoleConditions.by_name_contains,
-                equals_factory=RoleConditions.by_name_equals,
-                starts_with_factory=RoleConditions.by_name_starts_with,
-                ends_with_factory=RoleConditions.by_name_ends_with,
-                in_factory=RoleConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.source is not None:
-            src = f.source
-            if src.equals is not None:
-                conditions.append(RoleConditions.by_source_equals(InternalRoleSource(src.equals)))
-            if src.in_ is not None and src.in_:
-                conditions.append(
-                    RoleConditions.by_sources([InternalRoleSource(s) for s in src.in_])
-                )
-            if src.not_equals is not None:
-                conditions.append(
-                    RoleConditions.by_source_not_equals(InternalRoleSource(src.not_equals))
-                )
-            if src.not_in is not None and src.not_in:
-                conditions.append(
-                    RoleConditions.by_source_not_in([InternalRoleSource(s) for s in src.not_in])
-                )
-        if f.status is not None:
-            st = f.status
-            if st.equals is not None:
-                conditions.append(RoleConditions.by_status_equals(InternalRoleStatus(st.equals)))
-            if st.in_ is not None and st.in_:
-                conditions.append(
-                    RoleConditions.by_statuses([InternalRoleStatus(s) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                conditions.append(
-                    RoleConditions.by_status_not_equals(InternalRoleStatus(st.not_equals))
-                )
-            if st.not_in is not None and st.not_in:
-                conditions.append(
-                    RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
-                )
-        if f.assigned_user is not None:
-            conditions.extend(self._convert_user_nested_filter(f.assigned_user))
-        if f.mapped_scope is not None:
-            conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
-        if f.permission is not None:
-            conditions.extend(
-                self._convert_permission_nested_filter(
-                    RoleConditions.exists_permission_combined, f.permission
-                )
-            )
+        fields = RoleSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self._convert_role_source_filter(f.source, fields.source.filter),
+            *self._convert_role_status_filter(f.status, fields.status.filter),
+            *self._convert_assigned_user_nested_filter(f.assigned_user),
+            *self._convert_mapped_scope_nested_filter(f.mapped_scope),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1167,62 +1133,80 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    def _convert_user_nested_filter(self, f: UserNestedFilterDTO) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if f.user_id is not None:
-            condition = self.convert_uuid_filter(
-                f.user_id,
-                equals_factory=AssignedUserConditions.by_user_id_equals,
-                in_factory=AssignedUserConditions.by_user_id_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
+    def _convert_role_source_filter(
+        self, f: RoleSourceFilterDTO | None, conditions: EnumConditions[InternalRoleSource]
+    ) -> list[QueryCondition]:
+        """The request-side source names carry the same values as the stored ones."""
+        if f is None:
+            return []
+        applied: list[QueryCondition] = []
+        if f.equals is not None:
+            applied.append(conditions.equals(InternalRoleSource(f.equals)))
+        if f.in_:
+            applied.append(conditions.in_([InternalRoleSource(s) for s in f.in_]))
+        if f.not_equals is not None:
+            applied.append(conditions.not_equals(InternalRoleSource(f.not_equals)))
+        if f.not_in:
+            applied.append(conditions.not_in([InternalRoleSource(s) for s in f.not_in]))
+        return applied
+
+    def _convert_role_status_filter(
+        self, f: RoleStatusFilterDTO | None, conditions: EnumConditions[InternalRoleStatus]
+    ) -> list[QueryCondition]:
+        """The request-side status names carry the same values as the stored ones."""
+        if f is None:
+            return []
+        applied: list[QueryCondition] = []
+        if f.equals is not None:
+            applied.append(conditions.equals(InternalRoleStatus(f.equals)))
+        if f.in_:
+            applied.append(conditions.in_([InternalRoleStatus(s) for s in f.in_]))
+        if f.not_equals is not None:
+            applied.append(conditions.not_equals(InternalRoleStatus(f.not_equals)))
+        if f.not_in:
+            applied.append(conditions.not_in([InternalRoleStatus(s) for s in f.not_in]))
+        return applied
+
+    def _convert_assigned_user_nested_filter(
+        self, f: UserNestedFilterDTO | None
+    ) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one assignment row."""
+        if f is None:
+            return []
+        row_conditions = self.apply_uuid_filter(
+            f.user_id, RoleAssignmentSearchableFields.own.user_id.filter
+        )
         conditions: list[QueryCondition] = []
-        if raw_conditions:
-            conditions.append(RoleConditions.by_assigned_user_id(raw_conditions))
+        if row_conditions:
+            conditions.append(DeprecatedRoleConditions.exists_assignment_combined(row_conditions))
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_user_nested_filter(sub))
+                conditions.extend(self._convert_assigned_user_nested_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_user_nested_filter(sub))
+                or_conditions.extend(self._convert_assigned_user_nested_filter(sub))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_user_nested_filter(sub))
+                not_conditions.extend(self._convert_assigned_user_nested_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _convert_mapped_scope_nested_filter(
-        self, f: MappedScopeNestedFilterDTO
+        self, f: MappedScopeNestedFilterDTO | None
     ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if f.scope_type is not None:
-            condition = self.convert_string_filter(
-                f.scope_type,
-                contains_factory=RoleConditions.by_scope_type_match.contains,
-                equals_factory=RoleConditions.by_scope_type_match.equals,
-                starts_with_factory=RoleConditions.by_scope_type_match.starts_with,
-                ends_with_factory=RoleConditions.by_scope_type_match.ends_with,
-                in_factory=RoleConditions.by_scope_type_match.in_,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if f.scope_id is not None:
-            condition = self.convert_uuid_filter(
-                f.scope_id,
-                equals_factory=RoleConditions.by_scope_id_equals,
-                in_factory=RoleConditions.by_scope_id_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        conditions: list[QueryCondition] = []
-        if raw_conditions:
-            conditions.append(RoleConditions.by_mapped_scope(raw_conditions))
+        """The scope a role is registered in sits in the role's own two columns."""
+        if f is None:
+            return []
+        fields = RoleSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
+            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_mapped_scope_nested_filter(sub))
@@ -1240,73 +1224,32 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_role_orders_gql(orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
+    def _convert_role_orders_gql(self, orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
+        fields = RoleSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "name":
-                result.append(RoleOrders.name(ascending))
+                result.append(fields.name.order.apply(ascending))
             elif o.field == "created_at":
-                result.append(RoleOrders.created_at(ascending))
+                result.append(fields.created_at.order.apply(ascending))
             elif o.field == "updated_at":
-                result.append(RoleOrders.updated_at(ascending))
+                result.append(fields.updated_at.order.apply(ascending))
         return result
 
     def _convert_role_nested_filter(self, f: RoleNestedFilterDTO) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if f.name is not None:
-            condition = self.convert_string_filter(
-                f.name,
-                contains_factory=RoleConditions.by_name_contains,
-                equals_factory=RoleConditions.by_name_equals,
-                starts_with_factory=RoleConditions.by_name_starts_with,
-                ends_with_factory=RoleConditions.by_name_ends_with,
-                in_factory=RoleConditions.by_name_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if f.source is not None:
-            src = f.source
-            if src.equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_source_equals(InternalRoleSource(src.equals))
-                )
-            if src.in_ is not None and src.in_:
-                raw_conditions.append(
-                    RoleConditions.by_sources([InternalRoleSource(s) for s in src.in_])
-                )
-            if src.not_equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_source_not_equals(InternalRoleSource(src.not_equals))
-                )
-            if src.not_in is not None and src.not_in:
-                raw_conditions.append(
-                    RoleConditions.by_source_not_in([InternalRoleSource(s) for s in src.not_in])
-                )
-        if f.status is not None:
-            st = f.status
-            if st.equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_status_equals(InternalRoleStatus(st.equals))
-                )
-            if st.in_ is not None and st.in_:
-                raw_conditions.append(
-                    RoleConditions.by_statuses([InternalRoleStatus(s) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_status_not_equals(InternalRoleStatus(st.not_equals))
-                )
-            if st.not_in is not None and st.not_in:
-                raw_conditions.append(
-                    RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
-                )
-        if f.mapped_scope is not None:
-            raw_conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
+        """Deprecated. Every condition lands in one EXISTS over the assignment's role."""
+        fields = RoleSearchableFields.own
+        row_conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self._convert_role_source_filter(f.source, fields.source.filter),
+            *self._convert_role_status_filter(f.status, fields.status.filter),
+        ]
         conditions: list[QueryCondition] = []
-        if raw_conditions:
-            conditions.append(AssignedUserConditions.exists_role_combined(raw_conditions))
+        if row_conditions:
+            conditions.append(
+                DeprecatedRoleAssignmentConditions.exists_role_combined(row_conditions)
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_nested_filter(sub))
@@ -1325,92 +1268,56 @@ class RBACAdapter(BaseAdapter):
         return conditions
 
     def _convert_permission_nested_filter(
-        self,
-        exists_factory: Callable[[list[QueryCondition]], QueryCondition],
-        f: PermissionNestedFilterDTO,
+        self, f: PermissionNestedFilterDTO
     ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if f.entity_type is not None:
-            condition = self.convert_string_filter(
-                f.entity_type,
-                contains_factory=ScopedPermissionConditions.by_entity_type_match.contains,
-                equals_factory=ScopedPermissionConditions.by_entity_type_match.equals,
-                starts_with_factory=ScopedPermissionConditions.by_entity_type_match.starts_with,
-                ends_with_factory=ScopedPermissionConditions.by_entity_type_match.ends_with,
-                in_factory=ScopedPermissionConditions.by_entity_type_match.in_,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if f.permission is not None:
-            raw_conditions.extend(
-                self._convert_permission_bit_filter(
-                    f.permission,
-                    equals_factory=ScopedPermissionConditions.by_permission_equals,
-                    not_equals_factory=ScopedPermissionConditions.by_permission_not_equals,
-                    in_factory=ScopedPermissionConditions.by_permission_in,
-                    not_in_factory=ScopedPermissionConditions.by_permission_not_in,
-                )
-            )
+        """Deprecated. Every condition lands in one EXISTS over one permission entry."""
+        fields = PermissionSearchableFields.own
+        row_conditions = [
+            *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
+            *(
+                self._convert_permission_bit_filter(f.permission, fields.permission.filter)
+                if f.permission is not None
+                else []
+            ),
+        ]
         conditions: list[QueryCondition] = []
-        if raw_conditions:
-            conditions.append(exists_factory(raw_conditions))
+        if row_conditions:
+            conditions.append(
+                DeprecatedRoleAssignmentConditions.exists_permission_combined(row_conditions)
+            )
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
+                conditions.extend(self._convert_permission_nested_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
+                or_conditions.extend(self._convert_permission_nested_filter(sub))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_nested_filter(exists_factory, sub))
+                not_conditions.extend(self._convert_permission_nested_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.role_id is not None:
-            condition = self.convert_uuid_filter(
-                f.role_id,
-                equals_factory=AssignedUserConditions.by_role_id_equals,
-                in_factory=AssignedUserConditions.by_role_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.role is not None:
-            conditions.extend(self._convert_role_nested_filter(f.role))
-        if f.permission is not None:
-            conditions.extend(
-                self._convert_permission_nested_filter(
-                    AssignedUserConditions.exists_permission_combined, f.permission
-                )
-            )
-        if f.username is not None:
-            condition = self.convert_string_filter(
-                f.username,
-                contains_factory=AssignedUserConditions.by_username_contains,
-                equals_factory=AssignedUserConditions.by_username_equals,
-                starts_with_factory=AssignedUserConditions.by_username_starts_with,
-                ends_with_factory=AssignedUserConditions.by_username_ends_with,
-                in_factory=AssignedUserConditions.by_username_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.email is not None:
-            condition = self.convert_string_filter(
-                f.email,
-                contains_factory=AssignedUserConditions.by_email_contains,
-                equals_factory=AssignedUserConditions.by_email_equals,
-                starts_with_factory=AssignedUserConditions.by_email_starts_with,
-                ends_with_factory=AssignedUserConditions.by_email_ends_with,
-                in_factory=AssignedUserConditions.by_email_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        """The searcher joins the assignment row to its user, so the user's columns
+        carry plain conditions rather than a subquery."""
+        fields = RoleAssignmentSearchableFields.own
+        user_fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.role_id, fields.role_id.filter),
+            *(self._convert_role_nested_filter(f.role) if f.role is not None else []),
+            *(
+                self._convert_permission_nested_filter(f.permission)
+                if f.permission is not None
+                else []
+            ),
+            *self.apply_string_filter(f.username, user_fields.username.filter),
+            *self.apply_string_filter(f.email, user_fields.email.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_assignment_filter(sub))
@@ -1428,17 +1335,20 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_assignment_orders(orders: list[RoleAssignmentOrderByDTO]) -> list[QueryOrder]:
+    def _convert_assignment_orders(
+        self, orders: list[RoleAssignmentOrderByDTO]
+    ) -> list[QueryOrder]:
+        fields = RoleAssignmentSearchableFields.own
+        user_fields = UserSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "username":
-                result.append(AssignedUserOrders.username(ascending))
+                result.append(user_fields.username.order.apply(ascending))
             elif o.field == "email":
-                result.append(AssignedUserOrders.email(ascending))
+                result.append(user_fields.email.order.apply(ascending))
             elif o.field == "granted_at":
-                result.append(AssignedUserOrders.granted_at(ascending))
+                result.append(fields.granted_at.order.apply(ascending))
         return result
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:

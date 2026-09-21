@@ -12474,7 +12474,20 @@ type Query {
   """
   Added in 26.3.0. List roles with filtering and pagination (admin only).
   """
-  adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
+  adminRoles(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    """
+    usedBy: RoleUsedBy = null
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection
 
   """
   Added in 26.3.0. List scoped permissions with filtering and pagination (admin only).
@@ -12552,10 +12565,38 @@ type Query {
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves.")
 
   """Added in 26.9.0. List the roles the current authenticated user holds."""
-  myRolesV2(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
+  myRolesV2(
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    """
+    usedBy: RoleUsedBy = null
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection
 
   """Added in 26.4.2. List roles registered in a project scope."""
-  projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
+  projectRoles(
+    projectId: UUID!
+
+    """
+    Added in 26.9.0. Entities whose use narrows the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    """
+    usedBy: RoleUsedBy = null
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]
@@ -14650,8 +14691,12 @@ type RoleAssignmentEdge {
 """Added in 26.3.0. Filter for role assignments"""
 input RoleAssignmentFilter {
   roleId: UUIDFilter = null
-  role: RoleAssignmentRoleNestedFilter = null
-  permission: PermissionNestedFilter = null
+
+  """Filter assignments by the role they name."""
+  role: RoleAssignmentRoleNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
+
+  """Filter assignments by the permissions their role carries."""
+  permission: PermissionNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
   username: StringFilter = null
   email: StringFilter = null
   AND: [RoleAssignmentFilter!] = null
@@ -14679,11 +14724,6 @@ input RoleAssignmentRoleNestedFilter {
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
-
-  """
-  Added in 26.9.0. Filter assignments by the scope their role is registered in. For listing assignments only — a role registered in a scope does not mean the caller holds anything there. Use `myScopePermissions` to decide.
-  """
-  mappedScope: RoleMappedScopeNestedFilter = null
   AND: [RoleAssignmentRoleNestedFilter!] = null
   OR: [RoleAssignmentRoleNestedFilter!] = null
   NOT: [RoleAssignmentRoleNestedFilter!] = null
@@ -14713,13 +14753,10 @@ input RoleFilter {
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
-  assignedUser: RoleUserNestedFilter = null
-  mappedScope: RoleMappedScopeNestedFilter = null
 
-  """
-  Added in 26.9.0. Filter roles by the permissions they carry. For listing roles only — a role carrying a bit does not mean the caller holds it. Use `myScopePermissions` to decide what the caller may do.
-  """
-  permission: PermissionNestedFilter = null
+  """Filter roles by the users holding them."""
+  assignedUser: RoleUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter reaching the rows that join a role to a user cannot check whether the caller may read that user. Search roles within that user's scope instead.")
+  mappedScope: RoleMappedScopeNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -15140,6 +15177,14 @@ input RoleStatusFilter {
 
   """Excludes roles whose status is in this list."""
   notIn: [RoleStatus!] = null
+}
+
+"""
+Added in 26.9.0. Entities whose use narrows a role query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only roles the caller can read are returned, even when a listed entity uses others.
+"""
+input RoleUsedBy {
+  """Role presets the roles were instantiated from."""
+  rolePreset: [UUID!] = null
 }
 
 """Added in 26.4.4. Filter roles by their user assignments."""

@@ -20277,80 +20277,6 @@
         "title": "MappedScopeNestedFilter",
         "type": "object"
       },
-      "PermissionNestedFilter": {
-        "description": "Nested filter for permissions within a role assignment.",
-        "properties": {
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "PermissionNestedFilter",
-        "type": "object"
-      },
       "RoleFilter": {
         "description": "Filter for roles.",
         "properties": {
@@ -20542,6 +20468,30 @@
         "title": "RoleStatusFilter",
         "type": "object"
       },
+      "RoleUsedBy": {
+        "description": "Entities whose use narrows the roles read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Roles the caller cannot read\nare left out even when a listed entity uses them.",
+        "properties": {
+          "role_preset": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Role presets the roles were instantiated from",
+            "title": "Role Preset"
+          }
+        },
+        "title": "RoleUsedBy",
+        "type": "object"
+      },
       "UserNestedFilter": {
         "description": "Filter roles by their user assignments.",
         "properties": {
@@ -20608,6 +20558,17 @@
       "SearchRolesInput": {
         "description": "Pagination search input for roles.",
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "filter": {
             "anyOf": [
               {
@@ -21220,6 +21181,80 @@
         "title": "RevokeRoleInput",
         "type": "object"
       },
+      "PermissionNestedFilter": {
+        "description": "Nested filter for permissions within a role assignment.",
+        "properties": {
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "PermissionNestedFilter",
+        "type": "object"
+      },
       "RoleAssignmentFilter": {
         "description": "Filter for role assignments.",
         "properties": {
@@ -21243,7 +21278,9 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "deprecated": true,
+            "description": "Filter by the role the assignment names. Deprecated: search roles first, then narrow by `role_id`."
           },
           "permission": {
             "anyOf": [
@@ -21254,7 +21291,9 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "deprecated": true,
+            "description": "Filter by the permissions the assignment's role carries. Deprecated: search roles by permission first, then narrow by `role_id`."
           },
           "username": {
             "anyOf": [
@@ -21374,17 +21413,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RoleStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "mapped_scope": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MappedScopeNestedFilter"
               },
               {
                 "type": "null"

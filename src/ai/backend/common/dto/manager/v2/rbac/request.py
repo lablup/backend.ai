@@ -53,6 +53,7 @@ __all__ = (
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
+    "RoleUsedBy",
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
@@ -301,9 +302,15 @@ class RoleFilter(BaseRequestModel):
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    assigned_user: UserNestedFilter | None = None
+    assigned_user: UserNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the users holding the role. Deprecated: read a user's roles "
+            "through the role search scoped to that user."
+        ),
+        deprecated=True,
+    )
     mapped_scope: MappedScopeNestedFilter | None = None
-    permission: PermissionNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -318,7 +325,6 @@ class RoleNestedFilter(BaseRequestModel):
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    mapped_scope: MappedScopeNestedFilter | None = None
     AND: list[RoleNestedFilter] | None = None
     OR: list[RoleNestedFilter] | None = None
     NOT: list[RoleNestedFilter] | None = None
@@ -331,8 +337,22 @@ class RoleAssignmentFilter(BaseRequestModel):
     """Filter for role assignments."""
 
     role_id: UUIDFilter | None = None
-    role: RoleNestedFilter | None = None
-    permission: PermissionNestedFilter | None = None
+    role: RoleNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the role the assignment names. Deprecated: search roles first, "
+            "then narrow by `role_id`."
+        ),
+        deprecated=True,
+    )
+    permission: PermissionNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the permissions the assignment's role carries. Deprecated: search "
+            "roles by permission first, then narrow by `role_id`."
+        ),
+        deprecated=True,
+    )
     username: StringFilter | None = None
     email: StringFilter | None = None
     AND: list[RoleAssignmentFilter] | None = None
@@ -413,9 +433,22 @@ class AdminSearchPermissionsGQLInput(BaseRequestModel):
     offset: int | None = None
 
 
+class RoleUsedBy(BaseRequestModel):
+    """Entities whose use narrows the roles read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Roles the caller cannot read
+    are left out even when a listed entity uses them.
+    """
+
+    role_preset: list[UUID] | None = Field(
+        default=None, description="Role presets the roles were instantiated from"
+    )
+
+
 class SearchRolesInput(BaseRequestModel):
     """Pagination search input for roles."""
 
+    used_by: RoleUsedBy | None = None
     filter: RoleFilter | None = None
     order: list[RoleOrderBy] | None = None
     first: int | None = None

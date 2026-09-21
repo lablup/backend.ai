@@ -19,7 +19,6 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
     ProjectRoleCount,
-    RoleListResult,
     RoleRevocationResult,
     UserRoleAssignmentInput,
     UserRoleRevocationData,
@@ -34,6 +33,9 @@ from ai.backend.manager.errors.permission import (
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -41,7 +43,6 @@ from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssign
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -212,7 +213,7 @@ class PermissionDBSource:
                     sa.select(PermissionRow).where(PermissionRow.role_id == role_id)
                 )
             ).all()
-        return [row.to_data() for row in rows]
+        return [PermissionSearchableFields.own.to_data(row) for row in rows]
 
     async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
         async with self._db.begin_readonly_session_read_committed() as db_session:
@@ -221,31 +222,6 @@ class PermissionDBSource:
             except RoleNotFound:
                 return None
             return result
-
-    async def search_roles_in_scope(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> RoleListResult:
-        """Search the roles the named scopes reach, combined with OR."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(RoleRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=scopes,
-            )
-
-            items = [row.RoleRow.to_data() for row in result.rows]
-
-            return RoleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleRow:
         """Get the role a detail read answers with."""

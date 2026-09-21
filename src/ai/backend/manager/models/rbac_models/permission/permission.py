@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.bit import single_bit
-from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
+from ai.backend.manager.data.permission.permission import PermissionCreator
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.base import (
     GUID,
@@ -68,13 +68,4 @@ class PermissionRow(CreatedAtMixin, Base):
             role_id=input.role_id,
             entity_type=input.entity_type,
             permission=single_bit(input.permission),
-        )
-
-    def to_data(self) -> PermissionData:
-        return PermissionData(
-            id=self.id,
-            role_id=self.role_id,
-            entity_type=self.entity_type,
-            permission=self.permission,
-            created_at=self.created_at,
         )

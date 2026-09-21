@@ -9,7 +9,7 @@ from __future__ import annotations
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     BulkAddRolePermissionPresetsInput,
     BulkRemoveRolePermissionPresetsInput,
@@ -57,22 +57,20 @@ from ai.backend.manager.data.role_preset.types import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.rbac_models.role_permission_preset.conditions import (
-    RolePermissionPresetConditions,
-)
 from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
     RolePermissionPresetCreator,
-)
-from ai.backend.manager.models.rbac_models.role_permission_preset.orders import (
-    RolePermissionPresetOrders,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.rbac_models.role_preset.conditions import RolePresetConditions
+from ai.backend.manager.models.rbac_models.role_permission_preset.searchable_fields import (
+    RolePermissionPresetSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
-from ai.backend.manager.models.rbac_models.role_preset.orders import RolePresetOrders
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePermissionPresetSearcher,
     RolePresetSearcher,
@@ -103,14 +101,14 @@ from ai.backend.manager.types import OptionalState
 
 def _role_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RolePresetOrders.created_at(ascending=False),
+        forward_order=RolePresetSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=RolePresetRow.id,
     )
 
 
 def _role_permission_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RolePermissionPresetOrders.id(ascending=False),
+        forward_order=RolePermissionPresetSearchableFields.own.id.order.apply(ascending=False),
         cursor_column=RolePermissionPresetRow.id,
     )
 
@@ -158,7 +156,7 @@ class RolePresetAdapter(BaseAdapter):
         # top-level ``deleted`` filter.
         base_conditions: list[QueryCondition] = []
         if input.filter is None or input.filter.deleted is None:
-            base_conditions.append(RolePresetConditions.by_deleted(False))
+            base_conditions.append(RolePresetSearchableFields.own.deleted.filter.equals(False))
         searcher = self._build_searcher(
             RolePresetSearcher,
             conditions=[*base_conditions, *conditions],
@@ -294,7 +292,7 @@ class RolePresetAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._role_preset.search_permission_presets.run(
-            SearchRolePermissionPresetsAction(preset_id=role_preset_id, searcher=searcher)
+            SearchRolePermissionPresetsAction(preset_ids=[role_preset_id], searcher=searcher)
         )
         return SearchRolePermissionPresetsPayload(
             items=[self._permission_data_to_node(d) for d in result.items],
@@ -344,33 +342,13 @@ class RolePresetAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter_: RolePresetFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.name is not None:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=RolePresetConditions.by_name_contains,
-                equals_factory=RolePresetConditions.by_name_equals,
-                starts_with_factory=RolePresetConditions.by_name_starts_with,
-                ends_with_factory=RolePresetConditions.by_name_ends_with,
-                in_factory=RolePresetConditions.by_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.scope_type is not None:
-            cond = self.convert_string_filter(
-                filter_.scope_type,
-                contains_factory=RolePresetConditions.by_scope_type_match.contains,
-                equals_factory=RolePresetConditions.by_scope_type_match.equals,
-                starts_with_factory=RolePresetConditions.by_scope_type_match.starts_with,
-                ends_with_factory=RolePresetConditions.by_scope_type_match.ends_with,
-                in_factory=RolePresetConditions.by_scope_type_match.in_,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.auto_assign is not None:
-            conditions.append(RolePresetConditions.by_auto_assign(filter_.auto_assign))
-        if filter_.deleted is not None:
-            conditions.append(RolePresetConditions.by_deleted(filter_.deleted))
+        fields = RolePresetSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
+            *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
+            *self.apply_bool_filter(filter_.deleted, fields.deleted.filter),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -389,18 +367,19 @@ class RolePresetAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[RolePresetOrder]) -> list[QueryOrder]:
+        fields = RolePresetSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field:
                 case RolePresetOrderField.NAME:
-                    result.append(RolePresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case RolePresetOrderField.SCOPE_TYPE:
-                    result.append(RolePresetOrders.scope_type(ascending))
+                    result.append(fields.scope_type.order.apply(ascending))
                 case RolePresetOrderField.CREATED_AT:
-                    result.append(RolePresetOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case RolePresetOrderField.UPDATED_AT:
-                    result.append(RolePresetOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
         return result
 
     def _convert_permission_filter(
@@ -408,52 +387,12 @@ class RolePresetAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         # ``role_preset_id`` is intentionally ignored here: the parent preset scope
         # is enforced as a base condition by the caller, so it cannot be widened.
-        conditions: list[QueryCondition] = []
-        if filter_.entity_type is not None:
-            cond = self.convert_string_filter(
-                filter_.entity_type,
-                contains_factory=RolePermissionPresetConditions.by_entity_type_match.contains,
-                equals_factory=RolePermissionPresetConditions.by_entity_type_match.equals,
-                starts_with_factory=RolePermissionPresetConditions.by_entity_type_match.starts_with,
-                ends_with_factory=RolePermissionPresetConditions.by_entity_type_match.ends_with,
-                in_factory=RolePermissionPresetConditions.by_entity_type_match.in_,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.permission is not None:
-            f_bit = filter_.permission
-            if f_bit.equals is not None:
-                conditions.append(
-                    RolePermissionPresetConditions.by_permission_equals(
-                        f_bit.equals.to_permission()
-                    )
-                )
-            if f_bit.not_equals is not None:
-                conditions.append(
-                    RolePermissionPresetConditions.by_permission_not_equals(
-                        f_bit.not_equals.to_permission()
-                    )
-                )
-            if f_bit.in_:
-                conditions.append(
-                    RolePermissionPresetConditions.by_permission_in([
-                        v.to_permission() for v in f_bit.in_
-                    ])
-                )
-            if f_bit.not_in:
-                conditions.append(
-                    RolePermissionPresetConditions.by_permission_not_in([
-                        v.to_permission() for v in f_bit.not_in
-                    ])
-                )
-        if filter_.created_at is not None:
-            cond = filter_.created_at.build_query_condition(
-                before_factory=RolePermissionPresetConditions.by_created_at_before,
-                after_factory=RolePermissionPresetConditions.by_created_at_after,
-                equals_factory=RolePermissionPresetConditions.by_created_at_equals,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = RolePermissionPresetSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter_.entity_type, fields.entity_type.filter),
+            *self._convert_permission_bit_filter(filter_.permission),
+            *self.apply_datetime_filter(filter_.created_at, fields.created_at.filter),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -471,19 +410,38 @@ class RolePresetAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conds))
         return conditions
 
+    def _convert_permission_bit_filter(
+        self, bit_filter: PermissionBitFilter | None
+    ) -> list[QueryCondition]:
+        """Each operation the caller set, on the entry's one permission bit."""
+        if bit_filter is None:
+            return []
+        conditions = RolePermissionPresetSearchableFields.own.permission.filter
+        applied: list[QueryCondition] = []
+        if bit_filter.equals is not None:
+            applied.append(conditions.equals(bit_filter.equals.to_permission()))
+        if bit_filter.not_equals is not None:
+            applied.append(conditions.not_equals(bit_filter.not_equals.to_permission()))
+        if bit_filter.in_:
+            applied.append(conditions.in_([v.to_permission() for v in bit_filter.in_]))
+        if bit_filter.not_in:
+            applied.append(conditions.not_in([v.to_permission() for v in bit_filter.not_in]))
+        return applied
+
     def _convert_permission_orders(
         self, orders: list[RolePermissionPresetOrder]
     ) -> list[QueryOrder]:
+        fields = RolePermissionPresetSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field:
                 case RolePermissionPresetOrderField.ENTITY_TYPE:
-                    result.append(RolePermissionPresetOrders.entity_type(ascending))
+                    result.append(fields.entity_type.order.apply(ascending))
                 case RolePermissionPresetOrderField.PERMISSION:
-                    result.append(RolePermissionPresetOrders.permission(ascending))
+                    result.append(fields.permission.order.apply(ascending))
                 case RolePermissionPresetOrderField.CREATED_AT:
-                    result.append(RolePermissionPresetOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
         return result
 
     @staticmethod

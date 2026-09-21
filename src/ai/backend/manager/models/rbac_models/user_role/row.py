@@ -12,8 +12,6 @@ from sqlalchemy.orm import (
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
-    AssignedUserData,
-    UserRoleAssignmentData,
     UserRoleAssignmentInput,
 )
 from ai.backend.manager.models.base import (
@@ -47,23 +45,6 @@ class UserRoleRow(Base):
     granted_at: Mapped[datetime] = mapped_column(
         "granted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-
-    def to_data(self) -> UserRoleAssignmentData:
-        return UserRoleAssignmentData(
-            id=self.id,
-            user_id=self.user_id,
-            role_id=self.role_id,
-            granted_by=self.granted_by,
-        )
-
-    def to_assigned_user_data(self) -> AssignedUserData:
-        return AssignedUserData(
-            id=self.id,
-            user_id=self.user_id,
-            role_id=self.role_id,
-            granted_by=self.granted_by,
-            granted_at=self.granted_at,
-        )
 
     @classmethod
     def from_input(cls, input: UserRoleAssignmentInput) -> UserRoleRow:

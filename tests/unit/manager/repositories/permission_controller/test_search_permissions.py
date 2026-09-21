@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.agent import AgentRow
@@ -27,13 +28,10 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.permission.conditions import (
-    ScopedPermissionConditions,
-)
-from ai.backend.manager.models.rbac_models.permission.orders import (
-    ScopedPermissionOrders,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -136,7 +134,11 @@ class TestSearchPermissions:
     ) -> None:
         searcher = RolePermissionSearcher(
             conditions=[
-                ScopedPermissionConditions.by_entity_type(VFolderEntityType()),
+                PermissionSearchableFields.own.entity_type.filter.equals(
+                    StringMatchSpec(
+                        value=str(VFolderEntityType()), case_insensitive=False, negated=False
+                    )
+                ),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
@@ -155,7 +157,7 @@ class TestSearchPermissions:
     ) -> None:
         searcher = RolePermissionSearcher(
             conditions=[],
-            orders=[ScopedPermissionOrders.entity_type(ascending=True)],
+            orders=[PermissionSearchableFields.own.entity_type.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
