@@ -3,6 +3,9 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from ai.backend.common.dependencies import DependencyBuilderStack
+from ai.backend.manager.clients.container_registry.harbor import (
+    ContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.dependencies.domain.composer import (
     DomainComposer,
     DomainInput,
@@ -21,7 +24,7 @@ class TestDomainComposer:
         mock_create_lock: MagicMock,
         mock_repos_class: MagicMock,
     ) -> None:
-        """DomainComposer should initialize all three domain dependencies."""
+        """DomainComposer should initialize all four domain dependencies."""
         # Setup mocks
         mock_nc = MagicMock()
         mock_nc.close = AsyncMock()
@@ -51,6 +54,9 @@ class TestDomainComposer:
             resources = await stack.enter_composer(composer, domain_input)
 
             assert resources.notification_center is mock_nc
+            assert isinstance(
+                resources.registry_quota_client_pool, ContainerRegistryQuotaClientPool
+            )
             assert resources.distributed_lock_factory is mock_factory
             assert resources.repositories is mock_repos
 

@@ -12,9 +12,6 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
-from ai.backend.manager.clients.container_registry.harbor import (
-    ContainerRegistryQuotaClientPool,
-)
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -43,7 +40,6 @@ from .agent_client_pool import AgentClientPoolDependency, AgentClientPoolInput
 from .appproxy_client_pool import AppProxyClientPoolDependency
 from .deployment_controller import DeploymentControllerDependency, DeploymentControllerInput
 from .registry import AgentRegistryDependency, AgentRegistryInput
-from .registry_quota_client_pool import RegistryQuotaClientPoolDependency
 from .route_controller import RouteControllerDependency, RouteControllerInput
 from .scheduling_controller import SchedulingControllerDependency, SchedulingControllerInput
 
@@ -87,7 +83,6 @@ class AgentsResources:
     route_controller: RouteController
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
-    registry_quota_client_pool: ContainerRegistryQuotaClientPool
     registry: AgentRegistry
 
 
@@ -165,13 +160,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             None,
         )
 
-        # 7. Registry quota client pool
-        registry_quota_client_pool = await stack.enter_dependency(
-            RegistryQuotaClientPoolDependency(),
-            None,
-        )
-
-        # 8. Agent registry
+        # 7. Agent registry
         registry = await stack.enter_dependency(
             AgentRegistryDependency(),
             AgentRegistryInput(
@@ -203,6 +192,5 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             route_controller=route_controller,
             agent_client_pool=agent_client_pool,
             appproxy_client_pool=appproxy_client_pool,
-            registry_quota_client_pool=registry_quota_client_pool,
             registry=registry,
         )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ai.backend.manager.dependencies.agents.registry_quota_client_pool import (
+from ai.backend.manager.dependencies.domain.registry_quota_client_pool import (
     RegistryQuotaClientPoolDependency,
 )
 
@@ -11,7 +11,7 @@ class TestRegistryQuotaClientPoolDependency:
     """Test RegistryQuotaClientPoolDependency lifecycle."""
 
     @patch(
-        "ai.backend.manager.dependencies.agents.registry_quota_client_pool"
+        "ai.backend.manager.dependencies.domain.registry_quota_client_pool"
         ".ContainerRegistryQuotaClientPool"
     )
     async def test_provide_registry_quota_client_pool(

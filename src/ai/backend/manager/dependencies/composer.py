@@ -328,7 +328,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 agent_cache=components.agent_cache,
                 notification_center=domain.notification_center,
                 appproxy_client_pool=agents.appproxy_client_pool,
-                registry_quota_client_pool=agents.registry_quota_client_pool,
+                registry_quota_client_pool=domain.registry_quota_client_pool,
                 prometheus_client=system.prometheus_client,
                 # BgtaskRegistry creation
                 agent_client_pool=agents.agent_client_pool,

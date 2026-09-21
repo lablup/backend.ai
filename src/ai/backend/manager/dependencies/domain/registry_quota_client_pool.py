@@ -4,14 +4,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import override
 
-from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.clients.container_registry.harbor import (
     ContainerRegistryQuotaClientPool,
 )
 
+from .base import DomainDependency
+
 
 class RegistryQuotaClientPoolDependency(
-    NonMonitorableDependencyProvider[None, ContainerRegistryQuotaClientPool],
+    DomainDependency[None, ContainerRegistryQuotaClientPool],
 ):
     """Provides ContainerRegistryQuotaClientPool lifecycle management."""
 
