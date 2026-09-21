@@ -15,19 +15,19 @@ from ai.backend.common.data.entity.container_registry import (
 )
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
-from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import ContainerRegistryNotFound, ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.queries import user_scope_reaches
@@ -38,6 +38,7 @@ from ai.backend.manager.models.virtual_entity.queries import scope_membership_ex
 __all__ = (
     "ContainerRegistryImageTarget",
     "DomainImageTarget",
+    "ImageAliasTarget",
     "ImageTarget",
     "ProjectImageTarget",
     "PublicImageTarget",
@@ -242,3 +243,34 @@ class VisibleImageTarget(ImageTarget):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         # The id comes from the session, and the RBAC gate already answered for it.
         return ()
+
+
+@dataclass(frozen=True)
+class ImageAliasTarget(ScopeTarget):
+    """The aliases one image holds."""
+
+    image_id: ImageID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.image_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        image_id = self.image_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageAliasRow.image_id == image_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=ImageRow.id,
+                value=self.image_id,
+                error=ImageNotFound(str(self.image_id)),
+            ),
+        ]
