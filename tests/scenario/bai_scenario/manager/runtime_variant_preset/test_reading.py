@@ -21,6 +21,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -172,11 +173,14 @@ class AnIdNothingAnswersToIsNotFound(
 ):
     @override
     def summary(self) -> str:
-        return "reading-a-preset-id-nothing-answers-to-is-not-found"
+        return "reading-a-preset-id-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 ID로 조회하면 대상을 찾을 수 없어 요청이 거부된다"
+        return (
+            "존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 "
+            "닿지 못하는 것인지는 응답으로 드러나지 않는다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
@@ -190,7 +194,7 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)

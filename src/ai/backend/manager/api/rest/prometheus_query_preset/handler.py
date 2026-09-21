@@ -27,6 +27,10 @@ from ai.backend.manager.data.prometheus_query_preset import (
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
+from ai.backend.manager.models.prometheus_query_preset.scopes import (
+    PublicPrometheusQueryPresetTarget,
+)
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.prometheus_query_preset.actions.create import (
     CreatePresetAction,
 )
@@ -39,8 +43,8 @@ from ai.backend.manager.services.prometheus_query_preset.actions.get import (
 from ai.backend.manager.services.prometheus_query_preset.actions.purge import (
     PurgePresetAction,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions.search import (
-    SearchPresetsAction,
+from ai.backend.manager.services.prometheus_query_preset.actions.scoped_search import (
+    ScopedSearchPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.update import (
     UpdatePresetAction,
@@ -88,8 +92,12 @@ class PrometheusQueryPresetHandler:
     ) -> APIResponse:
         """Search presets with filters, orders, and pagination."""
         searcher = self._adapter.build_searcher(body.parsed)
-        action_result = await self._processor.public_search_presets.run(
-            SearchPresetsAction(searcher=searcher)
+        action_result = await self._processor.scoped_search_presets.run(
+            ScopedSearchPresetsAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicPrometheusQueryPresetTarget()], used_by=(), searcher=searcher
+                )
+            )
         )
         resp = SearchQueryDefinitionsResponse(
             items=[
@@ -108,7 +116,7 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Get a preset by ID."""
-        action_result = await self._processor.public_get_preset.run(
+        action_result = await self._processor.get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
         resp = GetQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))

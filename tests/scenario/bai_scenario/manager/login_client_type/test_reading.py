@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -80,12 +80,12 @@ class AUserGrantedNothingReadsById(
 
 
 @dataclass(frozen=True)
-class AnIdNothingAnswersToIsNotFound(
+class AnIdNothingAnswersToIsRefused(
     Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
-        return "reading-a-login-client-type-id-nothing-answers-to-is-not-found"
+        return "reading-a-login-client-type-id-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
@@ -101,12 +101,12 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[ATypeAndACaller, LoginClientTypeNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 SCENARIOS: list[ReadingStep] = [
     AUserGrantedNothingReadsById(started=datetime.now(UTC)),
-    AnIdNothingAnswersToIsNotFound(),
+    AnIdNothingAnswersToIsRefused(),
 ]
 
 

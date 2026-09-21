@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-adapter-scenarios
 type: reference
-description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the reads open to every authenticated user, the bulk delete that answers per id
+description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the reads answered in the public scope, the bulk delete that answers per id
 scope: src/ai/backend/manager/api/adapters/runtime_variant
 keywords: [runtime variant, scenario, adapter, superadmin, public read, lookup, bulk delete, partial bulk purge]
 generated:
@@ -9,7 +9,7 @@ generated:
   at: 2026-09-11
 updated:
   by: claude-code/opus-5
-  at: 2026-09-18
+  at: 2026-09-21
 status: draft
 ---
 # runtime_variant 어댑터 — 시나리오
@@ -17,11 +17,11 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
 의심한다.
 
-`runtime_variant` 행은 어느 스코프에도 속하지 않게 만들어진다. 생성은 호출한 사용자가 슈퍼관리자인지
-검사하고, 하나를 지정해 수정·삭제하는 호출은 그 `runtime_variant` 행에 부여된 권한을 검사한다. 그런데
-역할은 스코프에 속하고 `runtime_variant` 행은 어느 스코프에도 없으므로, 그 권한을 받을 방법이
-없다. 생성과 수정·삭제 모두 슈퍼관리자만 통과하지만 거부 이유가 서로 다르다. id 조회, 이름을 id로
-변환, 여러 id 조회는 어떤 검사도 없이 인증만 확인한다.
+`runtime_variant` 행은 global 과 public 양쪽에 소속되어 만들어진다. 생성은 호출한 사용자가
+슈퍼관리자인지 검사하고, 하나를 지정해 수정·삭제하는 호출은 그 `runtime_variant` 행에 부여된 권한을
+검사한다. 그 권한은 global 에서만 나오므로 슈퍼관리자만 통과하며, 생성과 수정·삭제의 거부 이유는
+서로 다르다. id 조회, 이름을 id로 변환, 여러 id 조회, 검색은 public 에서 READ 를 검사한다. 모든
+계정이 public 소속 역할을 자동으로 받으므로 로그인한 사용자는 모두 읽을 수 있다.
 
 `runtime_variant` 하위의 preset은 자기 어댑터를 가지므로 `../runtime_variant_preset/KNOWLEDGE.md`에
 있다.
@@ -47,20 +47,20 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 아무 권한도 없는 사용자가 id로 조회한다 | `runtime_variant` 하나, 아무 권한도 없음 | id로 조회 | 그 `runtime_variant` 노드 전체 |
-| 존재하지 않는 id로 조회한다 | 다른 `runtime_variant` 행만 있음 | id로 조회 | 대상을 찾을 수 없어 거부 |
-| 이름으로 id를 얻는다 | `runtime_variant` 하나, 아무 권한도 없음 | 이름을 id로 변환 | 그 `runtime_variant` 행의 id |
-| 존재하지 않는 이름을 변환한다 | 다른 `runtime_variant` 행만 있음 | 이름을 id로 변환 | 대상을 찾을 수 없어 거부 |
-| 있는 것과 없는 것을 섞어 조회한다 | `runtime_variant` 둘, 아무 권한도 없음 | 세 id를 한 번에 | 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다 |
+| public 에서 읽는 사용자가 id로 조회한다 | `runtime_variant` 하나, public 조회 권한만 있음 | id로 조회 | 그 `runtime_variant` 노드 전체 |
+| 존재하지 않는 id로 조회한다 | 다른 `runtime_variant` 행만 있음 | id로 조회 | 권한 부족으로 거부 |
+| 이름으로 id를 얻는다 | `runtime_variant` 하나, public 조회 권한만 있음 | 이름을 id로 변환 | 그 `runtime_variant` 행의 id |
+| 존재하지 않는 이름을 변환한다 | 다른 `runtime_variant` 행만 있음 | 이름을 id로 변환 | 잘못된 요청으로 거부 |
+| 있는 것과 없는 것을 섞어 조회한다 | `runtime_variant` 둘, public 조회 권한만 있음 | 세 id를 한 번에 | 요청한 순서대로 반환되고, 없는 id에 해당하는 항목에는 거부가 담긴다 |
 | 빈 목록을 준다 | `runtime_variant` 하나 | 빈 id 목록 | 빈 응답. 하위 계층을 호출하지 않는다 |
 
-조회에는 권한 검사가 없다. 아무 권한도 없는 사용자가 성공하는 시나리오가 그것을 증명하므로, 이
-절에는 권한 부족으로 거부되는 시나리오가 없다. 그에 대응하는 시나리오는 생성 절의 역할 부족으로
-거부되는 시나리오다. 같은 사용자가 조회는 할 수 있고 생성은 할 수 없다.
+조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자가 성공하는 시나리오가 그것을
+증명한다. 같은 사용자가 조회는 할 수 있고 생성은 할 수 없다. 그에 대응하는 거부 시나리오는 생성
+절의 역할 부족으로 거부되는 시나리오다.
 
-이름을 id로 변환하는 호출에는 뒤따르는 권한 검사가 없다. 그래서 존재하지 않는 이름은 그대로
-대상을 찾을 수 없어 거부된다. 권한 검사가 뒤따르는 변환은 존재하지 않는 키와 접근할 수 없는 키를
-같은 이유로 거부하지만, 이 변환은 그 경우에 해당하지 않는다.
+존재하지 않는 id와 닿을 수 없는 id는 같은 이유로 거부된다. 권한 검사가 먼저 실행되는데 없는 행에는
+부여된 권한도 없기 때문이다. 이름을 id로 변환하는 호출도 변환한 대상에 권한 검사가 뒤따르므로,
+존재하지 않는 이름과 접근할 수 없는 이름을 같은 이유로 거부한다.
 
 인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
 

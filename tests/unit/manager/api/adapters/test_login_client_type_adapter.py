@@ -25,7 +25,7 @@ from ai.backend.manager.models.specs.pagination import (
 @pytest.fixture
 def processors() -> MagicMock:
     processors = MagicMock()
-    processors.public_search.run = AsyncMock(
+    processors.scoped_search.run = AsyncMock(
         return_value=BatchOpsResult(
             items=[], total_count=0, has_next_page=False, has_previous_page=False
         )
@@ -65,7 +65,7 @@ async def test_search_pages_by_the_cursor_it_is_given(
 ) -> None:
     await adapter.search(case.input)
 
-    pagination = processors.public_search.run.call_args.args[0].searcher.pagination
+    pagination = processors.scoped_search.run.call_args.args[0].searcher.searcher.pagination
     assert isinstance(pagination, (CursorForwardPagination, CursorBackwardPagination))
     assert type(pagination) is case.pagination_type
     assert pagination.cursor_condition is not None
@@ -102,7 +102,7 @@ async def test_search_pages_by_offset(
 ) -> None:
     await adapter.search(case.input)
 
-    pagination = processors.public_search.run.call_args.args[0].searcher.pagination
+    pagination = processors.scoped_search.run.call_args.args[0].searcher.searcher.pagination
     assert pagination == case.expected
 
 
@@ -113,4 +113,4 @@ async def test_search_refuses_two_pagination_modes(
     with pytest.raises(InvalidGraphQLParameters):
         await adapter.search(SearchLoginClientTypesInput(first=1, limit=1))
 
-    processors.public_search.run.assert_not_awaited()
+    processors.scoped_search.run.assert_not_awaited()

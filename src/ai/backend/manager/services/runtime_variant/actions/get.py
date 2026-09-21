@@ -15,14 +15,14 @@ from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 @dataclass
 class GetRuntimeVariantAction(GetSingleEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]):
-    """Read one runtime variant; every authenticated user may."""
+    """Read one runtime variant."""
 
     variant_id: RuntimeVariantID
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_get_runtime_variant"
+        return "get_runtime_variant"
 
     @override
     def entity_id(self) -> EntityIdentifier:

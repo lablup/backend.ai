@@ -193,18 +193,18 @@ class AUserGrantedNothingMayNotRun(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-who-may-read-a-preset-may-not-run-it"
+        return "a-user-granted-nothing-may-not-run-a-preset"
 
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 없는 사용자는 프리셋을 조회할 수 있지만 실행하면 권한 부족으로 "
-            "거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 역할로는 권한을 받을 방법이 없다"
+            "아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 "
+            "같은 권한을 묻는다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, APresetAndACaller]:
-        return APresetAndSomeone()
+        return APresetAndSomeone(reading_in_public=False)
 
     @override
     def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:

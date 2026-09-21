@@ -78,13 +78,13 @@ class TheLaidAndTheUnknownComeBackInOrder(
 ):
     @override
     def summary(self) -> str:
-        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap"
+        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal"
 
     @override
     def describe(self) -> str:
         return (
             "카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
-            "빈 항목으로 반환되고 순서가 요청한 순서와 같다"
+            "거부로 반환되고 순서가 요청한 순서와 같다"
         )
 
     @override

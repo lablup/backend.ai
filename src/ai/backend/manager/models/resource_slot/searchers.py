@@ -17,6 +17,9 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -28,7 +31,7 @@ class ResourceSlotTypeSearcher(Searcher[ResourceSlotTypeRow, ResourceSlotTypeDat
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return row.to_data()
+        return ResourceSlotTypeSearchableFields.own.to_data(row)
 
 
 @dataclass

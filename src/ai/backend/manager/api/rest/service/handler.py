@@ -26,6 +26,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.model_serving.request import (
     ListServeRequestModel,
     NewServiceRequestModel,
@@ -82,9 +83,13 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
-from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
+from ai.backend.manager.models.runtime_variant.scopes import PublicRuntimeVariantTarget
+from ai.backend.manager.models.runtime_variant.searchable_fields import (
+    RuntimeVariantSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
 )
@@ -134,8 +139,8 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 from ai.backend.manager.services.runtime_variant.actions.lookup import (
     LookupRuntimeVariantAction,
 )
-from ai.backend.manager.services.runtime_variant.actions.search import (
-    SearchRuntimeVariantsAction,
+from ai.backend.manager.services.runtime_variant.actions.scoped_search import (
+    ScopedSearchRuntimeVariantsAction,
 )
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 
@@ -239,10 +244,18 @@ class ServiceHandler:
         """
         searcher = RuntimeVariantSearcher(
             pagination=OffsetPagination(limit=1),
-            conditions=[RuntimeVariantConditions.by_ids([runtime_variant_id])],
+            conditions=[
+                RuntimeVariantSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=[runtime_variant_id], negated=False)
+                )
+            ],
         )
-        result = await self._runtime_variant.public_search.run(
-            SearchRuntimeVariantsAction(searcher=searcher)
+        result = await self._runtime_variant.scoped_search.run(
+            ScopedSearchRuntimeVariantsAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicRuntimeVariantTarget()], used_by=(), searcher=searcher
+                )
+            )
         )
         if not result.items:
             raise RuntimeVariantNotFound()
@@ -681,9 +694,7 @@ class ServiceHandler:
         Uses the dedicated ``resolve_by_name`` processor added for the
         legacy → id migration; v2 surface callers skip this step.
         """
-        result = await self._runtime_variant.public_lookup.run(
-            LookupRuntimeVariantAction(name=str(name))
-        )
+        result = await self._runtime_variant.lookup.run(LookupRuntimeVariantAction(name=str(name)))
         return result.entity_id()
 
     @staticmethod

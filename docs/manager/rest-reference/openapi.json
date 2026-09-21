@@ -8231,8 +8231,44 @@
         "title": "DeploymentRevisionPresetOrderField",
         "type": "string"
       },
+      "DeploymentRevisionPresetUsedBy": {
+        "description": "Entities whose use narrows the presets read; every id is AND-ed.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose revisions name the preset",
+            "title": "Deployment"
+          }
+        },
+        "title": "DeploymentRevisionPresetUsedBy",
+        "type": "object"
+      },
       "SearchDeploymentRevisionPresetsInput": {
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentRevisionPresetUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller."
+          },
           "filter": {
             "anyOf": [
               {
@@ -26440,8 +26476,44 @@
         "title": "RuntimeVariantOrderField",
         "type": "string"
       },
+      "RuntimeVariantUsedBy": {
+        "description": "Entities whose use narrows the runtime variants read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose revisions name the runtime variant",
+            "title": "Deployment"
+          }
+        },
+        "title": "RuntimeVariantUsedBy",
+        "type": "object"
+      },
       "SearchRuntimeVariantsInput": {
         "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeVariantUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use narrows the result. Each listed entity must be readable by the caller."
+          },
           "filter": {
             "anyOf": [
               {

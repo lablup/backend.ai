@@ -15,10 +15,10 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     SearchQueryDefinitionsPayload,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -152,7 +152,7 @@ class OnlyTheNamedOneIsFound(Then[ManyPresetsAndACaller, Searched]):
     def look(self, laid: ManyPresetsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
         page = answered.response
         if page is None:
-            return [Refused(UserNotFound, answered.raised)]
+            return [Refused(UnreachableError, answered.raised)]
         return [
             Same("items", [one.name for one in page.items], [laid.named.name]),
             Same("total_count", page.total_count, 1),
@@ -271,7 +271,7 @@ class NobodyMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다"
+        return "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다"
 
     @override
     def given(self) -> Given[SeedingSession, APresetAlone]:
@@ -283,7 +283,7 @@ class NobodyMayNotSearch(
 
     @override
     def then(self) -> Then[APresetAlone, Searched]:
-        return TheCallIsRefused(UserNotFound)
+        return TheCallIsRefused(UnreachableError)
 
 
 SCENARIOS: list[SearchingStep] = [

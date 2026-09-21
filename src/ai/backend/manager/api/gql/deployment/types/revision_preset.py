@@ -95,6 +95,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    DeploymentRevisionPresetUsedBy,
     PresetModelConfigInfoDTO,
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
@@ -536,6 +537,24 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     NOT: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Entities whose use narrows a deployment preset query; every id is AND-ed. The "
+            "caller must be able to read each listed entity, or the request is refused."
+        ),
+    ),
+    name="DeploymentRevisionPresetUsedBy",
+)
+class DeploymentRevisionPresetUsedByGQL(PydanticInputMixin[DeploymentRevisionPresetUsedBy]):
+    """The entities whose use of a preset narrows the read."""
+
+    deployment: list[UUID] | None = gql_field(
+        default=None, description="Deployments whose revisions name the preset."
     )
 
 

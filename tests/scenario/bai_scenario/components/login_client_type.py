@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     DeleteLoginClientTypePayload,
@@ -32,7 +33,12 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.components.system import (
+    KEPT,
+    Kept,
+    lay_a_public_reader,
+    role_named,
+)
 from bai_scenario.seeds.login_client_type.login_client_type import SeedLoginClientType
 
 DESCRIBED = "미리 만들어 둔 로그인 클라이언트 종류"
@@ -69,7 +75,7 @@ class ATypeAndSomeone(Given[Any, ATypeAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ATypeAndACaller:
         client_type = await seeding.creating(SeedLoginClientType(description=DESCRIBED))
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, LoginClientTypeEntityType(), self.role)
         return ATypeAndACaller(seeding.made(client_type), seeding.made(caller))
 
 
@@ -91,7 +97,7 @@ class ManyTypesAndSomeone(Given[Any, ManyTypesAndACaller]):
             await seeding.creating(SeedLoginClientType(name_hint="other"))
             for _ in range(self.besides)
         ]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, LoginClientTypeEntityType(), self.role)
         return ManyTypesAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),

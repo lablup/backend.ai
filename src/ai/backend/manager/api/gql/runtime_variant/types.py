@@ -53,6 +53,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantUsedBy
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -230,6 +231,24 @@ class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
     NOT: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Entities whose use narrows a runtime variant query; every id is AND-ed. The "
+            "caller must be able to read each listed entity, or the request is refused."
+        ),
+    ),
+    name="RuntimeVariantUsedBy",
+)
+class RuntimeVariantUsedByGQL(PydanticInputMixin[RuntimeVariantUsedBy]):
+    """The entities whose use of a runtime variant narrows the read."""
+
+    deployment: list[UUID] | None = gql_field(
+        default=None, description="Deployments whose revisions name the runtime variant."
     )
 
 

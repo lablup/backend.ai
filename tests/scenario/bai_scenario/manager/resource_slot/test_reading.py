@@ -9,7 +9,7 @@ import pytest
 
 from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -80,16 +80,19 @@ class AUserGrantedNothingReadsByName(
 
 
 @dataclass(frozen=True)
-class ANameNothingAnswersToIsNotFound(
+class ANameNothingAnswersToIsRefused(
     Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
-        return "reading-a-slot-name-nothing-answers-to-is-not-found"
+        return "reading-a-slot-name-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return (
+            "존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 "
+            "존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다"
+        )
 
     @override
     def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
@@ -101,12 +104,12 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(GenericBadRequest)
 
 
 SCENARIOS: list[ReadingStep] = [
     AUserGrantedNothingReadsByName(),
-    ANameNothingAnswersToIsNotFound(),
+    ANameNothingAnswersToIsRefused(),
 ]
 
 

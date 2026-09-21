@@ -13,6 +13,9 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
+from ai.backend.manager.models.prometheus_query_preset_category.searchable_fields import (
+    PrometheusQueryPresetCategorySearchableFields,
+)
 from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -44,4 +47,4 @@ class PrometheusQueryPresetCategoryCreator(
 
     @override
     def to_data(self, row: PrometheusQueryPresetCategoryRow) -> PrometheusQueryPresetCategoryData:
-        return row.to_data()
+        return PrometheusQueryPresetCategorySearchableFields.own.to_data(row)

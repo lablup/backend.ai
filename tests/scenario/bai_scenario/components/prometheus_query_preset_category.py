@@ -12,6 +12,9 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryEntityType,
+)
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     CategoryNode,
@@ -23,6 +26,7 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -35,8 +39,8 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.system import lay_a_public_reader
 from bai_scenario.seeds.prometheus_query_preset_category.category import SeedCategory
 from bai_scenario.seeds.seeder import Laid
 
@@ -82,10 +86,8 @@ class ManyCategoriesAndACaller:
 
 
 async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
-    """호출자 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나를 함께 만든다."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    laid: Laid[UserData] = await seeding.within(SomeoneOf(domain, role=role))
-    return laid
+    """호출자 한 명. public 에서 읽을 권한을 함께 받는다."""
+    return await lay_a_public_reader(seeding, PrometheusQueryPresetCategoryEntityType(), role)
 
 
 @dataclass(frozen=True)
@@ -278,11 +280,11 @@ def node_of(seeded: PrometheusQueryPresetCategoryData) -> CategoryNode:
 
 @dataclass(frozen=True)
 class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]]):
-    """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 빈 항목으로."""
+    """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 거부로."""
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다"
 
     @override
     def look(
@@ -304,7 +306,8 @@ class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]
                     ),
                 )
             )
-        seen.append(Same(f"[{len(laid.laid)}]", answer[-1], None))
+        last = answer[-1]
+        seen.append(Refused(NotEnoughPermission, last if isinstance(last, BaseException) else None))
         return seen
 
 

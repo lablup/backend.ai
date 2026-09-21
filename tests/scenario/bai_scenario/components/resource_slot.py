@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceSlotTypesPayload,
@@ -30,7 +31,12 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.components.system import (
+    KEPT,
+    Kept,
+    lay_a_public_reader,
+    role_named,
+)
 from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
 
 DISPLAYED = "미리 만들어 둔 슬롯"
@@ -71,7 +77,7 @@ class ASlotTypeAndSomeone(Given[Any, ASlotTypeAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ASlotTypeAndACaller:
         slot_type = await seeding.creating(SeedResourceSlotType(enabled=self.enabled))
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
         return ASlotTypeAndACaller(seeding.made(slot_type), seeding.made(caller))
 
 
@@ -101,7 +107,7 @@ class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
             await seeding.creating(SeedResourceSlotType(name_hint="other"))
             for _ in range(self.besides)
         ]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
         return ManySlotTypesAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),

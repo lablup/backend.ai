@@ -31,8 +31,6 @@ from ai.backend.common.data.entity.resource_allocation import ResourceAllocation
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
-    NumberFormatData,
-    ResourceSlotTypeData,
 )
 from ai.backend.manager.models.base import (
     GUID,
@@ -121,24 +119,6 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
-
-    def to_data(self) -> ResourceSlotTypeData:
-        return ResourceSlotTypeData(
-            uuid=self.uuid,
-            slot_name=self.slot_name,
-            slot_type=self.slot_type,
-            required=self.required,
-            enabled=self.enabled,
-            display_name=self.display_name,
-            description=self.description,
-            display_unit=self.display_unit,
-            display_icon=self.display_icon,
-            number_format=NumberFormatData(
-                binary=self.number_format.binary,
-                round_length=self.number_format.round_length,
-            ),
-            rank=self.rank,
-        )
 
 
 class AgentResourceRow(LifecycleTimestampsMixin, Base):

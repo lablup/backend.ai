@@ -10,6 +10,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 __all__ = ("BulkDeploymentPresetQuerier", "DeploymentPresetQuerier")
@@ -36,7 +39,7 @@ class DeploymentPresetQuerier(
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return row.to_data()
+        return DeploymentPresetSearchableFields.own.to_data(row)
 
 
 class BulkDeploymentPresetQuerier(
@@ -54,4 +57,4 @@ class BulkDeploymentPresetQuerier(
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return row.to_data()
+        return DeploymentPresetSearchableFields.own.to_data(row)
