@@ -48,6 +48,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
@@ -56,6 +57,8 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -135,11 +138,26 @@ def domain_processors(
 
 
 @pytest.fixture()
+def resource_group_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> ResourceGroupProcessors:
+    """The adapter resolves a resource group name to its id, so this runs against the DB."""
+    service = ResourceGroupService(
+        ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
+    return ResourceGroupProcessors(
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
+    )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     resource_allocation_processors: ResourceAllocationProcessors,
     domain_processors: DomainProcessors,
     user_processors: UserProcessors,
+    resource_group_processors: ResourceGroupProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Register v2 resource allocation REST routes for testing."""
@@ -148,12 +166,14 @@ def server_module_registries(
     processors.session = MagicMock(spec=SessionProcessors)
     processors.domain = domain_processors
     processors.user = user_processors
+    processors.resource_group = resource_group_processors
     processors.session.resource_allocation = resource_allocation_processors
 
     adapter = ResourceAllocationAdapter(
         processors.session,
         processors.domain,
         processors.user,
+        processors.resource_group,
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)

@@ -119,6 +119,7 @@ def _build_registries(
         processors.session,
         MagicMock(),
         MagicMock(),
+        MagicMock(),
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)

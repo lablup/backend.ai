@@ -116,16 +116,32 @@ class TestResourceGroupUsage:
         assert isinstance(result.resource_group.free, list)
         assert isinstance(result.resource_group.max_per_node, list)
 
-    async def test_invalid_rg_returns_error(
+    async def test_regular_user_resource_group_usage_returns_structure(
+        self,
+        user_v2_registry: V2ClientRegistry,
+        resource_group_name: ResourceGroupName,
+    ) -> None:
+        """The read is answered for the named group, not behind the superadmin gate."""
+        result = await user_v2_registry.resource_allocation.resource_group_usage(
+            resource_group_name,
+        )
+        assert isinstance(result, ResourceGroupResourceAllocationPayload)
+        assert result.resource_group is not None
+        assert isinstance(result.resource_group.capacity, list)
+        assert isinstance(result.resource_group.used, list)
+        assert isinstance(result.resource_group.free, list)
+        assert isinstance(result.resource_group.max_per_node, list)
+
+    async def test_invalid_rg_returns_not_found(
         self,
         admin_v2_registry: V2ClientRegistry,
     ) -> None:
-        """Query a non-existent resource group returns an error."""
+        """A name matching no resource group ends at the lookup with not-found."""
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_v2_registry.resource_allocation.resource_group_usage(
                 "non-existent-rg-name",
             )
-        assert exc_info.value.status in (404, 500)
+        assert exc_info.value.status == 404
 
 
 class TestEffectiveAllocation:

@@ -263,7 +263,11 @@ class Adapters:
             rbac=RBACAdapter(processors.rbac, processors.permission_controller),
             reservoir_registry=ReservoirRegistryAdapter(processors.artifact_registry),
             resource_allocation=ResourceAllocationAdapter(
-                processors.session, processors.domain, processors.user, config_provider
+                processors.session,
+                processors.domain,
+                processors.user,
+                processors.resource_group,
+                config_provider,
             ),
             resource_group=ResourceGroupAdapter(
                 processors.resource_group,

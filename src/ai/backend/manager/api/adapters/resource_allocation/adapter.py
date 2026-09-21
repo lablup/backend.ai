@@ -9,6 +9,7 @@ from uuid import UUID
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -42,6 +43,8 @@ from ai.backend.manager.data.resource_allocation.types import (
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
@@ -76,6 +79,7 @@ class ResourceAllocationAdapter(BaseAdapter):
     _session: SessionProcessors
     _domain: DomainProcessors
     _user: UserProcessors
+    _resource_group: ResourceGroupProcessors
     _config_provider: ManagerConfigProvider | None
 
     def __init__(
@@ -83,11 +87,13 @@ class ResourceAllocationAdapter(BaseAdapter):
         session: SessionProcessors,
         domain: DomainProcessors,
         user: UserProcessors,
+        resource_group: ResourceGroupProcessors,
         config_provider: ManagerConfigProvider | None,
     ) -> None:
         self._session = session
         self._domain = domain
         self._user = user
+        self._resource_group = resource_group
         self._config_provider = config_provider
 
     def _visibility_settings(self) -> tuple[bool, bool]:
@@ -238,9 +244,14 @@ class ResourceAllocationAdapter(BaseAdapter):
         rg_name: str,
     ) -> ResourceGroupResourceAllocationPayload:
         """Get resource group usage."""
+        resource_group_name = ResourceGroupName(rg_name)
+        resource_group = await self._resource_group.lookup.run(
+            LookupResourceGroupAction(name=resource_group_name)
+        )
         result = await self._session.resource_allocation.get_resource_group_usage.run(
             GetResourceGroupUsageAction(
-                rg_name=rg_name,
+                resource_group_id=resource_group.entity_id(),
+                rg_name=resource_group_name,
             )
         )
         return ResourceGroupResourceAllocationPayload(

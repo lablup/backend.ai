@@ -3,27 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.resource_allocation.types import ResourceGroupUsageData
 
 
 @dataclass(frozen=True)
-class GetResourceGroupUsageAction(BaseGlobalAction):
-    """Read what a resource group is currently using.
+class GetResourceGroupUsageAction(BaseSingleEntityAction):
+    """Read what a resource group is currently using."""
 
-    Global until a resource group name resolves to its id: naming the group as the
-    entity needs that lookup, which does not exist yet.
-    """
-
-    rg_name: str
+    resource_group_id: ResourceGroupID
+    rg_name: ResourceGroupName
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ResourceGroupEntityType()
+    def entity_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     @classmethod
@@ -33,7 +29,7 @@ class GetResourceGroupUsageAction(BaseGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_get_resource_group_usage"
+        return "get_resource_group_usage"
 
 
 @dataclass(frozen=True)
