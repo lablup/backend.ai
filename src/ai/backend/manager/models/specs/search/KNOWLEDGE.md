@@ -326,7 +326,7 @@ The tables below state, for each entity package under `models/`, which scopes it
 | `prometheus_query_preset_category` | None | Membership (whole type) | None | `PublicPrometheusQueryPresetCategoryTarget` |
 | `resource_slot` (slot type) | None | Membership (whole type) | None | `PublicResourceSlotTypeTarget` |
 | `login_client_type` | None | Membership (whole type) | None | `PublicLoginClientTypeTarget` |
-| `deployment_revision_preset` | None | Membership (whole type). Read through the global search only today | None (a field Target only) | `PublicDeploymentPresetTarget` |
+| `deployment_revision_preset` | None | Membership (whole type) | None | `PublicDeploymentPresetTarget` |
 | `app_config_allow_list`, `app_config_definition` | None | n/a | None | None |
 | `artifact`, `artifact_registries`, `huggingface_registry`, `reservoir_registry` | None | n/a | None | None |
 | `object_storage`, `vfs_storage`, `storage_namespace` | None | n/a | None | None |
