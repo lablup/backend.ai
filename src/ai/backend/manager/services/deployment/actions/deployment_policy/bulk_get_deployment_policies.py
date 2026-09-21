@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import override
+from dataclasses import dataclass, replace
+from typing import Self, override
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.v2.ops.base import BulkGetOwnedFieldOpsAction
+from ai.backend.manager.actions.v2.ops.base import PartialBulkGetOwnedFieldOpsAction
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.models.deployment_policy.queriers import (
     DeploymentPolicyByDeploymentQuerier,
@@ -16,9 +16,9 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 
 @dataclass
 class BulkGetDeploymentPoliciesAction(
-    BulkGetOwnedFieldOpsAction[DeploymentID, DeploymentPolicyRow, DeploymentPolicyData]
+    PartialBulkGetOwnedFieldOpsAction[DeploymentID, DeploymentPolicyRow, DeploymentPolicyData]
 ):
-    """Read the policy each named deployment carries."""
+    """Read the policy each named deployment carries, answering for each deployment."""
 
     deployment_ids: Sequence[DeploymentID]
 
@@ -38,3 +38,13 @@ class BulkGetDeploymentPoliciesAction(
     @override
     def to_querier(self) -> DeploymentPolicyByDeploymentQuerier:
         return DeploymentPolicyByDeploymentQuerier()
+
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(
+            self,
+            deployment_ids=[
+                deployment_id for deployment_id in self.deployment_ids if deployment_id in allowed
+            ],
+        )

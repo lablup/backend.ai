@@ -1630,37 +1630,21 @@ class DeploymentAdapter(BaseAdapter):
 
         One answer per deployment in the given order: the policy, ``None`` for a
         deployment carrying none or an id matching no row, and the denial for one the
-        caller may not read. Each deployment is checked through the bulk get; the
-        policies are read for the ones that passed.
+        caller may not read.
         """
         if not endpoint_ids:
             return []
-        deployment_ids = [DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
-        deployment_result = await self._deployment.bulk_get.run(
-            BulkGetDeploymentsAction(ids=deployment_ids)
-        )
-        readable_deployments = deployment_result.values()
-        deployment_failures = deployment_result.errors()
-        readable_deployment_ids = [
-            deployment_id
-            for deployment_id in deployment_ids
-            if deployment_id in readable_deployments
-        ]
-        policies_by_deployment: Mapping[DeploymentID, DeploymentPolicyData] = {}
-        if readable_deployment_ids:
-            policy_result = await self._deployment.bulk_get_deployment_policies.run(
-                BulkGetDeploymentPoliciesAction(deployment_ids=readable_deployment_ids)
+        policy_result = await self._deployment.bulk_get_deployment_policies.run(
+            BulkGetDeploymentPoliciesAction(
+                deployment_ids=[DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
             )
-            policies_by_deployment = policy_result.designated
-        policy_nodes: list[DeploymentPolicyNode | Exception | None] = []
-        for deployment_id in deployment_ids:
-            deployment_failure = self.batch_load_failure(deployment_failures.get(deployment_id))
-            if deployment_failure is not None:
-                policy_nodes.append(deployment_failure)
-                continue
-            policy = policies_by_deployment.get(deployment_id)
-            policy_nodes.append(self._policy_data_to_dto(policy) if policy is not None else None)
-        return policy_nodes
+        )
+        return [
+            self._policy_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in policy_result.items
+        ]
 
     # ------------------------------------------------------------------
     # Querier builders

@@ -39,7 +39,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
     SuperAdminActionValidator,
 )
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
@@ -442,7 +442,7 @@ class TestFieldBatchLoads:
 
 
 class TestPolicyBatchLoad:
-    """The policy DataLoader answers per deployment, each checked through the bulk get."""
+    """The policy DataLoader answers per deployment, each checked on its own."""
 
     @pytest.fixture
     def policy(self) -> DeploymentPolicyData:
@@ -464,25 +464,18 @@ class TestPolicyBatchLoad:
         self, policy: DeploymentPolicyData, denial: GenericForbidden
     ) -> tuple[DeploymentAdapter, MagicMock]:
         processors = MagicMock()
-        processors.deployment.bulk_get.run = AsyncMock(
+        processors.deployment.bulk_get_deployment_policies.run = AsyncMock(
             return_value=PartialBulkResult(
                 items=[
-                    PartialBulkEntityResult[ModelDeploymentData].succeeded(
-                        WITH_POLICY, MagicMock(id=WITH_POLICY)
-                    ),
-                    PartialBulkEntityResult[ModelDeploymentData].succeeded(
-                        WITHOUT_POLICY, MagicMock(id=WITHOUT_POLICY)
-                    ),
-                    PartialBulkEntityResult[ModelDeploymentData].denied(DENIED_DEPLOYMENT, denial),
-                    PartialBulkEntityResult[ModelDeploymentData].failed(
+                    PartialBulkEntityResult[DeploymentPolicyData].succeeded(WITH_POLICY, policy),
+                    PartialBulkEntityResult[DeploymentPolicyData].nothing(WITHOUT_POLICY),
+                    PartialBulkEntityResult[DeploymentPolicyData].denied(DENIED_DEPLOYMENT, denial),
+                    PartialBulkEntityResult[DeploymentPolicyData].failed(
                         ABSENT_DEPLOYMENT,
                         EntityNotFoundError(entity_type=DeploymentEntityType()),
                     ),
                 ]
             )
-        )
-        processors.deployment.bulk_get_deployment_policies.run = AsyncMock(
-            return_value=OwnedFieldsOpsResult(designated={WITH_POLICY: policy})
         )
         return DeploymentAdapter(processors.deployment, MagicMock()), processors
 
@@ -508,26 +501,12 @@ class TestPolicyBatchLoad:
         assert refused is denial
         assert missing is None
         action = processors.deployment.bulk_get_deployment_policies.run.await_args.args[0]
-        assert list(action.owner_ids()) == [WITH_POLICY, WITHOUT_POLICY]
-
-    async def test_no_readable_deployment_reads_no_policy(
-        self,
-        adapter: tuple[DeploymentAdapter, MagicMock],
-        denial: GenericForbidden,
-    ) -> None:
-        deployment_adapter, processors = adapter
-        processors.deployment.bulk_get.run = AsyncMock(
-            return_value=PartialBulkResult(
-                items=[
-                    PartialBulkEntityResult[ModelDeploymentData].denied(DENIED_DEPLOYMENT, denial),
-                ]
-            )
-        )
-
-        assert await deployment_adapter.batch_load_policies_by_endpoint_ids([
-            DENIED_DEPLOYMENT
-        ]) == [denial]
-        processors.deployment.bulk_get_deployment_policies.run.assert_not_awaited()
+        assert list(action.owner_ids()) == [
+            WITH_POLICY,
+            WITHOUT_POLICY,
+            DENIED_DEPLOYMENT,
+            ABSENT_DEPLOYMENT,
+        ]
 
     async def test_no_deployment_ids_read_no_policy(
         self, adapter: tuple[DeploymentAdapter, MagicMock]
@@ -535,5 +514,4 @@ class TestPolicyBatchLoad:
         deployment_adapter, processors = adapter
 
         assert await deployment_adapter.batch_load_policies_by_endpoint_ids([]) == []
-        processors.deployment.bulk_get.run.assert_not_awaited()
         processors.deployment.bulk_get_deployment_policies.run.assert_not_awaited()

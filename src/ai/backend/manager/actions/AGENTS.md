@@ -156,6 +156,10 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   `LookupFieldGroup.partial_bulk_get_ops`. The answer is keyed by the row, the check
   and the record by the owner. The owner lookup a partial field shape runs first is
   wired public, for the reason the entity bulk lookup under Gates is.
+- A read of the one row each named entity designates is partial too:
+  `LookupFieldGroup.partial_bulk_get_owned_field_ops`, keyed by the owner, an owner
+  designating nothing answered as `nothing`. `atomic_bulk_get_ops` stays for a run
+  whose owners must all go through or none.
 - A partial run answers with `PartialBulkResult`, one item per entity the caller named
   and in that order. Fixed rather than per domain: completing and ordering the answer
   is the processor's job, and it cannot do that for a shape only the domain knows.

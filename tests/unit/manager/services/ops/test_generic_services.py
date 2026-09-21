@@ -61,6 +61,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityUpsertOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
+    PartialBulkGetOwnedFieldOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
@@ -99,7 +100,7 @@ from ai.backend.manager.models.specs.purger import (
     GuardedEntityPurger,
     GuardedFieldPurger,
 )
-from ai.backend.manager.models.specs.querier import BulkFieldQuerier, DataQuerier
+from ai.backend.manager.models.specs.querier import BulkFieldQuerier, DataQuerier, OwnedFieldQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import (
     BulkResultWithFailures,
@@ -137,6 +138,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalUpsertService,
     LookupService,
     PartialBulkDeleteService,
+    PartialBulkOwnedFieldGetService,
     PartialBulkUpdateService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
@@ -1065,6 +1067,49 @@ class _BulkGetFieldAction(
         return replace(self, ids=[field_id for field_id in self.ids if field_id in allowed])
 
 
+class _PresetOwnedFieldQuerier(OwnedFieldQuerier[_EntityID, RolePresetRow, _PresetFieldData]):
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(RolePresetRow)
+
+    @override
+    def owner_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetFieldData:
+        return _PresetFieldData(id=_FieldID(row.id), owner=_EntityID(row.id))
+
+
+@dataclass
+class _BulkGetOwnedFieldAction(
+    PartialBulkGetOwnedFieldOpsAction[_EntityID, RolePresetRow, _PresetFieldData]
+):
+    owners: list[_EntityID]
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "bulk_get_owned_field_role_presets"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return self.owners
+
+    @override
+    def owner_ids(self) -> Sequence[_EntityID]:
+        return self.owners
+
+    @override
+    def to_querier(self) -> _PresetOwnedFieldQuerier:
+        return _PresetOwnedFieldQuerier()
+
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(self, owners=[owner for owner in self.owners if owner in allowed])
+
+
 @dataclass
 class _FieldUpsertAction(
     BaseSingleEntityAction, FieldUpsertOpsAction[_EntityID, RolePresetRow, _PresetFieldData]
@@ -1663,6 +1708,24 @@ async def test_field_partial_bulk_get_answers_for_every_named_row(
     assert result.successes == {field_stored.id: field_stored}
     assert list(result.errors) == [absent]
     assert isinstance(result.errors[absent], FieldNotFoundError)
+
+
+async def test_partial_bulk_owned_field_get_answers_for_every_named_owner(
+    repository: MagicMock, field_stored: _PresetFieldData
+) -> None:
+    service: PartialBulkOwnedFieldGetService[_PresetFieldData] = PartialBulkOwnedFieldGetService(
+        repository
+    )
+    designating_nothing = _EntityID(uuid.uuid4())
+    repository.owned_fields.return_value = {field_stored.owner: field_stored}
+
+    result = await service.execute(
+        _BulkGetOwnedFieldAction(owners=[field_stored.owner, designating_nothing])
+    )
+
+    assert result.values() == {field_stored.owner: field_stored}
+    assert result.errors() == {}
+    assert [item.entity_id for item in result.items] == [field_stored.owner, designating_nothing]
 
 
 async def test_field_upsert_forwards_owner_and_upserter(
