@@ -324,7 +324,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-        payload = await info.context.adapters.image.image_search_aliases(
+        payload = await info.context.adapters.image.scoped_search_aliases(
             ImageID(self.id),
             SearchImageAliasesInput(
                 filter=pydantic_filter,

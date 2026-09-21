@@ -204,11 +204,11 @@ async def test_admin_search_refuses_two_pagination_modes(
     processors.search_images.run.assert_not_awaited()
 
 
-async def test_image_search_aliases_reads_within_the_image(
+async def test_scoped_search_aliases_reads_within_the_image(
     adapter: ImageAdapter,
     processors: MagicMock,
 ) -> None:
-    payload = await adapter.image_search_aliases(READABLE, SearchImageAliasesInput())
+    payload = await adapter.scoped_search_aliases(READABLE, SearchImageAliasesInput())
 
     action = processors.search_image_aliases.run.call_args.args[0]
     assert action.scope_targets() == (READABLE,)

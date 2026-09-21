@@ -316,7 +316,7 @@ class ImageAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def image_search_aliases(
+    async def scoped_search_aliases(
         self, image_id: ImageID, input: SearchImageAliasesInput
     ) -> SearchImageAliasesPayload:
         """Search the aliases of one image, answered for by the caller's read on it."""

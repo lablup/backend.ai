@@ -221,7 +221,7 @@ class SearchingTheAliasesOfTheImage(
 
     @override
     def operation(self) -> str:
-        return "image_search_aliases"
+        return "scoped_search_aliases"
 
     @override
     def describe(self, laid: AnAliasAndACaller) -> str:
@@ -232,7 +232,7 @@ class SearchingTheAliasesOfTheImage(
         self, adapter: ImageAdapter, laid: AnAliasAndACaller
     ) -> SearchImageAliasesPayload:
         with ActingAs(laid.caller):
-            return await adapter.image_search_aliases(
+            return await adapter.scoped_search_aliases(
                 ImageID(laid.image.id), SearchImageAliasesInput(limit=DEFAULT_PAGE)
             )
 

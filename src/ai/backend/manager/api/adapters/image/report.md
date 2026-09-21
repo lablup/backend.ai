@@ -1605,7 +1605,7 @@ Given
 
 When
 
-- ImageAdapter.image_search_aliases — user-1이 image-1의 별칭을 검색함
+- ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
 
 Then
 
@@ -1634,7 +1634,7 @@ Given
 
 When
 
-- ImageAdapter.image_search_aliases — user-1이 image-1의 별칭을 검색함
+- ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
 
 Then
 
