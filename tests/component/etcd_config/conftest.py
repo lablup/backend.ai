@@ -14,7 +14,7 @@ from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
+    ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -31,15 +31,15 @@ from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 
 
 @pytest.fixture()
-def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
-    return PerProjectContainerRegistryQuotaClientPool()
+def registry_quota_client_pool() -> ContainerRegistryQuotaClientPool:
+    return ContainerRegistryQuotaClientPool()
 
 
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-    registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(

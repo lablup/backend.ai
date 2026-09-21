@@ -36,7 +36,7 @@ class ContainerRegistrySearchResult:
 
 
 @dataclass
-class PerProjectContainerRegistryInfo:
+class ContainerRegistryInfo:
     """Container registry info resolved from a project's container_registry config.
 
     Unlike ContainerRegistryData, all fields are non-nullable because

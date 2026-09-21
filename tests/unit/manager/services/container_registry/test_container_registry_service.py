@@ -15,7 +15,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
+    ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
@@ -87,7 +87,7 @@ def container_registry_service(
     return ContainerRegistryService(
         db=mock_db_engine,
         container_registry_repository=mock_container_registry_repository,
-        quota_client_pool=MagicMock(spec=PerProjectContainerRegistryQuotaClientPool),
+        quota_client_pool=MagicMock(spec=ContainerRegistryQuotaClientPool),
     )
 
 

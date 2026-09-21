@@ -33,7 +33,7 @@ from ai.backend.manager.api.rest.resource_group.registry import register_resourc
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
+    ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -84,15 +84,15 @@ from ai.backend.manager.services.user.service import UserService
 
 
 @pytest.fixture()
-def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
-    return PerProjectContainerRegistryQuotaClientPool()
+def registry_quota_client_pool() -> ContainerRegistryQuotaClientPool:
+    return ContainerRegistryQuotaClientPool()
 
 
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-    registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(

@@ -12,7 +12,7 @@ class TestRegistryQuotaClientPoolDependency:
 
     @patch(
         "ai.backend.manager.dependencies.agents.registry_quota_client_pool"
-        ".PerProjectContainerRegistryQuotaClientPool"
+        ".ContainerRegistryQuotaClientPool"
     )
     async def test_provide_registry_quota_client_pool(
         self,

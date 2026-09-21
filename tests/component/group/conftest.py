@@ -19,10 +19,10 @@ from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.container_registry.harbor import (
-    AbstractPerProjectRegistryQuotaClient,
+    AbstractContainerRegistryQuotaClient,
+    ContainerRegistryQuotaClientPool,
     HarborAuthArgs,
     HarborProjectInfo,
-    PerProjectContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -52,7 +52,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 class InMemoryQuotaClient:
     """In-memory Harbor quota client for component tests (duck-typed).
 
-    Does not inherit AbstractPerProjectRegistryQuotaClient because the abstract
+    Does not inherit AbstractContainerRegistryQuotaClient because the abstract
     read_quota() returns int, but the API response model
     (ReadRegistryQuotaResponse.result) is int | None. This fixture mirrors
     the expected API behaviour: None when no quota is configured.
@@ -82,19 +82,19 @@ class InMemoryQuotaClient:
         self._store.pop(project_info.project, None)
 
 
-class InMemoryQuotaClientPool(PerProjectContainerRegistryQuotaClientPool):
+class InMemoryQuotaClientPool(ContainerRegistryQuotaClientPool):
     _client: InMemoryQuotaClient
 
     def __init__(self) -> None:
         self._client = InMemoryQuotaClient()
 
     @override
-    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
-        return cast(AbstractPerProjectRegistryQuotaClient, self._client)
+    def make_client(self, type_: ContainerRegistryType) -> AbstractContainerRegistryQuotaClient:
+        return cast(AbstractContainerRegistryQuotaClient, self._client)
 
 
 @pytest.fixture()
-def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
+def registry_quota_client_pool() -> ContainerRegistryQuotaClientPool:
     return InMemoryQuotaClientPool()
 
 
@@ -102,7 +102,7 @@ def registry_quota_client_pool() -> PerProjectContainerRegistryQuotaClientPool:
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
-    registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
     service = ContainerRegistryService(

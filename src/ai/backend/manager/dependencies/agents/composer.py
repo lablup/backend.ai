@@ -13,7 +13,7 @@ from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
+    ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -87,7 +87,7 @@ class AgentsResources:
     route_controller: RouteController
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
-    registry_quota_client_pool: PerProjectContainerRegistryQuotaClientPool
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool
     registry: AgentRegistry
 
 

@@ -19,7 +19,7 @@ from ai.backend.manager.actions.registry.types import (
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
+    ContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
@@ -69,7 +69,7 @@ async def adapter(
             ContainerRegistryService(
                 engine,
                 ContainerRegistryRepository(engine, shares),
-                PerProjectContainerRegistryQuotaClientPool(),
+                ContainerRegistryQuotaClientPool(),
             ),
         ),
         RbacProcessors(

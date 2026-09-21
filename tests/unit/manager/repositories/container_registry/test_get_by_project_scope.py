@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
+from ai.backend.manager.data.container_registry.types import ContainerRegistryInfo
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.agent import AgentRow
 
@@ -331,7 +331,7 @@ class TestGetByProjectScope:
         result = await repository.get_by_project_scope(scope_id)
 
         # Then
-        assert isinstance(result, PerProjectContainerRegistryInfo)
+        assert isinstance(result, ContainerRegistryInfo)
         assert result.id == project_with_registry.registry_id
         assert result.url == project_with_registry.registry_url
         assert result.registry_name == project_with_registry.registry_name

@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.container_registry.harbor import (
-    AbstractPerProjectRegistryQuotaClient,
+    AbstractContainerRegistryQuotaClient,
+    ContainerRegistryQuotaClientPool,
     HarborAuthArgs,
     HarborProjectInfo,
-    PerProjectContainerRegistryQuotaClientPool,
 )
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
@@ -94,7 +94,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass(frozen=True)
 class _RegistryQuotaTarget:
-    client: AbstractPerProjectRegistryQuotaClient
+    client: AbstractContainerRegistryQuotaClient
     project: HarborProjectInfo
     auth: HarborAuthArgs
 
@@ -102,13 +102,13 @@ class _RegistryQuotaTarget:
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
     _container_registry_repository: ContainerRegistryRepository
-    _quota_client_pool: PerProjectContainerRegistryQuotaClientPool
+    _quota_client_pool: ContainerRegistryQuotaClientPool
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         container_registry_repository: ContainerRegistryRepository,
-        quota_client_pool: PerProjectContainerRegistryQuotaClientPool,
+        quota_client_pool: ContainerRegistryQuotaClientPool,
     ) -> None:
         self._db = db
         self._container_registry_repository = container_registry_repository

@@ -40,7 +40,7 @@ def _get_harbor_auth_args(auth_args: HarborAuthArgs) -> dict[str, Any]:
     return {"auth": aiohttp.BasicAuth(auth_args["username"], auth_args["password"])}
 
 
-class AbstractPerProjectRegistryQuotaClient(abc.ABC):
+class AbstractContainerRegistryQuotaClient(abc.ABC):
     async def create_quota(
         self, project_info: HarborProjectInfo, quota: int, auth_args: HarborAuthArgs
     ) -> None:
@@ -60,7 +60,7 @@ class AbstractPerProjectRegistryQuotaClient(abc.ABC):
         raise NotImplementedError
 
 
-class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
+class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     async def _get_harbor_project_id(
         self,
         sess: aiohttp.ClientSession,
@@ -188,11 +188,11 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
                     raise InternalServerError(f"Failed to delete quota! response: {resp}")
 
 
-class PerProjectContainerRegistryQuotaClientPool:
-    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
+class ContainerRegistryQuotaClientPool:
+    def make_client(self, type_: ContainerRegistryType) -> AbstractContainerRegistryQuotaClient:
         match type_:
             case ContainerRegistryType.HARBOR2:
-                return PerProjectHarborQuotaClient()
+                return HarborQuotaClient()
             case _:
                 raise GenericBadRequest(
                     f"{type_} does not support registry quota per project management."

@@ -6,14 +6,14 @@ from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.clients.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
+    ContainerRegistryQuotaClientPool,
 )
 
 
 class RegistryQuotaClientPoolDependency(
-    NonMonitorableDependencyProvider[None, PerProjectContainerRegistryQuotaClientPool],
+    NonMonitorableDependencyProvider[None, ContainerRegistryQuotaClientPool],
 ):
-    """Provides PerProjectContainerRegistryQuotaClientPool lifecycle management."""
+    """Provides ContainerRegistryQuotaClientPool lifecycle management."""
 
     @property
     @override
@@ -22,15 +22,13 @@ class RegistryQuotaClientPoolDependency(
 
     @asynccontextmanager
     @override
-    async def provide(
-        self, setup_input: None
-    ) -> AsyncIterator[PerProjectContainerRegistryQuotaClientPool]:
-        """Initialize and provide a per-project registry quota client pool.
+    async def provide(self, setup_input: None) -> AsyncIterator[ContainerRegistryQuotaClientPool]:
+        """Initialize and provide a registry quota client pool.
 
         Args:
             setup_input: Not used (no dependencies required)
 
         Yields:
-            Initialized PerProjectContainerRegistryQuotaClientPool
+            Initialized ContainerRegistryQuotaClientPool
         """
-        yield PerProjectContainerRegistryQuotaClientPool()
+        yield ContainerRegistryQuotaClientPool()

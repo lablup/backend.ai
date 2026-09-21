@@ -17,7 +17,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
-    PerProjectContainerRegistryInfo,
+    ContainerRegistryInfo,
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
@@ -256,7 +256,7 @@ class ContainerRegistryRepository:
             return result.scalars().one_or_none()
 
     @container_registry_repository_resilience.apply()
-    async def get_by_project_scope(self, scope_id: ProjectScope) -> PerProjectContainerRegistryInfo:
+    async def get_by_project_scope(self, scope_id: ProjectScope) -> ContainerRegistryInfo:
         registry_id = await self._db_source.lookup_image_commit_registry_id(
             ProjectID(scope_id.project_id)
         )
@@ -265,7 +265,7 @@ class ContainerRegistryRepository:
             raise ContainerRegistryNotFound(
                 f"Container registry {registry.registry_name} carries no project to hold the quota. (project: {scope_id.project_id})"
             )
-        return PerProjectContainerRegistryInfo(
+        return ContainerRegistryInfo(
             id=registry.id,
             url=registry.url,
             registry_name=registry.registry_name,
