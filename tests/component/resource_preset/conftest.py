@@ -269,12 +269,10 @@ async def group_name_fixture(
 @pytest.fixture()
 async def preset_factory(
     db_engine: SAEngine,
-    valkey_clients: ValkeyClients,
 ) -> AsyncIterator[PresetFactory]:
     """Factory that inserts resource preset rows directly into DB.
 
     Yields a factory callable and cleans up all created presets on teardown.
-    Each insert and the teardown drop the preset cache the repository reads first.
     """
     created_ids: list[uuid.UUID] = []
 
@@ -290,7 +288,6 @@ async def preset_factory(
         defaults.update(overrides)
         async with db_engine.begin() as conn:
             await conn.execute(sa.insert(ResourcePresetRow.__table__).values(**defaults))
-        await valkey_clients.stat.invalidate_all_resource_presets()
         created_ids.append(defaults["id"])
         return defaults
 
@@ -301,7 +298,6 @@ async def preset_factory(
             await conn.execute(
                 ResourcePresetRow.__table__.delete().where(ResourcePresetRow.__table__.c.id == pid)
             )
-    await valkey_clients.stat.invalidate_all_resource_presets()
 
 
 @pytest.fixture()
