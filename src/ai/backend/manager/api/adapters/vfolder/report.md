@@ -35,7 +35,7 @@ When
 
 Then
 
-- 자리마다 결과가 입력 순서대로 온다
+- 입력 순서대로 자리마다 폴더 또는 거부가 온다
   - length = 3
   - [0].id: 심은 폴더와 같다
   - [0].host = 'local:volume1'
@@ -59,7 +59,7 @@ Then
 
 #### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
-아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 검사에 닿기 전에 빈 목록이 온다
+아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다
 
 Given
 
@@ -82,7 +82,7 @@ Then
 
 #### [a-user-granted-folder-read-loads-their-own-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
-자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽으면, 그 자리에 그 폴더가 온다
+자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
 
 Given
 
@@ -105,7 +105,7 @@ When
 
 Then
 
-- 자리 하나에 심은 폴더 전체가 온다
+- 심은 폴더 하나가 통째로 온다
   - length = 1
   - [0].id: 심은 폴더와 같다
   - [0].host = 'local:volume1'
@@ -127,7 +127,7 @@ Then
 
 #### [a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
-아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽으면, 호출은 답하되 그 자리에 권한 부족 거부가 온다
+아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
 
 Given
 
@@ -146,13 +146,13 @@ When
 
 Then
 
-- 자리 하나에 권한 부족 거부가 온다
+- 그 자리는 권한 부족으로 거부된다
   - length = 1
   - 거부: NotEnoughPermission
 
 #### [an-accepted-share-loads-someone-elses-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
-남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽으면, 그 자리에 그 폴더가 온다
+남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
 
 Given
 
@@ -180,7 +180,7 @@ When
 
 Then
 
-- 자리 하나에 심은 폴더 전체가 온다
+- 심은 폴더 하나가 통째로 온다
   - length = 1
   - [0].id: 심은 폴더와 같다
   - [0].host = 'local:volume1'
@@ -202,7 +202,7 @@ Then
 
 #### [an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
-남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽으면, 호출은 답하되 그 자리에 권한 부족 거부가 온다
+남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
 
 Given
 
@@ -229,13 +229,13 @@ When
 
 Then
 
-- 자리 하나에 권한 부족 거부가 온다
+- 그 자리는 권한 부족으로 거부된다
   - length = 1
   - 거부: NotEnoughPermission
 
 #### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
-슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다
+슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
 
 Given
 
@@ -257,7 +257,7 @@ When
 
 Then
 
-- 있는 폴더는 노드, 없는 id 자리는 비어서 온다
+- 있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
   - length = 2
   - [0].id: 심은 폴더와 같다
   - [0].host = 'local:volume1'

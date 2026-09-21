@@ -128,13 +128,13 @@ class LoadingNothing(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
 
 @dataclass(frozen=True)
 class TheFolderAlone(Then[AFolderAndItsReader, Answer]):
-    """자리 하나에 심은 폴더가 통째로 온다."""
+    """심은 폴더 하나가 통째로 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "자리 하나에 심은 폴더 전체가 온다"
+        return "심은 폴더 하나가 통째로 온다"
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -152,11 +152,11 @@ class TheFolderAlone(Then[AFolderAndItsReader, Answer]):
 
 @dataclass(frozen=True)
 class ARefusalAlone(Then[AFolderAndItsReader, Answer]):
-    """호출은 답하고, 자리 하나에 권한 부족 거부가 온다."""
+    """호출은 성공하고, 그 자리는 권한 부족으로 거부된다."""
 
     @override
     def says(self) -> str:
-        return "자리 하나에 권한 부족 거부가 온다"
+        return "그 자리는 권한 부족으로 거부된다"
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -172,13 +172,13 @@ class ARefusalAlone(Then[AFolderAndItsReader, Answer]):
 
 @dataclass(frozen=True)
 class EachElementInOrder(Then[AReaderAndTwoFolders, Answer]):
-    """자리마다 폴더와 거부가 입력 순서대로 온다."""
+    """입력 순서대로 자리마다 폴더 또는 거부가 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "자리마다 결과가 입력 순서대로 온다"
+        return "입력 순서대로 자리마다 폴더 또는 거부가 온다"
 
     @override
     def look(self, laid: AReaderAndTwoFolders, answered: Answered[Answer]) -> list[Verdict]:
@@ -200,13 +200,13 @@ class EachElementInOrder(Then[AReaderAndTwoFolders, Answer]):
 
 @dataclass(frozen=True)
 class TheFolderThenNothing(Then[AFolderAndItsReader, Answer]):
-    """있는 폴더는 노드, 없는 id 자리는 비어서 온다."""
+    """있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "있는 폴더는 노드, 없는 id 자리는 비어서 온다"
+        return "있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다"
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -254,8 +254,8 @@ class AUserLoadsTheirOwnFolderById(
     @override
     def describe(self) -> str:
         return (
-            "자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽으면, "
-            "그 자리에 그 폴더가 온다"
+            "자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, "
+            "그 폴더가 온다"
         )
 
     @override
@@ -282,8 +282,8 @@ class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽으면, "
-            "호출은 답하되 그 자리에 권한 부족 거부가 온다"
+            "아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, "
+            "호출은 성공하되 그 자리는 권한 부족으로 거부된다"
         )
 
     @override
@@ -342,8 +342,8 @@ class AnAcceptedShareLoadsSomeoneElsesFolderById(
     @override
     def describe(self) -> str:
         return (
-            "남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽으면, "
-            "그 자리에 그 폴더가 온다"
+            "남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, "
+            "그 폴더가 온다"
         )
 
     @override
@@ -370,8 +370,8 @@ class AnUnansweredOfferGetsARefusalForTheFolder(
     @override
     def describe(self) -> str:
         return (
-            "남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽으면, "
-            "호출은 답하되 그 자리에 권한 부족 거부가 온다"
+            "남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, "
+            "호출은 성공하되 그 자리는 권한 부족으로 거부된다"
         )
 
     @override
@@ -401,7 +401,7 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
     def describe(self) -> str:
         return (
             "슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, "
-            "권한 문을 지나 없는 원소 자리에 빈 값이 온다"
+            "그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다"
         )
 
     @override
@@ -427,7 +427,7 @@ class ABatchLoadOfNothingAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 검사에 닿기 전에 빈 목록이 온다"
+        return "아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다"
 
     @override
     def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
