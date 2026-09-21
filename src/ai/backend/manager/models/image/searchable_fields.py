@@ -36,7 +36,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 
 class _ImageOwnFields(RowDataConverter[ImageRow, ImageData]):
@@ -185,15 +185,15 @@ class _ImageNestedFields:
     )
 
 
-class _ImageLinkedEntities:
-    """How an image connects to other entities; the other entity's permission governs."""
+class _ImageUsage:
+    """Uses between an image and other entities."""
 
-    sessions = UsageConditions[SessionID](
+    sessions = UsedByConditions[SessionID](
         ToManyCorrelation(KernelRow, ImageRow, KernelRow.image_id == ImageRow.id),
         KernelRow.session_id,
     )
     """Images a session's kernels run."""
-    deployments = UsageConditions[DeploymentID](
+    deployments = UsedByConditions[DeploymentID](
         ToManyCorrelation(
             sa.join(
                 ReplicaGroupRow,
@@ -209,6 +209,12 @@ class _ImageLinkedEntities:
         ReplicaGroupRow.deployment_id,
     )
     """Images a live replica group's current revision names."""
+
+
+class _ImageLinkedEntities:
+    """How an image connects to other entities; the other entity's permission governs."""
+
+    usage = _ImageUsage
 
 
 class ImageSearchableFields:

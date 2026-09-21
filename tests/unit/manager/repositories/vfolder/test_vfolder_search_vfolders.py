@@ -391,7 +391,7 @@ class TestVfolderSearchVfolders:
             )
 
         result = await ops_repository.global_search(
-            _global_searcher([VFolderSearchableFields.linked.model_cards.used_by(card_id)])
+            _global_searcher([VFolderSearchableFields.linked.usage.model_cards.used_by(card_id)])
         )
 
         assert [item.id for item in result.items] == [test_data["vfolder_a1_id"]]

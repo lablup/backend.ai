@@ -14,9 +14,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.fair_share.types import (
@@ -64,6 +66,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
     ResourceGroupScope,
+    ResourceGroupUsage,
     SchedulerTypeDTO,
 )
 from ai.backend.common.exception import DomainNotFound, UnreachableError
@@ -111,6 +114,7 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -307,6 +311,20 @@ class ResourceGroupAdapter(BaseAdapter):
             for item in result.items
         ]
 
+    def _usage(self, usage: ResourceGroupUsage | None) -> list[UsedBy]:
+        """The uses the request named, sessions before deployments."""
+        if usage is None or usage.used_by is None:
+            return []
+        used_by = usage.used_by
+        linked = ResourceGroupSearchableFields.linked.usage
+        return [
+            *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
+            *(
+                linked.deployments.used_by(DeploymentID(entity_id))
+                for entity_id in used_by.deployment or ()
+            ),
+        ]
+
     async def search(self, input: AdminSearchResourceGroupsInput) -> ResourceGroupSearchPayload:
         """Search resource groups with filters, ordering, and pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
@@ -326,7 +344,7 @@ class ResourceGroupAdapter(BaseAdapter):
         action_result = await self._resource_group.search_resource_groups.run(
             SearchResourceGroupsAction(
                 searcher=GlobalSearcher(
-                    used_by=(),
+                    used_by=self._usage(input.usage),
                     searcher=ResourceGroupSearcher(
                         pagination=querier.pagination,
                         conditions=querier.conditions,
@@ -380,7 +398,7 @@ class ResourceGroupAdapter(BaseAdapter):
             ScopedSearchResourceGroupsAction(
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(input.scope),
-                    used_by=(),
+                    used_by=self._usage(input.usage),
                     searcher=searcher,
                 )
             )

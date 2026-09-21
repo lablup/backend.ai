@@ -75,7 +75,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderPermissionField,
     VFolderQuotaInfo,
     VFolderScope,
-    VFolderUsedBy,
+    VFolderUsage,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -327,7 +327,7 @@ class VFolderAdapter(BaseAdapter):
         action_result = await self._vfolder_admin.admin_search_vfolders.run(
             GlobalSearchVFoldersAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_vfolder_searcher(input),
                 )
             )
@@ -392,11 +392,12 @@ class VFolderAdapter(BaseAdapter):
         scopes.extend(UserVFolderTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
         return scopes
 
-    def _used_by(self, used_by: VFolderUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: VFolderUsage | None) -> list[UsedBy]:
         """The uses the request named, deployments before model cards."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = VFolderSearchableFields.linked
+        used_by = usage.used_by
+        linked = VFolderSearchableFields.linked.usage
         return [
             *(
                 linked.deployments.used_by(DeploymentID(entity_id))
@@ -414,7 +415,7 @@ class VFolderAdapter(BaseAdapter):
         return ScopedSearchVFoldersAction(
             searcher=ScopedSearcher(
                 scopes=scopes,
-                used_by=self._used_by(input.used_by),
+                used_by=self._usage(input.usage),
                 searcher=self._build_vfolder_searcher(input),
             )
         )

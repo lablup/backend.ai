@@ -6,7 +6,7 @@ from .shelf_fields import ShelfSearchableFields
 from .shelf_fixtures import Seeded
 from .shelf_search import ShelfSearches, ids
 
-CARTS = ShelfSearchableFields.linked.carts
+CARTS = ShelfSearchableFields.linked.usage.carts
 
 
 class TestUsedBy:

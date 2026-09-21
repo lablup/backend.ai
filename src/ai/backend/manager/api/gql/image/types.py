@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageScope,
     ImageTagInfo,
+    ImageUsage,
     ImageUsedBy,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -456,11 +457,7 @@ class ImageSearchScopeGQL(PydanticInputMixin[ImageScope]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description=(
-            "Entities whose use narrows an image query; every id is AND-ed. The caller must "
-            "be able to read each listed entity, or the request is refused. Only images the "
-            "caller can read are returned, even when a listed entity uses others."
-        ),
+        description="Entities whose use of an image narrows the read.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="ImageUsedBy",
@@ -476,6 +473,25 @@ class ImageUsedByGQL(PydanticInputMixin[ImageUsedBy]):
         description=(
             "Deployments whose live replica groups name the image in their current revision."
         ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing an image query; every id is AND-ed. The caller must be able to "
+            "read each listed entity, or the request is refused. Only images the caller can "
+            "read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ImageUsage",
+)
+class ImageUsageGQL(PydanticInputMixin[ImageUsage]):
+    """The uses that narrow an image read."""
+
+    used_by: ImageUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the image narrows the read."
     )
 
 

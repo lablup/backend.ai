@@ -83,7 +83,8 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardScope,
-    ModelCardUsedBy,
+    ModelCardUsage,
+    ModelCardUses,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
@@ -811,17 +812,32 @@ class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Entities whose use narrows a model card query; every id is AND-ed. The caller "
-            "must be able to read each listed entity, or the request is refused. Only model "
-            "cards the caller can read are returned, even when a listed entity uses others."
-        ),
+        description="Entities a model card uses, whose ids narrow the read.",
     ),
-    name="ModelCardUsedBy",
+    name="ModelCardUses",
 )
-class ModelCardUsedByGQL(PydanticInputMixin[ModelCardUsedBy]):
-    """The entities whose use of a model card narrows the read."""
+class ModelCardUsesGQL(PydanticInputMixin[ModelCardUses]):
+    """The entities a model card uses, whose ids narrow the read."""
 
     vfolder: list[UUID] | None = gql_field(
         default=None, description="VFolders the model card is built on."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Uses narrowing a model card query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only model cards the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+    ),
+    name="ModelCardUsage",
+)
+class ModelCardUsageGQL(PydanticInputMixin[ModelCardUsage]):
+    """The uses that narrow a model card read."""
+
+    uses: ModelCardUsesGQL | None = gql_field(
+        default=None, description="Entities the model card uses, whose ids narrow the read."
     )

@@ -53,7 +53,8 @@ __all__ = (
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
-    "RoleUsedBy",
+    "RoleUsage",
+    "RoleUses",
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
@@ -433,22 +434,30 @@ class AdminSearchPermissionsGQLInput(BaseRequestModel):
     offset: int | None = None
 
 
-class RoleUsedBy(BaseRequestModel):
-    """Entities whose use narrows the roles read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Roles the caller cannot read
-    are left out even when a listed entity uses them.
-    """
+class RoleUses(BaseRequestModel):
+    """Entities the role uses, whose ids narrow the result."""
 
     role_preset: list[UUID] | None = Field(
         default=None, description="Role presets the roles were instantiated from"
     )
 
 
+class RoleUsage(BaseRequestModel):
+    """Uses narrowing the roles read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Roles the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    uses: RoleUses | None = Field(
+        default=None, description="Entities the role uses, whose ids narrow the result"
+    )
+
+
 class SearchRolesInput(BaseRequestModel):
     """Pagination search input for roles."""
 
-    used_by: RoleUsedBy | None = None
+    usage: RoleUsage | None = None
     filter: RoleFilter | None = None
     order: list[RoleOrderBy] | None = None
     first: int | None = None

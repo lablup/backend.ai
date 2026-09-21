@@ -34,6 +34,7 @@ __all__ = (
     "VFolderAccessControlInfo",
     "VFolderQuotaInfo",
     "VFolderStatusFilter",
+    "VFolderUsage",
     "VFolderUsageInfo",
     "VFolderUsageMode",
     "VFolderUsageModeFilter",
@@ -117,11 +118,7 @@ class VFolderUsageInfo(BaseResponseModel):
 
 
 class VFolderUsedBy(BaseRequestModel):
-    """Entities whose use narrows the vfolders read; every id is AND-ed.
-
-    An entity the caller cannot read refuses the request. Vfolders the caller cannot read
-    are left out even when a listed entity uses them.
-    """
+    """Entities whose use of the vfolder narrows the result."""
 
     deployment: list[UUID] | None = Field(
         default=None,
@@ -129,6 +126,18 @@ class VFolderUsedBy(BaseRequestModel):
     )
     model_card: list[UUID] | None = Field(
         default=None, description="Model cards built on the vfolder"
+    )
+
+
+class VFolderUsage(BaseRequestModel):
+    """Uses narrowing the vfolders read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Vfolders the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    used_by: VFolderUsedBy | None = Field(
+        default=None, description="Entities whose use of the vfolder narrows the result"
     )
 
 

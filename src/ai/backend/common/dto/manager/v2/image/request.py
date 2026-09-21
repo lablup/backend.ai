@@ -26,7 +26,7 @@ from .types import (
     ImageScope,
     ImageStatusType,
     ImageTypeEnum,
-    ImageUsedBy,
+    ImageUsage,
     OrderDirection,
 )
 
@@ -48,7 +48,7 @@ __all__ = (
     "ImageScopeInputDTO",
     "ImageStatusFilterInputDTO",
     "ImageTypeFilterInputDTO",
-    "ImageUsedBy",
+    "ImageUsage",
     "PurgeImageInput",
     "RescanImagesInput",
     "ScopedSearchImagesInput",
@@ -238,11 +238,11 @@ class PurgeImageInput(BaseRequestModel):
 class AdminSearchImagesInput(BaseRequestModel):
     """Input for admin search of images with cursor and offset pagination."""
 
-    used_by: ImageUsedBy | None = Field(
+    usage: ImageUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; images the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
         ),
     )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
@@ -261,11 +261,11 @@ class ScopedSearchImagesInput(BaseRequestModel):
     """Input for searching the images the named scopes reach."""
 
     scope: ImageScope = Field(description="Scope (OR across all items).")
-    used_by: ImageUsedBy | None = Field(
+    usage: ImageUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; images the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
         ),
     )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")

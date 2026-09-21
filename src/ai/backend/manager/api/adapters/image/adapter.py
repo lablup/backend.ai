@@ -55,7 +55,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageStatusType,
     ImageTagInfo,
     ImageTypeEnum,
-    ImageUsedBy,
+    ImageUsage,
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
@@ -176,7 +176,7 @@ class ImageAdapter(BaseAdapter):
         action_result = await self._image.search_images.run(
             SearchImagesAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_image_searcher(input, limit=limit),
                 )
             )
@@ -206,11 +206,12 @@ class ImageAdapter(BaseAdapter):
             targets.append(PublicImageTarget())
         return targets
 
-    def _used_by(self, used_by: ImageUsedBy | None) -> list[UsedBy]:
+    def _usage(self, usage: ImageUsage | None) -> list[UsedBy]:
         """The uses the request named, sessions before deployments."""
-        if used_by is None:
+        if usage is None or usage.used_by is None:
             return []
-        linked = ImageSearchableFields.linked
+        used_by = usage.used_by
+        linked = ImageSearchableFields.linked.usage
         return [
             *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
             *(
@@ -247,7 +248,7 @@ class ImageAdapter(BaseAdapter):
             ScopedSearchImagesAction(
                 searcher=ScopedSearcher(
                     scopes=self._scope_targets(input.scope),
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_image_searcher(input),
                 )
             )
@@ -268,7 +269,7 @@ class ImageAdapter(BaseAdapter):
         action_result = await self._image.search_images.run(
             SearchImagesAction(
                 searcher=GlobalSearcher(
-                    used_by=self._used_by(input.used_by),
+                    used_by=self._usage(input.usage),
                     searcher=self._build_image_searcher(input, base_conditions=base_conditions),
                 )
             )

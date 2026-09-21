@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.types import AccessKey, SessionResult, SessionTypes
@@ -36,7 +37,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsedByConditions, UsesConditions
 
 
 class _SessionOwnFields(RowDataConverter[SessionRow, SessionEntityData]):
@@ -269,15 +270,20 @@ class _SessionNestedFields:
     )
 
 
-class _SessionLinkedEntities:
-    """How a session connects to other entities; the other entity's permission governs."""
+class _SessionUsage:
+    """Uses between a session and other entities."""
 
-    deployments = UsageConditions[DeploymentID](
+    deployments = UsedByConditions[DeploymentID](
         ToManyCorrelation(RoutingRow, SessionRow, RoutingRow.session == SessionRow.id),
         RoutingRow.endpoint,
     )
     """Sessions a deployment's route rows serve as their replica."""
-    agents = UsageConditions[AgentUUID](
+    images = UsesConditions[ImageID](
+        ToManyCorrelation(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id),
+        KernelRow.image_id,
+    )
+    """Sessions whose kernels run the image."""
+    agents = UsesConditions[AgentUUID](
         ToManyCorrelation(
             sa.join(KernelRow, AgentRow, AgentRow.id == KernelRow.agent),
             SessionRow,
@@ -286,13 +292,19 @@ class _SessionLinkedEntities:
         AgentRow.uuid,
     )
     """Sessions an agent runs a kernel of."""
-    resource_groups = UsageConditions[ResourceGroupID](
+    resource_groups = UsesConditions[ResourceGroupID](
         ToManyCorrelation(
             ResourceGroupRow, SessionRow, ResourceGroupRow.id == SessionRow.resource_group_id
         ),
         ResourceGroupRow.id,
     )
     """Sessions a resource group runs."""
+
+
+class _SessionLinkedEntities:
+    """How a session connects to other entities; the other entity's permission governs."""
+
+    usage = _SessionUsage
 
 
 class SessionSearchableFields:

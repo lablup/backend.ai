@@ -430,13 +430,13 @@ class TestDeploymentScopedSearch:
                 )
             )
 
-    async def test_used_by_narrows_to_the_resource_group_the_deployments_run_in(
+    async def test_uses_narrows_to_the_resource_group_the_deployments_run_in(
         self,
         repository: OpsRepository[ModelDeploymentData],
         searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        used_by = DeploymentSearchableFields.linked.resource_groups.used_by(
+        used_by = DeploymentSearchableFields.linked.usage.resource_groups.uses(
             test_data.resource_group_id
         )
         result = await repository.scoped_search(
@@ -449,13 +449,13 @@ class TestDeploymentScopedSearch:
 
         assert {item.id for item in result.items} == set(test_data.endpoint_ids_in_a)
 
-    async def test_used_by_another_resource_group_returns_none(
+    async def test_uses_another_resource_group_returns_none(
         self,
         repository: OpsRepository[ModelDeploymentData],
         searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        used_by = DeploymentSearchableFields.linked.resource_groups.used_by(
+        used_by = DeploymentSearchableFields.linked.usage.resource_groups.uses(
             ResourceGroupID(uuid.uuid4())
         )
         result = await repository.scoped_search(

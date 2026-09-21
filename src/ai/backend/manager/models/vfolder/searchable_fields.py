@@ -35,7 +35,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 
 
@@ -210,11 +210,10 @@ class _VFolderNestedFields:
     )
 
 
-class _VFolderLinkedEntities:
-    """How a vfolder connects to other entities; the other entity's permission governs."""
+class _VFolderUsage:
+    """Uses between a vfolder and other entities."""
 
-    membership = MembershipConditions(VFolderEntityType(), VFolderRow.id)
-    deployments = UsageConditions[DeploymentID](
+    deployments = UsedByConditions[DeploymentID](
         ToManyCorrelation(
             sa.join(
                 ReplicaGroupRow,
@@ -230,10 +229,18 @@ class _VFolderLinkedEntities:
         ReplicaGroupRow.deployment_id,
     )
     """Vfolders a live replica group's current revision names as its model."""
-    model_cards = UsageConditions[ModelCardID](
+    model_cards = UsedByConditions[ModelCardID](
         ToManyCorrelation(ModelCardRow, VFolderRow, ModelCardRow.vfolder == VFolderRow.id),
         ModelCardRow.id,
     )
+    """Vfolders a model card is built on."""
+
+
+class _VFolderLinkedEntities:
+    """How a vfolder connects to other entities; the other entity's permission governs."""
+
+    membership = MembershipConditions(VFolderEntityType(), VFolderRow.id)
+    usage = _VFolderUsage
 
 
 class VFolderSearchableFields:

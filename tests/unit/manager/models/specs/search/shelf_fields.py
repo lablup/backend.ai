@@ -32,7 +32,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation, ToOneCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
-from ai.backend.manager.models.specs.search.usage import UsageConditions
+from ai.backend.manager.models.specs.search.usage import UsedByConditions
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.virtual_entity.permission_reach import user_permission_reaches
 
@@ -257,10 +257,10 @@ class _ShelfNestedFields:
     )
 
 
-class _ShelfLinkedEntities:
-    """How a shelf connects to another entity; a revoked line is not a use."""
+class _ShelfUsage:
+    """Uses between a shelf and other entities; a revoked line is not a use."""
 
-    carts = UsageConditions[CartID](
+    carts = UsedByConditions[CartID](
         ToManyCorrelation(
             CartLineRow,
             ShelfRow,
@@ -271,6 +271,12 @@ class _ShelfLinkedEntities:
         ),
         CartLineRow.cart_id,
     )
+
+
+class _ShelfLinkedEntities:
+    """How a shelf connects to another entity."""
+
+    usage = _ShelfUsage
 
 
 class ShelfSearchableFields:

@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetFilterGQL,
     DeploymentRevisionPresetGQL,
     DeploymentRevisionPresetOrderByGQL,
-    DeploymentRevisionPresetUsedByGQL,
+    DeploymentRevisionPresetUsageGQL,
     UpdateDeploymentRevisionPresetInputGQL,
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
@@ -46,12 +46,12 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def deployment_revision_presets(
     info: Info[StrawberryGQLContext],
-    used_by: Annotated[
-        DeploymentRevisionPresetUsedByGQL | None,
+    usage: Annotated[
+        DeploymentRevisionPresetUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Entities whose use narrows the result. Each "
-                "listed entity must be readable by the caller."
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller."
             )
         ),
     ] = None,
@@ -75,7 +75,7 @@ async def deployment_revision_presets(
             for o in order_by
         ]
     search_input = SearchDeploymentRevisionPresetsInput(
-        used_by=used_by.to_pydantic() if used_by else None,
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,

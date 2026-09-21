@@ -211,6 +211,13 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 - The two directions sit in one bundle because the check and the narrowing are the same. Either way the named entity's READ is checked and the result is narrowed with AND. What the direction settles is which column the condition lands on.
 - A plain column filter does not replace this. It checks no permission on the named entity, so whether a result comes back tells the caller that a row they cannot read exists.
 - "Who uses my resource" is answered by `uses`: the using side is searched, narrowed by the used entity's id.
+- The direction is named because the searched side's name alone does not say which side uses
+  which. A condition joining a session and an agent, sent as `used_by` alone, does not say
+  whether the sessions using an agent or the agents a session uses are wanted. Splitting the
+  bundle into `used_by` and `uses` makes the input's path say which side the given id belongs to.
+- The check and the narrowing are the same both ways, so the rules are stated once on the
+  bundle. The execution path is one as well: `ScopedSearcher.used_by` and
+  `GlobalSearcher.used_by` take both directions' conditions.
 
 ## Scopes and uses travel on the searcher
 

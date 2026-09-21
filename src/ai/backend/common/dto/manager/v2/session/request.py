@@ -39,7 +39,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionScope,
     SessionStatusFilter,
     SessionTypeFilter,
-    SessionUsedBy,
+    SessionUsage,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -195,11 +195,11 @@ class ScopedSearchSessionsInput(BaseRequestModel):
     """Input for searching the sessions the named scopes reach."""
 
     scope: SessionScope = Field(description="Scope (OR across all items).")
-    used_by: SessionUsedBy | None = Field(
+    usage: SessionUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; sessions the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "sessions the caller cannot read are left out."
         ),
     )
     filter: SessionFilter | None = Field(default=None, description="Filter criteria")
@@ -215,11 +215,11 @@ class ScopedSearchSessionsInput(BaseRequestModel):
 class AdminSearchSessionsInput(BaseRequestModel):
     """Input for admin search of sessions with cursor and offset pagination."""
 
-    used_by: SessionUsedBy | None = Field(
+    usage: SessionUsage | None = Field(
         default=None,
         description=(
-            "Entities whose use narrows the result. Each listed entity must be readable by "
-            "the caller; sessions the caller cannot read are left out."
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "sessions the caller cannot read are left out."
         ),
     )
     filter: SessionFilter | None = Field(default=None, description="Filter conditions.")
