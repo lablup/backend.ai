@@ -2,11 +2,7 @@ from .base import BaseGlobalAction
 from .monitor import GlobalActionMonitor
 from .processor import GlobalActionProcessor, PublicActionProcessor
 from .result import GlobalActionProcessResult, GlobalActionResultMeta
-from .validator import (
-    AuthenticatedActionValidator,
-    GlobalActionValidator,
-    SuperAdminActionValidator,
-)
+from .validator import AuthenticatedActionValidator, GlobalActionValidator
 
 __all__ = (
     "AuthenticatedActionValidator",
@@ -17,5 +13,4 @@ __all__ = (
     "GlobalActionResultMeta",
     "GlobalActionValidator",
     "PublicActionProcessor",
-    "SuperAdminActionValidator",
 )

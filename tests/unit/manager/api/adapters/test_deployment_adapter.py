@@ -36,9 +36,8 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
-from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
-    SuperAdminActionValidator,
-)
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
@@ -145,12 +144,18 @@ class _RecordingScopeValidator(ScopeActionValidator):
         self.seen.append(action.scope_targets())
 
 
-class TestDeploymentSearchGates:
-    """my/project searches are answered by the scope gate, not the superadmin gate.
+class _RefusingGlobalValidator(GlobalActionValidator):
+    @override
+    async def validate(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
+        raise InsufficientPrivilege("The global path is refused in this test.")
 
-    The processors come from the production wiring with the global gate kept as is and
-    the scope gate replaced by a recorder, so a regular user's search passing proves it
-    left the global (superadmin) path and names the scope it is answered for.
+
+class TestDeploymentSearchGates:
+    """my/project searches are answered by the scope gate, not the global one.
+
+    The processors come from the production wiring with the global gate replaced by a
+    refusal and the scope gate by a recorder, so a regular user's search passing proves
+    it left the global path and names the scope it is answered for.
     """
 
     @pytest.fixture
@@ -186,7 +191,7 @@ class TestDeploymentSearchGates:
                 monitors=ActionMonitors(),
                 validators=ActionValidators(
                     scope=[scope_gate],
-                    global_scope=[SuperAdminActionValidator()],
+                    global_scope=[_RefusingGlobalValidator()],
                 ),
                 repository=repository,
             )
