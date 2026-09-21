@@ -9,6 +9,8 @@ write ops because the artifact registries are the only thing shaped this way.
 
 from __future__ import annotations
 
+from typing import cast
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
@@ -16,6 +18,7 @@ from ai.backend.manager.models.artifact_registries.creators import ArtifactRegis
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_registries.updaters import ArtifactRegistryMetaUpdater
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.mixins.registry_name import RegistryNameMixin
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -37,6 +40,7 @@ class ArtifactRegistryWriteOps(V2WriteOps):
         await self._provision([registry_id])
         await self._created_in(creator.created_in(row), registry_id)
         await self._insert_row(meta_creator.build_row(registry_id), ())
+        cast(RegistryNameMixin, row).registry_name = meta_creator.name
         await self._sess.refresh(row, ["meta"])
         return creator.to_data(row)
 
@@ -63,6 +67,11 @@ class ArtifactRegistryWriteOps(V2WriteOps):
             meta_updater.guard_checks(),
             meta_updater.build_values(),
             meta_updater.integrity_error_checks,
+        )
+        cast(RegistryNameMixin, row).registry_name = await self._sess.scalar(
+            sa.select(ArtifactRegistryRow.name).where(
+                ArtifactRegistryRow.registry_id == updater.target_id_value()
+            )
         )
         await self._sess.refresh(row, ["meta"])
         return updater.to_data(row)
