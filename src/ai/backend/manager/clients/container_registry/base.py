@@ -24,6 +24,7 @@ class ContainerRegistryAuthArgs:
 
 
 class AbstractContainerRegistryQuotaClient(abc.ABC):
+    @abc.abstractmethod
     async def create_quota(
         self,
         project_info: ContainerRegistryProjectInfo,
@@ -32,6 +33,7 @@ class AbstractContainerRegistryQuotaClient(abc.ABC):
     ) -> None:
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def update_quota(
         self,
         project_info: ContainerRegistryProjectInfo,
@@ -40,11 +42,13 @@ class AbstractContainerRegistryQuotaClient(abc.ABC):
     ) -> None:
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def delete_quota(
         self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> None:
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def read_quota(
         self, project_info: ContainerRegistryProjectInfo, auth_args: ContainerRegistryAuthArgs
     ) -> int:
