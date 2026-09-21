@@ -39,6 +39,12 @@ from ai.backend.manager.models.scheduling_history.row import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.scheduling_history.searchable_fields import (
+    DeploymentHistorySearchableFields,
+    KernelSchedulingHistorySearchableFields,
+    RouteHistorySearchableFields,
+    SessionSchedulingHistorySearchableFields,
+)
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -83,7 +89,7 @@ class DeploymentHistoryCreator(
 
     @override
     def to_data(self, row: DeploymentHistoryRow) -> DeploymentHistoryData:
-        return row.to_data()
+        return DeploymentHistorySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -130,7 +136,7 @@ class RouteHistoryCreator(FieldCreator[DeploymentID, RouteHistoryRow, RouteHisto
 
     @override
     def to_data(self, row: RouteHistoryRow) -> RouteHistoryData:
-        return row.to_data()
+        return RouteHistorySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -171,7 +177,7 @@ class SessionSchedulingHistoryCreator(
 
     @override
     def to_data(self, row: SessionSchedulingHistoryRow) -> SessionSchedulingHistoryData:
-        return row.to_data()
+        return SessionSchedulingHistorySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -212,4 +218,4 @@ class KernelSchedulingHistoryCreator(
 
     @override
     def to_data(self, row: KernelSchedulingHistoryRow) -> KernelSchedulingHistoryData:
-        return row.to_data()
+        return KernelSchedulingHistorySearchableFields.own.to_data(row)

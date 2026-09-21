@@ -21,6 +21,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow, agents
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -100,7 +101,7 @@ class AgentDBSource:
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
-            return agent_row.to_data()
+            return AgentSearchableFields.own.to_data(agent_row)
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:

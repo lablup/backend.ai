@@ -154,6 +154,49 @@
         "title": "AgentStatusFilter",
         "type": "object"
       },
+      "AgentUsage": {
+        "description": "Uses narrowing the agents read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Agents the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the agent narrows the result"
+          }
+        },
+        "title": "AgentUsage",
+        "type": "object"
+      },
+      "AgentUsedBy": {
+        "description": "Entities whose use of the agent narrows the result.",
+        "properties": {
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions running a kernel on the agent",
+            "title": "Session"
+          }
+        },
+        "title": "AgentUsedBy",
+        "type": "object"
+      },
       "EntityLabelFilter": {
         "description": "Filter over label rows.\n\nOne instance matches a single label at a time, so `key` and `value` given together\nconstrain the same label rather than two different ones.",
         "properties": {
@@ -673,6 +716,18 @@
       "AdminSearchAgentsInput": {
         "description": "Input for admin-scoped paginated agent search with cursor and offset pagination.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; agents the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {

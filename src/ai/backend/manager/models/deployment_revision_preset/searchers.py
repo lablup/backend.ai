@@ -7,7 +7,6 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
@@ -20,6 +19,9 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     PresetResourceSlotRow,
     ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    PresetResourceSlotSearchableFields,
 )
 from ai.backend.manager.models.specs.pagination import QueryPagination
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -103,8 +105,4 @@ class PresetResourceSlotSearcher(Searcher[PresetResourceSlotRow, PresetResourceS
 
     @override
     def to_data(self, row: PresetResourceSlotRow) -> PresetResourceSlotData:
-        return PresetResourceSlotData(
-            preset_id=DeploymentPresetID(row.preset_id),
-            slot_name=row.slot_name,
-            quantity=row.quantity,
-        )
+        return PresetResourceSlotSearchableFields.own.to_data(row)

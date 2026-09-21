@@ -29,6 +29,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
@@ -263,7 +264,7 @@ class AgentRepository:
             # and fills them itself.
             return [
                 AgentDetailData(
-                    agent=agent_row.to_data(),
+                    agent=AgentSearchableFields.own.to_data(agent_row),
                     resources=agent_row.resources_by_rank(),
                     permissions=[],
                 )

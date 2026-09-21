@@ -32,7 +32,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -191,7 +191,9 @@ from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     RouteHistoryRow,
 )
-from ai.backend.manager.models.scheduling_history.conditions import RouteHistoryConditions
+from ai.backend.manager.models.scheduling_history.searchable_fields import (
+    RouteHistorySearchableFields,
+)
 from ai.backend.manager.models.scheduling_history.updaters import (
     DeploymentHistoryAttemptUpdater,
 )
@@ -1650,7 +1652,11 @@ class DeploymentDBSource:
                 ReconcileTransition(
                     owner_id=history.deployment_id,
                     history_creator=history.creator,
-                    match_conditions=[RouteHistoryConditions.by_route_id(history.creator.route_id)],
+                    match_conditions=[
+                        RouteHistorySearchableFields.own.route_id.filter.equals(
+                            UUIDEqualMatchSpec(value=history.creator.route_id, negated=False)
+                        )
+                    ],
                 )
                 for history in histories
             ])
