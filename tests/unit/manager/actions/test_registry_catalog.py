@@ -244,6 +244,9 @@ from ai.backend.manager.services.image.actions.lookup_alias_owner import (
     LookupBulkImageAliasOwnerAction,
     LookupImageAliasOwnerAction,
 )
+from ai.backend.manager.services.image.actions.search_image_aliases import (
+    SearchImageAliasesAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
@@ -874,6 +877,31 @@ def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
     }
     assert recorded[ScopedSearchDeploymentsAction] == (
         DeploymentEntityType(),
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_image_alias_read_is_a_scoped_permission_read() -> None:
+    """The aliases of one image are read within that image's scope, not superadmin-only."""
+    registry = _ops_registry()
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[SearchImageAliasesAction] == (
+        ImageEntityType(),
         ActionKind.SCOPE,
         ActionGate.PERMISSION,
     )

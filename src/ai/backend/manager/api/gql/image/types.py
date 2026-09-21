@@ -18,9 +18,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.image.request import (
-    AdminSearchImageAliasesInput,
     ContainerRegistryScopeInputDTO,
     ImageAliasFilterInputDTO,
     ImageAliasNestedFilterInputDTO,
@@ -30,6 +28,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageScopeInputDTO,
     ImageStatusFilterInputDTO,
     ImageTypeFilterInputDTO,
+    SearchImageAliasesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     ImageAliasNode,
@@ -74,7 +73,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.models.image.searchable_fields import ImageAliasSearchableFields
 
 # =============================================================================
 # Enums
@@ -327,13 +325,9 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-        base_conditions = [
-            ImageAliasSearchableFields.own.image_id.filter.in_(
-                UUIDInMatchSpec(values=[ImageID(self.id)], negated=False)
-            )
-        ]
-        payload = await info.context.adapters.image.admin_search_image_aliases(
-            AdminSearchImageAliasesInput(
+        payload = await info.context.adapters.image.scoped_search_aliases(
+            ImageID(self.id),
+            SearchImageAliasesInput(
                 filter=pydantic_filter,
                 order=pydantic_orders,
                 first=first,
@@ -341,7 +335,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
                 last=last,
                 before=before,
             ),
-            base_conditions=base_conditions,
         )
         edges = [
             ImageV2AliasEdgeGQL(
