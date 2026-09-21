@@ -430,10 +430,8 @@ class BaseVolume(AbstractVolume):
             raise QuotaScopeNotFoundError
         vfpath = self.mangle_vfpath(vfid)
         await aiofiles.os.makedirs(vfpath, mode, exist_ok=exist_ok)
-        if mode != DEFAULT_VFOLDER_PERMISSION_MODE:
-            # The mode parameter in os.makedirs() sometimes fails to set directory permissions correctly.
-            # Calling Path.chmod() afterward ensures the desired permissions are properly applied.
-            vfpath.chmod(mode)
+        # makedirs() masks mode with the process umask, so set the mode explicitly.
+        vfpath.chmod(mode)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
@@ -559,11 +557,14 @@ class BaseVolume(AbstractVolume):
         exist_ok: bool = False,
     ) -> None:
         target_path = self.sanitize_vfpath(vfid, relpath)
+
+        def _mkdir() -> None:
+            target_path.mkdir(DEFAULT_VFOLDER_PERMISSION_MODE, parents=parents, exist_ok=exist_ok)
+            # mkdir() masks mode with the process umask, so set the mode explicitly.
+            target_path.chmod(DEFAULT_VFOLDER_PERMISSION_MODE)
+
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: target_path.mkdir(0o755, parents=parents, exist_ok=exist_ok),
-        )
+        await loop.run_in_executor(None, _mkdir)
 
     async def rmdir(
         self,
