@@ -13,16 +13,6 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
     UserUsageBucketSearchResult,
 )
 
-from .options import (
-    DomainUsageBucketConditions,
-    DomainUsageBucketOrders,
-    KernelUsageRecordConditions,
-    KernelUsageRecordOrders,
-    ProjectUsageBucketConditions,
-    ProjectUsageBucketOrders,
-    UserUsageBucketConditions,
-    UserUsageBucketOrders,
-)
 from .repositories import ResourceUsageHistoryRepositories
 from .repository import ResourceUsageHistoryRepository
 
@@ -40,15 +30,4 @@ __all__ = (
     "DomainUsageBucketSearchResult",
     "ProjectUsageBucketSearchResult",
     "UserUsageBucketSearchResult",
-    # Creator specs
-    # Query conditions
-    "KernelUsageRecordConditions",
-    "DomainUsageBucketConditions",
-    "ProjectUsageBucketConditions",
-    "UserUsageBucketConditions",
-    # Query orders
-    "KernelUsageRecordOrders",
-    "DomainUsageBucketOrders",
-    "ProjectUsageBucketOrders",
-    "UserUsageBucketOrders",
 )
