@@ -15,6 +15,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
@@ -32,6 +34,7 @@ from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.specs.search.usage import UsageConditions
 from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.virtual_entity.permission_reach import user_permission_reaches
 
 from .shelf_rows import (
     BoxData,
@@ -42,6 +45,7 @@ from .shelf_rows import (
     CategoryData,
     CategoryRow,
     ShelfData,
+    ShelfEntityType,
     ShelfItemData,
     ShelfItemRow,
     ShelfKind,
@@ -304,6 +308,33 @@ class ZoneShelfTarget(ScopeTarget):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ShelfRow.zone_id == zone_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
+class VisibleShelfTarget(ScopeTarget):
+    """The shelves a user's roles grant READ on, through the shared predicate."""
+
+    _user_id: UserID
+
+    def __init__(self, user_id: UserID) -> None:
+        self._user_id = user_id
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self._user_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self._user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return user_permission_reaches(user_id, Permission.READ, ShelfEntityType(), ShelfRow.id)
 
         return inner
 

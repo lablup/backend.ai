@@ -19,7 +19,7 @@ permissions:
   entity_share:                     []
   global:                           []
   idle_checker:                     []
-  image:                            []
+  image:                            [read]
   keypair_resource_policy:          []
   login_client_type:                []
   model_card:                       []

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination, QueryPagination
@@ -22,6 +23,7 @@ from .shelf_fields import (
     BoxSearchableFields,
     ShelfSearcher,
     SpecSearchableFields,
+    VisibleShelfTarget,
     ZoneShelfTarget,
 )
 from .shelf_rows import ShelfData, ZoneID
@@ -46,6 +48,22 @@ class ShelfSearches:
         return await self._repository.scoped_search(
             ScopedSearcher(
                 scopes=[ZoneShelfTarget(zone) for zone in zones],
+                used_by=used_by,
+                searcher=self._searcher(conditions, orders, pagination),
+            )
+        )
+
+    async def visible_to(
+        self,
+        user_id: UserID,
+        conditions: Sequence[QueryCondition] = (),
+        orders: Sequence[QueryOrder] = (),
+        used_by: Sequence[UsedBy] = (),
+        pagination: QueryPagination | None = None,
+    ) -> SearcherResult[ShelfData]:
+        return await self._repository.scoped_search(
+            ScopedSearcher(
+                scopes=[VisibleShelfTarget(user_id)],
                 used_by=used_by,
                 searcher=self._searcher(conditions, orders, pagination),
             )
