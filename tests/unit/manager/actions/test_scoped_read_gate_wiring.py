@@ -40,6 +40,9 @@ from ai.backend.manager.actions.registry.types import (
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
@@ -131,7 +134,10 @@ def registry(denying_scope: _DenyingScopeValidator) -> ProcessorRegistry[Any]:
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(scope=[denying_scope]),
+            validators=ActionValidators(
+                scope=[denying_scope],
+                global_scope=[RefusingGlobalActionValidator()],
+            ),
             repository=OpsRepository(MagicMock()),
         )
     )
@@ -147,7 +153,10 @@ def bulk_registry(denying_bulk: _DenyingBulkValidator) -> ProcessorRegistry[Any]
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(atomic_bulk=[denying_bulk]),
+            validators=ActionValidators(
+                atomic_bulk=[denying_bulk],
+                global_scope=[RefusingGlobalActionValidator()],
+            ),
             repository=OpsRepository(MagicMock()),
         )
     )

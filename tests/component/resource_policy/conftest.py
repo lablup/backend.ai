@@ -41,6 +41,7 @@ from ai.backend.manager.api.rest.v2.resource_policy.handler import V2ResourcePol
 from ai.backend.manager.api.rest.v2.resource_policy.registry import (
     register_v2_resource_policy_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -71,20 +72,27 @@ ProjectResourcePolicyFactory = Callable[
 @pytest.fixture()
 def resource_policy_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> tuple[
     KeypairResourcePolicyProcessors,
     UserResourcePolicyProcessors,
     ProjectResourcePolicyProcessors,
 ]:
     kp_processors = KeypairResourcePolicyProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(KeyPairResourcePolicyEntityType()))
+        group=ops_processor_group(
+            database_engine, GroupMeta(KeyPairResourcePolicyEntityType()), config_provider
+        )
     )
     up_processors = UserResourcePolicyProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(UserResourcePolicyEntityType()))
+        group=ops_processor_group(
+            database_engine, GroupMeta(UserResourcePolicyEntityType()), config_provider
+        )
     )
 
     pp_processors = ProjectResourcePolicyProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(ProjectResourcePolicyEntityType()))
+        group=ops_processor_group(
+            database_engine, GroupMeta(ProjectResourcePolicyEntityType()), config_provider
+        )
     )
 
     return kp_processors, up_processors, pp_processors

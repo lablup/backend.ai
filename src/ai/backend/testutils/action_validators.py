@@ -1,4 +1,4 @@
-"""Mock factories for the manager action-validator bundles used by processor tests."""
+"""Factories for the manager action-validator bundles used by processor tests."""
 
 from unittest.mock import MagicMock
 
@@ -22,6 +22,27 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+
+
+def build_global_gate(
+    db: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> VirtualEntityGlobalActionRBACValidator:
+    """The production global gate over the given database.
+
+    For a test registry whose processors are actually run: a super admin passes without
+    a read, and everyone else is answered by the graph in that database.
+    """
+    return VirtualEntityGlobalActionRBACValidator(
+        RbacPermissionCheckRepository(PermissionOpsProvider(db), config_provider),
+        config_provider,
+    )
 
 
 def mock_virtual_entity_rbac_validators() -> VirtualEntityRBACValidators:

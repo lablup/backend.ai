@@ -44,9 +44,14 @@ from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
-def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
+def error_log_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ErrorLogProcessors:
     return ErrorLogProcessors(
-        ops_processor_group(database_engine, GroupMeta(UserEntityType())).field_group(
+        ops_processor_group(
+            database_engine, GroupMeta(UserEntityType()), config_provider
+        ).field_group(
             FieldGroupMeta(ErrorLogFieldType()),
             ErrorLogData,
             LookupErrorLogOwnerAction,

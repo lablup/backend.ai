@@ -27,6 +27,9 @@ from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDepend
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityPartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.user.types import UserStatus
@@ -219,7 +222,8 @@ def processors(db: ExtendedAsyncSAEngine) -> DomainProcessors:
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(
-                partial_bulk=[VirtualEntityPartialBulkActionRBACValidator(check)]
+                partial_bulk=[VirtualEntityPartialBulkActionRBACValidator(check)],
+                global_scope=[RefusingGlobalActionValidator()],
             ),
             repository=OpsRepository(V2DBOpsProvider(db)),
         )

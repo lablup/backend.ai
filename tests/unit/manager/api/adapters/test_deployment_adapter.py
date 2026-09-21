@@ -36,8 +36,9 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
@@ -144,12 +145,6 @@ class _RecordingScopeValidator(ScopeActionValidator):
         self.seen.append(action.scope_targets())
 
 
-class _RefusingGlobalValidator(GlobalActionValidator):
-    @override
-    async def validate(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
-        raise InsufficientPrivilege("The global path is refused in this test.")
-
-
 class TestDeploymentSearchGates:
     """my/project searches are answered by the scope gate, not the global one.
 
@@ -191,7 +186,7 @@ class TestDeploymentSearchGates:
                 monitors=ActionMonitors(),
                 validators=ActionValidators(
                     scope=[scope_gate],
-                    global_scope=[_RefusingGlobalValidator()],
+                    global_scope=[RefusingGlobalActionValidator()],
                 ),
                 repository=repository,
             )

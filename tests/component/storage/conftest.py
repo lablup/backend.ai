@@ -80,9 +80,12 @@ def object_storage_processors(
 @pytest.fixture()
 def storage_namespace_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> StorageNamespaceProcessors:
     return StorageNamespaceProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(StorageNamespaceEntityType()))
+        group=ops_processor_group(
+            database_engine, GroupMeta(StorageNamespaceEntityType()), config_provider
+        )
     )
 
 

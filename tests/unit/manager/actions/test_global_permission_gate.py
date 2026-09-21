@@ -29,9 +29,13 @@ from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionPro
 from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
     VirtualEntityGlobalActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache, global_entity_id
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -121,6 +125,24 @@ def _processor(
         _run,
         validators=[VirtualEntityGlobalActionRBACValidator(repository, config_provider)],
     )
+
+
+class TestTheGateIsStated:
+    def test_a_processor_without_a_validator_is_refused(self) -> None:
+        with pytest.raises(ServerMisconfiguredError):
+            GlobalActionProcessor[_SearchAction, _Result](_run)
+
+        with pytest.raises(ServerMisconfiguredError):
+            GlobalActionProcessor[_SearchAction, _Result](_run, validators=[])
+
+    async def test_the_refusing_validator_lets_no_one_through(self) -> None:
+        processor = GlobalActionProcessor[_SearchAction, _Result](
+            _run, validators=[RefusingGlobalActionValidator()]
+        )
+
+        with with_user(_user(UserRole.SUPERADMIN)):
+            with pytest.raises(InsufficientPrivilege):
+                await processor.run(_SearchAction())
 
 
 class TestRoleBypasses:
