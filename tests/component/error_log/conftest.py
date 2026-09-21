@@ -17,6 +17,7 @@ from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -29,9 +30,14 @@ from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
-def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
+def error_log_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ErrorLogProcessors:
     return ErrorLogProcessors(
-        ops_processor_group(database_engine, GroupMeta(UserEntityType())).field_group(
+        ops_processor_group(
+            database_engine, GroupMeta(UserEntityType()), config_provider
+        ).field_group(
             FieldGroupMeta(ErrorLogFieldType()),
             ErrorLogData,
             LookupErrorLogOwnerAction,

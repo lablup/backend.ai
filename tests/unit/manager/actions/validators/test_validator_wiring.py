@@ -34,3 +34,4 @@ class TestVirtualEntityRBACValidatorWiring:
         assert validators.atomic_bulk == [bundle.atomic_bulk]
         assert validators.scope == [bundle.scope]
         assert validators.relation == [bundle.relation]
+        assert validators.global_scope == [bundle.global_scope]

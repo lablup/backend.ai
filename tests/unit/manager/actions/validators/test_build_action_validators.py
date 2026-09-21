@@ -8,6 +8,9 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.membership.validator.rbac import (
     VirtualEntityMembershipActionRBACValidator,
 )
@@ -50,3 +53,5 @@ class TestBuildActionValidators:
         assert isinstance(v2_validators.relation[0], VirtualEntityRelationActionRBACValidator)
         assert len(v2_validators.membership) == 1
         assert isinstance(v2_validators.membership[0], VirtualEntityMembershipActionRBACValidator)
+        assert len(v2_validators.global_scope) == 1
+        assert isinstance(v2_validators.global_scope[0], VirtualEntityGlobalActionRBACValidator)

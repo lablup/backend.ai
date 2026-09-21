@@ -28,6 +28,9 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualEntityScopeActionRBACValidator,
 )
@@ -245,7 +248,8 @@ def processors(db: ExtendedAsyncSAEngine) -> ResourcePresetProcessors:
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(
-                scope=[VirtualEntityScopeActionRBACValidator(check, config_provider)]
+                scope=[VirtualEntityScopeActionRBACValidator(check, config_provider)],
+                global_scope=[RefusingGlobalActionValidator()],
             ),
             repository=OpsRepository(V2DBOpsProvider(db)),
         )

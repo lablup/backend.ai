@@ -405,7 +405,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> PublicActionProcessor[TAction, TResult]:
         """Global state every authenticated caller may read.
 
-        The SUPERADMIN gate is replaced by an authentication check; the constructor
+        The global gate is replaced by an authentication check; the constructor
         rejects anything that is not a read, so a write cannot reach this path.
         """
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PUBLIC, ActionBacking.CUSTOM)

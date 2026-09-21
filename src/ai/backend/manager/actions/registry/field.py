@@ -229,7 +229,7 @@ class FieldGroup[TFieldData: FieldData]:
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, TResult]:
-        """Run a service over this field kind system-wide, behind the SUPERADMIN gate."""
+        """Run a service over this field kind system-wide, behind the global gate."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.CUSTOM)
         return GlobalActionProcessor(
             func,
@@ -244,7 +244,7 @@ class FieldGroup[TFieldData: FieldData]:
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TFieldData]]:
-        """A read across every row of this field type, behind the SUPERADMIN gate.
+        """A read across every row of this field type, behind the global gate.
 
         For one owner's rows use :meth:`search_ops`; this one names no owner."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)

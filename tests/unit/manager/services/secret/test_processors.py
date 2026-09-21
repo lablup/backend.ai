@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
+from collections.abc import Iterator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.secret import SecretFieldType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -19,7 +22,11 @@ from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
     ProcessorDependencies,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import (
     KeyProviderType,
     SecretFieldData,
@@ -27,6 +34,9 @@ from ai.backend.manager.data.secret.types import (
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.secret.repository import SecretRepository
 from ai.backend.manager.services.secret.actions.reencrypt import ReencryptSecretsAction
 from ai.backend.manager.services.secret.actions.status import GetSecretStatusAction
@@ -42,12 +52,33 @@ def repository() -> MagicMock:
     return repository
 
 
+@pytest.fixture(autouse=True)
+def global_singleton() -> Iterator[None]:
+    GlobalEntityIDCache.fill({name: GlobalEntityID(uuid.uuid4()) for name in GlobalEntityName})
+    try:
+        yield
+    finally:
+        GlobalEntityIDCache.clear()
+
+
 @pytest.fixture
-def registry() -> ProcessorRegistry[Any]:
+def global_gate() -> VirtualEntityGlobalActionRBACValidator:
+    """The production gate over a graph granting nothing, so only the roles pass."""
+    permission_check = MagicMock(spec=RbacPermissionCheckRepository)
+    permission_check.governed_permissions = AsyncMock(
+        side_effect=lambda keys: dict.fromkeys(keys, Permission.NONE)
+    )
+    config_provider = MagicMock()
+    config_provider.config.manager.rbac.enforcement_enabled = True
+    return VirtualEntityGlobalActionRBACValidator(permission_check, config_provider)
+
+
+@pytest.fixture
+def registry(global_gate: VirtualEntityGlobalActionRBACValidator) -> ProcessorRegistry[Any]:
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(global_scope=[global_gate]),
             repository=OpsRepository(MagicMock()),
         )
     )

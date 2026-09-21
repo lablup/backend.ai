@@ -46,6 +46,7 @@ from ai.backend.manager.api.rest.v2.app_config_definition.handler import (
 from ai.backend.manager.api.rest.v2.app_config_definition.registry import (
     register_v2_app_config_definition_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -55,6 +56,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.app_config.service import AppConfigService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.processors import ops_processor_group
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
@@ -65,18 +67,23 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture()
-def app_config_processors(database_engine: ExtendedAsyncSAEngine) -> AppConfigProcessors:
-    """The real read path: no RBAC validator, since the adapter fills the principal itself."""
+def app_config_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> AppConfigProcessors:
+    """The real read path: only the global gate, since the adapter fills the principal itself."""
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )
     return AppConfigProcessors(
         registry.group(GroupMeta(AppConfigEntityType())),
-        ops_processor_group(database_engine, GroupMeta(AppConfigEntityType())),
+        ops_processor_group(database_engine, GroupMeta(AppConfigEntityType()), config_provider),
         registry.group(GroupMeta(AppConfigDefinitionEntityType())),
         registry.group(GroupMeta(AppConfigAllowListEntityType())),
         AppConfigService(
