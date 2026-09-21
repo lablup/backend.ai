@@ -241,17 +241,16 @@ class ResourceAllocationAdapter(BaseAdapter):
 
     async def resource_group_usage(
         self,
-        rg_name: str,
+        resource_group_name: ResourceGroupName,
     ) -> ResourceGroupResourceAllocationPayload:
         """Get resource group usage."""
-        resource_group_name = ResourceGroupName(rg_name)
         resource_group = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=resource_group_name)
         )
         result = await self._session.resource_allocation.get_resource_group_usage.run(
             GetResourceGroupUsageAction(
                 resource_group_id=resource_group.entity_id(),
-                rg_name=resource_group_name,
+                resource_group_name=resource_group_name,
             )
         )
         return ResourceGroupResourceAllocationPayload(

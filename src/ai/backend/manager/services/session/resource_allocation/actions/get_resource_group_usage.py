@@ -15,7 +15,7 @@ class GetResourceGroupUsageAction(BaseSingleEntityAction):
     """Read what a resource group is currently using."""
 
     resource_group_id: ResourceGroupID
-    rg_name: ResourceGroupName
+    resource_group_name: ResourceGroupName
 
     @override
     def entity_id(self) -> EntityIdentifier:

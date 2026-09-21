@@ -70,7 +70,7 @@ async def test_usage_is_read_on_the_group_the_name_resolves_to(
     adapter: ResourceAllocationAdapter,
     processors: MagicMock,
 ) -> None:
-    payload = await adapter.resource_group_usage(rg_name=str(READABLE))
+    payload = await adapter.resource_group_usage(resource_group_name=READABLE)
 
     lookup_action = processors.resource_group.lookup.run.await_args.args[0]
     assert lookup_action.name == READABLE
@@ -78,7 +78,7 @@ async def test_usage_is_read_on_the_group_the_name_resolves_to(
         processors.session.resource_allocation.get_resource_group_usage.run.await_args.args[0]
     )
     assert usage_action.entity_id() == READABLE_ID
-    assert usage_action.rg_name == READABLE
+    assert usage_action.resource_group_name == READABLE
     assert payload.resource_group.capacity[0].quantity == Decimal(8)
     assert payload.resource_group.used[0].quantity == Decimal(2)
     assert payload.resource_group.free[0].quantity == Decimal(6)
@@ -95,7 +95,7 @@ async def test_a_group_the_caller_may_not_read_is_refused(
     )
 
     with pytest.raises(NotEnoughPermission):
-        await adapter.resource_group_usage(rg_name=str(READABLE))
+        await adapter.resource_group_usage(resource_group_name=READABLE)
 
 
 async def test_a_name_matching_no_group_ends_at_the_lookup(
@@ -107,5 +107,5 @@ async def test_a_name_matching_no_group_ends_at_the_lookup(
     )
 
     with pytest.raises(EntityNotFoundError):
-        await adapter.resource_group_usage(rg_name="rg-absent")
+        await adapter.resource_group_usage(resource_group_name=ResourceGroupName("rg-absent"))
     processors.session.resource_allocation.get_resource_group_usage.run.assert_not_awaited()
