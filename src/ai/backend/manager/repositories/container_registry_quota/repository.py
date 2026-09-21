@@ -42,7 +42,7 @@ class PerProjectRegistryQuotaRepository:
         self._db_source = registry_db_source
 
     @per_project_registry_quota_repository_resilience.apply()
-    async def fetch_container_registry_row(
+    async def fetch_container_registry_info(
         self, scope_id: ProjectScope
     ) -> PerProjectContainerRegistryInfo:
         registry_id = await self._db_source.lookup_image_commit_registry_id(
