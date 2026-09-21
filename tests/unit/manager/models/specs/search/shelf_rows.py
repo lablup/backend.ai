@@ -11,7 +11,7 @@ from __future__ import annotations
 import enum
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import override
 
@@ -75,6 +75,7 @@ class ShelfRow(Base):
     tags: Mapped[list[str]] = mapped_column(postgresql.ARRAY(sa.String), nullable=False)
     opened_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    stocked_on: Mapped[date] = mapped_column(sa.Date, nullable=False)
     zone_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, nullable=False)
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         sa.Uuid, sa.ForeignKey("test_search_category.id"), nullable=True
@@ -159,6 +160,7 @@ class ShelfData:
     tags: list[str]
     opened_at: datetime
     closed_at: datetime | None
+    stocked_on: date
     zone_id: uuid.UUID
     category_id: uuid.UUID | None
 

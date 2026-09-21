@@ -9,6 +9,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
+from ai.backend.manager.models.specs.conditions.date import DateConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
@@ -28,6 +29,7 @@ type FieldConditions = (
     StringEqualityConditions
     | StringConditions
     | UUIDConditions
+    | DateConditions
     | DateTimeConditions
     | IntConditions
     | FloatConditions

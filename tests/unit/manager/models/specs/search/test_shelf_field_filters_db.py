@@ -11,9 +11,11 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.common.dto.manager.query import DateRangeFilter
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 from .shelf_fields import ShelfSearchableFields
-from .shelf_fixtures import TIMES, Seeded
+from .shelf_fixtures import DATES, TIMES, Seeded
 from .shelf_rows import ShelfKind
 from .shelf_search import ShelfSearches, ids
 
@@ -185,6 +187,67 @@ class TestDateTimeFilters:
         result = await searches.in_global(conditions=[OWN.opened_at.filter.equals(stored)])
 
         assert ids(result) == seeded.shelf_ids("S3")
+
+
+class TestDateFilters:
+    async def test_가10_equality_and_its_negation(
+        self, searches: ShelfSearches, seeded: Seeded
+    ) -> None:
+        equal = await searches.in_global(conditions=[OWN.stocked_on.filter.equals(DATES[1])])
+        unequal = await searches.in_global(conditions=[OWN.stocked_on.filter.not_equals(DATES[1])])
+
+        assert ids(equal) == seeded.shelf_ids("S2")
+        assert ids(unequal) == seeded.shelf_ids("S1", "S3", "S4")
+
+    async def test_가10_before_and_after_exclude_the_bound(
+        self, searches: ShelfSearches, seeded: Seeded
+    ) -> None:
+        before = await searches.in_global(conditions=[OWN.stocked_on.filter.before(DATES[2])])
+        after = await searches.in_global(conditions=[OWN.stocked_on.filter.after(DATES[1])])
+
+        assert ids(before) == seeded.shelf_ids("S1", "S2")
+        assert ids(after) == seeded.shelf_ids("S3", "S4")
+
+    async def test_가10_on_or_before_and_on_or_after_include_the_bound(
+        self, searches: ShelfSearches, seeded: Seeded
+    ) -> None:
+        on_or_before = await searches.in_global(
+            conditions=[OWN.stocked_on.filter.on_or_before(DATES[2])]
+        )
+        on_or_after = await searches.in_global(
+            conditions=[OWN.stocked_on.filter.on_or_after(DATES[1])]
+        )
+
+        assert ids(on_or_before) == seeded.shelf_ids("S1", "S2", "S3")
+        assert ids(on_or_after) == seeded.shelf_ids("S2", "S3", "S4")
+
+    async def test_가10_range_filter_includes_both_bounds(
+        self, searches: ShelfSearches, seeded: Seeded
+    ) -> None:
+        adapter = BaseFilterAdapter()
+        both = await searches.in_global(
+            conditions=adapter.apply_date_range_filter(
+                DateRangeFilter(after=DATES[1], before=DATES[2]), OWN.stocked_on.filter
+            )
+        )
+        lower_only = await searches.in_global(
+            conditions=adapter.apply_date_range_filter(
+                DateRangeFilter(after=DATES[2]), OWN.stocked_on.filter
+            )
+        )
+        upper_only = await searches.in_global(
+            conditions=adapter.apply_date_range_filter(
+                DateRangeFilter(before=DATES[1]), OWN.stocked_on.filter
+            )
+        )
+        unbounded = await searches.in_global(
+            conditions=adapter.apply_date_range_filter(DateRangeFilter(), OWN.stocked_on.filter)
+        )
+
+        assert ids(both) == seeded.shelf_ids("S2", "S3")
+        assert ids(lower_only) == seeded.shelf_ids("S3", "S4")
+        assert ids(upper_only) == seeded.shelf_ids("S1", "S2")
+        assert ids(unbounded) == seeded.shelf_ids("S1", "S2", "S3", "S4")
 
 
 class TestEnumBoolUUIDFilters:

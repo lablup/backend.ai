@@ -19,6 +19,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
+from ai.backend.manager.models.specs.conditions.date import DateConditions
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
@@ -206,6 +207,11 @@ class _ShelfOwnFields(RowDataConverter[ShelfRow, ShelfData]):
         DateTimeConditions(ShelfRow.closed_at),
         ColumnOrder(ShelfRow.closed_at),
     )
+    stocked_on = SearchableField(
+        ShelfRow.stocked_on,
+        DateConditions(ShelfRow.stocked_on),
+        ColumnOrder(ShelfRow.stocked_on),
+    )
     zone_id = SearchableField(
         ShelfRow.zone_id, UUIDConditions(ShelfRow.zone_id), ColumnOrder(ShelfRow.zone_id)
     )
@@ -228,6 +234,7 @@ class _ShelfOwnFields(RowDataConverter[ShelfRow, ShelfData]):
             tags=self.tags.read(row),
             opened_at=self.opened_at.read(row),
             closed_at=self.closed_at.read(row),
+            stocked_on=self.stocked_on.read(row),
             zone_id=self.zone_id.read(row),
             category_id=self.category_id.read(row),
         )

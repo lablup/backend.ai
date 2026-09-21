@@ -2,15 +2,16 @@
 
 Four shelves in two zones: one whose two conditions sit on different boxes (S1), one
 whose single box meets both (S2), one with no child and no related row (S3), and one
-whose box has no spec (S4). Expected values are derived from :class:`Seeded` rather
-than repeated per test.
+whose box has no spec (S4). Their instants and dates step one day apart, so a bound set
+at one of them separates the four. Expected values are derived from :class:`Seeded`
+rather than repeated per test.
 """
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -30,6 +31,7 @@ from .shelf_rows import (
 )
 
 TIMES = [datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=offset) for offset in range(5)]
+DATES = [date(2026, 1, 1) + timedelta(days=offset) for offset in range(5)]
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,7 @@ class SeededShelf:
     tags: list[str]
     opened_at: datetime
     closed_at: datetime | None
+    stocked_on: date
     category_id: uuid.UUID | None
 
     def to_row(self) -> ShelfRow:
@@ -61,6 +64,7 @@ class SeededShelf:
             tags=self.tags,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
+            stocked_on=self.stocked_on,
             zone_id=self.zone_id,
             category_id=self.category_id,
         )
@@ -103,6 +107,7 @@ def _shelves(zones: dict[str, ZoneID], categories: dict[str, uuid.UUID]) -> dict
             tags=["a", "b"],
             opened_at=TIMES[0],
             closed_at=None,
+            stocked_on=DATES[0],
             category_id=categories["C1"],
         ),
         "S2": SeededShelf(
@@ -117,6 +122,7 @@ def _shelves(zones: dict[str, ZoneID], categories: dict[str, uuid.UUID]) -> dict
             tags=["b"],
             opened_at=TIMES[1],
             closed_at=TIMES[3],
+            stocked_on=DATES[1],
             category_id=categories["C2"],
         ),
         "S3": SeededShelf(
@@ -131,6 +137,7 @@ def _shelves(zones: dict[str, ZoneID], categories: dict[str, uuid.UUID]) -> dict
             tags=[],
             opened_at=TIMES[2],
             closed_at=TIMES[4],
+            stocked_on=DATES[2],
             category_id=None,
         ),
         "S4": SeededShelf(
@@ -145,6 +152,7 @@ def _shelves(zones: dict[str, ZoneID], categories: dict[str, uuid.UUID]) -> dict
             tags=["a"],
             opened_at=TIMES[3],
             closed_at=None,
+            stocked_on=DATES[3],
             category_id=None,
         ),
     }
