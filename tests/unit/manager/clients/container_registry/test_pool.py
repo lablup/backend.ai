@@ -5,7 +5,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.clients.container_registry.harbor import HarborQuotaClient
 from ai.backend.manager.clients.container_registry.pool import ContainerRegistryQuotaClientPool
-from ai.backend.manager.errors.image import ContainerRegistryQuotaNotSupported
+from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaNotSupported
 
 
 class TestContainerRegistryQuotaClientPool:

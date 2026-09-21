@@ -35,9 +35,9 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ImageType,
 )
+from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaNotConfigurable
 from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
-    ContainerRegistryQuotaNotConfigurable,
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )

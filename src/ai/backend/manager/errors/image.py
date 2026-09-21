@@ -62,32 +62,6 @@ class ContainerRegistryNotFound(EntityError, ObjectNotFound):
         )
 
 
-class ContainerRegistryQuotaNotConfigurable(EntityError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/container-registry/quota-not-configurable"
-    error_title = "The container registry lacks the project or credentials for quota management."
-
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            ContainerRegistryEntityType(),
-            ActionOperationType.GET,
-            ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class ContainerRegistryQuotaNotSupported(EntityError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/container-registry/quota-not-supported"
-    error_title = "The container registry type does not support quota management."
-
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            ContainerRegistryEntityType(),
-            ActionOperationType.GET,
-            ErrorDetail.NOT_IMPLEMENTED,
-        )
-
-
 class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
     object_name = "association of container_registry and group"
 

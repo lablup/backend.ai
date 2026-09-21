@@ -13,10 +13,10 @@ from ai.backend.manager.clients.container_registry.base import (
     ContainerRegistryProjectInfo,
 )
 from ai.backend.manager.errors.common import (
-    GenericBadRequest,
     InternalServerError,
     ObjectNotFound,
 )
+from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaAlreadyExists
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -100,7 +100,9 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
             if previous_quota != -1:
-                raise GenericBadRequest("Quota limit already exists!")
+                raise ContainerRegistryQuotaAlreadyExists(
+                    f"Quota limit already exists. (project: {project_info.project})"
+                )
 
             put_quota_api = yarl.URL(project_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)
             payload = {"hard": {"storage": quota}}

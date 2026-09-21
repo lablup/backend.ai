@@ -5,7 +5,7 @@ from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
 )
 from ai.backend.manager.clients.container_registry.harbor import HarborQuotaClient
-from ai.backend.manager.errors.image import ContainerRegistryQuotaNotSupported
+from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaNotSupported
 
 
 class ContainerRegistryQuotaClientPool:
