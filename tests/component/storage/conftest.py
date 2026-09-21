@@ -53,7 +53,9 @@ def object_storage_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ObjectStorageProcessors:
     artifact_repository = ArtifactRepository(database_engine, V2DBOpsProvider(database_engine))
-    object_storage_repository = ObjectStorageRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     service = ObjectStorageService(
         artifact_repository=artifact_repository,
@@ -90,7 +92,7 @@ def vfs_storage_processors(
     storage_manager: StorageSessionManager,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
-    vfs_storage_repository = VFSStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFSStorageService(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,

@@ -70,6 +70,7 @@ from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicy
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -125,7 +126,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.secret.types import SecretValue
@@ -1993,12 +1993,12 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: DeploymentID,
     ) -> None:
         """Test search_revisions returns empty result when no revisions exist."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 0
         assert result.items == []
@@ -2012,12 +2012,12 @@ class TestDeploymentRevisionOperations:
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions returns correct results."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 3
         assert len(result.items) == 3
@@ -2032,11 +2032,11 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test search_revisions respects pagination."""
         # First page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2044,11 +2044,11 @@ class TestDeploymentRevisionOperations:
         assert result.has_previous_page is False
 
         # Second page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=2),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2

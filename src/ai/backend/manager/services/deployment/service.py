@@ -44,8 +44,8 @@ from ai.backend.manager.errors.service import EndpointTokenNotFound, RoutingNotF
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
@@ -428,7 +428,7 @@ class DeploymentService:
         """Legacy (REST v1) search — full revision per item. DO NOT USE in new
         code; v2 uses :meth:`search_deployments`.
         """
-        result = await self._deployment_repository.search_legacy_endpoints(action.querier)
+        result = await self._deployment_repository.search_legacy_endpoints(action.searcher)
         deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
         return GlobalSearchLegacyDeploymentsActionResult(
             data=deployments,
@@ -550,7 +550,7 @@ class DeploymentService:
         # Bulk scan + independent per-deployment orchestration: multiple repo
         # and controller calls are required by design to preserve partial
         # success semantics. Each inner call owns its own transaction boundary.
-        active_querier = BatchQuerier(
+        active_searcher = DeploymentIDSearcher(
             pagination=NoPagination(),
             conditions=[
                 DeploymentSearchableFields.own.lifecycle_stage.filter.in_(
@@ -559,7 +559,7 @@ class DeploymentService:
             ],
         )
         deployment_ids = await self._deployment_repository.search_deployment_ids(
-            querier=active_querier,
+            searcher=active_searcher,
         )
         results: list[RevisionRefreshResult] = []
         succeeded = 0
@@ -640,9 +640,7 @@ class DeploymentService:
             total_count,
             has_next_page,
             has_previous_page,
-        ) = await self._deployment_repository.search_revision_resource_slots(
-            action.revision_id, action.querier
-        )
+        ) = await self._deployment_repository.search_revision_resource_slots(action.searcher)
         return SearchRevisionResourceSlotsActionResult(
             items=items,
             total_count=total_count,

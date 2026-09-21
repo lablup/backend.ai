@@ -47,8 +47,8 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionTerminated,
 )
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import (
     RouteData,
@@ -702,7 +702,7 @@ class RouteExecutor:
         # Caller composes the filter so the conditions stay explicit at
         # the call site instead of hiding behind a flag-laden helper.
         replica_fields = ReplicaSearchableFields.own
-        route_querier = BatchQuerier(
+        route_searcher = RouteInfoSearcher(
             pagination=NoPagination(),
             conditions=[
                 replica_fields.deployment_id.filter.in_(
@@ -713,7 +713,7 @@ class RouteExecutor:
             ],
         )
         connection_infos = await self._deployment_repo.fetch_route_connection_infos(
-            route_querier=route_querier,
+            route_searcher=route_searcher,
         )
 
         items_by_target: dict[tuple[str, str], list[UpdateRoutesItem]] = {}

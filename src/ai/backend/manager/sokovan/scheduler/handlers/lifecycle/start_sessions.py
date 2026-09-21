@@ -14,8 +14,8 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -126,7 +126,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Query Repository for additional data needed by Launcher
         # Use search_sessions_with_kernels_and_user to get user info for session start
-        querier = BatchQuerier(
+        searcher = SessionSearcher(
             pagination=NoPagination(),
             conditions=[
                 SessionSearchableFields.own.id.filter.in_(
@@ -134,7 +134,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                 )
             ],
         )
-        sessions_data = await self._repository.search_sessions_with_kernels_and_user(querier)
+        sessions_data = await self._repository.search_sessions_with_kernels_and_user(searcher)
 
         # Start kernels on agents via Launcher
         # Note: RecorderContext is handled inside Launcher

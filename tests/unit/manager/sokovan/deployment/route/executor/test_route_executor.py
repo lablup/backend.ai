@@ -1230,10 +1230,10 @@ class TestSyncAppproxy:
 
         await route_executor.sync_appproxy(routes)
 
-        querier = mock_deployment_repo.fetch_route_connection_infos.await_args.kwargs[
-            "route_querier"
+        searcher = mock_deployment_repo.fetch_route_connection_infos.await_args.kwargs[
+            "route_searcher"
         ]
-        compiled = [str(condition()) for condition in querier.conditions]
+        compiled = [str(condition()) for condition in searcher.conditions]
         assert not any("health_status" in clause for clause in compiled), (
             f"sync_appproxy must not filter by health; got {compiled}"
         )

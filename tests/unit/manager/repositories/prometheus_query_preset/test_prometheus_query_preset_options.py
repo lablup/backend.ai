@@ -114,6 +114,7 @@ class TestPrometheusQueryPresetOptions:
         return PrometheusQueryPresetRepository(
             db=db_with_cleanup,
             prometheus_client=MagicMock(spec=PrometheusClient),
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
 
     async def _seed_presets(

@@ -13,18 +13,21 @@ from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.object_storage.searchable_fields import (
     ObjectStorageSearchableFields,
 )
+from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 class ObjectStorageDBSource:
     """Database source for object storage operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     async def get_by_name(self, storage_name: str) -> ObjectStorageData:
         """
@@ -86,26 +89,14 @@ class ObjectStorageDBSource:
 
     async def search(
         self,
-        querier: BatchQuerier,
+        searcher: ObjectStorageSearcher,
     ) -> ObjectStorageListResult:
         """Searches Object storages with total count."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ObjectStorageRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [
-                ObjectStorageSearchableFields.own.to_data(row.ObjectStorageRow)
-                for row in result.rows
-            ]
-
-            return ObjectStorageListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return ObjectStorageListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

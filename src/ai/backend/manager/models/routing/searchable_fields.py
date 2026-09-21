@@ -12,6 +12,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
+    RouteData,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
@@ -168,6 +169,32 @@ class _ReplicaOwnFields(RowDataConverter[RoutingRow, ModelReplicaData]):
             traffic_status=self.traffic_status.read(row),
             health_check=self.health_check.read(row),
             replica_group_id=self.replica_group_id.read(row),
+            error_data=self.error_data.read(row) or {},
+        )
+
+    def to_route_data(self, row: RoutingRow) -> RouteData:
+        """The same row read as the reconciler's route record.
+
+        ``last_transition_at`` stays unset: it comes from the route history, which is
+        read separately.
+        """
+        session_id = self.session.read(row)
+        return RouteData(
+            route_id=self.field_id.read(row),
+            deployment_id=self.deployment_id.read(row),
+            session_id=SessionId(session_id) if session_id else None,
+            status=self.status.read(row),
+            health_status=self.health_status.read(row),
+            traffic_ratio=self.traffic_ratio.read(row),
+            created_at=self.created_at.read(row),
+            revision_id=self.revision.read(row),
+            traffic_status=self.traffic_status.read(row),
+            health_check=self.health_check.read(row),
+            termination_grace_period=self.termination_grace_period.read(row),
+            replica_host=self.replica_host.read(row),
+            replica_port=self.replica_port.read(row),
+            updated_at=self.updated_at.read(row),
+            sub_status=self.sub_status.read(row),
             error_data=self.error_data.read(row) or {},
         )
 
