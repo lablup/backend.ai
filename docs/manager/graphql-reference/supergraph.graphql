@@ -7154,9 +7154,9 @@ input DomainFairShareFilter
   domainName: StringFilter = null
 
   """
-  Added in 26.2.0. Nested filter for domain entity properties. Allows filtering by domain active status.
+  Added in 26.2.0. Filter by the domain this fair share is calculated for.
   """
-  domain: DomainFairShareDomainNestedFilter = null
+  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainFairShareFilter!] = null
@@ -7198,7 +7198,7 @@ enum DomainFairShareOrderField
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  DOMAIN_IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_IS_ACTIVE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search domains first, then order there.")
 }
 
 """Added in 24.09.0. """
@@ -15838,9 +15838,9 @@ input ProjectFairShareFilter
   domainName: StringFilter = null
 
   """
-  Added in 26.2.0. Nested filter for project entity properties. Allows filtering by project name, active status, and type.
+  Added in 26.2.0. Filter by the project this fair share is calculated for.
   """
-  project: ProjectFairShareProjectNestedFilter = null
+  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectFairShareFilter!] = null
@@ -15881,8 +15881,8 @@ enum ProjectFairShareOrderField
 {
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
-  PROJECT_IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
+  PROJECT_IS_ACTIVE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
 }
 
 """
@@ -19997,8 +19997,8 @@ input RGDomainFairShareFilter
   """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by domain properties."""
-  domain: DomainFairShareDomainNestedFilter = null
+  """Filter by the domain this fair share is calculated for."""
+  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
 
   """Combine with AND logic."""
   AND: [RGDomainFairShareFilter!] = null
@@ -20025,8 +20025,8 @@ input RGProjectFairShareFilter
   """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by project properties."""
-  project: ProjectFairShareProjectNestedFilter = null
+  """Filter by the project this fair share is calculated for."""
+  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
 
   """Combine with AND logic."""
   AND: [RGProjectFairShareFilter!] = null
@@ -20056,8 +20056,8 @@ input RGUserFairShareFilter
   """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by user properties."""
-  user: UserFairShareUserNestedFilter = null
+  """Filter by the user this fair share is calculated for."""
+  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
 
   """Combine with AND logic."""
   AND: [RGUserFairShareFilter!] = null
@@ -25119,10 +25119,8 @@ input UserFairShareFilter
   """
   domainName: StringFilter = null
 
-  """
-  Added in 26.2.0. Nested filter for user entity properties. Allows filtering by username, email, and active status.
-  """
-  user: UserFairShareUserNestedFilter = null
+  """Added in 26.2.0. Filter by the user this fair share is calculated for."""
+  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserFairShareFilter!] = null
@@ -25163,8 +25161,8 @@ enum UserFairShareOrderField
 {
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  USER_USERNAME @join__enumValue(graph: STRAWBERRY)
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
 }
 
 """Added in 24.09.0. Scope parameters for filtering user fair shares."""

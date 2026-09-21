@@ -64,23 +64,13 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.fair_share.conditions import (
-    DomainFairShareConditions,
-    ProjectFairShareConditions,
-    RGDomainFairShareConditions,
-    RGProjectFairShareConditions,
-    RGUserFairShareConditions,
-    UserFairShareConditions,
-)
-from ai.backend.manager.models.fair_share.orders import (
-    DomainFairShareOrders,
-    ProjectFairShareOrders,
-    RGDomainFairShareOrders,
-    RGProjectFairShareOrders,
-    RGUserFairShareOrders,
-    UserFairShareOrders,
+from ai.backend.manager.models.fair_share.deprecated_search import (
+    DeprecatedDomainFairShareFields,
+    DeprecatedProjectFairShareFields,
+    DeprecatedUserFairShareFields,
 )
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
@@ -91,6 +81,11 @@ from ai.backend.manager.models.fair_share.scopes import (
     DomainFairShareTarget,
     ProjectFairShareTarget,
     UserFairShareTarget,
+)
+from ai.backend.manager.models.fair_share.searchable_fields import (
+    DomainFairShareSearchableFields,
+    ProjectFairShareSearchableFields,
+    UserFairShareSearchableFields,
 )
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -119,21 +114,21 @@ from ai.backend.manager.services.resource_group.processors import ResourceGroupP
 
 def _domain_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DomainFairShareOrders.by_created_at(ascending=False),
+        forward_order=DomainFairShareSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=DomainFairShareRow.id,
     )
 
 
 def _project_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ProjectFairShareOrders.by_created_at(ascending=False),
+        forward_order=ProjectFairShareSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=ProjectFairShareRow.id,
     )
 
 
 def _user_fair_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=UserFairShareOrders.by_created_at(ascending=False),
+        forward_order=UserFairShareSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=UserFairShareRow.id,
     )
 
@@ -539,29 +534,21 @@ class FairShareAdapter(BaseAdapter):
 
     def _convert_domain_filter(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=DomainFairShareConditions.by_resource_group_contains,
-                equals_factory=DomainFairShareConditions.by_resource_group_equals,
-                starts_with_factory=DomainFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=DomainFairShareConditions.by_resource_group_ends_with,
-                in_factory=DomainFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=DomainFairShareConditions.by_domain_name_contains,
-                equals_factory=DomainFairShareConditions.by_domain_name_equals,
-                starts_with_factory=DomainFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=DomainFairShareConditions.by_domain_name_ends_with,
-                in_factory=DomainFairShareConditions.by_domain_name_in,
+        )
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DomainFairShareSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain is not None and filter.domain.is_active is not None:
-            conditions.append(
-                DomainFairShareConditions.by_domain_is_active(filter.domain.is_active)
+        )
+        if filter.domain is not None:
+            conditions.extend(
+                self.apply_bool_filter(
+                    filter.domain.is_active, DeprecatedDomainFairShareFields.is_active.filter
+                )
             )
         if filter.AND:
             for sub_filter in filter.AND:
@@ -582,29 +569,21 @@ class FairShareAdapter(BaseAdapter):
 
     def _convert_domain_filter_rg(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=RGDomainFairShareConditions.by_resource_group_contains,
-                equals_factory=RGDomainFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGDomainFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGDomainFairShareConditions.by_resource_group_ends_with,
-                in_factory=RGDomainFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=RGDomainFairShareConditions.by_domain_name_contains,
-                equals_factory=RGDomainFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGDomainFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGDomainFairShareConditions.by_domain_name_ends_with,
-                in_factory=RGDomainFairShareConditions.by_domain_name_in,
+        )
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DeprecatedDomainFairShareFields.name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain is not None and filter.domain.is_active is not None:
-            conditions.append(
-                DomainFairShareConditions.by_domain_is_active(filter.domain.is_active)
+        )
+        if filter.domain is not None:
+            conditions.extend(
+                self.apply_bool_filter(
+                    filter.domain.is_active, DeprecatedDomainFairShareFields.is_active.filter
+                )
             )
         if filter.AND:
             for sub_filter in filter.AND:
@@ -630,13 +609,13 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
-                return DomainFairShareOrders.by_domain_name(ascending=ascending)
+                return DomainFairShareSearchableFields.own.domain_name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareOrders.by_created_at(ascending=ascending)
+                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
-                return DomainFairShareOrders.by_domain_is_active(ascending=ascending)
+                return DeprecatedDomainFairShareFields.is_active.order.apply(ascending)
 
     def _convert_domain_orders_rg(self, orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
         return [self._convert_domain_order_rg(o) for o in orders]
@@ -645,48 +624,38 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return RGDomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
-                return RGDomainFairShareOrders.by_domain_name(ascending=ascending)
+                return DeprecatedDomainFairShareFields.name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return RGDomainFairShareOrders.by_created_at(ascending=ascending)
+                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
-                return RGDomainFairShareOrders.by_domain_is_active(ascending=ascending)
+                return DeprecatedDomainFairShareFields.is_active.order.apply(ascending)
 
     # ------------------------------------------------------------------ filter helpers (project)
 
     def _convert_project_filter(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_resource_group_contains,
-                equals_factory=ProjectFairShareConditions.by_resource_group_equals,
-                starts_with_factory=ProjectFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_resource_group_ends_with,
-                in_factory=ProjectFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=ProjectFairShareConditions.by_project_id,
-                in_factory=ProjectFairShareConditions.by_project_ids,
+        )
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, ProjectFairShareSearchableFields.own.project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_domain_name_contains,
-                equals_factory=ProjectFairShareConditions.by_domain_name_equals,
-                starts_with_factory=ProjectFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_domain_name_ends_with,
-                in_factory=ProjectFairShareConditions.by_domain_name_in,
+        )
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, ProjectFairShareSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.project is not None and filter.project.is_active is not None:
-            conditions.append(
-                ProjectFairShareConditions.by_project_is_active(filter.project.is_active)
+        )
+        if filter.project is not None:
+            conditions.extend(
+                self.apply_bool_filter(
+                    filter.project.is_active, DeprecatedProjectFairShareFields.is_active.filter
+                )
             )
         if filter.AND:
             for sub_filter in filter.AND:
@@ -707,36 +676,24 @@ class FairShareAdapter(BaseAdapter):
 
     def _convert_project_filter_rg(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=RGProjectFairShareConditions.by_resource_group_contains,
-                equals_factory=RGProjectFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGProjectFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGProjectFairShareConditions.by_resource_group_ends_with,
-                in_factory=RGProjectFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=RGProjectFairShareConditions.by_project_id,
-                in_factory=RGProjectFairShareConditions.by_project_ids,
+        )
+        conditions.extend(
+            self.apply_uuid_filter(filter.project_id, DeprecatedProjectFairShareFields.id.filter)
+        )
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DeprecatedProjectFairShareFields.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=RGProjectFairShareConditions.by_domain_name_contains,
-                equals_factory=RGProjectFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGProjectFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGProjectFairShareConditions.by_domain_name_ends_with,
-                in_factory=RGProjectFairShareConditions.by_domain_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.project is not None and filter.project.is_active is not None:
-            conditions.append(
-                ProjectFairShareConditions.by_project_is_active(filter.project.is_active)
+        )
+        if filter.project is not None:
+            conditions.extend(
+                self.apply_bool_filter(
+                    filter.project.is_active, DeprecatedProjectFairShareFields.is_active.filter
+                )
             )
         if filter.AND:
             for sub_filter in filter.AND:
@@ -762,13 +719,13 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareOrders.by_created_at(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_NAME:
-                return ProjectFairShareOrders.by_project_name(ascending=ascending)
+                return DeprecatedProjectFairShareFields.name.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
-                return ProjectFairShareOrders.by_project_is_active(ascending=ascending)
+                return DeprecatedProjectFairShareFields.is_active.order.apply(ascending)
 
     def _convert_project_orders_rg(self, orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
         return [self._convert_project_order_rg(o) for o in orders]
@@ -777,54 +734,49 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return RGProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return RGProjectFairShareOrders.by_created_at(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_NAME:
-                return RGProjectFairShareOrders.by_project_name(ascending=ascending)
+                return DeprecatedProjectFairShareFields.name.order.apply(ascending)
             case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
-                return RGProjectFairShareOrders.by_project_is_active(ascending=ascending)
+                return DeprecatedProjectFairShareFields.is_active.order.apply(ascending)
+
+    def _user_active_conditions(self, is_active: bool | None) -> list[QueryCondition]:
+        """Active means the account status is ACTIVE; inactive means it is anything else."""
+        if is_active is None:
+            return []
+        status = DeprecatedUserFairShareFields.status.filter
+        if is_active:
+            return [status.equals(UserStatus.ACTIVE)]
+        return [status.not_equals(UserStatus.ACTIVE)]
 
     # ------------------------------------------------------------------ filter helpers (user)
 
     def _convert_user_filter(self, filter: UserFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=UserFairShareConditions.by_resource_group_contains,
-                equals_factory=UserFairShareConditions.by_resource_group_equals,
-                starts_with_factory=UserFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=UserFairShareConditions.by_resource_group_ends_with,
-                in_factory=UserFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.user_uuid is not None:
-            cond = filter.user_uuid.build_query_condition(
-                equals_factory=UserFairShareConditions.by_user_uuid,
-                in_factory=UserFairShareConditions.by_user_uuids,
+        )
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.user_uuid, UserFairShareSearchableFields.own.user_uuid.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=UserFairShareConditions.by_project_id,
-                in_factory=UserFairShareConditions.by_project_ids,
+        )
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, UserFairShareSearchableFields.own.project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=UserFairShareConditions.by_domain_name_contains,
-                equals_factory=UserFairShareConditions.by_domain_name_equals,
-                starts_with_factory=UserFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=UserFairShareConditions.by_domain_name_ends_with,
-                in_factory=UserFairShareConditions.by_domain_name_in,
+        )
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, UserFairShareSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.user is not None and filter.user.is_active is not None:
-            conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
+        )
+        if filter.user is not None:
+            conditions.extend(self._user_active_conditions(filter.user.is_active))
         if filter.AND:
             for sub_filter in filter.AND:
                 conditions.extend(self._convert_user_filter(sub_filter))
@@ -844,42 +796,28 @@ class FairShareAdapter(BaseAdapter):
 
     def _convert_user_filter_rg(self, filter: UserFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=RGUserFairShareConditions.by_resource_group_contains,
-                equals_factory=RGUserFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGUserFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGUserFairShareConditions.by_resource_group_ends_with,
-                in_factory=RGUserFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.user_uuid is not None:
-            cond = filter.user_uuid.build_query_condition(
-                equals_factory=RGUserFairShareConditions.by_user_uuid,
-                in_factory=RGUserFairShareConditions.by_user_uuids,
+        )
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.user_uuid, DeprecatedUserFairShareFields.membership_user_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=RGUserFairShareConditions.by_project_id,
-                in_factory=RGUserFairShareConditions.by_project_ids,
+        )
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, DeprecatedUserFairShareFields.membership_project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=RGUserFairShareConditions.by_domain_name_contains,
-                equals_factory=RGUserFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGUserFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGUserFairShareConditions.by_domain_name_ends_with,
-                in_factory=RGUserFairShareConditions.by_domain_name_in,
+        )
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DeprecatedUserFairShareFields.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.user is not None and filter.user.is_active is not None:
-            conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
+        )
+        if filter.user is not None:
+            conditions.extend(self._user_active_conditions(filter.user.is_active))
         if filter.AND:
             for sub_filter in filter.AND:
                 conditions.extend(self._convert_user_filter_rg(sub_filter))
@@ -904,13 +842,13 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareOrders.by_created_at(ascending=ascending)
+                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
             case UserFairShareOrderField.USER_USERNAME:
-                return UserFairShareOrders.by_user_username(ascending=ascending)
+                return DeprecatedUserFairShareFields.username.order.apply(ascending)
             case UserFairShareOrderField.USER_EMAIL:
-                return UserFairShareOrders.by_user_email(ascending=ascending)
+                return DeprecatedUserFairShareFields.email.order.apply(ascending)
 
     def _convert_user_orders_rg(self, orders: list[UserFairShareOrder]) -> list[QueryOrder]:
         return [self._convert_user_order_rg(o) for o in orders]
@@ -919,13 +857,13 @@ class FairShareAdapter(BaseAdapter):
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return RGUserFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return RGUserFairShareOrders.by_created_at(ascending=ascending)
+                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
             case UserFairShareOrderField.USER_USERNAME:
-                return RGUserFairShareOrders.by_user_username(ascending=ascending)
+                return DeprecatedUserFairShareFields.username.order.apply(ascending)
             case UserFairShareOrderField.USER_EMAIL:
-                return RGUserFairShareOrders.by_user_email(ascending=ascending)
+                return DeprecatedUserFairShareFields.email.order.apply(ascending)
 
     # ------------------------------------------------------------------ data → DTO converters
 

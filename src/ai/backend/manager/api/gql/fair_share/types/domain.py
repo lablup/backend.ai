@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     UpsertDomainFairShareWeightPayload as UpsertDomainFairShareWeightPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -149,6 +150,16 @@ class DomainFairShareConnection(Connection[DomainFairShareGQL]):
         self.count = count
 
 
+_DOMAIN_FILTER_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns cannot check"
+    " whether the caller may read that row. Search domains first, then narrow by domainName."
+)
+_DOMAIN_ORDER_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. An order on another entity's columns cannot check"
+    " whether the caller may read that row. Search domains first, then order there."
+)
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Nested filter for domain entity fields in domain fair share queries. Allows filtering by domain properties such as active status.",
@@ -183,9 +194,10 @@ class DomainFairShareFilter(PydanticInputMixin[DomainFairShareFilterDTO]):
     domain: DomainFairShareDomainNestedFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.2.0",
-            description="Nested filter for domain entity properties. Allows filtering by domain active status.",
+            description="Filter by the domain this fair share is calculated for.",
         ),
         default=None,
+        deprecation_reason=_DOMAIN_FILTER_DEPRECATION,
     )
 
     AND: list[Self] | None = gql_field(
@@ -217,7 +229,9 @@ class RGDomainFairShareFilter(PydanticInputMixin[DomainFairShareFilterDTO]):
     )
     domain_name: StringFilter | None = gql_field(description="Filter by domain name.", default=None)
     domain: DomainFairShareDomainNestedFilter | None = gql_field(
-        description="Filter by domain properties.", default=None
+        description="Filter by the domain this fair share is calculated for.",
+        default=None,
+        deprecation_reason=_DOMAIN_FILTER_DEPRECATION,
     )
 
     AND: list[Self] | None = gql_field(description="Combine with AND logic.", default=None)
@@ -237,6 +251,7 @@ class RGDomainFairShareFilter(PydanticInputMixin[DomainFairShareFilterDTO]):
         ),
     ),
     name="DomainFairShareOrderField",
+    deprecated_values={"DOMAIN_IS_ACTIVE": _DOMAIN_ORDER_DEPRECATION},
 )
 class DomainFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
