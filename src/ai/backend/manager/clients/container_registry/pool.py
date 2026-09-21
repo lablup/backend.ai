@@ -5,7 +5,7 @@ from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
 )
 from ai.backend.manager.clients.container_registry.harbor import HarborQuotaClient
-from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.image import ContainerRegistryQuotaNotSupported
 
 
 class ContainerRegistryQuotaClientPool:
@@ -14,6 +14,6 @@ class ContainerRegistryQuotaClientPool:
             case ContainerRegistryType.HARBOR2:
                 return HarborQuotaClient()
             case _:
-                raise GenericBadRequest(
-                    f"{type_} does not support registry quota per project management."
+                raise ContainerRegistryQuotaNotSupported(
+                    f"{type_} does not support registry quota management."
                 )
