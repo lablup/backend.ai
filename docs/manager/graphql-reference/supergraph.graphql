@@ -765,6 +765,24 @@ type AgentSystemInfo
   computePlugins: ComputePlugins!
 }
 
+"""
+Added in 26.9.0. Uses narrowing an agent query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only agents the caller can read are returned, even when a listed entity is tied to others.
+"""
+input AgentUsage
+  @join__type(graph: STRAWBERRY)
+{
+  """Entities whose use of the agent narrows the read."""
+  usedBy: AgentUsedBy = null
+}
+
+"""Added in 26.9.0. Entities whose use of an agent narrows the read."""
+input AgentUsedBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Sessions running a kernel on the agent."""
+  session: [UUID!] = null
+}
+
 """Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
 type AgentV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -17276,7 +17294,20 @@ type Query
   agentStats: AgentStats @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0. List agents with filtering and pagination"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection @join__field(graph: STRAWBERRY)
+  agentsV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; agents the caller cannot read are left out.
+    """
+    usage: AgentUsage = null
+    filter: AgentFilter = null
+    orderBy: [AgentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): AgentV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.7.0. Get a single app config allow-list entry by id (super admin only).
