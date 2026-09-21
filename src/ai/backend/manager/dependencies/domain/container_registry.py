@@ -11,15 +11,13 @@ from ai.backend.manager.clients.container_registry.harbor import (
 from .base import DomainDependency
 
 
-class RegistryQuotaClientPoolDependency(
-    DomainDependency[None, ContainerRegistryQuotaClientPool],
-):
-    """Provides ContainerRegistryQuotaClientPool lifecycle management."""
+class ContainerRegistryDependency(DomainDependency[None, ContainerRegistryQuotaClientPool]):
+    """Provides the container registry domain's client pool."""
 
     @property
     @override
     def stage_name(self) -> str:
-        return "registry-quota-client-pool"
+        return "container-registry"
 
     @asynccontextmanager
     @override

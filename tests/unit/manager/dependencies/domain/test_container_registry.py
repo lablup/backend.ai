@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ai.backend.manager.dependencies.domain.registry_quota_client_pool import (
-    RegistryQuotaClientPoolDependency,
+from ai.backend.manager.dependencies.domain.container_registry import (
+    ContainerRegistryDependency,
 )
 
 
-class TestRegistryQuotaClientPoolDependency:
-    """Test RegistryQuotaClientPoolDependency lifecycle."""
+class TestContainerRegistryDependency:
+    """Test ContainerRegistryDependency lifecycle."""
 
     @patch(
-        "ai.backend.manager.dependencies.domain.registry_quota_client_pool"
-        ".ContainerRegistryQuotaClientPool"
+        "ai.backend.manager.dependencies.domain.container_registry.ContainerRegistryQuotaClientPool"
     )
     async def test_provide_registry_quota_client_pool(
         self,
@@ -22,7 +21,7 @@ class TestRegistryQuotaClientPoolDependency:
         mock_pool = MagicMock()
         mock_pool_class.return_value = mock_pool
 
-        dependency = RegistryQuotaClientPoolDependency()
+        dependency = ContainerRegistryDependency()
         async with dependency.provide(None) as pool:
             assert pool is mock_pool
             mock_pool_class.assert_called_once()
