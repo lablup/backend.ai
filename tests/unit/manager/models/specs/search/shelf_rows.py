@@ -34,12 +34,30 @@ class BoxState(enum.StrEnum):
     CLOSED = "closed"
 
 
+class ShelfEntityType(EntityType):
+    """The type the graph records a shelf under."""
+
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_search_shelf"
+
+
+class ZoneEntityType(EntityType):
+    """The type the graph records a zone under."""
+
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_search_zone"
+
+
 class ZoneID(EntityIdentifier):
     """The scope a shelf belongs to."""
 
     @override
     def entity_type(self) -> EntityType:
-        return EntityType("test_search_zone")
+        return ZoneEntityType()
 
 
 class CartID(EntityIdentifier):
