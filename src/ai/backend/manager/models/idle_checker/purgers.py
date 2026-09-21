@@ -18,6 +18,9 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.relation import RelationPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -52,7 +55,7 @@ class IdleCheckerPurger(EntityPurger[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return row.to_data()
+        return IdleCheckerSearchableFields.own.to_data(row)
 
 
 @dataclass

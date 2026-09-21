@@ -1,9 +1,9 @@
 from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import ScopedFieldsOpsResult
-from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
@@ -70,7 +70,7 @@ class ArtifactProcessors:
     search_artifacts_with_revisions: GlobalActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
     ]
-    get_revisions: ScopeActionProcessor[
+    get_revisions: BulkActionProcessor[
         GetArtifactRevisionsAction, ScopedFieldsOpsResult[ArtifactRevisionData]
     ]
     update: SingleEntityActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
@@ -104,7 +104,7 @@ class ArtifactProcessors:
         self.search_artifacts_with_revisions = group.global_scope(
             SearchArtifactsWithRevisionsAction, service.search_with_revisions
         )
-        self.get_revisions = revisions.search_ops(GetArtifactRevisionsAction)
+        self.get_revisions = revisions.atomic_bulk_scoped_search_ops(GetArtifactRevisionsAction)
         self.update = group.single_entity(UpdateArtifactAction, service.update)
         self.upsert_artifacts_with_revisions = group.global_scope(
             UpsertArtifactsAction, service.upsert_artifacts_with_revisions

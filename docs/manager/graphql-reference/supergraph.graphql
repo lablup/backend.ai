@@ -1485,12 +1485,15 @@ input ArtifactOrderBy
   direction: OrderDirection! = ASC
 }
 
+"""
+Added in 24.09.0. Fields available for ordering artifact query results.
+"""
 enum ArtifactOrderField
   @join__type(graph: STRAWBERRY)
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   TYPE @join__enumValue(graph: STRAWBERRY)
-  SIZE @join__enumValue(graph: STRAWBERRY)
+  SIZE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A size belongs to a revision rather than the artifact, so this value is not used for ordering. It is removed in the next release.")
   SCANNED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }

@@ -12,7 +12,6 @@ from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
-from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -111,24 +110,3 @@ class AuditLogRow(Base):
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> AuditLogData:
-        return AuditLogData(
-            id=AuditLogID(self.id),
-            action_id=self.action_id,
-            action_kind=self.action_kind,
-            action_name=self.action_name,
-            entity_type=self.entity_type,
-            operation=self.operation,
-            created_at=self.created_at,
-            description=self.description,
-            status=self.status,
-            target_entity_id=self.entity_id,
-            lookup_kind=self.lookup_kind,
-            lookup_key=self.lookup_key,
-            request_id=self.request_id,
-            triggered_by=self.triggered_by,
-            acted_as=self.acted_as,
-            duration=self.duration,
-            client_ip=self.client_ip,
-        )

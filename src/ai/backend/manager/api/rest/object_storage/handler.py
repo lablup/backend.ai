@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.request import (
     GetPresignedDownloadURLReq,
     GetPresignedUploadURLReq,
@@ -27,7 +28,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -135,7 +138,11 @@ class ObjectStorageHandler:
                     used_by=(),
                     searcher=StorageNamespaceSearcher(
                         pagination=NoPagination(),
-                        conditions=[StorageNamespaceConditions.by_storage_id(storage_id)],
+                        conditions=[
+                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                                UUIDEqualMatchSpec(value=storage_id, negated=False)
+                            )
+                        ],
                     ),
                 )
             )

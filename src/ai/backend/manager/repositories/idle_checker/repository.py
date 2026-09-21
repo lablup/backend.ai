@@ -5,13 +5,15 @@ from collections.abc import Collection, Sequence
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerAssignmentSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -54,7 +56,11 @@ class IdleCheckerRepository:
             result = await r.search_in_global(
                 IdleCheckerAssignmentSearcher(
                     pagination=OffsetPagination(limit=1),
-                    conditions=[IdleCheckerAssignmentConditions.by_id(assignment_id)],
+                    conditions=[
+                        IdleCheckerAssignmentSearchableFields.own.field_id.filter.equals(
+                            UUIDEqualMatchSpec(value=assignment_id, negated=False)
+                        )
+                    ],
                 )
             )
         if not result.items:
@@ -69,11 +75,15 @@ class IdleCheckerRepository:
                 IdleCheckerAssignmentSearcher(
                     pagination=OffsetPagination(limit=1),
                     conditions=[
-                        IdleCheckerAssignmentConditions.by_scope_type_equals(scope.entity_type()),
-                        IdleCheckerAssignmentConditions.by_scope_id_equals(
+                        IdleCheckerAssignmentSearchableFields.own.scope_type.filter.equals(
+                            StringMatchSpec(
+                                scope.entity_type(), case_insensitive=False, negated=False
+                            )
+                        ),
+                        IdleCheckerAssignmentSearchableFields.own.scope_id.filter.equals(
                             UUIDEqualMatchSpec(value=scope, negated=False)
                         ),
-                        IdleCheckerAssignmentConditions.by_idle_checker_id_equals(
+                        IdleCheckerAssignmentSearchableFields.own.idle_checker_id.filter.equals(
                             UUIDEqualMatchSpec(value=checker_id, negated=False)
                         ),
                     ],

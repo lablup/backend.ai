@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from functools import lru_cache
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.data.entity.artifact import ArtifactID
@@ -68,17 +69,14 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.data.artifact.types import (
     DelegateeTarget as ServiceDelegateeTarget,
 )
-from ai.backend.manager.models.artifact.conditions import ArtifactConditions
-from ai.backend.manager.models.artifact.orders import (
-    DEFAULT_FORWARD_ORDER,
-    resolve_order,
-)
 from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
 from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
 from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
-from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
-from ai.backend.manager.models.artifact_revision.orders import ArtifactRevisionOrders
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchable_fields import (
+    ArtifactRevisionSearchableFields,
+)
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
@@ -133,7 +131,7 @@ from ai.backend.manager.types import OptionalState, TriState
 @lru_cache(maxsize=1)
 def _get_artifact_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DEFAULT_FORWARD_ORDER,
+        forward_order=ArtifactSearchableFields.own.id.order.apply(ascending=False),
         cursor_column=ArtifactRow.id,
     )
 
@@ -141,7 +139,7 @@ def _get_artifact_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_artifact_revision_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ArtifactRevisionRow.id.desc(),
+        forward_order=ArtifactRevisionSearchableFields.own.field_id.order.apply(ascending=False),
         cursor_column=ArtifactRevisionRow.id,
     )
 
@@ -491,48 +489,21 @@ class ArtifactAdapter(BaseAdapter):
         filter: ArtifactGQLFilterInputDTO,
     ) -> list[QueryCondition]:
         """Convert a GQL-facing ArtifactGQLFilterInputDTO to query conditions."""
+        fields = ArtifactSearchableFields.own
         conditions: list[QueryCondition] = []
 
         if filter.type:
             conditions.append(
-                ArtifactConditions.by_types([DataArtifactType(t.value) for t in filter.type])
+                fields.type.filter.in_([DataArtifactType(t.value) for t in filter.type])
             )
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=ArtifactConditions.by_name_contains,
-                equals_factory=ArtifactConditions.by_name_equals,
-                starts_with_factory=ArtifactConditions.by_name_starts_with,
-                ends_with_factory=ArtifactConditions.by_name_ends_with,
-                in_factory=ArtifactConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.registry is not None:
-            condition = self.convert_string_filter(
-                filter.registry,
-                contains_factory=ArtifactConditions.by_registry_contains,
-                equals_factory=ArtifactConditions.by_registry_equals,
-                starts_with_factory=ArtifactConditions.by_registry_starts_with,
-                ends_with_factory=ArtifactConditions.by_registry_ends_with,
-                in_factory=ArtifactConditions.by_registry_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.source is not None:
-            condition = self.convert_string_filter(
-                filter.source,
-                contains_factory=ArtifactConditions.by_source_contains,
-                equals_factory=ArtifactConditions.by_source_equals,
-                starts_with_factory=ArtifactConditions.by_source_starts_with,
-                ends_with_factory=ArtifactConditions.by_source_ends_with,
-                in_factory=ArtifactConditions.by_source_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        conditions.extend(self.apply_string_filter(filter.name, fields.name.filter))
+        conditions.extend(self.apply_string_filter(filter.registry, fields.registry_type.filter))
+        conditions.extend(
+            self.apply_string_filter(filter.source, fields.source_registry_type.filter)
+        )
         if filter.availability:
             conditions.append(
-                ArtifactConditions.by_availability([
+                fields.availability.filter.in_([
                     DataArtifactAvailability(a.value) for a in filter.availability
                 ])
             )
@@ -560,79 +531,26 @@ class ArtifactAdapter(BaseAdapter):
         orders: list[ArtifactGQLOrderByInputDTO],
     ) -> list[QueryOrder]:
         """Convert GQL order DTOs to query orders."""
-        result: list[QueryOrder] = []
-        for order in orders:
-            ascending = order.direction == OrderDirection.ASC
-            match order.field:
-                case ArtifactOrderField.NAME:
-                    result.append(ArtifactRow.name.asc() if ascending else ArtifactRow.name.desc())
-                case ArtifactOrderField.TYPE:
-                    result.append(ArtifactRow.type.asc() if ascending else ArtifactRow.type.desc())
-                case ArtifactOrderField.SCANNED_AT:
-                    result.append(
-                        ArtifactRow.scanned_at.asc() if ascending else ArtifactRow.scanned_at.desc()
-                    )
-                case ArtifactOrderField.UPDATED_AT:
-                    result.append(
-                        ArtifactRow.updated_at.asc() if ascending else ArtifactRow.updated_at.desc()
-                    )
-                case ArtifactOrderField.SIZE:
-                    result.append(
-                        ArtifactRow.updated_at.asc() if ascending else ArtifactRow.updated_at.desc()
-                    )
-        return result
+        return self._artifact_orders([
+            (order.field, order.direction == OrderDirection.ASC) for order in orders
+        ])
 
     def _convert_gql_revision_filter(
         self,
         filter: ArtifactRevisionGQLFilterInputDTO,
     ) -> list[QueryCondition]:
         """Convert a GQL-facing ArtifactRevisionGQLFilterInputDTO to query conditions."""
+        fields = ArtifactRevisionSearchableFields.own
         conditions: list[QueryCondition] = []
 
         if filter.status is not None:
             conditions.extend(self._convert_revision_status_filter(filter.status))
         if filter.remote_status is not None:
             conditions.extend(self._convert_revision_remote_status_filter(filter.remote_status))
-        if filter.version is not None:
-            condition = self.convert_string_filter(
-                filter.version,
-                contains_factory=ArtifactRevisionConditions.by_version_contains,
-                equals_factory=ArtifactRevisionConditions.by_version_equals,
-                starts_with_factory=ArtifactRevisionConditions.by_version_starts_with,
-                ends_with_factory=ArtifactRevisionConditions.by_version_ends_with,
-                in_factory=ArtifactRevisionConditions.by_version_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        conditions.extend(self.apply_string_filter(filter.version, fields.version.filter))
         if filter.artifact_id is not None:
-            if filter.artifact_id.equals is not None:
-                conditions.append(
-                    ArtifactRevisionConditions.by_artifact_id(filter.artifact_id.equals)
-                )
-            elif filter.artifact_id.in_ is not None:
-                conditions.append(
-                    ArtifactRevisionConditions.by_artifact_ids(filter.artifact_id.in_)
-                )
-        if filter.size is not None:
-            sf = filter.size
-            if sf.equals is not None:
-                conditions.append(ArtifactRevisionConditions.by_size_equals(sf.equals))
-            if sf.not_equals is not None:
-                conditions.append(ArtifactRevisionConditions.by_size_not_equals(sf.not_equals))
-            if sf.greater_than is not None:
-                conditions.append(ArtifactRevisionConditions.by_size_greater_than(sf.greater_than))
-            if sf.greater_than_or_equal is not None:
-                conditions.append(
-                    ArtifactRevisionConditions.by_size_greater_than_or_equal(
-                        sf.greater_than_or_equal
-                    )
-                )
-            if sf.less_than is not None:
-                conditions.append(ArtifactRevisionConditions.by_size_less_than(sf.less_than))
-            if sf.less_than_or_equal is not None:
-                conditions.append(
-                    ArtifactRevisionConditions.by_size_less_than_or_equal(sf.less_than_or_equal)
-                )
+            conditions.extend(self.apply_uuid_filter(filter.artifact_id, fields.artifact_id.filter))
+        conditions.extend(self.apply_int_filter(filter.size, fields.size.filter))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -656,64 +574,57 @@ class ArtifactAdapter(BaseAdapter):
     def _convert_revision_status_filter(
         sf: ArtifactRevisionStatusFilterDTO,
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
         statuses: list[DataArtifactStatus] = []
         if sf.in_ is not None:
             statuses.extend([DataArtifactStatus(s.value) for s in sf.in_])
         if sf.equals is not None:
             statuses.append(DataArtifactStatus(sf.equals.value))
-        if statuses:
-            conditions.append(ArtifactRevisionConditions.by_statuses(statuses))
-        return conditions
+        if not statuses:
+            return []
+        return [ArtifactRevisionSearchableFields.own.status.filter.in_(statuses)]
 
     @staticmethod
     def _convert_revision_remote_status_filter(
         rsf: ArtifactRevisionRemoteStatusFilterDTO,
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
         remote_statuses: list[DataArtifactRemoteStatus] = []
         if rsf.in_ is not None:
             remote_statuses.extend([DataArtifactRemoteStatus(s.value) for s in rsf.in_])
         if rsf.equals is not None:
             remote_statuses.append(DataArtifactRemoteStatus(rsf.equals.value))
-        if remote_statuses:
-            conditions.append(ArtifactRevisionConditions.by_remote_statuses(remote_statuses))
-        return conditions
+        if not remote_statuses:
+            return []
+        return [ArtifactRevisionSearchableFields.own.remote_status.filter.in_(remote_statuses)]
 
     @staticmethod
     def _convert_gql_revision_orders(
         orders: list[ArtifactRevisionGQLOrderByInputDTO],
     ) -> list[QueryOrder]:
         """Convert GQL revision order DTOs to query orders."""
+        fields = ArtifactRevisionSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field:
                 case ArtifactRevisionOrderField.VERSION:
-                    result.append(ArtifactRevisionOrders.version(ascending))
+                    result.append(fields.version.order.apply(ascending))
                 case ArtifactRevisionOrderField.STATUS:
-                    result.append(ArtifactRevisionOrders.status(ascending))
+                    result.append(fields.status.order.apply(ascending))
                 case ArtifactRevisionOrderField.SIZE:
-                    result.append(ArtifactRevisionOrders.size(ascending))
+                    result.append(fields.size.order.apply(ascending))
                 case ArtifactRevisionOrderField.CREATED_AT:
-                    result.append(ArtifactRevisionOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case ArtifactRevisionOrderField.UPDATED_AT:
-                    result.append(ArtifactRevisionOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
         return result
 
     def _convert_filter(self, filter: ArtifactFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=ArtifactConditions.by_name_contains,
-                equals_factory=ArtifactConditions.by_name_equals,
-                starts_with_factory=ArtifactConditions.by_name_starts_with,
-                ends_with_factory=ArtifactConditions.by_name_ends_with,
-                in_factory=ArtifactConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = ArtifactSearchableFields.own
+        conditions: list[QueryCondition] = list(
+            self.apply_string_filter(filter.name, fields.name.filter)
+        )
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.availability is not None:
@@ -722,51 +633,61 @@ class ArtifactAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_type_filter(tf: ArtifactTypeFilter) -> list[QueryCondition]:
+        conditions_of = ArtifactSearchableFields.own.type.filter
         conditions: list[QueryCondition] = []
         if tf.equals is not None:
-            conditions.append(ArtifactConditions.by_type_equals(DataArtifactType(tf.equals)))
+            conditions.append(conditions_of.equals(DataArtifactType(tf.equals)))
         if tf.in_ is not None:
-            conditions.append(ArtifactConditions.by_types([DataArtifactType(t) for t in tf.in_]))
+            conditions.append(conditions_of.in_([DataArtifactType(t) for t in tf.in_]))
         if tf.not_equals is not None:
-            conditions.append(
-                ArtifactConditions.by_type_not_equals(DataArtifactType(tf.not_equals))
-            )
+            conditions.append(conditions_of.not_equals(DataArtifactType(tf.not_equals)))
         if tf.not_in is not None:
-            conditions.append(
-                ArtifactConditions.by_types_not_in([DataArtifactType(t) for t in tf.not_in])
-            )
+            conditions.append(conditions_of.not_in([DataArtifactType(t) for t in tf.not_in]))
         return conditions
 
     @staticmethod
     def _convert_availability_filter(
         af: ArtifactAvailabilityFilter,
     ) -> list[QueryCondition]:
+        conditions_of = ArtifactSearchableFields.own.availability.filter
         conditions: list[QueryCondition] = []
         if af.equals is not None:
-            conditions.append(
-                ArtifactConditions.by_availability_equals(DataArtifactAvailability(af.equals))
-            )
+            conditions.append(conditions_of.equals(DataArtifactAvailability(af.equals)))
         if af.in_ is not None:
-            conditions.append(
-                ArtifactConditions.by_availability([DataArtifactAvailability(a) for a in af.in_])
-            )
+            conditions.append(conditions_of.in_([DataArtifactAvailability(a) for a in af.in_]))
         if af.not_equals is not None:
-            conditions.append(
-                ArtifactConditions.by_availability_not_equals(
-                    DataArtifactAvailability(af.not_equals)
-                )
-            )
+            conditions.append(conditions_of.not_equals(DataArtifactAvailability(af.not_equals)))
         if af.not_in is not None:
             conditions.append(
-                ArtifactConditions.by_availability_not_in([
-                    DataArtifactAvailability(a) for a in af.not_in
-                ])
+                conditions_of.not_in([DataArtifactAvailability(a) for a in af.not_in])
             )
         return conditions
 
+    def _convert_orders(self, order: list[ArtifactOrder]) -> list[QueryOrder]:
+        return self._artifact_orders([(o.field, o.direction == OrderDirection.ASC) for o in order])
+
     @staticmethod
-    def _convert_orders(order: list[ArtifactOrder]) -> list[QueryOrder]:
-        return [resolve_order(o.field, o.direction) for o in order]
+    def _artifact_orders(
+        orders: list[tuple[ArtifactOrderField, bool]],
+    ) -> list[QueryOrder]:
+        """``SIZE`` belongs to the revisions, not the artifact, so it orders by nothing."""
+        fields = ArtifactSearchableFields.own
+        result: list[QueryOrder] = []
+        for field, ascending in orders:
+            match field:
+                case ArtifactOrderField.NAME:
+                    result.append(fields.name.order.apply(ascending))
+                case ArtifactOrderField.TYPE:
+                    result.append(fields.type.order.apply(ascending))
+                case ArtifactOrderField.SCANNED_AT:
+                    result.append(fields.scanned_at.order.apply(ascending))
+                case ArtifactOrderField.UPDATED_AT:
+                    result.append(fields.updated_at.order.apply(ascending))
+                case ArtifactOrderField.SIZE:
+                    continue
+                case _:
+                    assert_never(field)
+        return result
 
     @staticmethod
     def _data_to_dto(data: ArtifactData) -> ArtifactNode:

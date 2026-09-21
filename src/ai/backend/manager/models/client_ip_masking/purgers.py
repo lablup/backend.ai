@@ -10,6 +10,9 @@ from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolic
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
+from ai.backend.manager.models.client_ip_masking.searchable_fields import (
+    ClientIPMaskingPolicySearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -42,4 +45,4 @@ class ClientIPMaskingPolicyPurger(
 
     @override
     def to_data(self, row: ClientIPMaskingPolicyRow) -> ClientIPMaskingPolicyData:
-        return row.to_data()
+        return ClientIPMaskingPolicySearchableFields.own.to_data(row)

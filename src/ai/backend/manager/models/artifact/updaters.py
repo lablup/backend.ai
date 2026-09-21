@@ -11,10 +11,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.artifact.types import ArtifactAvailability, ArtifactData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
-from ai.backend.manager.models.artifact.conditions import ArtifactConditions
 from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact.searchable_fields import (
+    ArtifactSearchableFields,
+)
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import (
@@ -72,7 +75,7 @@ class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return row.to_dataclass()
+        return ArtifactSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -113,7 +116,7 @@ class ArtifactScanUpdater(DataUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return row.to_dataclass()
+        return ArtifactSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -129,7 +132,11 @@ class ArtifactTouchUpdater(DataBatchUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        return [ArtifactConditions.by_ids(self.artifact_ids)]
+        return [
+            ArtifactSearchableFields.own.id.filter.in_(
+                UUIDInMatchSpec(values=list(self.artifact_ids), negated=False)
+            )
+        ]
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -142,4 +149,4 @@ class ArtifactTouchUpdater(DataBatchUpdater[ArtifactRow, ArtifactData]):
 
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
-        return row.to_dataclass()
+        return ArtifactSearchableFields.own.to_data(row)

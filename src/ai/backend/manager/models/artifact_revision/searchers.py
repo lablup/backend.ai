@@ -9,6 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchable_fields import (
+    ArtifactRevisionSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,4 +23,4 @@ class ArtifactRevisionSearcher(Searcher[ArtifactRevisionRow, ArtifactRevisionDat
 
     @override
     def to_data(self, row: ArtifactRevisionRow) -> ArtifactRevisionData:
-        return row.to_dataclass()
+        return ArtifactRevisionSearchableFields.own.to_data(row)

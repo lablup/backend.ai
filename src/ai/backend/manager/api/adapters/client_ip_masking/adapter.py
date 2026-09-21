@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import assert_never
+
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
 from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     AdminSearchClientIPMaskingPoliciesInput,
@@ -29,9 +31,10 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.client_ip_masking.conditions import ClientIPMaskingPolicyConditions
-from ai.backend.manager.models.client_ip_masking.orders import ClientIPMaskingPolicyOrders
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
+from ai.backend.manager.models.client_ip_masking.searchable_fields import (
+    ClientIPMaskingPolicySearchableFields,
+)
 from ai.backend.manager.models.client_ip_masking.searchers import ClientIPMaskingPolicySearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.client_ip_masking.actions.purge import (
@@ -48,7 +51,9 @@ from ai.backend.manager.services.client_ip_masking.processors import ClientIPMas
 
 def _pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ClientIPMaskingPolicyOrders.target_type(ascending=True),
+        forward_order=ClientIPMaskingPolicySearchableFields.own.target_type.order.apply(
+            ascending=True
+        ),
         cursor_column=ClientIPMaskingPolicyRow.id,
     )
 
@@ -111,33 +116,33 @@ class ClientIPMaskingAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_filter(f: ClientIPMaskingPolicyFilter) -> list[QueryCondition]:
+        fields = ClientIPMaskingPolicySearchableFields.own
         conditions: list[QueryCondition] = []
         if f.target_type is not None:
             conditions.append(
-                ClientIPMaskingPolicyConditions.by_target_type(
-                    ClientIPMaskingTarget(f.target_type.value)
-                )
+                fields.target_type.filter.equals(ClientIPMaskingTarget(f.target_type.value))
             )
         if f.mode is not None:
-            conditions.append(
-                ClientIPMaskingPolicyConditions.by_mode(ClientIPMaskingMode(f.mode.value))
-            )
+            conditions.append(fields.mode.filter.equals(ClientIPMaskingMode(f.mode.value)))
         return conditions
 
     @staticmethod
     def _convert_orders(orders: list[ClientIPMaskingPolicyOrder]) -> list[QueryOrder]:
+        fields = ClientIPMaskingPolicySearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
                 case ClientIPMaskingPolicyOrderField.TARGET_TYPE:
-                    result.append(ClientIPMaskingPolicyOrders.target_type(ascending))
+                    result.append(fields.target_type.order.apply(ascending))
                 case ClientIPMaskingPolicyOrderField.MODE:
-                    result.append(ClientIPMaskingPolicyOrders.mode(ascending))
+                    result.append(fields.mode.order.apply(ascending))
                 case ClientIPMaskingPolicyOrderField.CREATED_AT:
-                    result.append(ClientIPMaskingPolicyOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case ClientIPMaskingPolicyOrderField.UPDATED_AT:
-                    result.append(ClientIPMaskingPolicyOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
         return result
 
     @staticmethod

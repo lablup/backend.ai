@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import assert_never
 
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
@@ -16,6 +17,8 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
 )
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     EndpointInfo,
+    OrderDirection,
+    ServiceCatalogOrderField,
     ServiceCatalogStatusFilter,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -25,12 +28,10 @@ from ai.backend.manager.data.service_catalog.types import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
-from ai.backend.manager.models.service_catalog.orders import (
-    DEFAULT_FORWARD_ORDER,
-    resolve_order,
-)
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.service_catalog.searchable_fields import (
+    ServiceCatalogSearchableFields,
+)
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.service_catalog.actions.search import (
@@ -42,7 +43,7 @@ from ai.backend.manager.services.service_catalog.processors import ServiceCatalo
 @lru_cache(maxsize=1)
 def _get_service_catalog_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DEFAULT_FORWARD_ORDER,
+        forward_order=ServiceCatalogSearchableFields.own.registered_at.order.apply(ascending=False),
         cursor_column=ServiceCatalogRow.id,
     )
 
@@ -123,31 +124,50 @@ class ServiceCatalogAdapter(BaseAdapter):
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
+        conditions = ServiceCatalogSearchableFields.own.service_group.filter
         return self.convert_string_filter(
             sf,
-            contains_factory=ServiceCatalogConditions.by_service_group_contains,
-            equals_factory=ServiceCatalogConditions.by_service_group_equals,
-            starts_with_factory=ServiceCatalogConditions.by_service_group_starts_with,
-            ends_with_factory=ServiceCatalogConditions.by_service_group_ends_with,
-            in_factory=ServiceCatalogConditions.by_service_group_in,
+            contains_factory=conditions.contains,
+            equals_factory=conditions.equals,
+            starts_with_factory=conditions.starts_with,
+            ends_with_factory=conditions.ends_with,
+            in_factory=conditions.in_,
         )
 
     @staticmethod
     def _convert_status_filter(sf: ServiceCatalogStatusFilter) -> list[QueryCondition]:
+        conditions_of = ServiceCatalogSearchableFields.own.status.filter
         conditions: list[QueryCondition] = []
         if sf.equals is not None:
-            conditions.append(ServiceCatalogConditions.by_status_equals(sf.equals))
+            conditions.append(conditions_of.equals(sf.equals))
         if sf.in_ is not None:
-            conditions.append(ServiceCatalogConditions.by_status_in(sf.in_))
+            conditions.append(conditions_of.in_(sf.in_))
         if sf.not_equals is not None:
-            conditions.append(ServiceCatalogConditions.by_status_not_equals(sf.not_equals))
+            conditions.append(conditions_of.not_equals(sf.not_equals))
         if sf.not_in is not None:
-            conditions.append(ServiceCatalogConditions.by_status_not_in(sf.not_in))
+            conditions.append(conditions_of.not_in(sf.not_in))
         return conditions
 
     @staticmethod
     def _convert_orders(order: list[ServiceCatalogOrder]) -> list[QueryOrder]:
-        return [resolve_order(o.field, o.direction) for o in order]
+        fields = ServiceCatalogSearchableFields.own
+        result: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction != OrderDirection.DESC
+            match o.field:
+                case ServiceCatalogOrderField.SERVICE_GROUP:
+                    result.append(fields.service_group.order.apply(ascending))
+                case ServiceCatalogOrderField.DISPLAY_NAME:
+                    result.append(fields.display_name.order.apply(ascending))
+                case ServiceCatalogOrderField.REGISTERED_AT:
+                    result.append(fields.registered_at.order.apply(ascending))
+                case ServiceCatalogOrderField.LAST_HEARTBEAT:
+                    result.append(fields.last_heartbeat.order.apply(ascending))
+                case ServiceCatalogOrderField.STATUS:
+                    result.append(fields.status.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return result
 
     @staticmethod
     def _data_to_dto(data: ServiceCatalogData) -> ServiceCatalogNode:

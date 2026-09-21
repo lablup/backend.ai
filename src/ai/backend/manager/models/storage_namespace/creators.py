@@ -13,6 +13,9 @@ from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 
 
 @dataclass
@@ -38,4 +41,4 @@ class StorageNamespaceCreator(
 
     @override
     def to_data(self, row: StorageNamespaceRow) -> StorageNamespaceData:
-        return row.to_dataclass()
+        return StorageNamespaceSearchableFields.own.to_data(row)

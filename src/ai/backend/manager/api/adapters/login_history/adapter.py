@@ -102,7 +102,7 @@ class LoginHistoryAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._auth.search_login_history.run(
-            SearchLoginHistoryAction(user_id=UserID(me.user_id), searcher=searcher)
+            SearchLoginHistoryAction(user_ids=[UserID(me.user_id)], searcher=searcher)
         )
         return MySearchLoginHistoryPayload(
             items=[self._data_to_node(item) for item in action_result.items],

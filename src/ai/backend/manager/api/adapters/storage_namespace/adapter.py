@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     AdminSearchStorageNamespacesInput,
     RegisterStorageNamespaceInput,
@@ -21,8 +22,10 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.bulk_get import (
     BulkGetStorageNamespacesAction,
@@ -92,7 +95,11 @@ class StorageNamespaceAdapter(BaseAdapter):
                     used_by=(),
                     searcher=StorageNamespaceSearcher(
                         pagination=NoPagination(),
-                        conditions=[StorageNamespaceConditions.by_storage_id(storage_id)],
+                        conditions=[
+                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                                UUIDEqualMatchSpec(value=storage_id, negated=False)
+                            )
+                        ],
                     ),
                 )
             )

@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.object_storage.response import (
     ObjectStorageAllBucketsResponse,
     ObjectStorageBucketsResponse,
@@ -22,8 +23,10 @@ from ai.backend.common.dto.manager.object_storage.response import (
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
@@ -147,7 +150,11 @@ class TestStorageNamespace:
                 used_by=(),
                 searcher=StorageNamespaceSearcher(
                     pagination=NoPagination(),
-                    conditions=[StorageNamespaceConditions.by_storage_id(storage["id"])],
+                    conditions=[
+                        StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                            UUIDEqualMatchSpec(value=storage["id"], negated=False)
+                        )
+                    ],
                 ),
             )
         )
@@ -189,7 +196,11 @@ class TestStorageNamespace:
                 used_by=(),
                 searcher=StorageNamespaceSearcher(
                     pagination=NoPagination(),
-                    conditions=[StorageNamespaceConditions.by_storage_id(storage_a["id"])],
+                    conditions=[
+                        StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                            UUIDEqualMatchSpec(value=storage_a["id"], negated=False)
+                        )
+                    ],
                 ),
             )
         )
@@ -205,7 +216,11 @@ class TestStorageNamespace:
                 used_by=(),
                 searcher=StorageNamespaceSearcher(
                     pagination=NoPagination(),
-                    conditions=[StorageNamespaceConditions.by_storage_id(storage_b["id"])],
+                    conditions=[
+                        StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                            UUIDEqualMatchSpec(value=storage_b["id"], negated=False)
+                        )
+                    ],
                 ),
             )
         )
@@ -268,7 +283,11 @@ class TestStorageNamespace:
                     used_by=(),
                     searcher=StorageNamespaceSearcher(
                         pagination=NoPagination(),
-                        conditions=[StorageNamespaceConditions.by_storage_id(storage["id"])],
+                        conditions=[
+                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                                UUIDEqualMatchSpec(value=storage["id"], negated=False)
+                            )
+                        ],
                     ),
                 )
             )
@@ -290,7 +309,11 @@ class TestStorageNamespace:
                     used_by=(),
                     searcher=StorageNamespaceSearcher(
                         pagination=NoPagination(),
-                        conditions=[StorageNamespaceConditions.by_storage_id(storage["id"])],
+                        conditions=[
+                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
+                                UUIDEqualMatchSpec(value=storage["id"], negated=False)
+                            )
+                        ],
                     ),
                 )
             )

@@ -99,7 +99,12 @@ class ObjectStorageFilter(BaseRequestModel):
 class ObjectStorageOrder(BaseRequestModel):
     """Single ordering criterion for object storage search."""
 
-    field: ObjectStorageOrderField = Field(description="Field to order by.")
+    field: ObjectStorageOrderField = Field(
+        description=(
+            "Field to order by. `CREATED_AT` is deprecated since 26.9.0: it is not used"
+            " for ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
 
 

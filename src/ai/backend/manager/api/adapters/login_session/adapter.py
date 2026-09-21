@@ -113,7 +113,7 @@ class LoginSessionAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._auth.search_login_sessions.run(
-            SearchLoginSessionsAction(user_id=UserID(me.user_id), searcher=searcher)
+            SearchLoginSessionsAction(user_ids=[UserID(me.user_id)], searcher=searcher)
         )
         return MySearchLoginSessionsPayload(
             items=[self._data_to_node(item) for item in action_result.items],
