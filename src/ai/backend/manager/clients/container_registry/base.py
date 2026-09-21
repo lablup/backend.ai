@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass
+from typing import Any
+
+import aiohttp
 
 
 @dataclass
@@ -15,6 +18,9 @@ class ContainerRegistryProjectInfo:
 class ContainerRegistryAuthArgs:
     username: str
     password: str
+
+    def to_aiohttp_auth_args(self) -> dict[str, Any]:
+        return {"auth": aiohttp.BasicAuth(self.username, self.password)}
 
 
 class AbstractContainerRegistryQuotaClient(abc.ABC):

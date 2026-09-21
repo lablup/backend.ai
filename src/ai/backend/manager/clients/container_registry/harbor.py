@@ -26,10 +26,6 @@ class HarborProjectQuotaInfo(TypedDict):
     quota_id: int
 
 
-def _get_harbor_auth_args(auth_args: ContainerRegistryAuthArgs) -> dict[str, Any]:
-    return {"auth": aiohttp.BasicAuth(auth_args.username, auth_args.password)}
-
-
 class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     async def _get_harbor_project_id(
         self,
@@ -83,7 +79,7 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     ) -> int:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
-            rqst_args = _get_harbor_auth_args(auth_args)
+            rqst_args = auth_args.to_aiohttp_auth_args()
             quota_info = await self._get_quota_info(sess, project_info, rqst_args)
             previous_quota = quota_info["previous_quota"]
             if previous_quota == -1:
@@ -99,7 +95,7 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     ) -> None:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
-            rqst_args = _get_harbor_auth_args(auth_args)
+            rqst_args = auth_args.to_aiohttp_auth_args()
             quota_info = await self._get_quota_info(sess, project_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
@@ -125,7 +121,7 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     ) -> None:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
-            rqst_args = _get_harbor_auth_args(auth_args)
+            rqst_args = auth_args.to_aiohttp_auth_args()
             quota_info = await self._get_quota_info(sess, project_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
@@ -148,7 +144,7 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
     ) -> None:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
-            rqst_args = _get_harbor_auth_args(auth_args)
+            rqst_args = auth_args.to_aiohttp_auth_args()
             quota_info = await self._get_quota_info(sess, project_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
