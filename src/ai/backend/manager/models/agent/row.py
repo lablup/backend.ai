@@ -30,6 +30,9 @@ from ai.backend.manager.models.base import (
     EnumType,
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+)
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -106,7 +109,10 @@ class AgentRow(Base):
         return sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
 
     def resources_by_rank(self) -> list[AgentResourceData]:
-        return [resource_row.to_data() for resource_row in self._resource_rows_by_rank()]
+        return [
+            AgentResourceSearchableFields.own.to_data(resource_row)
+            for resource_row in self._resource_rows_by_rank()
+        ]
 
     def actual_available_slots(self) -> ResourceSlot:
         available = ResourceSlot()

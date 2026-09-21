@@ -7,6 +7,7 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityWithFieldsOpsResult,
@@ -73,7 +74,7 @@ class DeploymentPresetProcessors:
     purge: SingleEntityActionProcessor[
         PurgeDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
-    search_resource_slots: ScopeActionProcessor[
+    search_resource_slots: BulkActionProcessor[
         SearchPresetResourceSlotsAction, ScopedFieldsOpsResult[PresetResourceSlotData]
     ]
 
@@ -95,4 +96,6 @@ class DeploymentPresetProcessors:
             LookupPresetResourceSlotOwnerAction,
             LookupBulkPresetResourceSlotOwnerAction,
         )
-        self.search_resource_slots = slots.search_ops(SearchPresetResourceSlotsAction)
+        self.search_resource_slots = slots.atomic_bulk_scoped_search_ops(
+            SearchPresetResourceSlotsAction
+        )

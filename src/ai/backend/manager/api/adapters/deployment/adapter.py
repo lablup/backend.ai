@@ -160,6 +160,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
+    AllocatedResourceSlotOrder,
     SearchAllocatedResourceSlotsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
@@ -167,6 +168,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     SearchAllocatedResourceSlotsPayload,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AllocatedResourceSlotOrderField,
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
 )
@@ -264,10 +266,9 @@ from ai.backend.manager.models.endpoint.searchers import (
     DeploymentSearcher,
 )
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
-from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
-from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-    resolve_allocated_slot_revision_order,
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+    RevisionResourceSlotSearchableFields,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
 from ai.backend.manager.models.routing import RoutingRow
@@ -521,7 +522,7 @@ def _get_replica_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
+        forward_order=ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending=True),
         cursor_column=DeploymentRevisionResourceSlotRow.id,
     )
 
@@ -2075,16 +2076,9 @@ class DeploymentAdapter(BaseAdapter):
     ) -> RevisionResourceSlotSearcher:
         conditions: list[QueryCondition] = []
         if input.filter:
-            conditions.extend(
-                self._convert_allocated_slot_filter(
-                    input.filter,
-                    RevisionResourceSlotConditions,
-                )
-            )
+            conditions.extend(self._convert_allocated_slot_filter(input.filter))
         orders: list[QueryOrder] = (
-            [resolve_allocated_slot_revision_order(o.field, o.direction) for o in input.order]
-            if input.order
-            else []
+            self._convert_allocated_slot_orders(input.order) if input.order else []
         )
         querier = self._build_querier(
             conditions=conditions,
@@ -2107,37 +2101,48 @@ class DeploymentAdapter(BaseAdapter):
     def _convert_allocated_slot_filter(
         self,
         filter_: AllocatedResourceSlotFilter,
-        conditions_cls: type[RevisionResourceSlotConditions],
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.slot_name is not None:
-            cond = self.convert_string_filter(
-                filter_.slot_name,
-                contains_factory=conditions_cls.by_slot_name_contains,
-                equals_factory=conditions_cls.by_slot_name_equals,
-                starts_with_factory=conditions_cls.by_slot_name_starts_with,
-                ends_with_factory=conditions_cls.by_slot_name_ends_with,
-                in_factory=conditions_cls.by_slot_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = RevisionResourceSlotSearchableFields.own
+        conditions = [*self.apply_string_filter(filter_.slot_name, fields.slot_name.filter)]
         if filter_.AND:
             for sub in filter_.AND:
-                conditions.extend(self._convert_allocated_slot_filter(sub, conditions_cls))
+                conditions.extend(self._convert_allocated_slot_filter(sub))
         if filter_.OR:
             or_groups: list[QueryCondition] = []
             for sub in filter_.OR:
-                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
+                sub_conditions = self._convert_allocated_slot_filter(sub)
                 if sub_conditions:
                     or_groups.append(combine_conditions_and(sub_conditions))
             if or_groups:
                 conditions.append(combine_conditions_or(or_groups))
         if filter_.NOT:
             for sub in filter_.NOT:
-                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
+                sub_conditions = self._convert_allocated_slot_filter(sub)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    @staticmethod
+    def _convert_allocated_slot_orders(
+        orders: list[AllocatedResourceSlotOrder],
+    ) -> list[QueryOrder]:
+        fields = RevisionResourceSlotSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AllocatedResourceSlotOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.QUANTITY:
+                    converted.append(fields.quantity.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.RANK:
+                    # The searcher joins the slot catalog, so its own rank order applies.
+                    converted.append(
+                        ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending)
+                    )
+                case _:
+                    assert_never(o.field)
+        return converted
 
     @staticmethod
     def _convert_tag_state(tags: list[str] | None | Unset) -> TriState[str]:

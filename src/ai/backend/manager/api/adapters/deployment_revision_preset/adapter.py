@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, assert_never
 from uuid import UUID
 
 from ai.backend.common.config import (
@@ -53,11 +53,16 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
+    AllocatedResourceSlotOrder,
     SearchAllocatedResourceSlotsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode,
     SearchAllocatedResourceSlotsPayload,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AllocatedResourceSlotOrderField,
+    OrderDirection,
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.tristate.unset import Unset
@@ -86,12 +91,11 @@ from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
-from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
-from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-    resolve_allocated_slot_preset_order,
-)
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    PresetResourceSlotSearchableFields,
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
@@ -133,7 +137,7 @@ def _preset_pagination_spec() -> PaginationSpec:
 
 def _preset_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
+        forward_order=ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending=True),
         cursor_column=PresetResourceSlotRow.id,
     )
 
@@ -382,7 +386,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         searcher = self._build_preset_resource_slot_searcher(input)
         action_result = await self._deployment_revision_preset.search_resource_slots.run(
             SearchPresetResourceSlotsAction(
-                preset_id=DeploymentPresetID(preset_id),
+                preset_ids=[DeploymentPresetID(preset_id)],
                 searcher=searcher,
             )
         )
@@ -404,9 +408,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if input.filter:
             conditions.extend(self._convert_allocated_slot_filter(input.filter))
         orders: list[QueryOrder] = (
-            [resolve_allocated_slot_preset_order(o.field, o.direction) for o in input.order]
-            if input.order
-            else []
+            self._convert_allocated_slot_orders(input.order) if input.order else []
         )
         return self._build_searcher(
             PresetResourceSlotSearcher,
@@ -421,22 +423,34 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             offset=input.offset,
         )
 
+    @staticmethod
+    def _convert_allocated_slot_orders(
+        orders: list[AllocatedResourceSlotOrder],
+    ) -> list[QueryOrder]:
+        fields = PresetResourceSlotSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AllocatedResourceSlotOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.QUANTITY:
+                    converted.append(fields.quantity.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.RANK:
+                    # The searcher joins the slot catalog, so its own rank order applies.
+                    converted.append(
+                        ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending)
+                    )
+                case _:
+                    assert_never(o.field)
+        return converted
+
     def _convert_allocated_slot_filter(
         self,
         filter_: AllocatedResourceSlotFilter,
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.slot_name is not None:
-            cond = self.convert_string_filter(
-                filter_.slot_name,
-                contains_factory=PresetResourceSlotConditions.by_slot_name_contains,
-                equals_factory=PresetResourceSlotConditions.by_slot_name_equals,
-                starts_with_factory=PresetResourceSlotConditions.by_slot_name_starts_with,
-                ends_with_factory=PresetResourceSlotConditions.by_slot_name_ends_with,
-                in_factory=PresetResourceSlotConditions.by_slot_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = PresetResourceSlotSearchableFields.own
+        conditions = [*self.apply_string_filter(filter_.slot_name, fields.slot_name.filter)]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_allocated_slot_filter(sub))

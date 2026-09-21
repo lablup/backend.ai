@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from functools import lru_cache
+from typing import assert_never
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainName
@@ -11,7 +12,6 @@ from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
@@ -44,9 +44,11 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     UpdateResourceSlotTypePayload,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AgentResourceOrderField,
     NumberFormatInfo,
     NumberFormatInput,
     OrderDirection,
+    ResourceAllocationOrderField,
     ResourceSlotTypeOrderField,
 )
 from ai.backend.common.types import AgentId
@@ -58,17 +60,7 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot.conditions import (
-    AgentResourceConditions,
-    ResourceAllocationConditions,
-)
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
-from ai.backend.manager.models.resource_slot.orders import (
-    AGENT_RESOURCE_DEFAULT_FORWARD_ORDER,
-    RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER,
-    resolve_agent_resource_order,
-    resolve_resource_allocation_order,
-)
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
@@ -77,6 +69,8 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.resource_slot.scopes import PublicResourceSlotTypeTarget
 from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+    ResourceAllocationSearchableFields,
     ResourceSlotTypeSearchableFields,
 )
 from ai.backend.manager.models.resource_slot.searchers import (
@@ -143,7 +137,7 @@ def _get_slot_type_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_agent_resource_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AGENT_RESOURCE_DEFAULT_FORWARD_ORDER,
+        forward_order=AgentResourceSearchableFields.own.slot_name.order.apply(ascending=True),
         cursor_column=AgentResourceRow.id,
     )
 
@@ -151,7 +145,7 @@ def _get_agent_resource_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_resource_allocation_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER,
+        forward_order=ResourceAllocationSearchableFields.own.slot_name.order.apply(ascending=True),
         cursor_column=ResourceAllocationRow.id,
     )
 
@@ -424,42 +418,30 @@ class ResourceSlotAdapter(BaseAdapter):
         )
 
     def _convert_agent_resource_filter(self, filter: AgentResourceFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.slot_name is not None:
-            condition = self._convert_slot_name_filter_for_agent_resource(filter.slot_name)
-            if condition is not None:
-                conditions.append(condition)
-        if filter.agent_id is not None:
-            condition = self._convert_agent_id_filter(filter.agent_id)
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
-
-    def _convert_slot_name_filter_for_agent_resource(
-        self, sf: StringFilter
-    ) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=AgentResourceConditions.by_slot_name_contains,
-            equals_factory=AgentResourceConditions.by_slot_name_equals,
-            starts_with_factory=AgentResourceConditions.by_slot_name_starts_with,
-            ends_with_factory=AgentResourceConditions.by_slot_name_ends_with,
-            in_factory=AgentResourceConditions.by_slot_name_in,
-        )
-
-    def _convert_agent_id_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=AgentResourceConditions.by_agent_id_contains,
-            equals_factory=AgentResourceConditions.by_agent_id_equals,
-            starts_with_factory=AgentResourceConditions.by_agent_id_starts_with,
-            ends_with_factory=AgentResourceConditions.by_agent_id_ends_with,
-            in_factory=AgentResourceConditions.by_agent_id_in,
-        )
+        fields = AgentResourceSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_string_filter(filter.agent_id, fields.agent_id.filter),
+        ]
 
     @staticmethod
     def _convert_agent_resource_orders(orders: list[AgentResourceOrder]) -> list[QueryOrder]:
-        return [resolve_agent_resource_order(o.field, o.direction) for o in orders]
+        fields = AgentResourceSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AgentResourceOrderField.AGENT_ID:
+                    converted.append(fields.agent_id.order.apply(ascending))
+                case AgentResourceOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case AgentResourceOrderField.CAPACITY:
+                    converted.append(fields.capacity.order.apply(ascending))
+                case AgentResourceOrderField.USED:
+                    converted.append(fields.used.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return converted
 
     @staticmethod
     def _agent_resource_data_to_node(data: AgentResourceData) -> AgentResourceNode:
@@ -532,39 +514,32 @@ class ResourceSlotAdapter(BaseAdapter):
     def _convert_resource_allocation_filter(
         self, filter: ResourceAllocationFilter
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.slot_name is not None:
-            condition = self._convert_slot_name_filter_for_allocation(filter.slot_name)
-            if condition is not None:
-                conditions.append(condition)
-        if filter.kernel_id is not None:
-            condition = self._convert_kernel_id_filter(filter.kernel_id)
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
-
-    def _convert_slot_name_filter_for_allocation(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ResourceAllocationConditions.by_slot_name_contains,
-            equals_factory=ResourceAllocationConditions.by_slot_name_equals,
-            starts_with_factory=ResourceAllocationConditions.by_slot_name_starts_with,
-            ends_with_factory=ResourceAllocationConditions.by_slot_name_ends_with,
-            in_factory=ResourceAllocationConditions.by_slot_name_in,
-        )
-
-    def _convert_kernel_id_filter(self, uf: UUIDFilter) -> QueryCondition | None:
-        return self.convert_uuid_filter(
-            uf,
-            equals_factory=ResourceAllocationConditions.by_kernel_id_filter_equals,
-            in_factory=ResourceAllocationConditions.by_kernel_id_filter_in,
-        )
+        fields = ResourceAllocationSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
+        ]
 
     @staticmethod
     def _convert_resource_allocation_orders(
         orders: list[ResourceAllocationOrder],
     ) -> list[QueryOrder]:
-        return [resolve_resource_allocation_order(o.field, o.direction) for o in orders]
+        fields = ResourceAllocationSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case ResourceAllocationOrderField.KERNEL_ID:
+                    converted.append(fields.kernel_id.order.apply(ascending))
+                case ResourceAllocationOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case ResourceAllocationOrderField.REQUESTED:
+                    converted.append(fields.requested.order.apply(ascending))
+                case ResourceAllocationOrderField.USED:
+                    converted.append(fields.used.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return converted
 
     @staticmethod
     def _resource_allocation_data_to_node(data: ResourceAllocationData) -> ResourceAllocationNode:

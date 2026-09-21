@@ -21,7 +21,10 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+    ResourceAllocationSearchableFields,
     ResourceSlotTypeSearchableFields,
+    RevisionResourceSlotSearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -52,7 +55,7 @@ class AgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData]):
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
-        return row.to_data()
+        return AgentResourceSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -65,7 +68,7 @@ class UnrankedAgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
-        return row.to_data()
+        return AgentResourceSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -78,13 +81,7 @@ class ResourceAllocationSearcher(Searcher[ResourceAllocationRow, ResourceAllocat
 
     @override
     def to_data(self, row: ResourceAllocationRow) -> ResourceAllocationData:
-        return ResourceAllocationData(
-            id=row.id,
-            kernel_id=row.kernel_id,
-            slot_name=row.slot_name,
-            requested=row.requested,
-            used=row.used,
-        )
+        return ResourceAllocationSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -109,8 +106,4 @@ class RevisionResourceSlotSearcher(
 
     @override
     def to_data(self, row: DeploymentRevisionResourceSlotRow) -> RevisionResourceSlotData:
-        return RevisionResourceSlotData(
-            revision_id=row.revision_id,
-            slot_name=row.slot_name,
-            quantity=row.quantity,
-        )
+        return RevisionResourceSlotSearchableFields.own.to_data(row)
