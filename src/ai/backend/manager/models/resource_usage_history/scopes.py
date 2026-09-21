@@ -37,10 +37,10 @@ class UsageBucketTarget(ScopeTarget, ABC):
 
 @dataclass(frozen=True)
 class DomainUsageBucketTarget(UsageBucketTarget):
-    """Scope for domain usage bucket queries."""
+    """The domain usage buckets of one resource group, optionally of one domain."""
 
     resource_group_id: ResourceGroupID
-    domain_name: str
+    domain_name: str | None = None
 
     @override
     def scope_id(self) -> EntityIdentifier:
@@ -52,17 +52,17 @@ class DomainUsageBucketTarget(UsageBucketTarget):
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                DomainUsageBucketRow.domain_name == domain_name,
-                DomainUsageBucketRow.resource_group_id == resource_group_id,
-            )
+            conditions = [DomainUsageBucketRow.resource_group_id == resource_group_id]
+            if domain_name is not None:
+                conditions.append(DomainUsageBucketRow.domain_name == domain_name)
+            return sa.and_(*conditions)
 
         return inner
 
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return [
+        checks: list[ExistenceCheck[Any]] = [
             ExistenceCheck(
                 column=ResourceGroupRow.id,
                 value=self.resource_group_id,
@@ -70,21 +70,25 @@ class DomainUsageBucketTarget(UsageBucketTarget):
                     extra_data={"resource_group_id": str(self.resource_group_id)}
                 ),
             ),
-            ExistenceCheck(
-                column=DomainRow.name,
-                value=self.domain_name,
-                error=DomainNotFound(self.domain_name),
-            ),
         ]
+        if self.domain_name is not None:
+            checks.append(
+                ExistenceCheck(
+                    column=DomainRow.name,
+                    value=self.domain_name,
+                    error=DomainNotFound(self.domain_name),
+                )
+            )
+        return checks
 
 
 @dataclass(frozen=True)
 class ProjectUsageBucketTarget(UsageBucketTarget):
-    """Scope for project usage bucket queries."""
+    """The project usage buckets of one domain, optionally of one project."""
 
     resource_group_id: ResourceGroupID
     domain_name: str
-    project_id: uuid.UUID
+    project_id: uuid.UUID | None = None
 
     @override
     def scope_id(self) -> EntityIdentifier:
@@ -97,18 +101,20 @@ class ProjectUsageBucketTarget(UsageBucketTarget):
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
+            conditions = [
                 ProjectUsageBucketRow.domain_name == domain_name,
-                ProjectUsageBucketRow.project_id == project_id,
                 ProjectUsageBucketRow.resource_group_id == resource_group_id,
-            )
+            ]
+            if project_id is not None:
+                conditions.append(ProjectUsageBucketRow.project_id == project_id)
+            return sa.and_(*conditions)
 
         return inner
 
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return [
+        checks: list[ExistenceCheck[Any]] = [
             ExistenceCheck(
                 column=ResourceGroupRow.id,
                 value=self.resource_group_id,
@@ -121,22 +127,26 @@ class ProjectUsageBucketTarget(UsageBucketTarget):
                 value=self.domain_name,
                 error=DomainNotFound(self.domain_name),
             ),
-            ExistenceCheck(
-                column=ProjectRow.id,
-                value=self.project_id,
-                error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
-            ),
         ]
+        if self.project_id is not None:
+            checks.append(
+                ExistenceCheck(
+                    column=ProjectRow.id,
+                    value=self.project_id,
+                    error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
+                )
+            )
+        return checks
 
 
 @dataclass(frozen=True)
 class UserUsageBucketTarget(UsageBucketTarget):
-    """Scope for user usage bucket queries."""
+    """The user usage buckets of one project, optionally of one user."""
 
     resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
-    user_uuid: uuid.UUID
+    user_uuid: uuid.UUID | None = None
 
     @override
     def scope_id(self) -> EntityIdentifier:
@@ -150,19 +160,21 @@ class UserUsageBucketTarget(UsageBucketTarget):
         user_uuid = self.user_uuid
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
+            conditions = [
                 UserUsageBucketRow.domain_name == domain_name,
                 UserUsageBucketRow.project_id == project_id,
-                UserUsageBucketRow.user_uuid == user_uuid,
                 UserUsageBucketRow.resource_group_id == resource_group_id,
-            )
+            ]
+            if user_uuid is not None:
+                conditions.append(UserUsageBucketRow.user_uuid == user_uuid)
+            return sa.and_(*conditions)
 
         return inner
 
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return [
+        checks: list[ExistenceCheck[Any]] = [
             ExistenceCheck(
                 column=ResourceGroupRow.id,
                 value=self.resource_group_id,
@@ -180,9 +192,13 @@ class UserUsageBucketTarget(UsageBucketTarget):
                 value=self.project_id,
                 error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
             ),
-            ExistenceCheck(
-                column=UserRow.uuid,
-                value=self.user_uuid,
-                error=UserNotFound(extra_data={"user_uuid": str(self.user_uuid)}),
-            ),
         ]
+        if self.user_uuid is not None:
+            checks.append(
+                ExistenceCheck(
+                    column=UserRow.uuid,
+                    value=self.user_uuid,
+                    error=UserNotFound(extra_data={"user_uuid": str(self.user_uuid)}),
+                )
+            )
+        return checks

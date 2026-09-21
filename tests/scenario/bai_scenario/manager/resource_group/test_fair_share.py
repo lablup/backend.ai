@@ -18,10 +18,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupDetailNode,
 )
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
-from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -122,18 +120,18 @@ class TheSuperadminReadsTheDefaults(
 
 
 @dataclass(frozen=True)
-class AUserGrantedReadOnTheGroupMayNotReadTheSpec(
+class AUserGrantedReadOnTheGroupReadsTheSpec(
     Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-read-on-the-group-may-not-read-its-fair-share-spec"
+        return "a-user-granted-read-on-the-group-reads-its-fair-share-spec"
 
     @override
     def describe(self) -> str:
         return (
-            "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 fair share 설정을 읽으려 하면 역할 부족으로 "
-            "거부된다. 설정 조회는 그룹을 전체 검색으로 찾으므로 슈퍼관리자 검사를 먼저 거친다"
+            "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 "
+            "읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다"
         )
 
     @override
@@ -146,7 +144,32 @@ class AUserGrantedReadOnTheGroupMayNotReadTheSpec(
 
     @override
     def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheFairShareDefaults()
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotReadTheSpec(
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-read-the-fair-share-spec"
+
+    @override
+    def describe(self) -> str:
+        return "아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다"
+
+    @override
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone()
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
+        return ReadingTheSpec()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -171,7 +194,7 @@ class ReadingTheSpecOfAnUnknownNameIsNotFound(
 
     @override
     def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
-        return TheCallIsRefused(ResourceGroupNotFound)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
@@ -282,7 +305,8 @@ class ChangingTheSpecOfAnUnknownNameIsNotFound(
 
 SCENARIOS: list[FairShareStep] = [
     TheSuperadminReadsTheDefaults(),
-    AUserGrantedReadOnTheGroupMayNotReadTheSpec(),
+    AUserGrantedReadOnTheGroupReadsTheSpec(),
+    AUserGrantedNothingMayNotReadTheSpec(),
     ReadingTheSpecOfAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheHalfLife(started=datetime.now(UTC)),
     AUserGrantedUpdateOnTheGroupChangesTheSpec(started=datetime.now(UTC)),

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.request import (
     GetPresignedDownloadURLReq,
     GetPresignedUploadURLReq,
@@ -27,10 +27,8 @@ from ai.backend.common.dto.manager.response import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.models.storage_namespace.searchable_fields import (
-    StorageNamespaceSearchableFields,
-)
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.storage_namespace.scopes import ObjectStorageNamespaceTarget
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -132,18 +130,12 @@ class ObjectStorageHandler:
         """
         storage_id: uuid.UUID = path.parsed.storage_id
 
-        action_result = await self._storage_namespace.global_get_namespaces.run(
+        action_result = await self._storage_namespace.get_namespaces.run(
             GetNamespacesAction(
-                searcher=GlobalSearcher(
+                searcher=ScopedSearcher(
+                    scopes=[ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage_id))],
                     used_by=(),
-                    searcher=StorageNamespaceSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            StorageNamespaceSearchableFields.own.storage_id.filter.equals(
-                                UUIDEqualMatchSpec(value=storage_id, negated=False)
-                            )
-                        ],
-                    ),
+                    searcher=StorageNamespaceSearcher(pagination=NoPagination()),
                 )
             )
         )

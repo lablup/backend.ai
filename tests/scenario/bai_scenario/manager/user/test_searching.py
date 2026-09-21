@@ -193,15 +193,18 @@ class AnActiveAndADeletedUser(Given[Any, AnAskerAndWhomTheyReach]):
 class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
     """도메인 하나와 사용자 둘, 그중 첫 사람만 역할 하나를 받았다.
 
-    부르는 사람이 슈퍼관리자가 아니면 그 도메인 스코프의 사용자 READ를 받는다.
+    부르는 사람이 슈퍼관리자가 아니고 `granted`면 그 도메인 스코프의 사용자 READ를 받는다.
     """
 
     role: UserRole
+    granted: bool = True
 
     @override
     def describe(self) -> str:
         if self.role == UserRole.SUPERADMIN:
             return "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 부르는 사람은 슈퍼관리자"
+        if not self.granted:
+            return "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 부르는 사람은 아무 권한도 받지 않았다"
         return (
             "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, "
             "부르는 사람은 그 도메인 스코프의 사용자 READ를 받았다"
@@ -219,7 +222,7 @@ class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
             role, holder, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
         )
         caller = await seeding.within(SomeoneOf(home, role=self.role))
-        if self.role != UserRole.SUPERADMIN:
+        if self.role != UserRole.SUPERADMIN and self.granted:
             await seeding.within(AGrant.on_domain(home, caller, Permission.READ))
         return AnAskerAndWhomTheyReach(
             caller=seeding.made(caller),
@@ -815,15 +818,16 @@ class TheSuperadminSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Ans
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AGrantedUserSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
-        return "a-user-who-is-not-the-superadmin-may-not-search-by-role"
+        return "a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"
 
     @override
     def describe(self) -> str:
         return (
-            "그 역할의 스코프 권한을 받은 사용자라도 역할 검색을 하려 하면, 전역 역할 문이 막는다"
+            "역할이 걸린 스코프의 사용자 READ를 받은 사용자가 역할 하나를 주면, "
+            "그 역할을 배정받은 사용자만 온다"
         )
 
     @override
@@ -836,7 +840,30 @@ class OnlyTheSuperadminSearchesByRole(Scenario[SeedingSession, Any, UserAdapter,
 
     @override
     def then(self) -> Then[Any, Answer]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheRoleHolderOnly()
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotSearchByRole(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-search-by-role"
+
+    @override
+    def describe(self) -> str:
+        return "아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다"
+
+    @override
+    def given(self) -> Given[SeedingSession, Any]:
+        return TwoUsersOneHoldingARole(role=UserRole.USER, granted=False)
+
+    @override
+    def when(self) -> When[Any, UserAdapter, Answer]:
+        return SearchingByRole()
+
+    @override
+    def then(self) -> Then[Any, Answer]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -1189,7 +1216,8 @@ SCENARIOS: list[SearchStep] = [
     TheSuperadminSearchesEveryUserWithoutPaging(),
     OnlyTheSuperadminSearchesEveryUserByGql(),
     TheSuperadminSearchesByRole(),
-    OnlyTheSuperadminSearchesByRole(),
+    AGrantedUserSearchesByRole(),
+    AUserGrantedNothingMayNotSearchByRole(),
     AGrantedUserSearchesTheirDomain(),
     AUserGrantedNothingMayNotSearchADomain(),
     ADomainNameNothingAnswersToIsNotFound(),

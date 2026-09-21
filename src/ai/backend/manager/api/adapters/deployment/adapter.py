@@ -1069,17 +1069,15 @@ class DeploymentAdapter(BaseAdapter):
         input: SearchAutoScalingRulesInput,
     ) -> SearchAutoScalingRulesPayload:
         """Search auto-scaling rules scoped to a specific deployment."""
-        querier = self._build_auto_scaling_rule_querier(input, scope=scope)
+        querier = self._build_auto_scaling_rule_querier(input)
         action_result = await self._deployment.search_auto_scaling_rules.run(
             SearchAutoScalingRulesAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=AutoScalingRuleSearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+                deployment_ids=[DeploymentID(scope.deployment_id)],
+                searcher=AutoScalingRuleSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
             )
         )
         return SearchAutoScalingRulesPayload(
@@ -1407,17 +1405,15 @@ class DeploymentAdapter(BaseAdapter):
         input: SearchRoutesInput,
     ) -> SearchRoutesPayload:
         """Search routes scoped to a specific deployment."""
-        querier = self._build_route_querier(input, scope=scope)
+        querier = self._build_route_querier(input)
         action_result = await self._deployment.search_routes.run(
             SearchRoutesAction(
-                searcher=GlobalSearcher(
-                    used_by=(),
-                    searcher=RouteInfoSearcher(
-                        pagination=querier.pagination,
-                        conditions=querier.conditions,
-                        orders=querier.orders,
-                    ),
-                )
+                deployment_ids=[DeploymentID(scope.deployment_id)],
+                searcher=RouteInfoSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
             )
         )
         return SearchRoutesPayload(
@@ -1850,18 +1846,11 @@ class DeploymentAdapter(BaseAdapter):
     def _build_route_querier(
         self,
         input: SearchRoutesInput,
-        scope: RouteOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
-        if scope is not None:
-            conditions.append(
-                ReplicaSearchableFields.own.deployment_id.filter.equals(
-                    UUIDEqualMatchSpec(value=scope.deployment_id, negated=False)
-                )
-            )
         if input.filter:
             f = input.filter
-            if scope is None and f.deployment_id is not None:
+            if f.deployment_id is not None:
                 conditions.append(
                     ReplicaSearchableFields.own.deployment_id.filter.equals(
                         UUIDEqualMatchSpec(value=f.deployment_id, negated=False)
@@ -1947,16 +1936,9 @@ class DeploymentAdapter(BaseAdapter):
     def _build_auto_scaling_rule_querier(
         self,
         input: SearchAutoScalingRulesInput,
-        scope: AutoScalingRuleOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
-        if scope is not None:
-            conditions.append(
-                AutoScalingRuleSearchableFields.own.deployment_id.filter.equals(
-                    UUIDEqualMatchSpec(value=scope.deployment_id, negated=False)
-                )
-            )
-        elif input.filter and input.filter.deployment_id is not None:
+        if input.filter and input.filter.deployment_id is not None:
             conditions.append(
                 AutoScalingRuleSearchableFields.own.deployment_id.filter.equals(
                     UUIDEqualMatchSpec(value=input.filter.deployment_id, negated=False)
