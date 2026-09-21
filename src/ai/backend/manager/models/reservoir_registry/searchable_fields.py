@@ -20,7 +20,11 @@ from ai.backend.manager.models.specs.search.field import NestedSearchableField, 
 
 
 class _ReservoirRegistryOwnFields(RowDataConverter[ReservoirRegistryRow, ReservoirRegistryData]):
-    """The Reservoir registry's own columns. ``name`` is the meta row's, declared in ``nested``."""
+    """The Reservoir registry's own columns.
+
+    ``name`` is the artifact_registries row's, read off ``registry_name`` once the
+    reader has joined it; filtering and ordering by it go through ``nested.meta``.
+    """
 
     id = SearchableField(
         ReservoirRegistryRow.id,
@@ -44,15 +48,17 @@ class _ReservoirRegistryOwnFields(RowDataConverter[ReservoirRegistryRow, Reservo
         StringConditions(ReservoirRegistryRow.api_version),
         ColumnOrder(ReservoirRegistryRow.api_version),
     )
+    name = SearchableField(ReservoirRegistryRow.registry_name, None, None)
+    """Derived: the artifact_registries row's name, filled by the reader's join."""
 
     @override
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryData:
-        meta = row.meta
-        if meta is None:
+        name = self.name.read(row)
+        if name is None:
             raise RelationNotLoadedError()
         return ReservoirRegistryData(
             id=self.id.read(row),
-            name=ArtifactRegistrySearchableFields.own.name.read(meta),
+            name=name,
             endpoint=self.endpoint.read(row),
             access_key=self.access_key.read(row),
             secret_key=self.secret_key.read(row),

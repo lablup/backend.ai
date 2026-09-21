@@ -41,7 +41,6 @@ class ArtifactRegistryWriteOps(V2WriteOps):
         await self._created_in(creator.created_in(row), registry_id)
         await self._insert_row(meta_creator.build_row(registry_id), ())
         cast(RegistryNameMixin, row).registry_name = meta_creator.name
-        await self._sess.refresh(row, ["meta"])
         return creator.to_data(row)
 
     async def update_registry[TRow: Base, TData](
@@ -73,7 +72,6 @@ class ArtifactRegistryWriteOps(V2WriteOps):
                 ArtifactRegistryRow.registry_id == updater.target_id_value()
             )
         )
-        await self._sess.refresh(row, ["meta"])
         return updater.to_data(row)
 
     async def purge_registry[TRow: Base, TData](

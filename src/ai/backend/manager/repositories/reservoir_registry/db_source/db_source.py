@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import with_expression
 
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
@@ -25,16 +26,25 @@ class ReservoirDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @staticmethod
+    def _select_with_name() -> sa.sql.Select[Any]:
+        """The registry row with the artifact_registries row's name on registry_name."""
+        return (
+            sa.select(ReservoirRegistryRow)
+            .join(
+                ArtifactRegistryRow,
+                ArtifactRegistryRow.registry_id == ReservoirRegistryRow.id,
+            )
+            .options(with_expression(ReservoirRegistryRow.registry_name, ArtifactRegistryRow.name))
+        )
+
     async def get_reservoir_registry_data_by_id(
         self, reservoir_id: uuid.UUID
     ) -> ReservoirRegistryData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ReservoirRegistryRow)
-                .where(ReservoirRegistryRow.id == reservoir_id)
-                .options(selectinload(ReservoirRegistryRow.meta))
+            row = await db_sess.scalar(
+                self._select_with_name().where(ReservoirRegistryRow.id == reservoir_id)
             )
-            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return ReservoirRegistrySearchableFields.own.to_data(row)
@@ -47,61 +57,47 @@ class ReservoirDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.execute(
-                sa.select(ReservoirRegistryRow)
-                .where(ReservoirRegistryRow.id.in_(reservoir_ids))
-                .options(selectinload(ReservoirRegistryRow.meta))
+                self._select_with_name().where(ReservoirRegistryRow.id.in_(reservoir_ids))
             )
-            rows = result.scalars().all()
-            return [ReservoirRegistrySearchableFields.own.to_data(row) for row in rows]
+            return [
+                ReservoirRegistrySearchableFields.own.to_data(row) for row in result.scalars().all()
+            ]
 
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ArtifactRegistryRow)
-                .where(ArtifactRegistryRow.name == name)
-                .options(
-                    selectinload(ArtifactRegistryRow.reservoir_registries).selectinload(
-                        ReservoirRegistryRow.meta
-                    )
-                )
+            row = await db_sess.scalar(
+                self._select_with_name().where(ArtifactRegistryRow.name == name)
             )
-            row = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
-            if row.reservoir_registries is None:
                 raise ArtifactRegistryNotFoundError(
                     f"Reservoir registry not found for registry {name}"
                 )
-            return ReservoirRegistrySearchableFields.own.to_data(row.reservoir_registries)
+            return ReservoirRegistrySearchableFields.own.to_data(row)
 
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> ReservoirRegistryData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ArtifactRow)
-                .where(ArtifactRow.id == artifact_id)
-                .options(
-                    selectinload(ArtifactRow.reservoir_registry).selectinload(
-                        ReservoirRegistryRow.meta
-                    ),
-                )
+            registry_id = await db_sess.scalar(
+                sa.select(ArtifactRow.registry_id).where(ArtifactRow.id == artifact_id)
             )
-            row = result.scalar_one_or_none()
-            if row is None:
+            if registry_id is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
-            if row.reservoir_registry is None:
+            row = await db_sess.scalar(
+                self._select_with_name().where(ReservoirRegistryRow.id == registry_id)
+            )
+            if row is None:
                 raise ArtifactRegistryNotFoundError(
                     f"Reservoir registry not found for artifact {artifact_id}"
                 )
-            return ReservoirRegistrySearchableFields.own.to_data(row.reservoir_registry)
+            return ReservoirRegistrySearchableFields.own.to_data(row)
 
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
         """
         List all Reservoir entries from the database.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
-            result = await db_session.execute(query)
-            rows = result.scalars().all()
-            return [ReservoirRegistrySearchableFields.own.to_data(row) for row in rows]
+            result = await db_session.execute(self._select_with_name())
+            return [
+                ReservoirRegistrySearchableFields.own.to_data(row) for row in result.scalars().all()
+            ]
