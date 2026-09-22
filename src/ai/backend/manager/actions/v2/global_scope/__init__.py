@@ -5,7 +5,7 @@ from .result import GlobalActionProcessResult, GlobalActionResultMeta
 from .validator import (
     AuthenticatedActionValidator,
     GlobalActionValidator,
-    SuperAdminActionValidator,
+    RefusingGlobalActionValidator,
 )
 
 __all__ = (
@@ -17,5 +17,5 @@ __all__ = (
     "GlobalActionResultMeta",
     "GlobalActionValidator",
     "PublicActionProcessor",
-    "SuperAdminActionValidator",
+    "RefusingGlobalActionValidator",
 )

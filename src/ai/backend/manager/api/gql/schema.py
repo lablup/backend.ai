@@ -431,6 +431,7 @@ from .resource_policy_v2 import (
     admin_user_resource_policy_v2,
     my_keypair_resource_policy_v2,
     my_user_resource_policy_v2,
+    scoped_project_resource_policy_v2,
 )
 from .resource_preset import (
     admin_create_resource_preset_v2,
@@ -786,6 +787,7 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    scoped_project_resource_policy_v2 = scoped_project_resource_policy_v2
     # Storage Host APIs
     my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs

@@ -16,6 +16,7 @@ from .resolver import (
     admin_user_resource_policy_v2,
     my_keypair_resource_policy_v2,
     my_user_resource_policy_v2,
+    scoped_project_resource_policy_v2,
 )
 
 __all__ = (
@@ -36,4 +37,5 @@ __all__ = (
     "admin_user_resource_policy_v2",
     "my_keypair_resource_policy_v2",
     "my_user_resource_policy_v2",
+    "scoped_project_resource_policy_v2",
 )

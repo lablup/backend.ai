@@ -25,6 +25,7 @@ from ai.backend.manager.api.rest.v2.runtime_variant.handler import V2RuntimeVari
 from ai.backend.manager.api.rest.v2.runtime_variant.registry import (
     register_v2_runtime_variant_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
@@ -37,9 +38,12 @@ from ai.backend.testutils.processors import ops_processor_group
 @pytest.fixture()
 def runtime_variant_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> RuntimeVariantProcessors:
     return RuntimeVariantProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(RuntimeVariantEntityType())),
+        group=ops_processor_group(
+            database_engine, GroupMeta(RuntimeVariantEntityType()), config_provider
+        ),
         service=RuntimeVariantService(
             RuntimeVariantRepository(database_engine, V2DBOpsProvider(database_engine))
         ),

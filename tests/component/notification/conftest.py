@@ -11,6 +11,7 @@ from ai.backend.manager.api.rest.notification.handler import NotificationHandler
 from ai.backend.manager.api.rest.notification.registry import register_notification_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
@@ -22,6 +23,7 @@ from ai.backend.testutils.processors import ops_processor_group
 @pytest.fixture()
 def notification_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
     notification_center: NotificationCenter,
 ) -> NotificationProcessors:
     repo = NotificationRepository(database_engine)
@@ -29,9 +31,11 @@ def notification_processors(
     # Create properly structured ActionValidators mock with async validators
     return NotificationProcessors(
         channel_group=ops_processor_group(
-            database_engine, GroupMeta(NotificationChannelEntityType())
+            database_engine, GroupMeta(NotificationChannelEntityType()), config_provider
         ),
-        rule_group=ops_processor_group(database_engine, GroupMeta(NotificationRuleEntityType())),
+        rule_group=ops_processor_group(
+            database_engine, GroupMeta(NotificationRuleEntityType()), config_provider
+        ),
         service=service,
     )
 

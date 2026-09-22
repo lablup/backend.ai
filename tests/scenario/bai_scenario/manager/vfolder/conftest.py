@@ -22,6 +22,9 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
@@ -84,6 +87,7 @@ async def adapter(
             engine,
             provider,
             share_provider,
+            ResourcePolicyOpsProvider(engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
         valkey_stat_client=valkey.stat,

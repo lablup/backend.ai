@@ -1,4 +1,8 @@
+from uuid import UUID
+
 from ai.backend.common.data.entity.permission import PermissionFieldType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -10,8 +14,10 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkLookupOpsResult,
     CreatedEntityOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
@@ -39,6 +45,10 @@ from .actions import (
 )
 from .actions.bulk_get_permissions import BulkGetPermissionsAction
 from .actions.bulk_get_roles import BulkGetRolesAction
+from .actions.bulk_lookup_role_assignment_ends import (
+    BulkLookupRoleAssignmentRolesAction,
+    BulkLookupRoleAssignmentUsersAction,
+)
 from .actions.delete_permission import DeletePermissionAction
 from .actions.get_entity_types import (
     PublicGetEntityTypesAction,
@@ -93,6 +103,12 @@ class PermissionControllerProcessors:
     ]
     global_search_role_assignments: GlobalActionProcessor[
         GlobalSearchRoleAssignmentsAction, GlobalSearchRoleAssignmentsActionResult
+    ]
+    bulk_lookup_role_assignment_roles: BulkLookupActionProcessor[
+        BulkLookupRoleAssignmentRolesAction, BulkLookupOpsResult[UUID, RoleID]
+    ]
+    bulk_lookup_role_assignment_users: BulkLookupActionProcessor[
+        BulkLookupRoleAssignmentUsersAction, BulkLookupOpsResult[UUID, UserID]
     ]
     add_role_permission: SingleEntityActionProcessor[
         AddRolePermissionAction, CreatedFieldOpsResult[PermissionData]
@@ -150,6 +166,12 @@ class PermissionControllerProcessors:
         )
         self.global_search_role_assignments = role_group.global_scope(
             GlobalSearchRoleAssignmentsAction, service.search_users_assigned_to_role
+        )
+        self.bulk_lookup_role_assignment_roles = role_group.public_bulk_lookup_ops(
+            BulkLookupRoleAssignmentRolesAction
+        )
+        self.bulk_lookup_role_assignment_users = user_group.public_bulk_lookup_ops(
+            BulkLookupRoleAssignmentUsersAction
         )
         permissions: LookupFieldGroup[PermissionData] = role_group.field_group(
             FieldGroupMeta(PermissionFieldType()),

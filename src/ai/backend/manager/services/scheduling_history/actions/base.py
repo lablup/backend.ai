@@ -9,14 +9,8 @@ from typing import override
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-
-
-@dataclass
-class SchedulingHistoryAction(BaseGlobalAction):
-    """Base for a history read that spans the installation."""
 
 
 @dataclass

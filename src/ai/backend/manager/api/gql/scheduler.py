@@ -131,6 +131,10 @@ async def scheduling_events_by_session(
         log.warning("Invalid session ID format: {}", session_id)
         raise InvalidSessionId(f"Invalid session ID format: {session_id}") from e
 
+    # Reading a session's scheduling events is reading the session, so the same
+    # entity read answers whether this caller may subscribe at all.
+    await info.context.adapters.session.get(session_uuid)
+
     event_hub = info.context.event_hub
     propagator = AsyncBypassPropagator()
     try:

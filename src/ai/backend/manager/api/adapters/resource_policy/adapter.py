@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -73,6 +74,7 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
+from ai.backend.manager.errors.resource import ProjectResourcePolicyNotFound
 from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
@@ -91,6 +93,7 @@ from ai.backend.manager.models.resource_policy.deprecated_search import (
     DeprecatedKeyPairResourcePolicyConditions,
 )
 from ai.backend.manager.models.resource_policy.scopes import (
+    ProjectResourcePolicyTarget,
     UserKeypairResourcePolicyTarget,
     UserResourcePolicyTarget,
 )
@@ -140,6 +143,9 @@ from ai.backend.manager.services.project_resource_policy.actions.create_project_
 )
 from ai.backend.manager.services.project_resource_policy.actions.get import (
     GetProjectResourcePolicyAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.global_search_project_resource_policies import (
+    GlobalSearchProjectResourcePoliciesAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
@@ -477,7 +483,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project_resource_policy.global_search.run(
-            SearchProjectResourcePoliciesAction(
+            GlobalSearchProjectResourcePoliciesAction(
                 searcher=GlobalSearcher(used_by=(), searcher=searcher)
             )
         )
@@ -520,6 +526,27 @@ class ResourcePolicyAdapter(BaseAdapter):
         return UpdateProjectResourcePolicyPayload(
             project_resource_policy=self._project_policy_data_to_node(result.data)
         )
+
+    async def get_project_resource_policy(self, project_id: ProjectID) -> ProjectResourcePolicyNode:
+        """The policy the named project is subject to, read at that project's scope.
+
+        The project is an argument rather than the caller's own: a caller belongs to
+        several, and which one is asked about is theirs to say.
+        """
+        result = await self._project_resource_policy.search.run(
+            SearchProjectResourcePoliciesAction(
+                searcher=ScopedSearcher(
+                    scopes=[ProjectResourcePolicyTarget(project_id=project_id)],
+                    used_by=(),
+                    searcher=ProjectResourcePolicySearcher(pagination=NoPagination()),
+                )
+            )
+        )
+        if not result.items:
+            raise ProjectResourcePolicyNotFound(
+                f"No project resource policy applies to project {project_id}."
+            )
+        return self._project_policy_data_to_node(result.items[0])
 
     async def admin_delete_project_resource_policy(
         self, input: DeleteProjectResourcePolicyInput

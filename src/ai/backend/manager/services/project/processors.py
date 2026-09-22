@@ -91,7 +91,7 @@ class ProjectProcessors:
         self.bulk_get = group.partial_bulk_get_ops(BulkGetProjectsAction)
         self.global_search = group.global_searcher_ops(GlobalSearchProjectsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchProjectsAction)
-        self.create_project = group.role_managed_create_ops(CreateProjectAction)
+        self.create_project = group.scope(CreateProjectAction, group_service.create_project)
         self.delete_project = group.single_delete_ops(DeleteProjectAction)
         self.restore_project = group.single_restore_ops(RestoreProjectAction)
         self.update_project = group.single_entity(UpdateProjectAction, group_service.update_group)

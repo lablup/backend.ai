@@ -9,6 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -22,4 +25,4 @@ class ReplicaGroupHistorySearcher(Searcher[ReplicaGroupHistoryRow, ReplicaGroupH
 
     @override
     def to_data(self, row: ReplicaGroupHistoryRow) -> ReplicaGroupHistoryData:
-        return row.to_data()
+        return ReplicaGroupHistorySearchableFields.own.to_data(row)

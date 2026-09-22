@@ -297,22 +297,22 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ImagesInTwoRegistries(Given[Any, ManyImagesAndACaller]):
-    """레지스트리 2개에 나뉘어 있는 이미지들과 호출자 1명.
+class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
+    """레지스트리 2개에 나뉘어 있는 이미지들과, 한쪽 레지스트리에 권한을 받았거나 받지 않은 사용자.
 
-    한쪽으로 좁히는 동작을 확인할 때 쓴다. 레지스트리가 1개뿐이면 좁혀도 걸러지는 것이
-    없어서, 조건을 빼도 같은 응답이 반환된다.
+    `registry`가 스코프로 지정할 한쪽이고, `laid`는 그 안의 이미지다.
     """
 
-    role: UserRole = UserRole.SUPERADMIN
+    granted: bool = True
     wanted: int = 2
     elsewhere: int = 2
 
     @override
     def describe(self) -> str:
+        holds = "한쪽 레지스트리에 권한을 받은" if self.granted else "아무 권한도 받지 않은"
         return (
             f"레지스트리 2개, 한쪽에 이미지 {self.wanted}개와 다른 쪽에 {self.elsewhere}개, "
-            f"{self.role.value} 1명"
+            f"{holds} 사용자 1명"
         )
 
     @override
@@ -326,7 +326,9 @@ class ImagesInTwoRegistries(Given[Any, ManyImagesAndACaller]):
         ]
         for index in range(self.elsewhere):
             await seeding.creating_from(SeedImage(name_hint=f"there-{index}"), other)
-        caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        caller = await seeding.within(SomeoneOf(domain))
+        if self.granted:
+            await seeding.within(SomeoneReachingImages(wanted, caller))
         return ManyImagesAndACaller(
             laid=tuple(seeding.made(one) for one in here),
             named=seeding.made(here[0]),

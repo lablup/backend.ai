@@ -107,7 +107,7 @@ class SidecarProcessorGroup[TSidecarData]:
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TSidecarData]]:
-        """A read across every row of this sidecar type, behind the SUPERADMIN gate.
+        """A read across every row of this sidecar type, behind the global gate.
 
         For the rows of named scopes use :meth:`search_ops`; this one names none."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)

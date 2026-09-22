@@ -263,7 +263,7 @@ class SearchOpsAction[TRow: Base, TData](OpsBackendAction):
 class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
     """A list read across an entire table, with no scope filter.
 
-    Mixed in alongside ``BaseGlobalAction``, whose SUPERADMIN gate is what makes an
+    Mixed in alongside ``BaseGlobalAction``, whose global gate is what makes an
     unscoped scan answerable for. Kept apart from :class:`SearchOpsAction` rather than
     signalled by an empty scope list, so the authority a query needs is visible in the
     action's shape instead of in the value of one of its fields.
@@ -700,7 +700,7 @@ class ScopedSearchOpsAction[TRow: Base, TData](BaseScopeAction, OpsBackendAction
 class GlobalSearcherOpsAction[TRow: Base, TData](BaseGlobalAction, OpsBackendAction, ABC):
     """A page read across the whole table, narrowed by the uses the searcher names.
 
-    The SUPERADMIN gate answers for the unscoped read, so the uses are not checked.
+    The global gate answers for the unscoped read by type, so the uses are not checked.
     """
 
     searcher: GlobalSearcher[TRow, TData]
@@ -842,7 +842,7 @@ class CreateGlobalRoleManagedEntityOpsAction[TRow: Base, TData](
     """An insert of one role-managed entity row that belongs under no other scope.
 
     Global-shaped rather than scope-shaped: a top-level entity has no parent scope to
-    target, and the SUPERADMIN gate is what answers for creating one.
+    target, and the global gate is what answers for creating one.
     """
 
     @override
@@ -1020,7 +1020,7 @@ class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction
     """A write to one row of system-wide state, named by a key that is not an ``EntityIdentifier``.
 
     Global rather than single-entity because the row it names belongs to no RBAC scope:
-    the SUPERADMIN gate is what answers for the write, and the catalogs this shape
+    the global gate is what answers for the write, and the catalogs this shape
     serves are keyed by a name that the caller passes as-is.
     """
 

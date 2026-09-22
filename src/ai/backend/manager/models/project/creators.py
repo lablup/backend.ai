@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.project.types import ProjectData
@@ -40,7 +41,7 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
     allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
     integration_name: str | None = None
     resource_policy: str | None = None
-    container_registry: dict[str, str] | None = None
+    container_registry: ImageCommitRegistry | None = None
     dotfiles: bytes | None = None
     creator_id: UserID | None = None
 
@@ -123,7 +124,9 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
             integration_id=self.integration_name,  # DB column is integration_id
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
-            container_registry=self.container_registry,
+            container_registry=self.container_registry.to_json()
+            if self.container_registry
+            else None,
             creator_id=self.creator_id,
         )
 

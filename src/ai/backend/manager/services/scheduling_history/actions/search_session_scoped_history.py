@@ -10,7 +10,9 @@ from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
 from ai.backend.manager.models.scheduling_history.scopes import (
     SessionSchedulingHistoryTarget,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.scheduling_history.searchers import (
+    SessionSchedulingHistorySearcher,
+)
 
 from .base import SchedulingHistoryScopeActionResult, SessionSchedulingHistoryAction
 
@@ -24,7 +26,7 @@ class SearchSessionScopedHistoryAction(SessionSchedulingHistoryAction):
     """
 
     scope: SessionSchedulingHistoryTarget
-    querier: BatchQuerier
+    searcher: SessionSchedulingHistorySearcher
 
     @override
     @classmethod

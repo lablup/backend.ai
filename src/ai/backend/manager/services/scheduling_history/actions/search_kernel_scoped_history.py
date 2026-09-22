@@ -11,7 +11,9 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
 from ai.backend.manager.models.scheduling_history.scopes import KernelHistoryTarget
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.scheduling_history.searchers import (
+    KernelSchedulingHistorySearcher,
+)
 
 
 @dataclass
@@ -22,7 +24,7 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
     # input already accepts several items and means them to be OR'd, but a
     # BaseScopeAction authorizes exactly one target.
     target: KernelHistoryTarget
-    querier: BatchQuerier
+    searcher: KernelSchedulingHistorySearcher
 
     @final
     @override

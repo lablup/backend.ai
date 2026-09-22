@@ -32,6 +32,8 @@ from ai.backend.common.dto.manager.v2.agent.response import (
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusEnum,
     AgentStatusFilter,
+    AgentUsage,
+    AgentUsedBy,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
@@ -140,6 +142,40 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities whose use of an agent narrows the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AgentUsedBy",
+)
+class AgentUsedByGQL(PydanticInputMixin[AgentUsedBy]):
+    """The entities whose use of an agent narrows the read."""
+
+    session: list[UUID] | None = gql_field(
+        default=None, description="Sessions running a kernel on the agent."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing an agent query; every id is AND-ed. The caller must be able to "
+            "read each listed entity, or the request is refused. Only agents the caller can "
+            "read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AgentUsage",
+)
+class AgentUsageGQL(PydanticInputMixin[AgentUsage]):
+    """The uses that narrow an agent read."""
+
+    used_by: AgentUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the agent narrows the read."
+    )
 
 
 @gql_pydantic_input(

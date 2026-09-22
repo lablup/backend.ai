@@ -62,6 +62,7 @@ from ai.backend.manager.models.scheduling_history.row import KernelSchedulingHis
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduling_history.repository import (
     SchedulingHistoryRepository,
 )
@@ -81,7 +82,7 @@ def scheduling_history_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> SchedulingHistoryProcessors:
-    repo = SchedulingHistoryRepository(database_engine)
+    repo = SchedulingHistoryRepository(database_engine, V2DBOpsProvider(database_engine))
     service = SchedulingHistoryService(repo)
     groups = processor_registry.concern(ConcernMeta(Concern.SESSION))
     return SchedulingHistoryProcessors(

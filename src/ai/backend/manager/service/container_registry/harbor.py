@@ -88,7 +88,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         scope_id: ProjectScope,
         quota: int,
     ) -> None:
-        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        registry_info = await self._repository.fetch_container_registry_info(scope_id)
         client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(
@@ -102,7 +102,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         scope_id: ProjectScope,
         quota: int,
     ) -> None:
-        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        registry_info = await self._repository.fetch_container_registry_info(scope_id)
         client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(
@@ -115,7 +115,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         self,
         scope_id: ProjectScope,
     ) -> None:
-        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        registry_info = await self._repository.fetch_container_registry_info(scope_id)
         client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(
@@ -125,7 +125,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
 
     @override
     async def read_quota(self, scope_id: ProjectScope) -> int:
-        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        registry_info = await self._repository.fetch_container_registry_info(scope_id)
         client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(

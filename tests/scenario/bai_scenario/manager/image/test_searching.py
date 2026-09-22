@@ -8,7 +8,6 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.image.request import (
@@ -19,24 +18,27 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
     ImageStatusFilterInputDTO,
+    ScopedSearchImagesInput,
     SearchImageAliasesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
+    ScopedSearchImagesPayload,
     SearchImageAliasesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageAliasOrderField,
     ImageOrderField,
+    ImageScope,
     ImageStatusType,
     OrderDirection,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -60,7 +62,7 @@ from bai_scenario.components.image import (
     ByOffset,
     ByTwoModesAtOnce,
     Filled,
-    ImagesInTwoRegistries,
+    ImagesInTwoRegistriesAndAPlainUser,
     ImagesWithTwoStatuses,
     ManyImagesAndACaller,
     ManyImagesAndSomeone,
@@ -135,10 +137,9 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
 
 @dataclass(frozen=True)
 class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]):
-    """커서를 사용하는 검색. 호출 측이 지정하는 기본 조건도 이 경로에만 있다."""
+    """커서를 사용하는 검색."""
 
     paging: Paging = field(default_factory=ByOffset)
-    narrowed: bool = False
 
     @override
     def operation(self) -> str:
@@ -146,26 +147,42 @@ class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchI
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        who = laid.caller.username
-        narrowing = "한 레지스트리로 좁혀 " if self.narrowed else ""
-        return f"{who}이 {narrowing}{self.paging.says()} 검색함"
+        return f"{laid.caller.username}이 {self.paging.says()} 검색함"
 
     @override
     async def call(
         self, adapter: ImageAdapter, laid: ManyImagesAndACaller
     ) -> AdminSearchImagesPayload:
-        narrowing = (
-            [
-                ImageSearchableFields.own.registry_id.filter.equals(
-                    UUIDEqualMatchSpec(value=laid.registry.id, negated=False)
-                )
-            ]
-            if self.narrowed
-            else None
-        )
         with ActingAs(laid.caller):
             return await adapter.admin_search_images_gql(
-                AdminSearchImagesInput(**self.paging.asked()), base_conditions=narrowing
+                AdminSearchImagesInput(**self.paging.asked())
+            )
+
+
+@dataclass(frozen=True)
+class SearchingWithinARegistry(When[ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]):
+    """레지스트리 하나를 스코프로 지정하는 검색."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search"
+
+    @override
+    def describe(self, laid: ManyImagesAndACaller) -> str:
+        return f"{laid.caller.username}이 한 레지스트리를 스코프로 이미지를 검색함"
+
+    @override
+    async def call(
+        self, adapter: ImageAdapter, laid: ManyImagesAndACaller
+    ) -> ScopedSearchImagesPayload:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search(
+                ScopedSearchImagesInput(
+                    scope=ImageScope(
+                        container_registry=[UUIDScope(value=laid.registry.id)],
+                    ),
+                    limit=DEFAULT_PAGE,
+                )
             )
 
 
@@ -296,17 +313,17 @@ class TheAttachedAliasIsFound[
 
 
 @dataclass(frozen=True)
-class EveryLaidImageIsCounted(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
-    """미리 만들어 둔 이미지가 모두 집계된다."""
+class EveryLaidImageIsCounted[TPayload: (AdminSearchImagesPayload, ScopedSearchImagesPayload)](
+    Then[ManyImagesAndACaller, TPayload]
+):
+    """미리 만들어 둔 이미지가 모두 집계된다. 전체 검색과 스코프 검색이 같이 쓴다."""
 
     @override
     def says(self) -> str:
         return "미리 만들어 둔 이미지가 모두 집계된다"
 
     @override
-    def look(
-        self, laid: ManyImagesAndACaller, answered: Answered[AdminSearchImagesPayload]
-    ) -> list[Verdict]:
+    def look(self, laid: ManyImagesAndACaller, answered: Answered[TPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Held("응답", answered.response, Filled())]
@@ -700,31 +717,60 @@ class ACursorReadsFromTheFront(
 
 
 @dataclass(frozen=True)
-class TheBaseConditionNarrowsFirst(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+class AReaderOfTheRegistrySearchesItsImages(
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-condition-given-from-outside-narrows-before-the-callers-filter"
+        return "a-user-granted-on-a-registry-reads-the-images-it-holds"
 
     @override
     def describe(self) -> str:
         return (
-            "이미지가 레지스트리 2개에 나뉘어 있을 때 호출 측이 한쪽으로 좁혀 주면, "
-            "그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다"
+            "이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 "
+            "그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 "
+            "집계되지 않는다"
         )
 
     @override
     def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
-        return ImagesInTwoRegistries()
+        return ImagesInTwoRegistriesAndAPlainUser()
 
     @override
-    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
-        return SearchingWithACursor(paging=ByOffset(limit=DEFAULT_PAGE), narrowed=True)
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]:
+        return SearchingWithinARegistry()
 
     @override
-    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+    def then(self) -> Then[ManyImagesAndACaller, ScopedSearchImagesPayload]:
         return EveryLaidImageIsCounted()
+
+
+@dataclass(frozen=True)
+class AUserWithNoPermissionMayNotSearchTheRegistryImages(
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-cannot-read-the-registry-is-refused-its-images"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 "
+            "권한 부족으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+        return ImagesInTwoRegistriesAndAPlainUser(granted=False)
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]:
+        return SearchingWithinARegistry()
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, ScopedSearchImagesPayload]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -944,7 +990,8 @@ SCENARIOS: list[Any] = [
     ASizeBesideACursorIsRefused(),
     APlainUserMayNotSearch(),
     ACursorReadsFromTheFront(),
-    TheBaseConditionNarrowsFirst(),
+    AReaderOfTheRegistrySearchesItsImages(),
+    AUserWithNoPermissionMayNotSearchTheRegistryImages(),
     TwoPaginationModesAreRefused(),
     ABrokenCursorIsRefused(),
     SearchingAliasesWithNoneAttached(),

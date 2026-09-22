@@ -16,13 +16,16 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
     ReconciliationResult,
     ResourceOccupancy,
 )
 from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
 )
 
 from .db_source import ResourceSlotDBSource
@@ -73,9 +76,10 @@ class ResourceSlotRepository:
     # ==================== agent_resources ====================
 
     @resource_slot_repository_resilience.apply()
-    async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceRow:
+    async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceData:
         """Get a single slot row for one agent+slot combination."""
-        return await self._db_source.get_agent_resource_by_slot(agent_id, slot_name)
+        row = await self._db_source.get_agent_resource_by_slot(agent_id, slot_name)
+        return AgentResourceSearchableFields.own.to_data(row)
 
     # ==================== resource_allocations ====================
 

@@ -30,6 +30,9 @@ from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
@@ -105,6 +108,7 @@ def group_repository(
     return ProjectRepository(
         db=database_engine,
         v2_ops_provider=V2DBOpsProvider(database_engine),
+        policy_ops_provider=ResourcePolicyOpsProvider(database_engine),
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
         storage_manager=storage_manager,

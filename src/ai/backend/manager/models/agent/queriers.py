@@ -8,6 +8,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -24,4 +25,4 @@ class BulkAgentQuerier(BulkEntityQuerier[AgentRow, AgentData]):
 
     @override
     def to_data(self, row: AgentRow) -> AgentData:
-        return row.to_data()
+        return AgentSearchableFields.own.to_data(row)

@@ -75,9 +75,13 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -155,7 +159,11 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine, V2DBOpsProvider(database_engine))
+    return SessionRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(database_engine)),
+    )
 
 
 @pytest.fixture()
@@ -699,7 +707,11 @@ async def compute_session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=SessionRepository(database_engine, V2DBOpsProvider(database_engine)),
+        session_repository=SessionRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(database_engine)),
+        ),
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),
@@ -707,6 +719,7 @@ async def compute_session_processors(
             database_engine,
             V2DBOpsProvider(database_engine),
             ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
     )

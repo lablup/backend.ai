@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
@@ -36,7 +36,6 @@ from ai.backend.manager.errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
@@ -281,29 +280,6 @@ class SessionDBSource:
             for kernel in session_row.kernels:
                 kernel.session_name = new_name
             return session_row
-
-    async def get_container_registry(
-        self,
-        registry_hostname: str,
-        registry_project: str,
-    ) -> ContainerRegistryRow | None:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ContainerRegistryRow)
-                .where(
-                    (ContainerRegistryRow.registry_name == registry_hostname)
-                    & (ContainerRegistryRow.project == registry_project)
-                )
-                .options(
-                    load_only(
-                        ContainerRegistryRow.url,
-                        ContainerRegistryRow.username,
-                        ContainerRegistryRow.password,
-                        ContainerRegistryRow.project,
-                    )
-                )
-            )
-            return cast(ContainerRegistryRow | None, await db_session.scalar(query))
 
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:
         async with self._ops_provider.read_ops() as r:

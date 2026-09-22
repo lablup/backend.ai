@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -34,8 +35,8 @@ from ai.backend.manager.models.replica_group.searchers import (
 )
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
-from ai.backend.manager.models.replica_group_history.conditions import (
-    ReplicaGroupHistoryConditions,
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
@@ -379,8 +380,10 @@ class ReplicaGroupDBSource:
             owner_id=transition.deployment_id,
             history_creator=creator,
             match_conditions=[
-                ReplicaGroupHistoryConditions.by_replica_group_ids([creator.replica_group_id]),
-                ReplicaGroupHistoryConditions.by_category(creator.category),
+                ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.in_(
+                    UUIDInMatchSpec(values=[creator.replica_group_id], negated=False)
+                ),
+                ReplicaGroupHistorySearchableFields.own.category.filter.equals(creator.category),
             ],
             status_updater=transition.status_updater,
         )

@@ -4,6 +4,7 @@ from .filters import (
     RolePresetFilterGQL,
     RolePresetOrderByGQL,
     RolePresetOrderFieldGQL,
+    RolePresetPermissionNestedFilterGQL,
 )
 from .inputs import (
     BulkAddRolePermissionPresetsInputGQL,
@@ -53,6 +54,7 @@ __all__ = [
     "RolePermissionPresetConnection",
     # Filter / OrderBy types
     "RolePresetFilterGQL",
+    "RolePresetPermissionNestedFilterGQL",
     "RolePresetOrderByGQL",
     "RolePresetOrderFieldGQL",
     "RolePermissionPresetFilterGQL",

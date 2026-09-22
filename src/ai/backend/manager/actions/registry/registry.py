@@ -174,8 +174,8 @@ class ProcessorRegistry[TData: EntityData]:
         """Every wiring a role may permit — the ones asking the caller for a permission
         on an entity a permission row can name.
 
-        Leaves out the global ones, which a SUPERADMIN gate answers rather than a role,
-        and the relations, which name no entity to hold a permission on.
+        Leaves out the global ones, whose scope the role matrix does not offer, and the
+        relations, which name no entity to hold a permission on.
         """
         return tuple(
             record

@@ -13,8 +13,8 @@ from strawberry.scalars import JSON
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     ArtifactGQLFilterInputDTO,
@@ -132,9 +132,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact_revision.searchable_fields import (
-    ArtifactRevisionSearchableFields,
-)
 
 
 async def get_registry_url(
@@ -692,12 +689,6 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
         pydantic_filter = filter.to_pydantic() if filter is not None else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
-        base_conditions = [
-            ArtifactRevisionSearchableFields.own.artifact_id.filter.equals(
-                UUIDEqualMatchSpec(value=uuid.UUID(self.id), negated=False)
-            )
-        ]
-
         search_input = AdminSearchArtifactRevisionsInput(
             filter=pydantic_filter,
             order=pydantic_order,
@@ -708,9 +699,9 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
             limit=limit,
             offset=offset,
         )
-        payload = await info.context.adapters.artifact.search_revisions_gql(
+        payload = await info.context.adapters.artifact.search_revisions_of_artifact_gql(
+            ArtifactID(uuid.UUID(self.id)),
             search_input,
-            base_conditions=base_conditions,
         )
 
         edges = []

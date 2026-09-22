@@ -48,6 +48,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduling_history import (
     SchedulingHistoryRepository,
 )
@@ -113,7 +114,7 @@ class TestSchedulingHistoryRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[SchedulingHistoryRepository, None]:
         """Create SchedulingHistoryRepository instance with database"""
-        repo = SchedulingHistoryRepository(db=db_with_cleanup)
+        repo = SchedulingHistoryRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
 
     # ========== Session History Tests ==========

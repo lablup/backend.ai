@@ -7,7 +7,7 @@ in, the project rosters, the relations, and the accepted shares. Then give the s
 that had no node when the preset roles were written their roles and grants.
 
 Revision ID: dafe06a6c763
-Revises: f345b344d526
+Revises: bf75b41e80ae
 Create Date: 2026-09-16
 
 """
@@ -21,7 +21,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "dafe06a6c763"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "f345b344d526"
+down_revision = "bf75b41e80ae"
 branch_labels = None
 depends_on = None
 
@@ -172,7 +172,8 @@ _CAP_ROSTER_EDGES: Final = sa.text(f"""
 """)
 
 # A personal project's creator is its one member. Every other member's edge is already in
-# the graph; `association_groups_users` stopped being written before that and is not read.
+# the graph; `association_groups_users` stopped being written before that, though a few
+# reads still remain.
 _ADD_PERSONAL_ROSTER_EDGES: Final = sa.text("""
     INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
     SELECT p.id, u.id, TRUE

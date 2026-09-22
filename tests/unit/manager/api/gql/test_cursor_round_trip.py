@@ -399,9 +399,15 @@ CASES: list[ConnectionCase] = [
         items=_model_cards(),
         payload_type=SearchModelCardsPayload,
         adapter_owner="model_card",
-        adapter_method="admin_search",
+        adapter_method="ownership_search",
         call=lambda info, first, after: VFolderGQL.model_cards(
-            SimpleNamespace(id=str(uuid.uuid4())), info, first=first, after=after
+            SimpleNamespace(
+                id=str(uuid.uuid4()),
+                ownership=SimpleNamespace(project_id=uuid.uuid4(), user_id=None),
+            ),
+            info,
+            first=first,
+            after=after,
         ),
     ),
     ConnectionCase(

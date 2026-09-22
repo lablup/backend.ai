@@ -97,6 +97,9 @@ from ai.backend.manager.actions.v2.field.base import (
 )
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
 from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
@@ -353,6 +356,7 @@ from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
+from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.mount_policy import (
@@ -404,7 +408,7 @@ def _ops_registry() -> ProcessorRegistry[Any]:
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(global_scope=[RefusingGlobalActionValidator()]),
             repository=OpsRepository(MagicMock()),
         )
     )
@@ -1125,6 +1129,22 @@ def test_vfolder_loader_read_is_a_partial_permission_read() -> None:
         VFolderEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
+    )
+
+
+def test_vfolder_allowed_types_read_is_public() -> None:
+    """The allowed vfolder types are read by any authenticated caller, not superadmin-only."""
+    registry = _ops_registry()
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[PublicListAllowedTypesAction] == (
+        VFolderEntityType(),
+        ActionKind.GLOBAL,
+        ActionGate.PUBLIC,
     )
 
 

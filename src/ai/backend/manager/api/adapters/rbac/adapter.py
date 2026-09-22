@@ -161,6 +161,7 @@ from ai.backend.manager.data.permission.types import RoleSource as InternalRoleS
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.permission import (
+    NotEnoughPermission,
     PermissionAlreadyGranted,
     ReplaceRolePermissionRoleIdMismatch,
 )
@@ -195,6 +196,7 @@ from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
 )
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
     RoleAssignmentTarget,
+    RoleRoleAssignmentTarget,
     UserRoleAssignmentTarget,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
@@ -215,6 +217,10 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_get_permissio
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_get_roles import (
     BulkGetRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_lookup_role_assignment_ends import (
+    BulkLookupRoleAssignmentRolesAction,
+    BulkLookupRoleAssignmentUsersAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
     BulkRemoveRolePermissionsAction,
@@ -391,8 +397,42 @@ class RBACAdapter(BaseAdapter):
         """
         if not assignment_ids:
             return []
-        # Serves the deprecated RoleAssignment node alone, so it stays on the global search
-        # and goes away with that node.
+        roles = await self._permission_controller.bulk_lookup_role_assignment_roles.run(
+            BulkLookupRoleAssignmentRolesAction(assignment_ids=assignment_ids)
+        )
+        users = await self._permission_controller.bulk_lookup_role_assignment_users.run(
+            BulkLookupRoleAssignmentUsersAction(assignment_ids=assignment_ids)
+        )
+        found: dict[UUID, RoleAssignmentNode] = {}
+        by_role: dict[RoleID, list[UUID]] = defaultdict(list)
+        for aid, role_id in roles.resolved.items():
+            by_role[role_id].append(aid)
+        for role_id, aids in by_role.items():
+            found.update(
+                await self._read_assignments_in_scope(
+                    RoleRoleAssignmentTarget(role_id=role_id), aids
+                )
+            )
+        by_user: dict[UserID, list[UUID]] = defaultdict(list)
+        for aid, user_id in users.resolved.items():
+            if aid not in found:
+                by_user[user_id].append(aid)
+        for user_id, aids in by_user.items():
+            found.update(
+                await self._read_assignments_in_scope(
+                    UserRoleAssignmentTarget(user_id=user_id), aids
+                )
+            )
+        return [found.get(aid) for aid in assignment_ids]
+
+    async def _read_assignments_in_scope(
+        self, target: RoleAssignmentTarget, assignment_ids: Sequence[UUID]
+    ) -> dict[UUID, RoleAssignmentNode]:
+        """Read the named assignment rows from one of the ends they join.
+
+        A caller barred from the end answers for none of its rows, so the loader falls
+        through to the other end and leaves the rest of the batch alone.
+        """
         searcher = RoleAssignmentSearcher(
             pagination=NoPagination(),
             conditions=[
@@ -401,13 +441,13 @@ class RBACAdapter(BaseAdapter):
                 )
             ],
         )
-        action_result = await self._permission_controller.global_search_role_assignments.run(
-            GlobalSearchRoleAssignmentsAction(searcher=searcher)
-        )
-        assignment_map: dict[UUID, RoleAssignmentNode] = {
-            data.id: self._assignment_data_to_node(data) for data in action_result.result.items
-        }
-        return [assignment_map.get(aid) for aid in assignment_ids]
+        try:
+            result = await self._permission_controller.scoped_search_role_assignments.run(
+                ScopedSearchRoleAssignmentsAction(targets=[target], searcher=searcher)
+            )
+        except NotEnoughPermission:
+            return {}
+        return {data.id: self._assignment_data_to_node(data) for data in result.result.items}
 
     async def batch_load_permissions_by_role_ids(
         self, role_ids: Sequence[RoleID]
@@ -1075,6 +1115,10 @@ class RBACAdapter(BaseAdapter):
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
         ]
+        if f.permission is not None:
+            conditions.extend(
+                self._convert_permission_bit_filter(f.permission, fields.permission.filter)
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -1113,6 +1157,11 @@ class RBACAdapter(BaseAdapter):
             *self._convert_role_status_filter(f.status, fields.status.filter),
             *self._convert_assigned_user_nested_filter(f.assigned_user),
             *self._convert_mapped_scope_nested_filter(f.mapped_scope),
+            *self.apply_to_many_filter(
+                f.permissions,
+                RoleSearchableFields.nested.permissions.correlation,
+                self._convert_permission_filter,
+            ),
         ]
         if f.AND:
             for sub in f.AND:
