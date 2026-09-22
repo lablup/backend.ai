@@ -7,11 +7,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Final, Self, override
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.types import BackendAISchema, ServiceDiscoveryType
 from ai.backend.logging.utils import BraceStyleAdapter
 
+_SERVICE_ID_NAMESPACE: Final = uuid.UUID(
+    "6ba7b811-9dad-11d1-80b4-00c04fd430c8"
+)  # uuid.NAMESPACE_URL
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
 _DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minutes
 
@@ -115,7 +118,10 @@ class ServiceMetadata(BackendAISchema):
     Metadata for a service.
     """
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        description="Identifier of the service. Derived from the endpoint when not given.",
+    )
     display_name: str = Field(..., description="Display name of the service")
     service_group: str = Field(..., description="Name of the service group (manager, agent, etc.)")
     version: str = Field(..., description="Version of the service")
@@ -127,6 +133,20 @@ class ServiceMetadata(BackendAISchema):
         default_factory=dict,
         description="Additional labels for service discovery and Prometheus",
     )
+
+    @model_validator(mode="after")
+    def _name_the_endpoint_when_no_id_was_given(self) -> Self:
+        """Identify the endpoint, not the process that registered it.
+
+        A component's worker processes share one listening socket, so a per-process
+        id registers the same endpoint several times over. See KNOWLEDGE.md.
+        """
+        if "id" not in self.model_fields_set:
+            self.id = uuid.uuid5(
+                _SERVICE_ID_NAMESPACE,
+                f"{self.service_group}/{self.endpoint.address}:{self.endpoint.port}",
+            )
+        return self
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
