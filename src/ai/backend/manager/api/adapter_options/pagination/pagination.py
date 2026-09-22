@@ -6,6 +6,7 @@ both the GQL adapter (BaseGQLAdapter) and domain adapters (BaseAdapter).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -134,6 +135,26 @@ class PaginationSpec:
             if order.modifier is operators.desc_op:
                 return order.element, False
         raise ServerMisconfiguredError(f"Pagination order must be a plain ASC/DESC column: {order}")
+
+
+def build_orders(
+    options: PaginationOptions,
+    spec: PaginationSpec,
+    orders: Sequence[QueryOrder],
+) -> list[QueryOrder]:
+    """The ORDER BY clauses a search applies after the pagination's own order.
+
+    Cursor pagination sorts by the spec alone, so the caller's ``orders`` are
+    dropped; offset pagination applies them, or the spec's forward order if empty.
+    """
+    result: list[QueryOrder] = []
+    if not options.has_cursor:
+        result.extend(orders if orders else [spec.forward_order])
+    if options.last is not None:
+        result.append(spec.backward_tiebreaker_order)
+    else:
+        result.append(spec.tiebreaker_order)
+    return result
 
 
 def build_pagination(
