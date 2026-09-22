@@ -6,15 +6,11 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactDataWithRevisions
+from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact.searchable_fields import (
     ArtifactSearchableFields,
-)
-from ai.backend.manager.models.artifact_revision.searchable_fields import (
-    ArtifactRevisionSearchableFields,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -31,19 +27,10 @@ class ArtifactSearcher(Searcher[ArtifactRow, ArtifactData]):
 
 
 @dataclass
-class ArtifactWithRevisionsSearcher(Searcher[ArtifactRow, ArtifactDataWithRevisions]):
-    """Reads artifacts with their revisions eagerly loaded."""
+class ArtifactWithRevisionsSearcher(ArtifactSearcher):
+    """Pages the artifacts of a with-revisions search.
 
-    @override
-    def build_select(self) -> sa.sql.Select[Any]:
-        return sa.select(ArtifactRow).options(selectinload(ArtifactRow.revision_rows))
-
-    @override
-    def to_data(self, row: ArtifactRow) -> ArtifactDataWithRevisions:
-        return ArtifactDataWithRevisions.from_dataclasses(
-            artifact_data=ArtifactSearchableFields.own.to_data(row),
-            revisions=[
-                ArtifactRevisionSearchableFields.own.to_data(revision)
-                for revision in row.revision_rows
-            ],
-        )
+    Revisions are to-many, so they are not joined here: a join would repeat an artifact
+    once per revision and the page and count would follow the revisions. The
+    repository reads the page's revisions in a second query and attaches them.
+    """

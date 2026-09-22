@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, override
+from typing import Any, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -21,18 +21,9 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRow",)
-
-
-def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
-
-    return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
 class ArtifactRow(Base):
@@ -93,11 +84,6 @@ class ArtifactRow(Base):
         "ReservoirRegistryRow",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == ReservoirRegistryRow.id,
         overlaps="huggingface_registry",
-    )
-
-    revision_rows: Mapped[list[ArtifactRevisionRow]] = relationship(
-        "ArtifactRevisionRow",
-        primaryjoin=_get_artifact_revision_join_cond,
     )
 
     @override

@@ -1,8 +1,9 @@
 import uuid
+from collections import defaultdict
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.entity.artifact import ArtifactID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import BackendAIError
@@ -40,10 +41,11 @@ from ai.backend.manager.models.artifact_revision.searchable_fields import (
 )
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.artifact_revision.updaters import ArtifactRevisionScanUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.db_source.db_source import ArtifactDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.types import TriState
 
@@ -434,12 +436,34 @@ class ArtifactRepository:
         self,
         searcher: ArtifactWithRevisionsSearcher,
     ) -> ArtifactWithRevisionsListResult:
-        """Search artifacts with their revisions."""
+        """Search artifacts, then attach the page's revisions read in the same transaction."""
         async with self._v2_ops.read_ops() as r:
             result = await r.search_in_global(searcher)
+            revisions = await self._revisions_by_artifact(r, [a.id for a in result.items])
         return ArtifactWithRevisionsListResult(
-            items=result.items,
+            items=[
+                ArtifactDataWithRevisions.from_dataclasses(
+                    artifact_data=a, revisions=revisions[a.id]
+                )
+                for a in result.items
+            ],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    @staticmethod
+    async def _revisions_by_artifact(
+        r: V2ReadOps, artifact_ids: list[uuid.UUID]
+    ) -> defaultdict[uuid.UUID, list[ArtifactRevisionData]]:
+        """The revisions of the given artifacts, grouped by artifact id."""
+        condition = ArtifactRevisionSearchableFields.own.artifact_id.filter.in_(
+            UUIDInMatchSpec(values=artifact_ids, negated=False)
+        )
+        found = await r.search_in_global(
+            ArtifactRevisionSearcher(pagination=NoPagination(), conditions=[condition])
+        )
+        grouped: defaultdict[uuid.UUID, list[ArtifactRevisionData]] = defaultdict(list)
+        for revision in found.items:
+            grouped[revision.artifact_id].append(revision)
+        return grouped
