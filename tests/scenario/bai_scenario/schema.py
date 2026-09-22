@@ -127,8 +127,12 @@ import ai.backend.manager.models.session_group.row
 import ai.backend.manager.models.session_template
 import ai.backend.manager.models.specs
 import ai.backend.manager.models.storage
+import ai.backend.manager.models.storage_backend
+import ai.backend.manager.models.storage_backend.row
 import ai.backend.manager.models.storage_namespace
 import ai.backend.manager.models.storage_namespace.row
+import ai.backend.manager.models.storage_volume
+import ai.backend.manager.models.storage_volume.row
 import ai.backend.manager.models.types
 import ai.backend.manager.models.user
 import ai.backend.manager.models.user.row
@@ -143,4 +147,4 @@ import ai.backend.manager.models.virtual_entity
 
 def registered() -> int:
     """How many model modules this file names; a smoke check for the generator."""
-    return 131
+    return 135

@@ -1,7 +1,7 @@
 """add the storage volume and backend schema
 
 Revision ID: c7d2fb1e5a90
-Revises: a7d2c9e41b58
+Revises: a91c4e7d0b35
 Create Date: 2026-09-04
 
 """
@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "c7d2fb1e5a90"
-down_revision = "a7d2c9e41b58"
+down_revision = "a91c4e7d0b35"
 branch_labels = None
 depends_on = None
 
@@ -150,7 +150,6 @@ def upgrade() -> None:
         "service_storage_volumes",
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_volume_id", GUID(), nullable=False),
-        sa.Column("mount_path", sa.String(), nullable=False),
         sa.Column("status", sa.String(length=64), nullable=False),
         sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=False),
         *_timestamp_columns(),
