@@ -16,6 +16,58 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.11 (2026-09-22)
+
+### Features
+* Limit the depth and the alias count of a GraphQL query so that a single request cannot exhaust the manager. ([#14483](https://github.com/lablup/backend.ai/issues/14483))
+
+### Improvements
+* Summarise a container registry rescan into a single log line instead of logging every scanned image. ([#14186](https://github.com/lablup/backend.ai/issues/14186))
+
+### Fixes
+* Fix the TUI installer to register the local Harbor container registry under its reachable `host:port` instead of the unresolvable `local-harbor` label, which docker parsed as a Docker Hub namespace and failed pushes with `insufficient_scope: authorization failed` ([#13288](https://github.com/lablup/backend.ai/issues/13288))
+* Fix the shared HTTP client pool closing a session while one of its requests is still streaming a response. ([#13425](https://github.com/lablup/backend.ai/issues/13425))
+* Fix `POST /resource/check-presets` reporting the policy remaining (often `Infinity`) as free capacity for a resource group with no alive schedulable agent; such groups now report zero remaining. ([#13788](https://github.com/lablup/backend.ai/issues/13788))
+* Attach GPUs via CDI device requests on Podman, whose Docker-compatible API silently ignores both the nvidia runtime and nvidia device requests. ([#13829](https://github.com/lablup/backend.ai/issues/13829))
+* Skip the Podman graph root when collecting node disk statistics, which otherwise double-counts the underlying filesystem. ([#13843](https://github.com/lablup/backend.ai/issues/13843))
+* Fix sessions requesting a zero-quantity resource slot (e.g. cuda.device: 0) staying PENDING forever when scheduled onto agents that don't serve that slot ([#13992](https://github.com/lablup/backend.ai/issues/13992))
+* Fix runtime variant preset update accepting a default_value that does not match its value_type ([#13994](https://github.com/lablup/backend.ai/issues/13994))
+* Restart the agent when its worker process dies unexpectedly, instead of leaving the supervisor running with the service manager reporting the unit as active, and record a crash dump for native faults that leave no Python traceback. ([#14003](https://github.com/lablup/backend.ai/issues/14003))
+* Release glide client resources when `GlideClient.create()` fails, so failed Valkey reconnects no longer leak sockets and connections. ([#14008](https://github.com/lablup/backend.ai/issues/14008))
+* Provision the RBAC scope graph for a cloned virtual folder so it is bound to its owner like a newly created one ([#14016](https://github.com/lablup/backend.ai/issues/14016))
+* Fix `GET /resource/presets` returning 500 on a preset-list cache hit ([#14025](https://github.com/lablup/backend.ai/issues/14025))
+* Fix the halfstack GraphQL gateway binding only to loopback inside its container on WSL2, which made web login fail with "No healthy Manager endpoint is available" ([#14029](https://github.com/lablup/backend.ai/issues/14029))
+* Fix updating a deployment revision preset's model_definition to no longer crash when a service block omits shell, preserving the existing value instead ([#14075](https://github.com/lablup/backend.ai/issues/14075))
+* Order fair shares by the project name, project active state, user name and user email that the order-field enums advertise; these were accepted but silently ignored since 26.4.0. ([#14076](https://github.com/lablup/backend.ai/issues/14076))
+* Fix multi-node sessions attached to a persistent inter-container network failing to start, because the launcher addressed the network by a fabricated name instead of the one the network plugin created. ([#14133](https://github.com/lablup/backend.ai/issues/14133))
+* Terminate a model service route as soon as its bound session ends, instead of waiting out the health check initial delay. ([#14145](https://github.com/lablup/backend.ai/issues/14145))
+* Log a request to an unregistered path at debug instead of warning, and count it in the API request metric. ([#14187](https://github.com/lablup/backend.ai/issues/14187))
+* Log the admin GraphQL per-operation access line at debug instead of info. ([#14188](https://github.com/lablup/backend.ai/issues/14188))
+* Log a background task failing with a 4xx client error at warning without a traceback, instead of at error with one. ([#14189](https://github.com/lablup/backend.ai/issues/14189))
+* Stop recording a failed request twice in the manager logs; the request layer now decides the level once, so a 4xx from user input no longer appears as an error with a traceback. ([#14190](https://github.com/lablup/backend.ai/issues/14190))
+* Stop logging a GraphQL client error (e.g. a duplicate vfolder name) as ERROR twice in the admin v2 handler. ([#14200](https://github.com/lablup/backend.ai/issues/14200))
+* Name the background task in its completion log line instead of leaving the name slot empty ([#14205](https://github.com/lablup/backend.ai/issues/14205))
+* Fix local container registry image scanning and session startup broken by Docker Engine 29 and the missing local-image guards. ([#14265](https://github.com/lablup/backend.ai/issues/14265))
+* Fix the GPU allocation map to report each device's allocated ratio (0 to 1) instead of the raw share amount, which exceeded 1 when several sessions shared one fractional GPU. ([#14327](https://github.com/lablup/backend.ai/issues/14327))
+* Grant a user's self role the permissions on the keypairs it owns, and write the keypair scope edge on the paths that create a keypair outside the RBAC creator, so a user created after the keypair RBAC migration is no longer refused on /auth/ssh-keypair. ([#14326](https://github.com/lablup/backend.ai/issues/14326), [#14433](https://github.com/lablup/backend.ai/issues/14433))
+* Fix the v2 audit-log `entity_id` filter, which was silently ignored so that filtering audit logs by entity id returned unfiltered results. ([#14553](https://github.com/lablup/backend.ai/issues/14553))
+* Normalize CRLF line endings in bootstrap scripts and dotfiles so they no longer break commands and environment variables inside session containers. ([#14554](https://github.com/lablup/backend.ai/issues/14554))
+* Page the container registry search with a cursor: first/after and last/before are read rather than dropped, and naming a cursor and a limit at once is refused. ([#14564](https://github.com/lablup/backend.ai/issues/14564))
+* Fix session creation failing on label-less images that ship no `ldd` (such as distroless bases) by detecting the C library from the library itself, stop leaking the probe container when the command cannot start, and report host-side Docker failures during the probe as themselves instead of as an unsupported image. ([#14587](https://github.com/lablup/backend.ai/issues/14587))
+* Page the REST image search with a cursor: first/after and last/before are read rather than dropped, and naming a cursor beside a limit or offset is refused. ([#14598](https://github.com/lablup/backend.ai/issues/14598))
+* Answer an image's digest without the trailing space the fixed-width column added to it, in the v2 image search and the GraphQL image type. ([#14602](https://github.com/lablup/backend.ai/issues/14602))
+* Fix kernel creation ignoring the configured `docker.image.auto_pull` behavior, which made agents re-pull images on session start even when it was set to `tag` ([#14616](https://github.com/lablup/backend.ai/issues/14616))
+* Refuse writes to a vfolder shared read-only through the v2 API, and report a share recipient their own mount permission instead of the owner's. ([#14719](https://github.com/lablup/backend.ai/issues/14719))
+* Fix cursor pagination skipping rows that share the order value ([#14734](https://github.com/lablup/backend.ai/issues/14734))
+* Page the login client type search with a cursor: first/after and last/before are read rather than dropped, and naming a cursor beside a limit or offset is refused. ([#14769](https://github.com/lablup/backend.ai/issues/14769))
+* Create every vfolder and every subfolder made through the storage-proxy group-writable (0775), so that project folders, clones, and folders of users assigned a `container_uid` after the fact are writable from containers running as a per-user uid. Folders created before this change keep their existing mode. ([#14866](https://github.com/lablup/backend.ai/issues/14866))
+* Set the group-writable mode on every intermediate directory that a vfolder `mkdir` with parents creates, not only on the leaf. ([#14893](https://github.com/lablup/backend.ai/issues/14893))
+* Check the session read permission before subscribing to `schedulingEventsBySession`, so a caller can no longer watch another user's scheduling events. ([#14894](https://github.com/lablup/backend.ai/issues/14894))
+
+### External Dependency Updates
+* Upgrade aiohttp, strawberry-graphql, orjson, PyJWT, click, msgpack, python-dotenv and memray past the versions reported as vulnerable. ([#14480](https://github.com/lablup/backend.ai/issues/14480))
+
+
 ## 26.4.10 (2026-08-19)
 
 ### Fixes
