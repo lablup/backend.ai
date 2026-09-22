@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
@@ -90,6 +91,21 @@ class PersonalProjectDeletionError(EntityError, web.HTTPConflict):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(ProjectEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
+
+
+class ProjectResourcePolicyNotFound(EntityNotFoundError):
+    error_type = "https://api.backend.ai/probs/project-resource-policy-not-found"
+    error_title = "The project resource policy does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(
+            extra_msg, entity_type=ProjectResourcePolicyEntityType(), operation=operation
+        )
 
 
 class ProjectHasActiveKernelsError(EntityError, web.HTTPConflict):

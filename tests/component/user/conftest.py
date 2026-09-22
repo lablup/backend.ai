@@ -47,6 +47,9 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -75,6 +78,7 @@ def user_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = UserService(

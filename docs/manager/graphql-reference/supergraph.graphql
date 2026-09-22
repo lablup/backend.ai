@@ -18234,6 +18234,11 @@ type Query
   myUserResourcePolicyV2: UserResourcePolicyV2 @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.9.0. Get the resource policy the named project is subject to.
+  """
+  scopedProjectResourcePolicyV2(projectId: ID!): ProjectResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.2. List storage hosts the current user is allowed to mount, with the union of permissions inherited from domain, project, and keypair resource policies.
   """
   myStorageHostPermissions: MyStorageHostPermissionsPayload @join__field(graph: STRAWBERRY)

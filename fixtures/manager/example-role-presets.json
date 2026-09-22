@@ -1401,6 +1401,13 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "01993d56-bb39-7246-836b-5744793fd522",
+            "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
+            "entity_type": "project_resource_policy",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "01993d56-bb39-70f3-80a8-a9d4df2bd426",
             "role_preset_id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
             "entity_type": "resource_group",
@@ -1741,6 +1748,13 @@
             "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
             "entity_type": "image",
             "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7df1-b907-21803eaabdd6",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "keypair_resource_policy",
+            "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {

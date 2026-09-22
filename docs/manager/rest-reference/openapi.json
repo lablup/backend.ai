@@ -54963,6 +54963,35 @@
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/resource-policies/project/projects/{project_id}": {
+      "get": {
+        "operationId": "v2/resource-policies.scoped_project_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/resource-presets/search": {
       "post": {
         "operationId": "v2/resource-presets.search",

@@ -35,6 +35,9 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.resource_policy.write import (
+    V2ResourcePolicyWriteOps,
+)
 from ai.backend.manager.repositories.ops.v2.roster.write import V2RosterWriteOps
 
 
@@ -59,7 +62,7 @@ class FullUserCreatorResult:
     personal_project: ProjectData
 
 
-class V2UserWriteOps(V2RosterWriteOps):
+class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
     """The roster write ops plus provisioning a user."""
 
     # groups.name is a slug of at most 64 characters; the tail is reserved for the
@@ -98,6 +101,8 @@ class V2UserWriteOps(V2RosterWriteOps):
         )
         keypair = await self._create_default_keypair(user, creation)
         personal_project = await self._create_personal_project(user_id, user.username, domain_id)
+        await self.restate_user_resource_policy_share(user_id)
+        await self.restate_keypair_resource_policy_share(user_id)
         return FullUserCreatorResult(user=user, keypair=keypair, personal_project=personal_project)
 
     async def _create_default_keypair(
@@ -168,6 +173,7 @@ class V2UserWriteOps(V2RosterWriteOps):
             )
         )
         await self._join(ProjectID(project.id), user_id)
+        await self.restate_project_resource_policy_share(ProjectID(project.id))
         return project
 
     async def _domain_name(self, domain_id: DomainID) -> str:

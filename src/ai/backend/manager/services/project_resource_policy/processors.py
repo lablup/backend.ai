@@ -9,7 +9,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
@@ -19,6 +21,9 @@ from ai.backend.manager.services.project_resource_policy.actions.create_project_
 )
 from ai.backend.manager.services.project_resource_policy.actions.get import (
     GetProjectResourcePolicyAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.global_search_project_resource_policies import (
+    GlobalSearchProjectResourcePoliciesAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
@@ -43,8 +48,11 @@ class ProjectResourcePolicyProcessors:
     lookup: LookupActionProcessor[
         LookupProjectResourcePolicyAction, LookupOpsResult[ProjectResourcePolicyUUID]
     ]
+    search: ScopeActionProcessor[
+        SearchProjectResourcePoliciesAction, ScopedBatchOpsResult[ProjectResourcePolicyData]
+    ]
     global_search: GlobalActionProcessor[
-        SearchProjectResourcePoliciesAction, BatchOpsResult[ProjectResourcePolicyData]
+        GlobalSearchProjectResourcePoliciesAction, BatchOpsResult[ProjectResourcePolicyData]
     ]
     global_create: GlobalActionProcessor[
         CreateProjectResourcePolicyAction, CreatedEntityOpsResult[ProjectResourcePolicyData]
@@ -59,7 +67,8 @@ class ProjectResourcePolicyProcessors:
     def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetProjectResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupProjectResourcePolicyAction)
-        self.global_search = group.global_searcher_ops(SearchProjectResourcePoliciesAction)
+        self.search = group.scoped_search_ops(SearchProjectResourcePoliciesAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchProjectResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)
         self.update = group.single_update_ops(UpdateProjectResourcePolicyAction)
         self.purge = group.entity_purge_ops(PurgeProjectResourcePolicyAction)
