@@ -481,7 +481,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.allowed_vfolder_hosts,
             ),
             allowed_docker_registries=OptionalState[list[str]].from_graphql(
-                self.allowed_vfolder_hosts,
+                self.allowed_docker_registries,
             ),
             integration_name=TriState[str].from_graphql(
                 self.integration_id,
