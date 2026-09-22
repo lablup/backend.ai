@@ -47,16 +47,16 @@ _PCT_TEMPLATE: Final[str] = (
     " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
     ' * 100, "value_type", "pct", "", "")'
 )
-# `current` is a cumulative counter (CPU msec) whose rate() is millicores. pct is
-# the share of one core and adds up over kernels, so the divisor is the unit, not
-# the capacity series: summing that over kernels would average them.
+# `current` is a cumulative counter (CPU msec) whose rate() is millicores, and
+# capacity is the unit (one core), so each kernel's ratio is the share of one core
+# and the ratios are summed: dividing the sums would average the kernels instead.
 _MILLICORES_UNIT_HINT: Final[str] = "millicores"
-_MILLICORES_PER_CORE: Final[int] = 1000
 _PCT_MILLICORES_TEMPLATE: Final[str] = (
     "label_replace("
-    "sum by (${{group_by}})(rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}]))"
-    f" / {_MILLICORES_PER_CORE} * 100"
-    ', "value_type", "pct", "", "")'
+    "sum by (${{group_by}})("
+    "rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}])"
+    " / ignoring(value_type) (" + _PCT_CAPACITY_SELECTOR + " > 0)"
+    ') * 100, "value_type", "pct", "", "")'
 )
 _SERIES_TEMPLATES: Final[Mapping[MetricType, str]] = {
     MetricType.GAUGE: _GAUGE_TEMPLATE,

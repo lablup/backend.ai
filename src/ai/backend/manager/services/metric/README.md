@@ -83,7 +83,7 @@ result = await metric_service.batch_get_kernel_live_stats(action)
 |---|---|---|
 | `current` | Stored `current` series | Raw value, or its `rate()` for counter metrics (see below) |
 | `capacity` | Stored `capacity` series | Raw value |
-| `pct` | Computed in PromQL | `Σcurrent / Σcapacity × 100` over the scope's kernels; metrics without a capacity series return no data. For the `millicores` unit hint (`cpu_util`) it is `Σrate(current) / 1000 × 100`, the share of one core, so kernels add up and the value may exceed 100 |
+| `pct` | Computed in PromQL | `Σcurrent / Σcapacity × 100` over the scope's kernels; metrics without a capacity series return no data. For the `millicores` unit hint (`cpu_util`, capacity = one core) it is `Σ(rate(current) / capacity) × 100`, the share of one core, so kernels add up and the value may exceed 100 |
 
 ### Metric Types and Automatic Detection
 For `current` and `capacity` queries the service determines metric types based on metric names:
