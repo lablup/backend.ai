@@ -24,13 +24,3 @@ class ArtifactSearcher(Searcher[ArtifactRow, ArtifactData]):
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
         return ArtifactSearchableFields.own.to_data(row)
-
-
-@dataclass
-class ArtifactWithRevisionsSearcher(ArtifactSearcher):
-    """Pages the artifacts of a with-revisions search.
-
-    Revisions are to-many, so they are not joined here: a join would repeat an artifact
-    once per revision and the page and count would follow the revisions. The
-    repository reads the page's revisions in a second query and attaches them.
-    """

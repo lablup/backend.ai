@@ -44,7 +44,7 @@ from ai.backend.manager.dto.response import (
 )
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
 from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
+from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
@@ -214,7 +214,7 @@ class ArtifactRegistryHandler:
 
         action_result = await self._artifact.search_artifacts_with_revisions.run(
             SearchArtifactsWithRevisionsAction(
-                searcher=ArtifactWithRevisionsSearcher(
+                searcher=ArtifactSearcher(
                     pagination=pagination, conditions=conditions, orders=orders
                 )
             )

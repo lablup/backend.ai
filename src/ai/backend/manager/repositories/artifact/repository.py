@@ -26,10 +26,7 @@ from ai.backend.manager.data.association.types import AssociationArtifactsStorag
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.models.artifact.creators import ArtifactCreator
 from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
-from ai.backend.manager.models.artifact.searchers import (
-    ArtifactSearcher,
-    ArtifactWithRevisionsSearcher,
-)
+from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
 from ai.backend.manager.models.artifact.updaters import (
     ArtifactScanUpdater,
     ArtifactTouchUpdater,
@@ -434,7 +431,7 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def search_artifacts_with_revisions(
         self,
-        searcher: ArtifactWithRevisionsSearcher,
+        searcher: ArtifactSearcher,
     ) -> ArtifactWithRevisionsListResult:
         """Search artifacts, then attach the page's revisions read in the same transaction."""
         async with self._v2_ops.read_ops() as r:

@@ -37,10 +37,7 @@ from ai.backend.manager.errors.artifact_registry import (
     ReservoirConnectionError,
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.artifact.searchers import (
-    ArtifactSearcher,
-    ArtifactWithRevisionsSearcher,
-)
+from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
 from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -1327,7 +1324,7 @@ class TestSearchArtifactsWithRevisionsAction:
             )
         )
 
-        searcher = ArtifactWithRevisionsSearcher(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=1, offset=5),
             conditions=[],
             orders=[],
@@ -1355,7 +1352,7 @@ class TestSearchArtifactsWithRevisionsAction:
             )
         )
 
-        searcher = ArtifactWithRevisionsSearcher(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
