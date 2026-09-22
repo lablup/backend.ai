@@ -4,8 +4,9 @@ A user on a project roster is a share capped to read, and granting the project's
 is the second step of joining rather than part of the same fact (BEP-1076). Both steps
 land in one primitive so a caller cannot write one without the other.
 
-A personal project takes no member beyond the user it was created with. The refusal is
-here, so no path can add one: the projects a user is enrolled in are narrowed by several
+A personal project takes no member beyond the user it was created with, and a
+model-store project keeps every user of its domain. Both refusals are here, so no path
+can write around one: the projects a user is enrolled in are narrowed by several
 callers, and a filter each of them applies is a filter each of them can forget.
 """
 
@@ -25,6 +26,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
+    ModelStoreProjectLeaveError,
     PersonalProjectMemberAdditionError,
     ProjectNotFound,
 )
@@ -90,16 +92,17 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         return [UserSearchableFields.own.to_data(row) for row in rows]
 
     async def leave_member(self, project_id: ProjectID, user_id: UserID) -> None:
-        """Take one user off the project's roster. Silent where they were not on it."""
-        await self._project_type(project_id)
+        """Take one user off the project's roster. Silent where they were not on it;
+        refuses a model-store project."""
+        await self._refuse_model_store_leave(project_id)
         await self._leave(project_id, user_id)
 
     async def leave_members(
         self, project_id: ProjectID, user_ids: Sequence[UserID]
     ) -> RosterLeaveResult:
         """Take the named users off the project's roster, reporting the ones that could
-        not leave and why."""
-        await self._project_type(project_id)
+        not leave and why. Refuses a model-store project."""
+        await self._refuse_model_store_leave(project_id)
         if not user_ids:
             return RosterLeaveResult()
         requested = set(user_ids)
@@ -173,6 +176,14 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         if await self._project_type(project_id) is ProjectType.PERSONAL:
             raise PersonalProjectMemberAdditionError(
                 f"Personal project takes no members: {project_id}"
+            )
+
+    async def _refuse_model_store_leave(self, project_id: ProjectID) -> None:
+        """Refuse the write when the project is a model-store one, whose roster holds
+        every user of its domain."""
+        if await self._project_type(project_id) is ProjectType.MODEL_STORE:
+            raise ModelStoreProjectLeaveError(
+                f"Model-store project keeps every user of its domain: {project_id}"
             )
 
     async def _revoke_project_roles(self, project_id: ProjectID, user_id: UserID) -> None:

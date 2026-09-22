@@ -5,10 +5,13 @@ import logging
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
     CreateDomainDotfileActionResult,
@@ -42,6 +45,13 @@ class DomainService:
 
     def __init__(self, repository: DomainRepository) -> None:
         self._repository = repository
+
+    async def create_domain(self, action: CreateDomainAction) -> CreatedEntityOpsResult[DomainData]:
+        """Register a domain. Not the generic create: a domain is registered with a
+        model-store project, in the same transaction."""
+        return CreatedEntityOpsResult(
+            data=await self._repository.create_domain(action.to_creator())
+        )
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction

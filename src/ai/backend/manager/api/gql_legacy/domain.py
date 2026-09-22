@@ -38,7 +38,6 @@ from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, D
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
@@ -59,7 +58,6 @@ from ai.backend.manager.services.domain.actions.update_domain_node import (
     UpdateDomainNodeAction,
     UpdateDomainNodeActionResult,
 )
-from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -778,14 +776,6 @@ class CreateDomain(graphene.Mutation):  # type: ignore[misc]
 
         res = await ctx.processors.domain.create_domain.run(props.to_action(name))
         domain_data = res.data
-        await ctx.processors.project.create_project.run(
-            CreateProjectAction(
-                domain_id=domain_data.id,
-                creator=ProjectCreator.model_store(
-                    domain_id=domain_data.id, domain_name=domain_data.name
-                ),
-            )
-        )
         return cls(
             ok=True,
             msg="domain creation succeed",

@@ -42,8 +42,8 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -93,7 +93,7 @@ def server_module_registries(
     v2_ops = V2DBOpsProvider(database_engine)
     domain = DomainProcessors(
         config_registry.group(GroupMeta(DomainEntityType())),
-        DomainService(DomainRepository(database_engine, RelationOpsProvider(database_engine))),
+        DomainService(DomainRepository(database_engine, DomainOpsProvider(database_engine))),
     )
     project = ProjectProcessors(
         config_registry.group(GroupMeta(ProjectEntityType())),

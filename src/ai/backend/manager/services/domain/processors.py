@@ -97,7 +97,7 @@ class DomainProcessors:
         self.update_domain = group.single_update_ops(UpdateDomainAction)
         self.delete_domain = group.single_delete_ops(DeleteDomainAction)
         self.restore_domain = group.single_restore_ops(RestoreDomainAction)
-        self.create_domain = group.global_role_managed_create_ops(CreateDomainAction)
+        self.create_domain = group.global_scope(CreateDomainAction, service.create_domain)
         self.create_domain_node = group.global_scope(
             CreateDomainNodeAction, service.create_domain_node
         )

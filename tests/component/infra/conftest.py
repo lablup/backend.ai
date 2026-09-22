@@ -47,10 +47,10 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -242,7 +242,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The handler resolves the caller's domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

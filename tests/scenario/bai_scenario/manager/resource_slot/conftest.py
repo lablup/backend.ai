@@ -28,8 +28,8 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -79,6 +79,6 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, RelationOpsProvider(engine))),
+            DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
     )

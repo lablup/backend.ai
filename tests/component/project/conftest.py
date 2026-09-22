@@ -66,6 +66,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -201,7 +202,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
