@@ -102,6 +102,8 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Test the release-grade classifier
+      run: python ./scripts/test_determine_release_type.py
     - name: Set up remote cache backend (if applicable)
       run: |
         echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
@@ -801,9 +803,25 @@ jobs:
           exit 1
         fi
 
-  build-scies:
-    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
+  determine-release-grade:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    outputs:
+      RELEASE_AUDIENCE: ${{ steps.grade.outputs.RELEASE_AUDIENCE }}
+      IS_PRERELEASE: ${{ steps.grade.outputs.IS_PRERELEASE }}
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        lfs: false
+    - name: Determine the release grade
+      id: grade
+      run: python3 ./scripts/determine-release-type.py "$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+  build-scies:
+    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
     strategy:
       fail-fast: false
       matrix:
@@ -916,13 +934,15 @@ jobs:
 
 
   build-sbom:
-    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
+    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
     uses: ./.github/workflows/sbom.yml
 
   build-supergraph:
-    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
+    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
@@ -970,7 +990,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
   build-isla-sorna-image:
-    needs: [build-scies, build-wheels]
+    needs: [build-wheels]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
 
@@ -985,13 +1005,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
   make-final-release:
-    needs: [build-scies, build-wheels, build-supergraph]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [determine-release-grade, build-scies, build-wheels, build-supergraph]
+    # `build-scies` and `build-supergraph` are skipped for an internal release, so
+    # only `build-wheels` is required to have succeeded.
+    if: |
+      !cancelled()
+      && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.result == 'success'
+      && needs.build-wheels.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
-    environment: deploy-to-pypi
+    env:
+      RELEASE_AUDIENCE: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
+      IS_PRERELEASE: ${{ needs.determine-release-grade.outputs.IS_PRERELEASE }}
     steps:
     - uses: actions/checkout@v6
     - name: Fetch remote tags
@@ -1004,28 +1031,25 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'twine~=6.0'
     - name: Extract the release changelog
       env:
         VERSION: ${{ github.ref_name }}
         REPOSITORY: ${{ github.repository }}
       run: python ./scripts/extract-release-changelog.py "$VERSION" --repository "$REPOSITORY"
-    - name: Determine the release type
-      run: echo "IS_PRERELEASE=$(python ./scripts/determine-release-type.py "$(cat VERSION)")" >> "$GITHUB_ENV"
     - name: Download wheels
       uses: actions/download-artifact@v6
       with:
         name: wheels
         path: dist
     - name: Download scies
+      if: env.RELEASE_AUDIENCE != 'internal'
       uses: actions/download-artifact@v6
       with:
         pattern: scies-*
         path: dist
         merge-multiple: true
     - name: Merge checksum files into one
+      if: env.RELEASE_AUDIENCE != 'internal'
       run: |
         cat dist/checksum-*.txt > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
@@ -1036,6 +1060,7 @@ jobs:
         name: SBOM report
         path: dist
     - name: Download supergraph schema
+      if: env.RELEASE_AUDIENCE != 'internal'
       uses: actions/download-artifact@v6
       with:
         name: supergraph
@@ -1083,31 +1108,6 @@ jobs:
         done
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: mint API token
-      id: mint-token
-      run: |
-          # retrieve the ambient OIDC token
-          resp=$(curl --fail-with-body -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=pypi")
-          oidc_token=$(jq -r '.value' <<< "${resp}")
-
-          # exchange the OIDC token for an API token
-          resp=$(curl --fail-with-body -X POST https://pypi.org/_/oidc/mint-token -d "{\"token\": \"${oidc_token}\"}")
-          api_token=$(jq -r '.token' <<< "${resp}")
-
-          # mask the newly minted API token, so that we don't accidentally leak it
-          echo "::add-mask::${api_token}"
-
-          # see the next step in the workflow for an example of using this step output
-          echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
-      # We don't use `pants publish ::` because we manually rename the
-      # wheels after building them to add arch-specific tags.
-      run: |
-        twine upload --skip-existing dist/*.whl dist/*.tar.gz
     - name: Resolve the installer channels
       id: channels
       run: |
@@ -1184,9 +1184,63 @@ jobs:
         }'
 
 
-  build-conda-pack-for-windows:
-    needs: [make-final-release]
+  publish-to-pypi:
+    needs: [determine-release-grade, build-wheels]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment: deploy-to-pypi
+    steps:
+    - uses: actions/checkout@v6
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'twine~=6.0'
+    - name: Download wheels
+      uses: actions/download-artifact@v6
+      with:
+        name: wheels
+        path: dist
+    - name: mint API token
+      id: mint-token
+      run: |
+          # retrieve the ambient OIDC token
+          resp=$(curl --fail-with-body -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=pypi")
+          oidc_token=$(jq -r '.value' <<< "${resp}")
+
+          # exchange the OIDC token for an API token
+          resp=$(curl --fail-with-body -X POST https://pypi.org/_/oidc/mint-token -d "{\"token\": \"${oidc_token}\"}")
+          api_token=$(jq -r '.token' <<< "${resp}")
+
+          # mask the newly minted API token, so that we don't accidentally leak it
+          echo "::add-mask::${api_token}"
+
+          # see the next step in the workflow for an example of using this step output
+          echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
+      # We don't use `pants publish ::` because we manually rename the
+      # wheels after building them to add arch-specific tags.
+      run: |
+        twine upload --skip-existing dist/*.whl dist/*.tar.gz
+
+
+  build-conda-pack-for-windows:
+    needs: [determine-release-grade, make-final-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
     runs-on: windows-latest
     permissions:
       contents: write
