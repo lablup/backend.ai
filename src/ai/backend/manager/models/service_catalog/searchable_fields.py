@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
@@ -154,14 +153,14 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
     def _endpoint_from_json(endpoint: ServiceCatalogEndpointRowJson) -> ServiceCatalogEndpointData:
         """One element of ``ServiceCatalogRow.endpoint_rows``, keyed by column name."""
         return ServiceCatalogEndpointData(
-            id=ServiceCatalogID(UUID(endpoint["id"])),
-            service_id=ServiceCatalogID(UUID(endpoint["service_id"])),
-            role=endpoint["role"],
-            scope=endpoint["scope"],
-            address=endpoint["address"],
-            port=endpoint["port"],
-            protocol=endpoint["protocol"],
-            metadata=endpoint["metadata"],
+            id=ServiceCatalogID(endpoint.id),
+            service_id=ServiceCatalogID(endpoint.service_id),
+            role=endpoint.role,
+            scope=endpoint.scope,
+            address=endpoint.address,
+            port=endpoint.port,
+            protocol=endpoint.protocol,
+            metadata=endpoint.metadata,
         )
 
     @override

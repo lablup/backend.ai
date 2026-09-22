@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import with_expression
 
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
+from ai.backend.manager.models.base import PydanticListColumn
 from ai.backend.manager.models.service_catalog.row import (
     ServiceCatalogEndpointRow,
     ServiceCatalogRow,
@@ -16,6 +17,7 @@ from ai.backend.manager.models.service_catalog.row import (
 from ai.backend.manager.models.service_catalog.searchable_fields import (
     ServiceCatalogSearchableFields,
 )
+from ai.backend.manager.models.service_catalog.types import ServiceCatalogEndpointRowJson
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -32,12 +34,13 @@ class ServiceCatalogSearcher(Searcher[ServiceCatalogRow, ServiceCatalogData]):
     def _endpoint_rows_json() -> sa.sql.expression.ColumnElement[Any]:
         """The service's endpoint rows as one JSON array, keyed by column name."""
         endpoint = ServiceCatalogEndpointRow.__table__
-        return (
+        rows_json = (
             sa.select(sa.func.json_agg(sa.func.row_to_json(endpoint.table_valued())))
             .where(endpoint.c.service_id == ServiceCatalogRow.id)
             .correlate(ServiceCatalogRow)
             .scalar_subquery()
         )
+        return sa.type_coerce(rows_json, PydanticListColumn(ServiceCatalogEndpointRowJson))
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
