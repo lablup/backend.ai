@@ -261,7 +261,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             users,
             keypairs.c.user == users.c.uuid,
         )
-        query = sa.select(keypairs).select_from(j)
+        query = sa.select(keypairs, users.c.email, users.c.full_name).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
