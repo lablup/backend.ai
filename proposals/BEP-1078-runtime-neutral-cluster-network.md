@@ -115,21 +115,59 @@ published ports away.
 Unchanged: the agent still holds no network privilege, and the node-wide claim stores keep their
 current on-disk shape and their owner tags -- the owner simply comes from the caller.
 
-### 2.4 Cluster name resolution
+### 2.4 VXLAN backend
+
+The multi-node data plane. One overlay per session, built by every member node from the same
+session record, with nothing learned from the wire.
+
+| Element | Contract |
+|---------|----------|
+| Identity | One VNI per session, allocated by the manager from `4096..16777215`; UDP port 4789 (operator-movable) |
+| Node devices | `baivx<vni>` (VXLAN, on the node's uplink) enslaved to `baibr<vni>`; a container gets one veth on that bridge, seen inside as `baimulti0` |
+| Addresses | Central IPAM: the manager cuts the session's block out of `10.128.0.0/12` and assigns every endpoint its IP before the container starts; no DHCP, no host-local IPAM |
+| Peers | FDB and ARP are programmed from the session's endpoints table, per remote endpoint, idempotently. No multicast, no flood-and-learn |
+| Peer exchange | The etcd endpoints table is the record. Nodes also announce endpoints to each other over UDP (`7947`, HMAC, whole state) so a peer converges before etcd is re-read; a node that understands a field acts on it, a node that does not ignores it — there is no version gate |
+| MTU | The manager states the overlay MTU; the node measures what its uplink actually carries and refuses the session when the two disagree, rather than let a full-size frame vanish |
+| Single-node sessions | Never touch VXLAN: a node-local bridge backend cuts a block from the node's own pool (default `172.30.0.0/16`, /26 per session) |
+
+The node is a member of a session from `setup_session_network` until its own teardown
+acknowledgement lands; the manager reuses a VNI or a block only after every member has done so.
+
+#### 2.4.1 Encryption
+
+| Element | Contract |
+|---------|----------|
+| Transport | ESP in transport mode, `rfc4106(gcm(aes))`, ESN, replay window; profile name `esp-aesgcm-esn-v1` |
+| Scope | Cluster-wide key: ESP policies select on the outer packet, which carries no session identifier |
+| Keyring | Three slots, so a rotation can overlap: the previous key still decrypts while the new one encrypts |
+| Selection | Only VXLAN traffic between member VTEPs is marked and encrypted; the plaintext path is dropped, not allowed through, when a session is encrypted |
+| Policy | Session-level `required` refuses a member that lacks the profile; `prefer` runs that session in the clear and says so |
+| Rotation | `rotate-overlay-key --confirm-drained`: refused unless no encrypted session exists, so no session ever publishes the previous key |
+
+#### 2.4.2 Keeping the data plane true
+
+Everything above lives in kernel state that anything on the host can disturb. A watchdog pass
+every 3 s compares what the node should hold against what it does, and re-asserts devices, bridge
+membership, firewall chains and their position, and ESP state. Firewall rules the node owns but
+whose session is gone are reclaimed, on the node's own devices only. A restarted agent rebuilds
+its view from the containers that are still running and from the journals, and re-converges every
+session it finds before it accepts new ones.
+
+#### 2.4.3 Readiness
+
+An agent publishes the backends it can serve, the encryption profile it holds, its VTEP and its
+boot id under `network/agent/{id}/caps`, refreshed every minute. It publishes only after its RPC
+transport serves, withdraws before it stops, and withholds its heartbeat entirely while its
+privileged helper is unreachable: a node that cannot build a device says so by leaving the
+scheduler's view, not by taking a session it cannot serve.
+
+### 2.5 Cluster name resolution
 
 Each session gets a resolver on the node that answers `cluster_hostname -> overlay ip` from the
-endpoints table, so a kernel reaches its peers by name without a shared `/etc/hosts` write.
-
-### 2.5 Encryption
-
-The VXLAN backend encrypts the overlay by default, in ESP transport mode with
-`rfc4106(gcm(aes))`, ESN and a replay window. The key is cluster-wide because ESP policies select
-on the outer packet, which carries no session identifier. The lifecycle record exposes only a
-fingerprint and key id. Rotation uses the same leased lock as network creation and fails unless all
-encrypted sessions are drained, so one session cannot publish the previous key during rotation.
-
-The manager disables encryption only when policy is `prefer` and a member lacks the advertised
-profile. Policy `required` refuses the session instead.
+endpoints table, so a kernel reaches its peers by name without a shared `/etc/hosts` write. The
+container's `/etc/resolv.conf` names the session's gateway first; answers carry a 5 s TTL, so a
+kernel that restarts at a new address is found on the next lookup. Names the resolver does not
+own are forwarded upstream.
 
 ## 3. Compatibility
 
