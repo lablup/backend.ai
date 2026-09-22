@@ -14,7 +14,6 @@ from typing import Final
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
-from testcontainers.minio import MinioContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -25,7 +24,6 @@ from ai.backend.testutils.pants import get_parallel_slot
 RedisContainerFixture = tuple[str, HostPortPairModel]
 EtcdContainerFixture = tuple[str, HostPortPairModel]
 PostgresContainerFixture = tuple[str, HostPortPairModel]
-MinioContainerFixture = tuple[str, HostPortPairModel]
 PrometheusContainerFixture = tuple[str, HostPortPairModel]
 
 log = logging.getLogger(__spec__.name)
@@ -166,34 +164,6 @@ def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
             container.get_container_host_ip(),
             HostPortPairModel(host="127.0.0.1", port=published_port),
         )
-    finally:
-        container.stop()
-
-
-@pytest.fixture(scope="session", autouse=False)
-def minio_container() -> Iterator[tuple[str, HostPortPairModel]]:
-    # Spawn a single-node MinIO container for a testing session.
-    random_id = secrets.token_hex(8)
-
-    container = (
-        MinioContainer("minio/minio:latest", access_key="minioadmin", secret_key="minioadmin")
-        .with_name(f"test--minio-slot-{get_parallel_slot()}-{random_id}")
-        .with_exposed_ports(9000)
-        .with_exposed_ports(9090)
-        .with_kwargs(tmpfs={"/data": ""})
-        .with_command("server /data --console-address :9090")
-    )
-
-    log.info("spawning minio container (parallel slot: %d)", get_parallel_slot())
-    container.start()
-    api_port = int(container.get_exposed_port(9000))
-    _ = int(container.get_exposed_port(9090))
-
-    try:
-        # MinioContainer automatically waits for MinIO to be ready, but add grace period
-        time.sleep(0.2)
-
-        yield container.get_container_host_ip(), HostPortPairModel(host="127.0.0.1", port=api_port)
     finally:
         container.stop()
 
