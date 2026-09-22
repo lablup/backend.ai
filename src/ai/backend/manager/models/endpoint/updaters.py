@@ -256,7 +256,7 @@ class EndpointLifecycleBatchUpdater(DataBatchUpdater[EndpointRow, DeploymentInfo
     def build_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {}
         if self.lifecycle_stage is not None:
-            values["lifecycle_stage"] = self.lifecycle_stage
+            values.update(EndpointRow.lifecycle_values(self.lifecycle_stage))
             values["sub_step"] = self.sub_step
         if self.scaling_state is not None:
             values["scaling_state"] = self.scaling_state
