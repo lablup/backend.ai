@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import Any
+from uuid import UUID
+
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 __all__ = ("ServiceCatalogEndpointRowJson",)
 
 
-class ServiceCatalogEndpointRowJson(TypedDict):
-    """One service_catalog_endpoint row as row_to_json renders it: keys are column names."""
+class ServiceCatalogEndpointRowJson(BackendAISchema):
+    """One service_catalog_endpoint row as row_to_json renders it: fields are column names."""
 
-    id: str
-    service_id: str
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    service_id: UUID
     role: str
     scope: str
     address: str
