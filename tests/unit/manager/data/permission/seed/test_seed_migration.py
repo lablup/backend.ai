@@ -22,6 +22,7 @@ _DOMAIN_MEMBER_READ_REVISION = "c4a71e0d5b38_grant_domain_members_read_on_their_
 _DOMAIN_MEMBER_PRESET_REVISION = "a3f60d2b7c19_grant_domain_members_read_on_resource_presets"
 _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _MEMBER_READS_REVISION = "a1f6b7c4d902_grant_image_and_project_reads_to_members"
+_OWN_POLICY_READS_REVISION = "b8e0c1f4a276_grant_seed_roles_read_on_their_own_policy"
 _REPOSITORY = Path(__file__).resolve().parents[6]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -65,6 +66,11 @@ def public_member_migration() -> Any:
 @pytest.fixture(scope="module")
 def member_reads_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_MEMBER_READS_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def own_policy_reads_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_OWN_POLICY_READS_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -124,6 +130,7 @@ class TestMigrationMatchesFixture:
         project_member_read_migration: Any,
         public_member_migration: Any,
         member_reads_migration: Any,
+        own_policy_reads_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         written = {
@@ -213,6 +220,20 @@ class TestMigrationMatchesFixture:
                 member_reads_migration._READ,
             )
             for preset_id, entity_type in member_reads_migration._GRANTS
+        }
+        written |= {
+            (
+                own_policy_reads_migration._identify(
+                    "role_permission_preset",
+                    preset_id,
+                    entity_type,
+                    str(own_policy_reads_migration._READ),
+                ),
+                preset_id,
+                entity_type,
+                own_policy_reads_migration._READ,
+            )
+            for preset_id, entity_type in own_policy_reads_migration._GRANTS
         }
         seeded = {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])

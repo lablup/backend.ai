@@ -195,3 +195,10 @@ class V2ResourcePolicyClient(BaseDomainClient):
             f"{_PROJECT_PATH}/{name}",
             response_model=DeleteProjectResourcePolicyPayload,
         )
+
+    async def get_project_resource_policy(self, project_id: str) -> ProjectResourcePolicyNode:
+        return await self._client.typed_request(
+            "GET",
+            f"{_PROJECT_PATH}/projects/{project_id}",
+            response_model=ProjectResourcePolicyNode,
+        )

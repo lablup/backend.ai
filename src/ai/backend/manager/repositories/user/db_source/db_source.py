@@ -99,6 +99,9 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import (
@@ -118,6 +121,7 @@ class UserDBSource:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
     _share_ops: ShareOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _user_ops_provider: UserOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -126,11 +130,13 @@ class UserDBSource:
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
         self._share_ops = share_ops_provider
+        self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
@@ -336,6 +342,7 @@ class UserDBSource:
             await self._sync_user_project_memberships(
                 updated_user.uuid, updated_user.domain_name, group_ids
             )
+        await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
 
     async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
@@ -708,6 +715,19 @@ class UserDBSource:
                 UserID(user_uuid), domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
             )
 
+    async def _restate_user_policy_shares(self, user_id: UserID) -> None:
+        """Lend the user the user and keypair policies they are now subject to — the
+        write above may have moved either one."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_user_resource_policy_share(user_id)
+            await w.restate_keypair_resource_policy_share(user_id)
+
+    async def _restate_keypair_policy_share(self, user_id: UserID) -> None:
+        """Lend the user the keypair policy the key they now authorize with is subject
+        to."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_keypair_resource_policy_share(user_id)
+
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""
         result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
@@ -928,6 +948,7 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
             await self._switch_default_keypair(session, user_id, access_key)
+        await self._restate_keypair_policy_share(user_id)
 
     async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Read one keypair by its id."""

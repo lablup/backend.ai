@@ -44,6 +44,9 @@ from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -100,7 +103,12 @@ def server_module_registries(
             MagicMock(),
             MagicMock(
                 repository=ProjectRepository(
-                    database_engine, v2_ops, MagicMock(), MagicMock(), MagicMock()
+                    database_engine,
+                    v2_ops,
+                    ResourcePolicyOpsProvider(database_engine),
+                    MagicMock(),
+                    MagicMock(),
+                    MagicMock(),
                 )
             ),
         ),
@@ -115,6 +123,7 @@ def server_module_registries(
                 database_engine,
                 v2_ops,
                 ShareOpsProvider(database_engine),
+                ResourcePolicyOpsProvider(database_engine),
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ),
             MagicMock(),

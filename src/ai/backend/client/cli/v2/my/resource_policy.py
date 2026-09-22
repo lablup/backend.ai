@@ -46,3 +46,19 @@ def my_user_resource_policy() -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@resource_policy.command(name="project")
+@click.argument("project_id")
+def project_resource_policy(project_id: str) -> None:
+    """Show the resource policy of PROJECT_ID."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_policy.get_project_resource_policy(project_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
