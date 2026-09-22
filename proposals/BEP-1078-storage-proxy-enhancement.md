@@ -9,13 +9,15 @@ Implemented-Version:
 
 <!-- context-for-ai
 type: bep
-scope: Normalize storage proxies, backends, volumes and their mounts into the database
+scope: Normalize storage backends, volumes, and which services hold them into the database
 key-constraints:
   - Storage proxy identity and address stay in the service catalog, never in a dedicated table
   - Volume and backend identity is an operator-assigned id declared in each service's configuration, never a name or an inferred path
   - Service state lives in the service catalog; storage state lives on relationships, never on a volume or a backend
+  - Mounts are never recorded in the manager database; a volume implementation owns its mounts and reports one volume state per service
 key-decisions:
   - Heartbeat upserts volumes by id; backends are inserted only when absent
+  - Agents and storage proxies run the same volume implementation from the same volume declaration
 upstream: BEP-1046 (service catalog)
 -->
 
@@ -37,7 +39,7 @@ Storage proxy and volume information is spread across three places that do not a
 | Volumes exist only in each proxy's TOML file | The manager cannot list volumes without calling every proxy |
 | `vfolders.host` is the string `"proxy:volume"` | No referential integrity; renaming or removing a proxy silently breaks folders |
 | No record of which backend appliance serves a volume | Cannot tell which volumes are affected when an appliance fails |
-| `GET /volumes` echoes the proxy's config | A dropped mount is indistinguishable from a healthy one |
+| `GET /volumes` echoes the proxy's config | A volume whose storage has gone away is indistinguishable from a healthy one |
 
 The goal is a normalized model in which every relationship is a row, service liveness comes from one place, and the manager can answer "which volumes exist, who serves them, and are they healthy" from the database.
 
@@ -62,27 +64,27 @@ The service catalog (`service_catalog`, `service_catalog_endpoint`) already exis
 erDiagram
     STORAGE_BACKEND ||--o{ STORAGE_VOLUME : hosts
     STORAGE_PROXY }o--o{ STORAGE_BACKEND : reaches
-    STORAGE_PROXY }o--o{ STORAGE_VOLUME : mounts
-    AGENT }o--o{ STORAGE_VOLUME : mounts
+    STORAGE_PROXY }o--o{ STORAGE_VOLUME : holds
+    AGENT }o--o{ STORAGE_VOLUME : holds
     RESOURCE_GROUP ||--o{ AGENT : contains
     RESOURCE_GROUP }o--o{ STORAGE_VOLUME : offers
     STORAGE_VOLUME ||--o{ VFOLDER : stores
 ```
 
-A storage backend is one storage appliance. A storage volume is a logical volume on it, identified by an operator-assigned id. Storage proxies and agents both mount volumes, each at its own path, so the proxy's path and an agent's path are independent facts rather than an assumption. A resource group offers a set of volumes to the sessions scheduled onto its agents.
+A storage backend is one storage appliance. A storage volume is a logical volume on it, identified by an operator-assigned id. Storage proxies and agents both hold volumes: each runs the same volume implementation from the same volume declaration, and the implementation owns whatever mounts it needs. A volume may be backed by many mounts on one service, one per user on Hammerspace, so a relationship is a service holding a volume and never one mount. A resource group offers a set of volumes to the sessions scheduled onto its agents.
 
 Every many-to-many relationship above carries data of its own:
 
 | Relationship | Carries | Set by |
 |--------------|---------|--------|
 | Storage proxy — storage backend | Whether the appliance answers from this proxy | Proxy probe |
-| Storage proxy — storage volume | This proxy's mount path; whether the mount is alive | Proxy declaration and probe |
-| Agent — storage volume | This agent's mount path; whether the mount is alive | Agent declaration and probe |
+| Storage proxy — storage volume | Whether the volume is usable on this proxy, as its volume implementation reports | Proxy declaration and volume implementation |
+| Agent — storage volume | Whether the volume is usable on this agent, as its volume implementation reports | Agent declaration and volume implementation |
 | Resource group — storage volume | Whether the volume is offered to this group | Administrator |
 
 Storage proxies and agents are not storage-specific records. They are services: their identity, address and state live in the service catalog, and this proposal adds only the storage-specific relationships hanging off them.
 
-The agent — volume relationship records which agents mount a volume. Whether it constrains placement is out of scope here.
+The agent — volume relationship records which agents hold a volume. Whether it constrains placement is out of scope here.
 
 ### Identity
 
@@ -100,40 +102,44 @@ Neither a name nor a path can serve as identity. A name is scoped per proxy toda
 |---------|--------------|-------|
 | Storage proxy, agent | ✅ Liveness | Service catalog, from heartbeats and the stale sweep |
 | Storage proxy — storage backend | ✅ Is the appliance reachable from this proxy | Relationship |
-| Storage proxy — storage volume | ✅ Is the mount alive on this proxy | Relationship |
-| Agent — storage volume | ✅ Is the mount alive on this agent | Relationship |
+| Storage proxy — storage volume | ✅ Is the volume usable on this proxy | Relationship |
+| Agent — storage volume | ✅ Is the volume usable on this agent | Relationship |
 | Resource group — storage volume | Administrator toggle, not health | Relationship |
 | Storage backend itself | ❌ Not managed | — |
 | Storage volume itself | ❌ Not managed | — |
 
-A storage backend has no overall verdict. Only the services that mount its volumes can reach it, each over its own network path, and rolling their observations into a single value would need an arbitrary rule — one reachable proxy out of four is neither healthy nor unhealthy. Consumers read the per-relationship states and decide for themselves.
+A storage backend has no overall verdict. Only the services that hold its volumes can reach it, each over its own network path, and rolling their observations into a single value would need an arbitrary rule — one reachable proxy out of four is neither healthy nor unhealthy. Consumers read the per-relationship states and decide for themselves.
 
 For the same reason a volume has no state. A volume that no service reports is not unhealthy; it simply has no service relationships, and folders on it cannot be mounted. Its record is kept regardless, so folders keep a valid reference.
 
-The two probes are distinct because they fail independently: a vendor appliance can answer its management API while a network mount on one proxy has silently dropped.
+The state on a service — volume relationship is the volume state as that service's volume implementation reports it. The implementation owns its mounts and derives one state from them: a single-mount volume reports its mount's state, and a multi-mount volume applies its own rule, such as reporting a problem when any mount has one. Mounts themselves are never recorded in the manager database. On Hammerspace a volume gains a mount per user, so a record per mount would grow with users rather than with volumes.
 
-| Probe | Runs on | Detects |
-|-------|---------|---------|
-| `st_dev` comparison against the value captured at volume init | The mounting service | The mount fell off and the path reverted to the underlying directory |
-| `statvfs` in an executor with a timeout | The mounting service | A dead network mount, where the timeout is itself the signal |
-| Marker file holding the volume name | The mounting service | The path is serving different storage than declared |
+The volume check and the backend check are distinct because they fail independently: a vendor appliance can answer its management API while a network mount on one proxy has silently dropped.
+
+| Check | Owned by | Detects |
+|-------|----------|---------|
+| `st_dev` comparison against the value captured at volume init | Volume implementation, per mount | The mount fell off and the path reverted to the underlying directory |
+| `statvfs` in an executor with a timeout | Volume implementation, per mount | A dead network mount, where the timeout is itself the signal |
+| Marker file holding the volume name | Volume implementation, per mount | The path is serving different storage than declared |
 | `get_hwinfo()` | Storage proxy | The backend appliance itself |
+
+The three mount checks are how the current single-mount implementation derives its volume state. Another implementation may check its mounts differently; only the volume state it reports leaves the service.
 
 Each probe runs on its own periodic loop and leaves its latest result, with the time it was taken, in the service's memory; the heartbeat carries that snapshot. Probe cadence and heartbeat cadence stay independent, so a slow or hung probe never delays a heartbeat and never makes a healthy service look dead. Because every entry carries its check time, a service reports no separate unknown state — the manager decides fresh from stale itself, and a volume never yet probed is still declared, without one.
 
 Probes run independently per volume: a dead network mount blocks in its system call, and walking the volumes in one loop would let a single one starve the rest. A probe that timed out is not retried while the previous attempt is outstanding, because cancelling the await does not release the executor thread.
 
-Mount failures are not written onto the agent. They reach an administrator through a notification rule.
+Volume failures are not written onto the agent. They reach an administrator through a notification rule.
 
 ### How records are created and change
 
 Registration is driven by heartbeats so that a fresh installation needs no manual setup, while everything remains administrator-editable afterwards. Services only ever add; the manager is the only party that removes.
 
-**A service starts and finishes initializing.** It registers in the service catalog and its heartbeat declares the backends it is configured against and the volumes it mounts, each with that service's mount path. The manager then:
+**A service starts and finishes initializing.** It registers in the service catalog and its heartbeat declares the backends it is configured against and the volumes it holds, each with the state its volume implementation reports. The manager then:
 
 - inserts a storage backend record **only if one with that id is absent**, so administrator-supplied connection details are never overwritten;
 - upserts each storage volume by id and links it to its backend, logging an error and leaving the volume unlinked if the declared backend id does not resolve;
-- creates the service's backend and volume relationships, with mount state unknown until the first probe.
+- creates the service's backend and volume relationships, with state absent until the first report.
 
 Every volume and backend in a service's configuration carries its id. A declaration missing one is rejected rather than registered under a generated id, so which records exist is always the operator's choice. Connection details and credentials are never carried in a heartbeat, because it travels over the shared event bus.
 
@@ -141,9 +147,9 @@ Every volume and backend in a service's configuration carries its id. A declarat
 
 **Heartbeats stop arriving.** A missed heartbeat is not proof that a service is gone: the event bus can lag, drop messages, or be partitioned from the publisher while the service itself keeps serving. A manager reconciler therefore picks up catalog records whose last heartbeat has aged past the threshold and **probes those services directly** before acting on them. A service that answers has its record refreshed and its volumes re-verified; only one that fails the probe is marked unhealthy. This extends the passive stale sweep of BEP-1046, which marks a record unhealthy on age alone.
 
-Once a service is confirmed down, its relationships are left in place but are no longer treated as usable, so folders on a volume that only this service mounted cannot be mounted. A volume that another healthy service still reports stays fully usable — this is the point of keeping mount state per relationship.
+Once a service is confirmed down, its relationships are left in place but are no longer treated as usable, so folders on a volume that only this service held cannot be mounted. A volume that another healthy service still reports stays fully usable — this is the point of keeping volume state per relationship.
 
-**A service deregisters.** Nothing is deleted from the database. The catalog record moves to its deregistered state and the manager marks that service's storage relationships detached, so the history of what was mounted where survives and a returning service reattaches instead of being recreated from nothing. Backend and volume records persist untouched. Nothing is ever hard-deleted, because folders reference them.
+**A service deregisters.** Nothing is deleted from the database. The catalog record moves to its deregistered state and the manager marks that service's storage relationships detached, so the record of which service held which volume survives and a returning service reattaches instead of being recreated from nothing. Backend and volume records persist untouched. Nothing is ever hard-deleted, because folders reference them.
 
 **An administrator acts.** Which volumes a resource group offers is set only this way, and so is the manager's copy of the backend connection details. There is no API to create or edit a volume — volumes exist because a service declares them — but an administrator may soft-delete one. A soft-deleted volume is withheld from new folder creation while every existing reference to it stays valid; a service that keeps declaring it does not resurrect it.
 
@@ -152,19 +158,21 @@ Once a service is confirmed down, its relationships are left in place but are no
 | Storage backend | First heartbeat declaring it | Administrator | Nothing |
 | Storage volume | First heartbeat declaring it | Heartbeat | Administrator, soft delete only |
 | Storage proxy — backend | Heartbeat | Probe results | Never deleted; marked detached by the manager on deregistration |
-| Storage proxy — volume | Heartbeat | Heartbeat, probe results | Never deleted; marked detached when the service deregisters or stops declaring it |
-| Agent — volume | Heartbeat | Heartbeat, probe results | Never deleted; marked detached when the service deregisters or stops declaring it |
+| Storage proxy — volume | Heartbeat | Heartbeat, reported volume state | Never deleted; marked detached when the service deregisters or stops declaring it |
+| Agent — volume | Heartbeat | Heartbeat, reported volume state | Never deleted; marked detached when the service deregisters or stops declaring it |
 | Resource group — volume | Administrator | Administrator | Administrator |
 | vfolder — volume | Folder creation | Nothing | With the folder |
 
 ### Who calls what
 
+An agent and a storage proxy run the same volume implementation. Injecting a volume declaration into an agent's configuration is all it takes for the agent to hold that volume; acquiring mounts, resolving paths and deriving the volume state belong to the implementation, and the two services differ only in what they expose on top of it.
+
 **Storage proxy**
 
 | When | Calls | Purpose |
 |------|-------|---------|
-| On start, then periodically | Event bus | Heartbeat declaring its backends and the volumes it mounts, each with this proxy's mount path and the latest probe result held in memory |
-| Periodically, independently per volume | Its own filesystem | Mount probe. The result is kept in memory and rides the next heartbeat |
+| On start, then periodically | Event bus | Heartbeat declaring its backends and the volumes it holds, each with the latest volume state held in memory |
+| Periodically, independently per volume | Its own mounts | Volume state check, run by the volume implementation. The result is kept in memory and rides the next heartbeat |
 | Periodically | The backend appliance | `get_hwinfo()`, for the appliance's reachability from this proxy. Also kept in memory |
 | On request from the manager | — | Serves the volume verification endpoint. **New** — the existing volume listing only echoes configuration and cannot answer whether a volume is ready |
 | On request from a client | — | Serves the existing vfolder file APIs, unchanged |
@@ -173,9 +181,9 @@ Once a service is confirmed down, its relationships are left in place but are no
 
 | When | Calls | Purpose |
 |------|-------|---------|
-| On start, then periodically | Event bus | Heartbeat declaring the volumes it mounts, each with this agent's mount path and the latest probe result. **New** — agents have no volume concept today |
-| Periodically, independently per volume | Its own filesystem | Mount probe. The result is kept in memory and rides the next heartbeat |
-| On session start | — | Binds the host path the manager supplies, unchanged |
+| On start, then periodically | Event bus | Heartbeat declaring the volumes it holds, each with the latest volume state. **New** — agents have no volume concept today |
+| Periodically, independently per volume | Its own mounts | Volume state check, run by the volume implementation. The result is kept in memory and rides the next heartbeat |
+| On session prepare, when the session mounts folders | Its own volume implementation | Checks that each folder's volume is usable on this agent and that the folder's path exists under it, then resolves the host path to bind. Either check failing fails the prepare. **New** — today the manager supplies the path after asking the proxy |
 
 **Manager**
 
@@ -185,7 +193,8 @@ Once a service is confirmed down, its relationships are left in place but are no
 | Whenever it needs a proxy address | Its own database | Service catalog lookup by role and scope, replacing the address previously held in etcd |
 | Periodically, for records with an aged heartbeat | The service itself | Direct probe before declaring it down |
 | When a heartbeat has not arrived | Storage proxy | Volume verification, on demand. Routine state arrives with the heartbeat, so this endpoint exists for the case where it has stopped |
-| On folder create, delete, clone, quota change, and on session start for the mount path | Storage proxy | Existing manager-facing APIs, unchanged. The proxy is selected from the folder's volume rather than read off the folder |
+| On folder create, delete, clone and quota change | Storage proxy | Existing manager-facing APIs, unchanged. The proxy is selected from the folder's volume rather than read off the folder |
+| On session start | Its own database | Passes each folder's volume id to the agent. **New** — the manager no longer asks the proxy for a host path |
 
 A folder names a volume and no longer names a proxy, so the manager selects one for every call. Eligible proxies are those whose relationship to that volume is attached and reported alive, and whose catalog record is healthy. Each manager-facing call is self-contained and every eligible proxy sees the same files, so any one of them may serve it and no affinity is carried between calls. When no proxy is eligible the call fails with an error naming the volume — the folder and its data are intact and nothing reaches them, which is a different condition from a missing folder.
 
@@ -206,6 +215,7 @@ A folder names a volume and no longer names a proxy, so the manager selects one 
 | Volume and backend records are pulled from the running storage proxies by a CLI command | etcd holds no volume or backend data — it lives only in each proxy's configuration file. The command reads what each proxy reports and writes the records and relationships, so an operator does not have to wait for every proxy to be upgraded to the new heartbeat |
 | The CLI assigns an id to every volume and backend it finds, and the operator writes those ids into each proxy's configuration | Configurations carry no id today. Until a proxy's configuration is updated its declarations are rejected, so the assignment is reported and rehearsed before it is applied |
 | `vfolders.host` is split into a volume reference | Hosts naming a volume that no longer exists still get a row, so the reference stays valid |
+| Agent configuration gains the volume declarations of the volumes it holds | Today an agent has no volume concept. Until it carries the declarations it holds no volume and no session on it can mount a folder |
 | `resource_group_storage_volumes` is seeded with every resource group and every volume | Resource groups place no restriction on volumes today; seeding preserves that. Without it, no session could mount anything after the migration |
 
 Data migration runs through a manager CLI command, not an Alembic migration, so that it can be rehearsed with a dry run and repeated. Alembic only creates and drops schema.
@@ -216,8 +226,8 @@ Data migration runs through a manager CLI command, not an Alembic migration, so 
 
 | Phase | Content |
 |-------|---------|
-| 1 | This BEP; the new tables; mount and backend health probes with the status updates they feed |
-| 2 | Heartbeat payload for proxies and agents; manager-side record creation; verification and reconciliation |
+| 1 | This BEP; the new tables; volume and backend state checks with the status updates they feed |
+| 2 | Heartbeat payload for proxies and agents; the volume implementation on the agent; manager-side record creation; verification and reconciliation |
 | 3 | Administrator APIs; configuration move; etcd retirement; notification rule types |
 
 ## Decision Log
@@ -233,15 +243,19 @@ Data migration runs through a manager CLI command, not an Alembic migration, so 
 | 2026-09-04 | Credentials never travel in a heartbeat | The event bus is readable by every component that consumes events |
 | 2026-09-04 | A stale service is probed before being declared down | A missed heartbeat can mean a lagging event bus rather than a dead service |
 | 2026-09-05 | Probe results ride the heartbeat rather than a separate health event | One payload and one cadence to reason about; the heartbeat is already an event |
-| 2026-09-04 | Services and their relationships are soft-deleted | A returning service reattaches, and the record of what was mounted where survives |
-| 2026-09-04 | Mount failures raise notifications rather than writing agent state | Keeps one owner for agent state and lets operators choose the response |
+| 2026-09-04 | Services and their relationships are soft-deleted | A returning service reattaches, and the record of which service held which volume survives |
+| 2026-09-04 | Volume failures raise notifications rather than writing agent state | Keeps one owner for agent state and lets operators choose the response |
 | 2026-09-09 | An administrator may soft-delete a volume, never hard-delete it | Withdrawing a volume from new folders is an operational need; folders already on it keep a valid reference |
 | 2026-09-09 | Session mounts are left as they are | Per-kernel mount identity is a question of its own, and normalizing it here would widen this proposal past storage |
+| 2026-09-22 | A service — volume relationship means the service holds the volume, not that it mounts it | One volume may be backed by many mounts on one service; Hammerspace adds a mount per user |
+| 2026-09-22 | Volume state is derived by the volume implementation from its mounts | A single-mount volume reports its mount's state; a multi-mount volume applies its own rule |
+| 2026-09-22 | Mounts are never recorded in the manager database | Their number grows with users on Hammerspace, and a record per mount would grow the same way |
+| 2026-09-22 | Agents and storage proxies run the same volume implementation from the same declaration | The agent resolves its own host paths, so the manager stops asking the proxy for a path on session start |
+| 2026-09-22 | The agent verifies volume state and folder path at session prepare | The heartbeat state is a snapshot; the check at bind time is what keeps a session from starting on a broken mount |
 
 ## Open Questions
 
 1. Which columns remain on `agents` once liveness is read from the catalog. The principle is settled; drawing the exact line is BEP-1046 Open Question 2.
-2. Whether the mount path must be identical on every service holding the same volume, or whether per-service divergence is supported from the start.
 
 ## References
 
