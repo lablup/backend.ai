@@ -10,17 +10,11 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec as PaginationSpec,
 )
-<<<<<<< HEAD
-from ai.backend.manager.api.adapter_options.pagination.pagination import build_pagination
-from ai.backend.manager.repositories.base import BatchQuerier, QueryOrder
-=======
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     build_orders,
     build_pagination,
 )
-from ai.backend.manager.models.clauses import QueryOrder
-from ai.backend.manager.repositories.base import BatchQuerier
->>>>>>> 82b68f24f (fix(BA-8084): drop the caller's order under cursor pagination (#14922))
+from ai.backend.manager.repositories.base import BatchQuerier, QueryOrder
 
 
 class BaseGQLAdapter:

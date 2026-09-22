@@ -86,54 +86,8 @@ class BaseAdapter(BaseFilterAdapter):
 
         final_orders = build_orders(options, pagination_spec, orders)
         pagination = build_pagination(options, pagination_spec)
-<<<<<<< HEAD
-        return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
-=======
         return BatchQuerier(
             conditions=all_conditions,
             orders=final_orders,
             pagination=pagination,
         )
-
-    def _build_searcher[TSearcher: Searcher[Any, Any]](
-        self,
-        searcher_class: type[TSearcher],
-        conditions: list[QueryCondition],
-        orders: list[QueryOrder],
-        pagination_spec: PaginationSpec,
-        first: int | None = None,
-        after: str | None = None,
-        last: int | None = None,
-        before: str | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> TSearcher:
-        """Build a domain :class:`Searcher` with the same pagination handling as
-        :meth:`_build_querier`.
-
-        A searcher carries the SELECT and the row conversion as well, so the ORM row
-        never leaves the repository layer. Domains move here as they migrate;
-        ``_build_querier`` goes away once the last one has.
-
-        No ``base_conditions``: it was how a fixed filter — a foreign-key scope, mostly —
-        got prepended before there was a scope to say it with. A scoped search now names
-        its scopes on the action, so a caller reaching for this should be adding a
-        ``OperationScope`` instead.
-        """
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=pagination_spec,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        )
-        return searcher_class(
-            pagination=querier.pagination,
-            conditions=querier.conditions,
-            orders=querier.orders,
-        )
->>>>>>> 82b68f24f (fix(BA-8084): drop the caller's order under cursor pagination (#14922))

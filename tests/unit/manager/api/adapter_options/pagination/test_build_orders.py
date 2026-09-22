@@ -14,7 +14,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
     build_orders,
 )
-from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.repositories.base import QueryOrder
 
 
 class _Base(DeclarativeBase):
