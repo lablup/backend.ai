@@ -67,6 +67,9 @@ Changes
 ### External Dependency Updates
 * Upgrade aiohttp, strawberry-graphql, orjson, PyJWT, click, msgpack, python-dotenv and memray past the versions reported as vulnerable. ([#14480](https://github.com/lablup/backend.ai/issues/14480))
 
+### Test Updates
+* Remove the storage-proxy object storage tests that required a MinIO container. ([#14909](https://github.com/lablup/backend.ai/issues/14909))
+
 
 ## 26.4.10 (2026-08-19)
 
