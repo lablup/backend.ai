@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+Not exercised by any scenario: batch_load_fields, get_project_resource_policy.
 
 ### creating
 
