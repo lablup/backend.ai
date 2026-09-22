@@ -84,7 +84,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -188,7 +188,7 @@ class TestDomainRepository:
         """Create DomainRepository instance with real database"""
         return DomainRepository(
             db=db_with_default_resource_policies,
-            relation_ops_provider=RelationOpsProvider(db_with_default_resource_policies),
+            domain_ops_provider=DomainOpsProvider(db_with_default_resource_policies),
         )
 
     @pytest.fixture

@@ -45,8 +45,8 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -100,7 +100,7 @@ def domain_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> DomainProcessors:
     service = DomainService(
-        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
