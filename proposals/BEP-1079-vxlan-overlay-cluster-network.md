@@ -7,7 +7,7 @@ Target-Version:
 Implemented-Version:
 ---
 
-# Runtime-Neutral Cluster Network
+# VXLAN Overlay Cluster Network
 
 ## Related Issues
 
@@ -21,10 +21,11 @@ Docker Swarm overlay network, which ties the feature to one container runtime: a
 containerd, enroot or apptainer has no way to join a session's network, and Swarm's IPAM and VNI
 allocation are internal to a daemon the manager does not control.
 
-This proposal moves the cluster network out of the runtime. The manager allocates the session's
-address space and tunnel identity; each agent programs its own node's data plane through a CNI
-plugin chain, driven by a backend that a runtime-neutral seam selects. The runtime's only role is
-to hand over a container's network namespace.
+This proposal gives cluster sessions a VXLAN overlay that Backend.AI builds itself, and so moves
+the cluster network out of the runtime. The manager allocates the session's address space and
+tunnel identity; each agent programs its own node's data plane through a CNI plugin chain, driven
+by a backend that a runtime-neutral seam selects. The runtime's only role is to hand over a
+container's network namespace.
 
 ## 2. Design
 
