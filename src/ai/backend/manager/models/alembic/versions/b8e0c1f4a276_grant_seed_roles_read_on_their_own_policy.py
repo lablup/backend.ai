@@ -6,7 +6,7 @@ made carry the grant too, so an installation seeded before this reads its own po
 the way a fresh one does.
 
 Revision ID: b8e0c1f4a276
-Revises: c4b1f7e9a2d3
+Revises: e4c1b9d7a250
 Create Date: 2026-09-22
 
 """
@@ -22,7 +22,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b8e0c1f4a276"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "c4b1f7e9a2d3"
+down_revision = "e4c1b9d7a250"
 branch_labels = None
 depends_on = None
 
