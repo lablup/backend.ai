@@ -350,11 +350,7 @@ class TestTemplateRepository:
     ) -> None:
         group_id, _ = test_group
         async with db_with_cleanup.begin_session() as session:
-            assoc = AssocGroupUserRow(
-                user_id=test_user,
-                group_id=group_id,
-            )
-            session.add(assoc)
+            await VirtualEntitySeeder().enroll_user_in_project(session, group_id, test_user)
             await session.commit()
 
     @pytest.fixture

@@ -528,7 +528,6 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        # Superadmin-only through the global search; removed together with this deprecated node.
         results = await info.context.data_loaders.role_assignment_loader.load_many([
             UUID(nid) for nid in node_ids
         ])

@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -14,6 +16,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
@@ -21,12 +24,12 @@ from ai.backend.manager.data.session.types import (
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
 
@@ -47,9 +50,16 @@ session_repository_resilience = Resilience(
 
 class SessionRepository:
     _db_source: SessionDBSource
+    _registry_db_source: ContainerRegistryDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ops_provider: V2DBOpsProvider,
+        registry_db_source: ContainerRegistryDBSource,
+    ) -> None:
         self._db_source = SessionDBSource(db, ops_provider)
+        self._registry_db_source = registry_db_source
 
     @session_repository_resilience.apply()
     async def get_session_name(self, session_id: SessionId) -> str:
@@ -124,12 +134,26 @@ class SessionRepository:
         return await self._db_source.update_session_name(session_id, new_name)
 
     @session_repository_resilience.apply()
+    async def get_container_registry_by_id(
+        self, registry_id: ContainerRegistryID
+    ) -> ContainerRegistryData:
+        return await self._registry_db_source.fetch_by_id(registry_id)
+
+    @session_repository_resilience.apply()
+    async def get_image_commit_registry(self, project_id: ProjectID) -> ContainerRegistryData:
+        registry_id = await self._registry_db_source.lookup_image_commit_registry_id(project_id)
+        return await self._registry_db_source.fetch_by_id(registry_id)
+
+    @session_repository_resilience.apply()
     async def get_container_registry(
         self,
         registry_hostname: str,
-        registry_project: str,
-    ) -> ContainerRegistryRow | None:
-        return await self._db_source.get_container_registry(registry_hostname, registry_project)
+        registry_project: str | None,
+    ) -> ContainerRegistryData:
+        registry_id = await self._registry_db_source.lookup_id_by_name_and_project(
+            registry_hostname, registry_project
+        )
+        return await self._registry_db_source.fetch_by_id(registry_id)
 
     @session_repository_resilience.apply()
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:

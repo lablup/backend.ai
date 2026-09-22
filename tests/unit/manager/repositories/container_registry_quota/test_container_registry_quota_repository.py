@@ -35,12 +35,14 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.container_registry_quota.repositories import (
     PerProjectRegistryQuotaRepositories,
 )
 from ai.backend.manager.repositories.container_registry_quota.repository import (
     PerProjectRegistryQuotaRepository,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -116,7 +118,9 @@ class TestPerProjectRegistryQuotaRepository:
         self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> PerProjectRegistryQuotaRepository:
         """Create PerProjectRegistryQuotaRepository instance with real database"""
-        return PerProjectRegistryQuotaRepository(db_with_cleanup)
+        return PerProjectRegistryQuotaRepository(
+            ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup))
+        )
 
     @pytest.fixture
     async def sample_domain(
@@ -330,7 +334,7 @@ class TestPerProjectRegistryQuotaRepository:
             extra={},
         )
 
-    async def test_fetch_container_registry_row_success(
+    async def test_fetch_container_registry_info_success(
         self,
         repository: PerProjectRegistryQuotaRepository,
         project_with_registry: _ProjectWithRegistry,
@@ -338,7 +342,7 @@ class TestPerProjectRegistryQuotaRepository:
         """Test successful fetch of registry info from a project with valid config."""
         # When
         scope_id = ProjectScope(project_id=project_with_registry.project_id)
-        result = await repository.fetch_container_registry_row(scope_id)
+        result = await repository.fetch_container_registry_info(scope_id)
 
         # Then
         assert isinstance(result, PerProjectContainerRegistryInfo)
@@ -353,16 +357,16 @@ class TestPerProjectRegistryQuotaRepository:
         assert result.is_global is project_with_registry.is_global
         assert result.extra == project_with_registry.extra
 
-    async def test_fetch_container_registry_row_project_not_found(
+    async def test_fetch_container_registry_info_project_not_found(
         self,
         repository: PerProjectRegistryQuotaRepository,
     ) -> None:
         """Test ContainerRegistryNotFound when project does not exist."""
         scope_id = ProjectScope(project_id=uuid.uuid4())
         with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
+            await repository.fetch_container_registry_info(scope_id)
 
-    async def test_fetch_container_registry_row_no_registry_config(
+    async def test_fetch_container_registry_info_no_registry_config(
         self,
         repository: PerProjectRegistryQuotaRepository,
         project_without_registry: _ProjectWithoutRegistry,
@@ -370,9 +374,9 @@ class TestPerProjectRegistryQuotaRepository:
         """Test ContainerRegistryNotFound when project has no container_registry config."""
         scope_id = ProjectScope(project_id=project_without_registry.project_id)
         with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
+            await repository.fetch_container_registry_info(scope_id)
 
-    async def test_fetch_container_registry_row_invalid_registry_config(
+    async def test_fetch_container_registry_info_invalid_registry_config(
         self,
         repository: PerProjectRegistryQuotaRepository,
         project_with_invalid_registry: _ProjectWithInvalidRegistry,
@@ -380,9 +384,9 @@ class TestPerProjectRegistryQuotaRepository:
         """Test ContainerRegistryNotFound when config is empty dict (missing required keys)."""
         scope_id = ProjectScope(project_id=project_with_invalid_registry.project_id)
         with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
+            await repository.fetch_container_registry_info(scope_id)
 
-    async def test_fetch_container_registry_row_registry_row_not_found(
+    async def test_fetch_container_registry_info_registry_row_not_found(
         self,
         repository: PerProjectRegistryQuotaRepository,
         project_with_orphaned_registry: _ProjectWithOrphanedRegistry,
@@ -390,7 +394,7 @@ class TestPerProjectRegistryQuotaRepository:
         """Test ContainerRegistryNotFound when config points to non-existent registry."""
         scope_id = ProjectScope(project_id=project_with_orphaned_registry.project_id)
         with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
+            await repository.fetch_container_registry_info(scope_id)
 
     async def test_fetch_registry_row_with_minimal_fields(
         self,
@@ -399,7 +403,7 @@ class TestPerProjectRegistryQuotaRepository:
     ) -> None:
         """Test fetch with registry that has only required fields (no username/password/extra)."""
         scope_id = ProjectScope(project_id=project_with_minimal_registry.project_id)
-        result = await repository.fetch_container_registry_row(scope_id)
+        result = await repository.fetch_container_registry_info(scope_id)
 
         # Verify fallback defaults for nullable text fields and server_default columns
         assert result.username == project_with_minimal_registry.username
@@ -417,6 +421,7 @@ class TestPerProjectRegistryQuotaRepositories:
         mock_db = MagicMock(spec=ExtendedAsyncSAEngine)
         args = MagicMock(spec=RepositoryArgs)
         args.db = mock_db
+        args.v2_ops_provider = V2DBOpsProvider(mock_db)
 
         repos = PerProjectRegistryQuotaRepositories.create(args)
 

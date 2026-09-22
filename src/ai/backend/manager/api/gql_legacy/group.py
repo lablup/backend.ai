@@ -25,8 +25,10 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -411,7 +413,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=dto.integration_name,  # ProjectData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry,
+            container_registry=dto.container_registry.to_json() if dto.container_registry else None,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -581,7 +583,13 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        container_registry_val = value_or_none(self.container_registry)
+        registry = value_or_none(self.container_registry)
+        container_registry_val = None
+        if registry:
+            parsed = ImageCommitRegistryReq.model_validate(registry)
+            container_registry_val = ImageCommitRegistry(
+                registry_name=parsed.registry, project_name=parsed.project
+            )
 
         return CreateProjectAction(
             domain_id=domain_id,
@@ -617,6 +625,16 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     )
 
     def to_action(self, group_id: uuid.UUID) -> UpdateProjectAction:
+        registry = self.container_registry
+        if registry is Undefined:
+            container_registry = TriState[ImageCommitRegistry].nop()
+        elif not registry:
+            container_registry = TriState[ImageCommitRegistry].nullify()
+        else:
+            parsed = ImageCommitRegistryReq.model_validate(registry)
+            container_registry = TriState.update(
+                ImageCommitRegistry(registry_name=parsed.registry, project_name=parsed.project)
+            )
         updater = ProjectUpdater(
             project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
@@ -645,9 +663,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=TriState[dict[str, str]].from_graphql(
-                self.container_registry,
-            ),
+            container_registry=container_registry,
         )
         return UpdateProjectAction(updater=updater)
 

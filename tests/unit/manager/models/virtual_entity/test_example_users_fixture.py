@@ -8,6 +8,8 @@ from typing import Any, Final
 
 import pytest
 
+from ai.backend.common.data.permission.types import Permission
+
 _FIXTURE: Final = (
     pathlib.Path(__file__).resolve().parents[5] / "fixtures" / "manager" / "example-users.json"
 )
@@ -34,6 +36,19 @@ def memberships(seed: dict[str, Any]) -> set[tuple[str, str]]:
 @pytest.fixture(scope="module")
 def bindings(seed: dict[str, Any]) -> set[tuple[str, str]]:
     return {(row["virtual_entity_id"], row["scope_entity_id"]) for row in seed["scope_bindings"]}
+
+
+@pytest.fixture(scope="module")
+def entity_types(seed: dict[str, Any]) -> dict[str, str]:
+    return {row["id"]: row["entity_type"] for row in seed["virtual_entities"]}
+
+
+@pytest.fixture(scope="module")
+def caps(seed: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in seed["entity_membership_caps"]:
+        grouped.setdefault(row["membership_id"], []).append(row)
+    return grouped
 
 
 class TestExampleUsersGraph:
@@ -81,3 +96,31 @@ class TestExampleUsersGraph:
             node = nodes[("project", group["id"])]
             owner = nodes[("user", group["creator_id"])]
             assert (node, owner) in memberships
+
+
+class TestExampleUsersRoster:
+    """A seeded roster row holds the shape `V2RosterWriteOps` writes: a share capped to
+    read."""
+
+    def test_every_roster_edge_is_a_read_capped_share(
+        self,
+        seed: dict[str, Any],
+        entity_types: dict[str, str],
+        caps: dict[str, list[dict[str, Any]]],
+    ) -> None:
+        rosters = [
+            row
+            for row in seed["entity_memberships"]
+            if entity_types[row["virtual_entity_id"]] == "project"
+            and entity_types[row["member_entity_id"]] == "user"
+        ]
+        assert rosters
+        for row in rosters:
+            assert row.get("capped") is True
+            assert caps.get(row.get("id")) == [
+                {
+                    "membership_id": row["id"],
+                    "permission": int(Permission.READ),
+                    "all_fields": True,
+                }
+            ]
