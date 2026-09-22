@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-import sqlalchemy as sa
-
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.session import SessionID
@@ -21,15 +19,17 @@ from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scheduling_history.conditions import (
-    DeploymentHistoryConditions,
-    KernelSchedulingHistoryConditions,
-    RouteHistoryConditions,
-    SessionSchedulingHistoryConditions,
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
 )
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.scheduling_history.searchable_fields import (
+    DeploymentHistorySearchableFields,
+    KernelSchedulingHistorySearchableFields,
+    RouteHistorySearchableFields,
+    SessionSchedulingHistorySearchableFields,
+)
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
@@ -60,7 +60,7 @@ class SessionSchedulingHistoryTarget(ScopeTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for SessionSchedulingHistoryRow."""
-        return SessionSchedulingHistoryConditions.by_session_id_filter(
+        return SessionSchedulingHistorySearchableFields.own.session_id.filter.equals(
             UUIDEqualMatchSpec(value=self.session_id, negated=False)
         )
 
@@ -101,7 +101,7 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for KernelSchedulingHistoryRow."""
-        return KernelSchedulingHistoryConditions.by_kernel_id_filter(
+        return KernelSchedulingHistorySearchableFields.own.kernel_id.filter.equals(
             UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
         )
 
@@ -135,7 +135,7 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for KernelSchedulingHistoryRow."""
-        return KernelSchedulingHistoryConditions.by_session_id_filter(
+        return KernelSchedulingHistorySearchableFields.own.session_id.filter.equals(
             UUIDEqualMatchSpec(value=self.session_id, negated=False)
         )
 
@@ -169,7 +169,7 @@ class DeploymentHistoryTarget(ScopeTarget):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for DeploymentHistoryRow."""
-        return DeploymentHistoryConditions.by_deployment_id_filter(
+        return DeploymentHistorySearchableFields.own.deployment_id.filter.equals(
             UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
         )
 
@@ -204,10 +204,9 @@ class DeploymentReplicaGroupHistoryTarget(ScopeTarget):
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for ReplicaGroupHistoryRow."""
 
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ReplicaGroupHistoryRow.deployment_id == self.deployment_id
-
-        return inner
+        return ReplicaGroupHistorySearchableFields.own.deployment_id.filter.equals(
+            UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
+        )
 
     @property
     @override
@@ -223,22 +222,27 @@ class DeploymentReplicaGroupHistoryTarget(ScopeTarget):
 
 
 @dataclass(frozen=True)
-class RouteHistoryTarget(OperationScope):
-    """Scope for route scheduling history search.
+class RouteHistoryTarget(ScopeTarget):
+    """Scope for route scheduling history search, bounded by one replica.
 
-    Used for entity-scoped queries where route_id is the scope parameter.
-
-    Names no scope of its own: a replica is authorized through the deployment that owns
-    it, and this carries only the replica's id.
+    A replica is no RBAC scope of its own, so the deployment that owns it is read first
+    and named here: it answers for the read, and the replica narrows the rows.
     """
+
+    deployment_id: DeploymentID
+    """Required. The deployment the replica serves, which the read is answered for."""
 
     route_id: ReplicaID
     """Required. The route to search history for."""
 
     @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.deployment_id
+
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for RouteHistoryRow."""
-        return RouteHistoryConditions.by_route_id_filter(
+        return RouteHistorySearchableFields.own.route_id.filter.equals(
             UUIDEqualMatchSpec(value=self.route_id, negated=False)
         )
 

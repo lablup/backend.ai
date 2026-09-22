@@ -40,7 +40,7 @@ class SchedulingHistoryService:
     ) -> SearchSessionScopedHistoryActionResult:
         """Searches session scheduling history within scope."""
         result = await self._repository.search_session_scoped_history(
-            querier=action.querier,
+            searcher=action.searcher,
             scope=action.scope,
         )
 
@@ -57,7 +57,7 @@ class SchedulingHistoryService:
     ) -> SearchKernelScopedHistoryActionResult:
         """Searches kernel scheduling history within the caller's authorized scopes."""
         result = await self._repository.search_kernel_scoped_history(
-            querier=action.querier,
+            searcher=action.searcher,
             scopes=[action.target],
         )
 
@@ -75,7 +75,7 @@ class SchedulingHistoryService:
     ) -> SearchDeploymentScopedHistoryActionResult:
         """Searches deployment history within scope."""
         result = await self._repository.search_deployment_scoped_history(
-            querier=action.querier,
+            searcher=action.searcher,
             scope=action.scope,
         )
 
@@ -92,7 +92,7 @@ class SchedulingHistoryService:
     ) -> ScopedSearchReplicaGroupHistoryActionResult:
         """Searches replica-group scheduling history within the caller's authorized scope."""
         result = await self._repository.scoped_search_replica_group_history(
-            querier=action.querier,
+            searcher=action.searcher,
             scopes=[action.target],
         )
 
@@ -110,7 +110,7 @@ class SchedulingHistoryService:
     ) -> SearchRouteScopedHistoryActionResult:
         """Searches route history within scope."""
         result = await self._repository.search_route_scoped_history(
-            querier=action.querier,
+            searcher=action.searcher,
             scope=action.scope,
         )
 

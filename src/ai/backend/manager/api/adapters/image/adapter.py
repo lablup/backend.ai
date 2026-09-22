@@ -229,11 +229,8 @@ class ImageAdapter(BaseAdapter):
         self,
         input: AdminSearchImagesInput | ScopedSearchImagesInput,
         limit: int | None = None,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> ImageSearcher:
-        conditions = list(base_conditions) if base_conditions else []
-        if input.filter:
-            conditions.extend(self._convert_filter(input.filter))
+        conditions = self._convert_filter(input.filter) if input.filter else []
         return self._build_searcher(
             ImageSearcher,
             conditions=conditions,
@@ -268,14 +265,13 @@ class ImageAdapter(BaseAdapter):
     async def admin_search_images_gql(
         self,
         input: AdminSearchImagesInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> AdminSearchImagesPayload:
         """Search images with cursor or offset pagination for GQL resolvers."""
         action_result = await self._image.search_images.run(
             SearchImagesAction(
                 searcher=GlobalSearcher(
                     used_by=self._usage(input.usage),
-                    searcher=self._build_image_searcher(input, base_conditions=base_conditions),
+                    searcher=self._build_image_searcher(input),
                 )
             )
         )
@@ -290,7 +286,6 @@ class ImageAdapter(BaseAdapter):
     async def admin_search_image_aliases(
         self,
         input: AdminSearchImageAliasesInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> AdminSearchImageAliasesPayload:
         """Search image aliases with cursor or offset pagination for GQL resolvers."""
         conditions = self._convert_alias_filter(input.filter) if input.filter else []
@@ -305,7 +300,6 @@ class ImageAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=list(base_conditions) if base_conditions else None,
         )
 
         action_result = await self._image.search_aliases.run(SearchAliasesAction(querier=querier))

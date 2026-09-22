@@ -106,9 +106,6 @@ from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.model_card.actions.available_presets import (
-    AvailablePresetsAction,
-)
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
 )
@@ -188,10 +185,17 @@ def _requirements_to_entries(
 class ModelCardAdapter(BaseAdapter):
     _model_card: ModelCardProcessors
     _deployment: DeploymentProcessors
+    _preset: DeploymentRevisionPresetAdapter
 
-    def __init__(self, model_card: ModelCardProcessors, deployment: DeploymentProcessors) -> None:
+    def __init__(
+        self,
+        model_card: ModelCardProcessors,
+        deployment: DeploymentProcessors,
+        preset: DeploymentRevisionPresetAdapter,
+    ) -> None:
         self._model_card = model_card
         self._deployment = deployment
+        self._preset = preset
 
     async def admin_search(
         self,
@@ -250,6 +254,29 @@ class ModelCardAdapter(BaseAdapter):
         """Search the model cards the named scopes reach, combined with OR."""
         result = await self._model_card.scoped_search.run(
             self._scoped_search_action(self._scope_targets(input.scope), input)
+        )
+        return await self._payload(result)
+
+    async def ownership_search(
+        self,
+        project_id: UUID | None,
+        user_id: UUID | None,
+        input: SearchModelCardsInput,
+    ) -> SearchModelCardsPayload:
+        """Search the model cards of the project or the user that owns a vfolder.
+
+        The vfolder itself travels on ``input.usage`` as a use, so the caller has to be
+        able to read it as well.
+        """
+        # A project folder names its project, a personal one its owner and their personal
+        # project, so at least one of the two is always given.
+        targets: list[ModelCardTarget] = []
+        if project_id is not None:
+            targets.append(ProjectModelCardTarget(project_id=project_id))
+        if user_id is not None:
+            targets.append(UserModelCardTarget(user_id=UserID(user_id)))
+        result = await self._model_card.scoped_search.run(
+            self._scoped_search_action(targets, input)
         )
         return await self._payload(result)
 
@@ -495,19 +522,8 @@ class ModelCardAdapter(BaseAdapter):
         model_card_id: UUID,
         input: SearchDeploymentRevisionPresetsInput,
     ) -> SearchDeploymentRevisionPresetsPayload:
-        action_result = await self._model_card.available_presets.run(
-            AvailablePresetsAction(
-                model_card_id=ModelCardID(model_card_id),
-                search_input=input,
-            )
-        )
-        search_result = action_result.result
-        return SearchDeploymentRevisionPresetsPayload(
-            items=[DeploymentRevisionPresetAdapter._data_to_node(d) for d in search_result.items],
-            total_count=search_result.total_count,
-            has_next_page=search_result.has_next_page,
-            has_previous_page=search_result.has_previous_page,
-        )
+        """The presets the card can be deployed on, read as a preset search."""
+        return await self._preset.available_presets(ModelCardID(model_card_id), input)
 
     async def _get_model_card_data(self, card_id: UUID) -> ModelCardData:
         """Fetch a single model card by ID."""

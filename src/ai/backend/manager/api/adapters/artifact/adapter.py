@@ -87,6 +87,9 @@ from ai.backend.manager.services.artifact.actions.delegate_scan import (
 )
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
+from ai.backend.manager.services.artifact.actions.get_revisions import (
+    GetArtifactRevisionsAction,
+)
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
     RestoreArtifactsActionResult,
@@ -202,18 +205,15 @@ class ArtifactAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def search_revisions_gql(
-        self,
-        input: AdminSearchArtifactRevisionsInput,
-        base_conditions: list[QueryCondition] | None = None,
-    ) -> AdminSearchArtifactRevisionsPayload:
-        """Search artifact revisions using GQL filter DTOs with cursor and offset pagination."""
-        conditions: list[QueryCondition] = list(base_conditions or [])
+    def _build_revision_searcher(
+        self, input: AdminSearchArtifactRevisionsInput
+    ) -> ArtifactRevisionSearcher:
+        conditions: list[QueryCondition] = []
         if input.filter is not None:
             conditions.extend(self._convert_gql_revision_filter(input.filter))
 
         orders = self._convert_gql_revision_orders(input.order) if input.order is not None else []
-        searcher = self._build_searcher(
+        return self._build_searcher(
             ArtifactRevisionSearcher,
             pagination_spec=_get_artifact_revision_pagination_spec(),
             conditions=conditions,
@@ -225,12 +225,38 @@ class ArtifactAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
+
+    async def search_revisions_gql(
+        self,
+        input: AdminSearchArtifactRevisionsInput,
+    ) -> AdminSearchArtifactRevisionsPayload:
+        """Search artifact revisions using GQL filter DTOs with cursor and offset pagination."""
         action_result = await self._artifact.revision.search_revision.run(
-            SearchArtifactRevisionsAction(searcher=searcher)
+            SearchArtifactRevisionsAction(searcher=self._build_revision_searcher(input))
         )
 
         return AdminSearchArtifactRevisionsPayload(
             items=[self._revision_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def search_revisions_of_artifact_gql(
+        self,
+        artifact_id: ArtifactID,
+        input: AdminSearchArtifactRevisionsInput,
+    ) -> AdminSearchArtifactRevisionsPayload:
+        """Search the revisions one artifact holds, authorized against that artifact."""
+        action_result = await self._artifact.get_revisions.run(
+            GetArtifactRevisionsAction(
+                artifact_ids=[artifact_id],
+                searcher=self._build_revision_searcher(input),
+            )
+        )
+
+        return AdminSearchArtifactRevisionsPayload(
+            items=[self._revision_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

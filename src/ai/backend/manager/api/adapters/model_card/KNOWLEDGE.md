@@ -25,5 +25,5 @@ status: draft
 `create`가 아직 없다. 모델 카드는 폴더 위에 얹히므로 폴더를 먼저 세워야 한다.
 
 `admin_bulk_delete`, `available_presets`, `batch_load_fields`, `create`, `delete`,
-`deploy`, `get`, `min_resources`, `project_search`, `scan_project`, `scoped_search`,
-`search_by_vfolder`, `update`.
+`deploy`, `get`, `min_resources`, `ownership_search`, `project_search`, `scan_project`,
+`scoped_search`, `update`.

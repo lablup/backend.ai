@@ -23,10 +23,6 @@ from ai.backend.manager.data.model_card.types import (
     ModelCardData,
     ModelCardResourceRequirementData,
 )
-from ai.backend.manager.services.model_card.actions.available_presets import (
-    AvailablePresetsAction,
-    AvailablePresetsActionResult,
-)
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
 )
@@ -76,7 +72,6 @@ class ModelCardProcessors:
         ScopedSearchModelCardsAction, ScopedBatchOpsResult[ModelCardData]
     ]
     scan: GlobalActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
-    available_presets: GlobalActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
     scoped_search_requirements: BulkActionProcessor[
         ScopedSearchModelCardResourceRequirementsAction,
         ScopedFieldsOpsResult[ModelCardResourceRequirementData],
@@ -91,9 +86,6 @@ class ModelCardProcessors:
         self.global_search = group.global_searcher_ops(GlobalSearchModelCardsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchModelCardsAction)
         self.scan = group.global_scope(ScanProjectModelCardsAction, service.scan)
-        self.available_presets = group.global_scope(
-            AvailablePresetsAction, service.available_presets
-        )
 
         requirements: LookupFieldGroup[ModelCardResourceRequirementData] = group.field_group(
             FieldGroupMeta(ModelCardResourceRequirementFieldType()),

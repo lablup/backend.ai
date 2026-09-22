@@ -16,13 +16,18 @@ __all__ = ("ActionValidators",)
 
 @dataclass
 class ActionValidators:
-    """Validators per target shape, mirroring :class:`ActionMonitors`."""
+    """Validators per target shape, mirroring :class:`ActionMonitors`.
 
+    ``global_scope`` is stated rather than defaulted: an empty list there is what a
+    global processor refuses to be built with, so handing one out by default would put
+    the refusal at every wiring instead of at the one that forgot the gate.
+    """
+
+    global_scope: list[GlobalActionValidator]
     single_entity: list[SingleEntityActionValidator] = field(default_factory=list)
     partial_bulk: list[PartialBulkActionValidator] = field(default_factory=list)
     atomic_bulk: list[AtomicBulkActionValidator] = field(default_factory=list)
     scope: list[ScopeActionValidator] = field(default_factory=list)
     relation: list[RelationActionValidator] = field(default_factory=list)
     membership: list[MembershipActionValidator] = field(default_factory=list)
-    global_scope: list[GlobalActionValidator] = field(default_factory=list)
     lookup: list[LookupActionValidator] = field(default_factory=list)

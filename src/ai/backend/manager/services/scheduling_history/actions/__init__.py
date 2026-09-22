@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from .base import SchedulingHistoryAction
 from .global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
 )
@@ -38,7 +37,6 @@ from .search_session_scoped_history import (
 )
 
 __all__ = (
-    "SchedulingHistoryAction",
     # Admin actions
     "SearchSessionHistoryAction",
     "SearchKernelHistoryAction",

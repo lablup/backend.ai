@@ -211,7 +211,9 @@ def server_module_registries(
     processors.rbac = rbac_processors
     processors.user = user_processors
 
-    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors.model_card, MagicMock()))
+    mc_handler = V2ModelCardHandler(
+        adapter=ModelCardAdapter(processors.model_card, MagicMock(), MagicMock())
+    )
     proj_handler = V2ProjectHandler(
         adapter=ProjectAdapter(processors.project, processors.rbac, MagicMock(), processors.user)
     )

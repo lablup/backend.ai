@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
 from ai.backend.manager.models.scheduling_history.scopes import DeploymentHistoryTarget
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.scheduling_history.searchers import DeploymentHistorySearcher
 
 from .base import DeploymentSchedulingHistoryAction, SchedulingHistoryScopeActionResult
 
@@ -22,7 +22,7 @@ class SearchDeploymentScopedHistoryAction(DeploymentSchedulingHistoryAction):
     """
 
     scope: DeploymentHistoryTarget
-    querier: BatchQuerier
+    searcher: DeploymentHistorySearcher
 
     @override
     @classmethod

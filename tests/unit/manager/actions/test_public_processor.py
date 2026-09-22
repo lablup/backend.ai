@@ -1,8 +1,9 @@
 """The public path of the global layer: authentication only, and reads only.
 
-``PublicActionProcessor`` runs ``BaseGlobalAction`` reads without the SUPERADMIN
-gate, so two invariants are worth pinning: a write action cannot be wired onto it
-at all, and the gated ``GlobalActionProcessor`` keeps its SUPERADMIN gate untouched.
+``PublicActionProcessor`` runs ``BaseGlobalAction`` reads with an authentication
+check in place of the permission gate, so one invariant is worth pinning: a write
+action cannot be wired onto it at all. The permission gate itself is pinned in
+``test_global_permission_gate``.
 """
 
 from __future__ import annotations
@@ -21,13 +22,9 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
 from ai.backend.manager.actions.v2.global_scope.result import GlobalActionProcessResult
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
-from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import GenericForbidden, ServerMisconfiguredError
 from ai.backend.manager.errors.user import UserNotFound
 
@@ -110,18 +107,6 @@ def _user(*, is_authorized: bool = True, is_superadmin: bool = False) -> UserDat
     )
 
 
-def _monitor_user() -> UserData:
-    return UserData(
-        user_id=uuid.uuid4(),
-        is_authorized=True,
-        is_admin=False,
-        is_superadmin=False,
-        role=UserRole.MONITOR,
-        domain_name="default",
-        domain_id=DomainID(uuid.uuid4()),
-    )
-
-
 def test_only_get_and_search_actions_can_be_wired_public() -> None:
     PublicActionProcessor[_GetAction, _Result](_GetAction, _run)
     PublicActionProcessor[_SearchAction, _Result](_SearchAction, _run)
@@ -165,33 +150,3 @@ async def test_a_public_denial_still_reaches_the_monitors() -> None:
             await processor.run(_SearchAction())
 
     assert monitor.done_results[0].meta.status is OperationStatus.DENIED
-
-
-async def test_the_global_path_still_gates_on_superadmin() -> None:
-    processor = GlobalActionProcessor[_SearchAction, _Result](_run)
-
-    with with_user(_user()):
-        with pytest.raises(InsufficientPrivilege):
-            await processor.run(_SearchAction())
-
-    with with_user(_user(is_superadmin=True)):
-        result = await processor.run(_SearchAction())
-
-    assert isinstance(result, _Result)
-
-
-async def test_the_global_path_passes_a_monitor_on_a_read() -> None:
-    processor = GlobalActionProcessor[_SearchAction, _Result](_run)
-
-    with with_user(_monitor_user()):
-        result = await processor.run(_SearchAction())
-
-    assert isinstance(result, _Result)
-
-
-async def test_the_global_path_refuses_a_monitor_anything_but_a_read() -> None:
-    processor = GlobalActionProcessor[_CreateAction, _Result](_run)
-
-    with with_user(_monitor_user()):
-        with pytest.raises(InsufficientPrivilege):
-            await processor.run(_CreateAction())

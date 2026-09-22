@@ -27,6 +27,9 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.validator.rbac import VirtualEntityScopeActionRBACValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
@@ -111,7 +114,8 @@ def registry(
                 scope=[ScopeActionAuditLogMonitor(audit_repository, policy, masking)],
             ),
             validators=ActionValidators(
-                scope=[VirtualEntityScopeActionRBACValidator(permission_repository, config)]
+                scope=[VirtualEntityScopeActionRBACValidator(permission_repository, config)],
+                global_scope=[RefusingGlobalActionValidator()],
             ),
         )
     )

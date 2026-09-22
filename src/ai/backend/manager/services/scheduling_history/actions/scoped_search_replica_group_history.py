@@ -10,10 +10,12 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
+from ai.backend.manager.models.replica_group_history.searchers import (
+    ReplicaGroupHistorySearcher,
+)
 from ai.backend.manager.models.scheduling_history.scopes import (
     DeploymentReplicaGroupHistoryTarget,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass
@@ -24,7 +26,7 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     # input already accepts several items and means them to be OR'd, but a
     # BaseScopeAction authorizes exactly one target.
     target: DeploymentReplicaGroupHistoryTarget
-    querier: BatchQuerier
+    searcher: ReplicaGroupHistorySearcher
 
     @final
     @override

@@ -19,7 +19,6 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import (
-    AgentData,
     AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
@@ -31,6 +30,9 @@ from ai.backend.manager.models.base import (
     EnumType,
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+)
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -107,33 +109,16 @@ class AgentRow(Base):
         return sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
 
     def resources_by_rank(self) -> list[AgentResourceData]:
-        return [resource_row.to_data() for resource_row in self._resource_rows_by_rank()]
+        return [
+            AgentResourceSearchableFields.own.to_data(resource_row)
+            for resource_row in self._resource_rows_by_rank()
+        ]
 
     def actual_available_slots(self) -> ResourceSlot:
         available = ResourceSlot()
         for resource_row in self._resource_rows_by_rank():
             available[resource_row.slot_name] = resource_row.capacity
         return available
-
-    def to_data(self) -> AgentData:
-        return AgentData(
-            uuid=self.uuid,
-            id=AgentId(self.id),
-            status=self.status,
-            status_changed=self.status_changed,
-            region=self.region,
-            resource_group=self.scaling_group,
-            schedulable=self.schedulable,
-            addr=self.addr,
-            public_host=self.public_host,
-            first_contact=self.first_contact,
-            lost_at=self.lost_at,
-            version=self.version,
-            architecture=self.architecture,
-            compute_plugins=self.compute_plugins,
-            public_key=self.public_key,
-            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
 
     def to_heartbeat_update_data(self) -> AgentDataForHeartbeatUpdate:
         return AgentDataForHeartbeatUpdate(

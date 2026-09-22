@@ -30,6 +30,9 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerByKeyOpsAction
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.lookup.base import (
     BaseLookupAction,
     BaseLookupActionResult,
@@ -329,10 +332,20 @@ async def test_a_key_owner_lookup_merges_both_failures(
         return owner_id
 
     missing_group = _group(
-        ActionValidators(single_entity=[_PassingValidator()]), missing_monitor, action
+        ActionValidators(
+            single_entity=[_PassingValidator()],
+            global_scope=[RefusingGlobalActionValidator()],
+        ),
+        missing_monitor,
+        action,
     )
     denied_group = _group(
-        ActionValidators(single_entity=[_DenyingValidator()]), denied_monitor, action
+        ActionValidators(
+            single_entity=[_DenyingValidator()],
+            global_scope=[RefusingGlobalActionValidator()],
+        ),
+        denied_monitor,
+        action,
     )
     monkeypatch.setattr(OpsRepository, "field_owner_by_key", missing)
     missing_processor = missing_group.key_owner_lookup_ops(type(action))
@@ -371,10 +384,20 @@ async def test_a_key_field_lookup_merges_both_failures(
         return field_id, owner_id
 
     missing_processor = _group(
-        ActionValidators(single_entity=[_PassingValidator()]), missing_monitor, action
+        ActionValidators(
+            single_entity=[_PassingValidator()],
+            global_scope=[RefusingGlobalActionValidator()],
+        ),
+        missing_monitor,
+        action,
     ).key_field_lookup_ops(LookupKeypairByAccessKeyAction)
     denied_processor = _group(
-        ActionValidators(single_entity=[_DenyingValidator()]), denied_monitor, action
+        ActionValidators(
+            single_entity=[_DenyingValidator()],
+            global_scope=[RefusingGlobalActionValidator()],
+        ),
+        denied_monitor,
+        action,
     ).key_field_lookup_ops(LookupKeypairByAccessKeyAction)
 
     with with_user(authenticated_user):

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -22,4 +23,4 @@ class AgentSearcher(Searcher[AgentRow, AgentData]):
 
     @override
     def to_data(self, row: AgentRow) -> AgentData:
-        return row.to_data()
+        return AgentSearchableFields.own.to_data(row)

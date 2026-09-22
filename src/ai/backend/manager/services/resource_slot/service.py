@@ -34,7 +34,7 @@ class ResourceSlotService:
         self, action: GetAgentResourceBySlotAction
     ) -> GetAgentResourceBySlotResult:
         row = await self._repository.get_agent_resource_by_slot(action.agent_id, action.slot_name)
-        return GetAgentResourceBySlotResult(item=row.to_data())
+        return GetAgentResourceBySlotResult(item=row)
 
     async def get_kernel_allocation_by_slot(
         self, action: GetKernelAllocationBySlotAction

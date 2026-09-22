@@ -152,7 +152,9 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ModelCardV2Connection | None:
-        result = await info.context.adapters.model_card.admin_search(
+        result = await info.context.adapters.model_card.ownership_search(
+            self.ownership.project_id,
+            self.ownership.user_id,
             SearchModelCardsInput(
                 usage=ModelCardUsage(uses=ModelCardUses(vfolder=[VFolderUUID(UUID(self.id))])),
                 filter=filter.to_pydantic() if filter is not None else None,
