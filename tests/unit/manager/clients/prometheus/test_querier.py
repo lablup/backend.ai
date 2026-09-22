@@ -47,6 +47,20 @@ class TestContainerMetricQuerier:
             "project_id": LabelMatcher.exact(str(project_id)),
         }
 
+    async def test_labels_pct_omits_value_type(self) -> None:
+        querier = ContainerMetricQuerier(
+            metric_name="cpu_util",
+            value_type=ValueType.PCT,
+            user_id=UUID("32345678-1234-5678-1234-567812345678"),
+        )
+
+        result = querier.labels()
+
+        assert result == {
+            "container_metric_name": LabelMatcher.exact("cpu_util"),
+            "user_id": LabelMatcher.exact("32345678-1234-5678-1234-567812345678"),
+        }
+
     async def test_group_by_required_only(self) -> None:
         querier = ContainerMetricQuerier(
             metric_name="cpu_util",
@@ -67,6 +81,17 @@ class TestContainerMetricQuerier:
         result = querier.group_by_labels()
 
         assert result == frozenset({"value_type", "kernel_id"})
+
+    async def test_group_by_pct_omits_value_type(self) -> None:
+        querier = ContainerMetricQuerier(
+            metric_name="cpu_util",
+            value_type=ValueType.PCT,
+            user_id=UUID("32345678-1234-5678-1234-567812345678"),
+        )
+
+        result = querier.group_by_labels()
+
+        assert result == frozenset({"user_id"})
 
     async def test_group_by_all_fields(self) -> None:
         querier = ContainerMetricQuerier(
