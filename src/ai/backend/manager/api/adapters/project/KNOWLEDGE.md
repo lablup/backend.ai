@@ -7,9 +7,6 @@ keywords: [project, scenario, adapter, rbac, roster]
 generated:
   by: claude-code/opus-5
   at: 2026-09-10
-updated:
-  by: codex/gpt-6
-  at: 2026-09-22
 status: draft
 ---
 # 프로젝트 어댑터 — 시나리오
