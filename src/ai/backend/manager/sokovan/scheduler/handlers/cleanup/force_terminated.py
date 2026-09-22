@@ -7,12 +7,13 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
 from ai.backend.manager.sokovan.scheduler.hooks import HookRegistry
@@ -115,11 +116,15 @@ class CleanupForceTerminatedHandler(CleanupHandler):
         hook = self._hook_registry.get_hook(SessionStatus.TERMINATED)
         if hook is None:
             return True
-        querier = BatchQuerier(
+        searcher = SessionInfoSearcher(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([session_id])],
+            conditions=[
+                SessionSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=[session_id], negated=False)
+                )
+            ],
         )
-        sessions = await self._repository.search_sessions_with_kernels_for_handler(querier)
+        sessions = await self._repository.search_sessions_with_kernels_for_handler(searcher)
         if not sessions:
             # The row is gone; nothing names the network any more and nothing can give it back
             # from here. Dropping the id stops an unbounded retry over a session that no longer

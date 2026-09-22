@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -102,5 +103,7 @@ class TestClusterDriverPublication:
         async with NetworkPluginDependency().provide(plugins_input):
             pass
 
-        args, kwargs = plugins_input.etcd.put.await_args
+        put = cast(AsyncMock, plugins_input.etcd.put)
+        put.assert_awaited_once()
+        args, kwargs = put.call_args
         assert args[:2] == (cluster_driver_key(), "overlay")
