@@ -82,6 +82,7 @@ from .post_processors import (
 )
 from .recorder import SessionRecorderContext
 from .results import (
+    FailureDisposition,
     KernelExecutionResult,
     KernelStatusTransitions,
     SessionExecutionResult,
@@ -427,13 +428,34 @@ class ScheduleCoordinator:
                 )
 
                 # Log any exceptions that occurred during parallel processing
+                failed = False
                 for resource_group_id, result in zip(resource_group_ids, results, strict=True):
                     if isinstance(result, BaseException):
+                        failed = True
                         log.error(
                             "Error processing resource group {} for {}: {}",
                             resource_group_id,
                             schedule_type.value,
                             result,
+                        )
+
+                # The manager looked at every kernel it has, and it did so whether or not there
+                # was anything to do -- an agent reads this to tell "the manager is not looking"
+                # from "the manager is looking and does not know this kernel", and the second is
+                # exactly the case where a resource group has nothing to find.
+                #
+                # Only when EVERY resource group came back. One group's query failing while
+                # another succeeded would otherwise publish a pass that never looked at the failed
+                # group's kernels, and an agent in that group would have its live kernels read as
+                # ones the manager does not know.
+                if not failed:
+                    try:
+                        await self._valkey_schedule.mark_manager_sweep()
+                    except Exception:
+                        # Not fatal. An agent that misses the mark waits rather than reaping,
+                        # which is the safe way round.
+                        log.warning(
+                            "could not record that the manager's kernel sweep ran", exc_info=True
                         )
 
             return True
@@ -1303,6 +1325,29 @@ class ScheduleCoordinator:
                 # Session not found - skip (shouldn't happen)
                 continue
 
+            # 0. What the handler knows and the counters cannot: work was already requested
+            # somewhere, so there is no second placement to make and no point retrying this one.
+            # Given up now rather than after five identical retries.
+            #
+            # REPLACE is deliberately NOT answered here, and this is measured rather than
+            # reasoned. Sending it to `expired` -- back to PENDING, to be scheduled somewhere
+            # else -- is unbounded by construction: the retry budget is counted from
+            # `last_phase`, which is carried only while the session's most recent history record
+            # is still this phase, and a round trip through PENDING puts three other phases in
+            # between. So every attempt starts at 1 and the budget never binds. On a two-node rig
+            # with one node refusing the session, this produced 31 full scheduling cycles in four
+            # minutes with no end -- a livelock, where before the change the session failed five
+            # times and terminated with a reason the user could see.
+            #
+            # So REPLACE falls through to the ordinary classification: retried in place, and
+            # given up once the budget is spent. The refusing agents are still recorded against
+            # the session by the launcher, so a later scheduling round avoids them. Re-placing
+            # properly needs a bound that survives the round trip, which is a durable per-session
+            # counter this branch should not be inventing.
+            if failure.disposition is FailureDisposition.ABANDON:
+                give_up_failures.append(failure)
+                continue
+
             policy = session.session_info.handler_options.resolve(handler_name)
             last_phase = session.last_phase
 
@@ -1378,7 +1423,21 @@ class ScheduleCoordinator:
                 )
                 for info in session_infos
             ]
-            updated = await self._repository.update_with_history(updater, histories)
+            if transition.kernel == KernelStatus.PENDING:
+                await self._record_failed_agents(handler_name, session_ids)
+                updated, reset_count = await self._repository.requeue_sessions_with_history(
+                    updater,
+                    histories,
+                    kernel_reason="EXCEEDED_MAX_RETRIES",
+                )
+                log.debug(
+                    "{}: Reset {} kernels while moving {} sessions to PENDING",
+                    handler_name,
+                    reset_count,
+                    updated,
+                )
+            else:
+                updated = await self._repository.update_with_history(updater, histories)
             log.debug(
                 "{}: Updated {} sessions to {} ({})",
                 handler_name,
@@ -1386,9 +1445,7 @@ class ScheduleCoordinator:
                 transition.session,
                 scheduling_result.value,
             )
-
-        # Kernel status reset if transitioning to PENDING
-        if transition.kernel == KernelStatus.PENDING:
+        elif transition.kernel == KernelStatus.PENDING:
             await self._apply_kernel_pending_resets(handler_name, session_ids)
 
     async def _apply_kernel_pending_resets(
@@ -1409,6 +1466,26 @@ class ScheduleCoordinator:
         """
         if not session_ids:
             return
+
+        await self._record_failed_agents(handler_name, session_ids)
+
+        reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
+            session_ids,
+            reason="EXCEEDED_MAX_RETRIES",
+        )
+        log.debug(
+            "{}: Reset {} kernels to PENDING for {} sessions",
+            handler_name,
+            reset_count,
+            len(session_ids),
+        )
+
+    async def _record_failed_agents(
+        self,
+        handler_name: str,
+        session_ids: list[SessionId],
+    ) -> None:
+        """Record placement hints before an atomic requeue clears them."""
 
         # Record current agent assignments before they are cleared by the reset.
         # This is best-effort: Valkey issues must not block kernel resets.
@@ -1431,17 +1508,6 @@ class ScheduleCoordinator:
                         session_id,
                         result,
                     )
-
-        reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
-            session_ids,
-            reason="EXCEEDED_MAX_RETRIES",
-        )
-        log.debug(
-            "{}: Reset {} kernels to PENDING for {} sessions",
-            handler_name,
-            reset_count,
-            len(session_ids),
-        )
 
     async def _record_history_without_transition(
         self,
@@ -1663,9 +1729,24 @@ class ScheduleCoordinator:
 
     async def handle_kernel_cancelled(self, event: KernelCancelledAnycastEvent) -> bool:
         """Handle kernel cancelled event through the kernel state engine."""
-        return await self._kernel_state_engine.mark_kernel_cancelled(
+        cancellation = await self._kernel_state_engine.mark_kernel_cancelled(
             event.kernel_id, event.session_id, event.reason
         )
+        if cancellation.session_cancelled:
+            # CANCELLED is written where the last kernel is cancelled, not by the promotion pass,
+            # so its hook is reached from here or not at all -- and the session's volatile network
+            # was created before any kernel started, so there is one to give back.
+            await self._execute_transition_hooks(
+                [
+                    SessionTransitionInfo(
+                        session_id=event.session_id,
+                        from_status=SessionStatus.PREPARED,
+                        reason=event.reason,
+                    )
+                ],
+                SessionStatus.CANCELLED,
+            )
+        return cancellation.kernel_cancelled
 
     async def handle_kernel_terminated(self, event: KernelTerminatedAnycastEvent) -> bool:
         """Handle kernel terminated event through the kernel state engine."""

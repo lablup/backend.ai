@@ -353,7 +353,8 @@ def mock_launcher() -> AsyncMock:
     """Mock SessionLauncher for CheckPrecondition and StartSessions handlers."""
     launcher = AsyncMock()
     launcher.trigger_image_pulling = AsyncMock(return_value=None)
-    launcher.start_sessions_for_handler = AsyncMock(return_value=None)
+    # It reports which sessions could NOT be started; nothing failing is an empty mapping.
+    launcher.start_sessions_for_handler = AsyncMock(return_value={})
     return launcher
 
 
@@ -379,6 +380,7 @@ def mock_repository() -> AsyncMock:
     )
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
     repository.reset_kernels_to_pending_for_sessions = AsyncMock(return_value=0)
+    repository.requeue_sessions_to_pending = AsyncMock(return_value=[])
     repository.get_resource_group_preemption_mode = AsyncMock(return_value=PreemptionMode.TERMINATE)
     return repository
 

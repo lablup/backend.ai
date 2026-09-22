@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import functools
 import logging
 import os
@@ -26,6 +27,7 @@ from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
+    IO,
     Any,
     ClassVar,
     Final,
@@ -53,6 +55,7 @@ from ai.backend.agent.errors import (
     AgentInitializationError,
     ResourceError,
 )
+from ai.backend.agent.errors.agent import AgentAlreadyRunning
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -289,6 +292,9 @@ class AgentRPCServer(aobject):
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
     runtime: AgentRuntime
+    #: Whether the RPC transport is actually serving. Registering handlers is not serving, and
+    #: `start_serving` refuses until this is true -- see there.
+    _transport_entered: bool
     rpc_server: Peer
     rpc_addr: str
     agent_addr: str
@@ -359,6 +365,7 @@ class AgentRPCServer(aobject):
             self.rpc_auth_agent_secret_key = None
             auth_handler = None
 
+        self._transport_entered = False
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,
             self.etcd,
@@ -388,7 +395,11 @@ class AgentRPCServer(aobject):
         for func_name in self.rpc_function_v2.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
 
-        log.info("started handling RPC requests at {}", rpc_addr)
+        log.info("registered RPC handlers for {}", rpc_addr)
+        # The node does NOT announce itself here. Registering handlers is not serving: the
+        # transport is entered later, in `__aenter__`, and the HTTP listener is set up between the
+        # two. Announcing at this point offers work to a process with nothing listening for it,
+        # and a failure in between leaves the manager holding an ALIVE node that never served.
 
         debug_socket_path = (
             self.local_config.agent_common.ipc_base_path / "agent-registry-snapshot.sock"
@@ -610,6 +621,21 @@ class AgentRPCServer(aobject):
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
+        self._transport_entered = True
+
+    async def start_serving(self) -> None:
+        """Publish readiness only after the RPC transport is serving."""
+        if not self._transport_entered:
+            raise AgentInitializationError(
+                "the agent cannot announce itself before its RPC transport is serving: the"
+                " manager marks a node ALIVE on the announcement and sends it work"
+            )
+        await self.runtime.start_serving()
+
+    async def stop_serving(self) -> None:
+        """Withdraw readiness after a partial or normal shutdown."""
+        self._transport_entered = False
+        await self.runtime.stop_serving()
 
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self.runtime.mark_stop_signal(stop_signal)
@@ -793,7 +819,11 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         coros = []
         agent = self.runtime.get_agent(agent_id)
-        throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)
+        # The agent's own, not one made here: a semaphore per RPC call bounds the kernels of ONE
+        # session, and `kernel-creation-concurrency` is a statement about the host. Six concurrent
+        # two-kernel sessions started twelve containers at once on a node configured for four,
+        # which is how a create came to miss the manager's RPC deadline and take its session down.
+        throttle_sema = agent.kernel_creation_sema
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs, strict=True):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
@@ -1542,7 +1572,15 @@ async def agent_server_ctx(
     await site.start()
     log.info("started serving HTTP at {}", internal_addr)
     async with agent_server:
-        yield agent_server
+        # Last of all, and only now: the RPC transport is entered and the HTTP listener is up, so
+        # anything the manager sends can actually be taken. If yielding raises -- or anything
+        # after this does -- the announcement is taken back rather than left standing over a
+        # process that is stopping.
+        await agent_server.start_serving()
+        try:
+            yield agent_server
+        finally:
+            await agent_server.stop_serving()
 
 
 @asynccontextmanager
@@ -1663,6 +1701,42 @@ async def server_main(
         await agent_init_stack.__aexit__(None, None, None)
 
 
+#: Open handles whose file locks must outlive the call that took them. A lock released is a lock
+#: that was not held: closing the pid file would let a second agent start under this id while the
+#: first is still running, which is the whole thing `_hold_pid_file` exists to stop.
+_held_locks: Final[list[IO[str]]] = []
+
+
+def _hold_pid_file(pid_file: Path) -> None:
+    """Take the agent's pid file exclusively and record this process in it.
+
+    An advisory `flock`, held open for the life of the process. Writing the pid and letting go --
+    which is what this did -- records who the agent is without stopping a second one, and a second
+    agent under the same id is a split brain the rest of the system cannot see: every name the
+    cluster identifies this node's state by is the agent id, so the two are one identity to the
+    manager, to the node-wide VNI registry and to the privnet's journal. The session generation
+    does not separate them either; they are working on the same session.
+
+    Raises:
+        AgentAlreadyRunning: another process holds the file.
+    """
+    handle = pid_file.open("a+")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as e:
+        handle.close()
+        raise AgentAlreadyRunning(
+            f"another agent already holds {pid_file}; refusing to start a second process under"
+            " this agent id, which would share its membership, its VNI claims and its privnet"
+            " journal with the one already running"
+        ) from e
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()))
+    handle.flush()
+    _held_locks.append(handle)
+
+
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -1753,7 +1827,15 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
-        server_config.agent_common.pid_file.write_text(str(os.getpid()))
+        # Held for the life of the process, not merely written. Two agents under one id share
+        # every name the cluster identifies this node's state by -- the member key
+        # `network/session/{sid}/members/{agent_id}`, the node-wide VNI claim's owner, the
+        # privnet's journal -- and the session generation cannot tell them apart, because they
+        # are the SAME session. During a supervisor restart the outgoing process can then
+        # withdraw the incoming one's membership and tear down the data plane it just adopted.
+        # An advisory exclusive lock is what stops the second process rather than the second
+        # session. The handle stays open for the life of the process (see `_held_locks`).
+        _hold_pid_file(server_config.agent_common.pid_file)
         image_commit_path = server_config.agent_common.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
         ipc_base_path = server_config.agent_common.ipc_base_path

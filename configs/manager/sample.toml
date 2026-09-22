@@ -749,6 +749,19 @@
   # computing workloads.
   # Added in 25.8.0
   [network.inter-container]
+    # Pin the per-session data plane the CNI driver builds (BEP-1079), e.g.
+    # 'vxlan'. Unset lets the driver pick from what the session's member agents
+    # advertise, which is the right answer whenever the cluster is not
+    # deliberately homogeneous.
+    # Added in 26.9.0
+    ## forced-backend = "vxlan"
+    # Private IPv4 pool used by the CNI driver for multi-node session overlays.
+    # It must not overlap a route present on any participating agent.
+    # Added in 26.9.0
+    ipam-pool = "10.128.0.0/12"
+    # Prefix length of the allocation units carved from 'ipam-pool'.
+    # Added in 26.9.0
+    ipam-block-size = 24
     # Default network driver for inter-container communication in cluster
     # sessions. 'overlay' enables multi-host container networking for
     # distributed workloads. Container communication performance depends on this
@@ -1043,7 +1056,7 @@
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
   # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service-discovery.extra-labels.<name>]
+  [service-discovery.extra-labels."<name>"]
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -1068,7 +1081,7 @@
     # Additional metadata for the endpoint.
     # Added in 26.3.0
     # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service-discovery.endpoints.metadata.<name>]
+    [service-discovery.endpoints.metadata."<name>"]
 
 # Default artifact registry configuration. Specifies the default model registry
 # for artifact operations. When configured, enables model artifact management

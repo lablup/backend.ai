@@ -16,8 +16,11 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.types import AutoPullBehavior
+from ai.backend.manager.errors.network import NetworkBackendMismatch
 from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
+from ai.backend.manager.sokovan.scheduler.results import FailureDisposition
+from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForPull,
@@ -296,6 +299,129 @@ class TestSessionLauncherKernelCreation:
 # =============================================================================
 # TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-015)
 # =============================================================================
+
+
+class TestWhatTheLauncherReportsAsUnstarted:
+    """A network the agent will not take is not a slow start: nothing has been asked of any
+    agent, so the placement can be given up and made again elsewhere -- and must be, because the
+    node it was placed on is one whose data plane refuses it. This is reported through the return
+    value; swallowing it left the handler recording the session as started, and it went to
+    CREATING on that same node and sat there until something timed it out."""
+
+    async def test_a_network_setup_failure_is_reported_as_unstarted(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _refuses(session: SessionDataForStart) -> NetworkSetup:
+            raise NetworkBackendMismatch("agent 'a1' does not advertise the 'vxlan' backend")
+
+        monkeypatch.setattr(launcher, "_setup_network_configuration", _refuses)
+        session_ids = [session_for_start_single_kernel.session_id]
+
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert session_for_start_single_kernel.session_id in failed
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert "NetworkBackendMismatch" in failure.reason
+        # Nothing was asked of any agent, so this placement is given up and made again elsewhere.
+        assert failure.disposition is FailureDisposition.REPLACE
+        # Nothing was asked of any agent, which is what makes this re-placeable.
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited()
+
+    async def test_a_preparation_failure_after_the_network_is_also_reported(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Only the network failure was reported; anything else before the first agent call fell
+        through to "no failure" and the session was recorded as started. The SSH keypair is one
+        such step, and there are several."""
+
+        async def _boom() -> tuple[str, str]:
+            raise RuntimeError("could not make the cluster ssh keypair")
+
+        monkeypatch.setattr(launcher, "_create_cluster_ssh_keypair", _boom)
+        session_ids = [session_for_start_single_kernel.session_id]
+
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert failure.disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_a_session_whose_kernels_have_no_agent_is_reported(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        # Nothing is ever asked of an agent, so the gather is empty and the old code went
+        # straight to "started" -- a session in CREATING with no kernels anywhere.
+        for kernel in session_for_start_single_kernel.kernels:
+            kernel.agent_id = None
+        session_ids = [session_for_start_single_kernel.session_id]
+
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert failure.disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_a_session_that_started_is_not_reported(
+        self,
+        launcher: SessionLauncher,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert failed == {}
+
+    async def test_a_refused_kernel_creation_is_reported_as_a_teardown(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """Once creation has been REQUESTED some of it may be running, so there is no second
+        placement to make. But it is not a session that started either: reported as one it sat in
+        CREATING, with kernels missing, until something timed it out."""
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RuntimeError(
+            "the agent went away mid-create"
+        )
+        session_ids = [session_for_start_single_kernel.session_id]
+
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        failure = failed[session_for_start_single_kernel.session_id]
+        assert failure.disposition is FailureDisposition.ABANDON
 
 
 class TestSessionLauncherNetworkSetup:

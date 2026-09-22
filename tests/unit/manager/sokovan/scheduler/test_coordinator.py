@@ -12,14 +12,17 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -36,14 +39,20 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
     HookExecutionResult,
     ScheduleCoordinator,
 )
+from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import (
+    KernelLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.kernel.state_engine import KernelCancellation
 from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
     KernelExecutionResult,
     KernelTransitionInfo,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import LastPhase
 
 # =============================================================================
@@ -995,7 +1004,8 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.PENDING,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.requeue_sessions_with_history = AsyncMock(return_value=(1, 1))
+        mock_coordinator._record_failed_agents = AsyncMock()
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1010,7 +1020,9 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
-        mock_coordinator._apply_kernel_pending_resets.assert_awaited_once()
+        mock_coordinator._repository.requeue_sessions_with_history.assert_awaited_once()
+        mock_coordinator._record_failed_agents.assert_awaited_once()
+        mock_coordinator._apply_kernel_pending_resets.assert_not_awaited()
 
     async def test_no_kernel_reset_for_non_pending_transition(
         self,
@@ -1375,3 +1387,171 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         (finalize,) = records[session_id].phases
         assert finalize.name == "finalize_start"
         assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
+
+
+class _CoordinatorWithFailingGroups(ScheduleCoordinator):
+    """A coordinator whose per-resource-group pass fails for the groups named.
+
+    Constructed without ``__init__`` and given only the attributes
+    ``_process_kernel_schedule`` touches: the point under test is which of its outcomes publishes
+    the sweep mark, not how a coordinator is wired.
+    """
+
+    _failing: frozenset[str]
+
+    @override
+    async def _process_kernel_resource_group(
+        self,
+        handler: KernelLifecycleHandler,
+        schedule_type: ScheduleType,
+        resource_group_id: ResourceGroupID,
+    ) -> None:
+        if str(resource_group_id) in self._failing:
+            raise RuntimeError("the database was unreachable")
+
+
+class TestAFailureThatCannotBeRePlacedForever:
+    """Measured on a two-node rig: routing REPLACE straight back to PENDING produced 31 full
+    scheduling cycles in four minutes with no end. The retry budget is counted from `last_phase`,
+    which is carried only while the session's most recent history record is still this phase --
+    and a round trip through PENDING puts three other phases in between, so every attempt starts
+    at 1 and the budget never binds."""
+
+    def _classify(self, disposition: Any) -> Any:
+        coordinator = object.__new__(ScheduleCoordinator)
+        session = MagicMock()
+        session.session_info.identity.id = "s1"
+        session.session_info.handler_options.resolve.return_value = MagicMock(
+            is_retry_exhausted=MagicMock(return_value=False),
+            is_timed_out=MagicMock(return_value=False),
+        )
+        session.last_phase = None
+        failure = SessionTransitionInfo(
+            session_id=cast(Any, "s1"),
+            from_status=SessionStatus.PREPARED,
+            disposition=disposition,
+        )
+        return coordinator._classify_failures(
+            [failure], [session], datetime.now(tzutc()), "start-sessions"
+        )
+
+    def test_replace_is_retried_rather_than_sent_back_to_pending(self) -> None:
+        classified = self._classify(FailureDisposition.REPLACE)
+        assert not classified.expired, "a re-placement with no bound is a livelock, not a retry"
+        assert classified.need_retry
+
+    def test_abandon_is_given_up_at_once(self) -> None:
+        # Work was already requested somewhere: there is no second placement to make.
+        classified = self._classify(FailureDisposition.ABANDON)
+        assert classified.give_up
+        assert not classified.need_retry
+
+
+class TestTheManagerSweepMark:
+    """The mark an agent reads to tell "the manager is not looking" from "the manager is looking
+    and does not know this kernel". Resource groups are gathered with return_exceptions=True, so a
+    mark written per group published a pass that had never looked at the groups that failed -- and
+    an agent in one of those would read its own live kernels as ones the manager does not know."""
+
+    def _coordinator(
+        self, resource_groups: list[str], failing: set[str]
+    ) -> tuple[_CoordinatorWithFailingGroups, AsyncMock]:
+        coordinator = object.__new__(_CoordinatorWithFailingGroups)
+        coordinator._failing = frozenset(failing)
+        metrics = MagicMock()
+
+        @contextmanager
+        def _measure(operation: str) -> Iterator[None]:
+            yield
+
+        metrics.measure_operation = _measure
+        coordinator._operation_metrics = metrics
+        repository = MagicMock()
+        repository.get_all_resource_groups = AsyncMock(return_value=resource_groups)
+        coordinator._repository = repository
+        mark = AsyncMock()
+        coordinator._valkey_schedule = MagicMock(mark_manager_sweep=mark)
+
+        # No lock factory and no config provider: the handler below declares no lock_id, so the
+        # branch that would use them is not taken. Leaving them unset keeps this stub to exactly
+        # what the path under test touches.
+        return coordinator, mark
+
+    async def _run(self, coordinator: _CoordinatorWithFailingGroups) -> None:
+        handler = MagicMock()
+        handler.name.return_value = "sweep-stale-kernels"
+        handler.lock_id = None
+        await coordinator._process_kernel_schedule(MagicMock(value="sweep"), handler)
+
+    async def test_it_is_marked_when_every_resource_group_came_back(self) -> None:
+        coordinator, mark = self._coordinator(["rg1", "rg2"], failing=set())
+
+        await self._run(coordinator)
+
+        mark.assert_awaited_once()
+
+    async def test_it_is_marked_when_there_was_nothing_to_do(self) -> None:
+        # An empty resource group is not a failure, and the mark has to keep advancing for it --
+        # that is the case the orphan reap exists for.
+        coordinator, mark = self._coordinator([], failing=set())
+
+        await self._run(coordinator)
+
+        mark.assert_awaited_once()
+
+    async def test_it_is_not_marked_when_a_resource_group_failed(self) -> None:
+        coordinator, mark = self._coordinator(["rg1", "rg2"], failing={"rg2"})
+
+        await self._run(coordinator)
+
+        mark.assert_not_awaited()
+
+
+class TestCancelledSessionRunsItsCleanupHook:
+    """CANCELLED is written where the last kernel is cancelled, not by the promotion pass.
+
+    The hook registry maps it, but `get_hook` is only ever reached with a spec's success status —
+    which is SCHEDULED, PREPARED, RUNNING or TERMINATED, never CANCELLED. So the session's
+    volatile network, created before any kernel started, was never given back.
+    """
+
+    @staticmethod
+    def _coordinator(session_cancelled: bool) -> Any:
+        coordinator = MagicMock()
+        coordinator._kernel_state_engine.mark_kernel_cancelled = AsyncMock(
+            return_value=KernelCancellation(
+                kernel_cancelled=True, session_cancelled=session_cancelled
+            )
+        )
+        coordinator._execute_transition_hooks = AsyncMock()
+        return coordinator
+
+    @staticmethod
+    def _event(session_id: SessionId) -> Any:
+        event = MagicMock()
+        event.kernel_id = KernelId(uuid4())
+        event.session_id = session_id
+        event.reason = "failed-to-start"
+        return event
+
+    async def test_the_hook_runs_when_the_session_is_cancelled_too(self) -> None:
+        session_id = SessionId(uuid4())
+        coordinator = self._coordinator(session_cancelled=True)
+
+        assert await ScheduleCoordinator.handle_kernel_cancelled(
+            coordinator, self._event(session_id)
+        )
+
+        coordinator._execute_transition_hooks.assert_awaited_once()
+        infos, target = coordinator._execute_transition_hooks.await_args.args
+        assert target == SessionStatus.CANCELLED
+        assert [info.session_id for info in infos] == [session_id]
+
+    async def test_no_hook_when_only_the_kernel_was_cancelled(self) -> None:
+        coordinator = self._coordinator(session_cancelled=False)
+
+        assert await ScheduleCoordinator.handle_kernel_cancelled(
+            coordinator, self._event(SessionId(uuid4()))
+        )
+
+        coordinator._execute_transition_hooks.assert_not_awaited()

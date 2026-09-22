@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 import os
 import re
@@ -62,7 +63,7 @@ from ai.backend.agent.errors import (
     UnsupportedBaseDistroError,
     UnsupportedResource,
 )
-from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
@@ -82,6 +83,22 @@ from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
     DockerKernelRegistryRecovery,
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.network.caps import (
+    probe_caps,
+    publish_caps,
+    publish_vtep,
+    withdraw_caps,
+    withdraw_vtep,
+)
+from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.network.port_forward import (
+    PortForwarder,
+    PortPublisher,
+    forwards_for,
+)
+from ai.backend.agent.network.privnet.client import PrivNetPortForwarder
+from ai.backend.agent.network.session_network import SessionNetwork
+from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.plugin.network import (
     ContainerNetworkCapability,
     ContainerNetworkInfo,
@@ -132,6 +149,7 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
@@ -141,6 +159,8 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.network.keys import cluster_driver_key
+from ai.backend.common.network.types import SessionNetMeta
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -156,6 +176,7 @@ from ai.backend.common.types import (
     ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
+    KernelCreationResult,
     KernelId,
     MountPermission,
     MountTypes,
@@ -170,13 +191,24 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
+from .gate import apply_gate, release_gate, stage_gate, wait_gated_pid
 from .kernel import DockerKernel
+from .session_network import (
+    NO_NETWORK_MODE,
+    build_docker_session_network,
+    effective_privnet_socket,
+    is_session_networked,
+)
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+#: How often the published network capabilities are refreshed. Their readiness half is a
+#: question that does not stay answered -- the privileged helper can die long after startup.
+_NETWORK_IDENTITY_REFRESH_SEC = 60.0
 eof_sentinel = Sentinel.TOKEN
 
 LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
@@ -427,6 +459,34 @@ class DockerPurgeImageReq:
     noprune: bool
 
 
+#: The kernel runner's control channel. Reached at the container's own address under BEP-1079,
+#: so it is never DNAT'd onto the host and the agent dials these numbers, not a host pairing.
+_REPL_IN_PORT: Final = 2000
+_REPL_OUT_PORT: Final = 2001
+_REPL_PORTS: Final = frozenset({_REPL_IN_PORT, _REPL_OUT_PORT})
+
+
+def _port_publisher(session_network: SessionNetwork) -> PortPublisher:
+    """Who installs the host-port DNAT for a session-networked kernel.
+
+    It is an iptables (CAP_NET_ADMIN) op, so it belongs to whoever owns the host's networking: this
+    agent when it runs privileged, the privnet when privilege is separated. Doing it here under a
+    privnet is not a degraded path but a failure -- the agent holds no capability and iptables
+    refuses with "you must be root", which is a kernel that never reaches RUNNING. Same choice the
+    containerd agent makes; see ContainerdAgent.__ainit__.
+    """
+    # The session network's own client, not a fresh one on the same socket. That object is where
+    # each session's incarnation is bound, and it is what stamps every request with it; a client
+    # built here carries none, so a PUBLISH or UNPUBLISH delayed across a teardown and a rebuild
+    # would reach the rules of the session that replaced the one it was issued for. And it is the
+    # one place that knows whether this agent uses a helper at all -- the configured socket is
+    # not consulted here, because under the Swarm driver it is configured and not used.
+    client = session_network.privnet_client
+    if client is None:
+        return PortForwarder()
+    return PrivNetPortForwarder(client, session_network.session_of)
+
+
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     scratch_dir: Path
     tmp_dir: Path
@@ -441,6 +501,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     gwbridge_subnet: str | None
     _seccomp_profile_as_path: bool
+    #: Whether BAI builds this session's data plane (BEP-1079) instead of Docker. Decided in
+    #: apply_network, read where the container is created and started: it is what puts the
+    #: container behind a gate so a device can be moved into its netns before its command runs.
+    _session_networked: bool
+    #: The node's session half (see docker/session_network.py). Shared with the agent: sessions
+    #: outlive kernels, so the per-session data plane cannot be owned by one kernel's context.
+    _session_network: SessionNetwork
+    #: What ensure_session settled on for this session — subnet, VNI, MTU. Needed at attach time.
+    _net_meta: SessionNetMeta | None
+    #: The container's node-local address, learned from the attach. Docker publishes nothing for a
+    #: `NetworkMode: none` container, so this is what the host ports are DNAT'd at.
+    _container_ip: str | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -457,10 +529,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
+        session_network: SessionNetwork,
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
-        gwbridge_subnet: str | None = None,
         seccomp_profile_as_path: bool = False,
+        gwbridge_subnet: str | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -492,6 +565,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
         self._seccomp_profile_as_path = seccomp_profile_as_path
         self.gwbridge_subnet = gwbridge_subnet
+        self._session_networked = False
+        self._session_network = session_network
+        self._net_meta = None
+        self._container_ip = None
 
         self.network_plugin_ctx = network_plugin_ctx
 
@@ -560,6 +637,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     log.exception(
                         "failed to chown {} to {}/{} (error: {})", p, int_uid, int_gid, repr(e)
                     )
+
+    @override
+    @override
+    async def destroy_scratch(self) -> None:
+        """Take back what `prepare_scratch` made, through the same path a teardown uses."""
+        await _clean_scratch(
+            current_loop(),
+            self.local_config.container.scratch_type,
+            self.local_config.container.scratch_root,
+            self.kernel_id,
+        )
 
     @override
     async def prepare_scratch(self) -> None:
@@ -813,8 +901,144 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             opts=opts,
         )
 
+    @property
+    def _gate_dir(self) -> Path:
+        """Where this kernel's start gate lives.
+
+        Under the config dir rather than the work dir: the work dir is the user's home, and the
+        wrapper and its FIFO are the agent's, not theirs.
+        """
+        return self.config_dir / "gate"
+
+    def _session_resolv_conf(self) -> Path:
+        """The resolv.conf this kernel gets, bind-mounted over the image's."""
+        return self.config_dir / "resolv.conf"
+
+    def _write_session_resolv_conf(self, gateway: str | None = None) -> None:
+        """Write the kernel's resolver list, optionally with the session resolver first.
+
+        Rewritten in place rather than replaced: the file is bind-mounted, so glibc picks the new
+        contents up on the container's next lookup.
+        """
+        resolv = resolve_container_dns(self.local_config.container.dns or ())
+        if gateway is not None:
+            resolv.nameservers = [gateway, *resolv.nameservers]
+        self._session_resolv_conf().write_text(resolv.render())
+
+    async def _point_resolv_conf_at_resolver(self) -> None:
+        """Prepend the session's cluster resolver, now that the attach has created its gateway.
+
+        Best-effort: with no gateway the upstream-only file stands, which is what a single-kernel
+        session wants anyway. `ensure_cluster_dns` is the loud guard for the clustered case.
+        """
+        gateway = await self._session_network.local_gateway_of(
+            str(self.kernel_config["session_id"])
+        )
+        if gateway is None:
+            return
+        self._write_session_resolv_conf(gateway)
+
+    async def _publish_session_ports(
+        self, cid: str, host_ports: Sequence[int], exposed_ports: Sequence[int]
+    ) -> None:
+        """DNAT the reserved host ports at the container's node-local address.
+
+        This backend runs its own publisher rather than delegating to a privnet: it already drives
+        a root Docker daemon, so the agent process that would delegate the privilege is the one
+        that holds it.
+        """
+        if self._container_ip is None:
+            raise ContainerCreationError(
+                container_id=ContainerId(cid),
+                message="no container address; the kernel's services would be unreachable",
+            )
+        # Services only. The repl is reached at the container's own address (see DockerKernel),
+        # so publishing it would put an interactive channel into the kernel on every local
+        # address for no one to use.
+        forwards = [
+            (hp, cp, None, "tcp")
+            for hp, cp in zip(host_ports, exposed_ports, strict=True)
+            if cp not in _REPL_PORTS
+        ]
+        if forwards:
+            await _port_publisher(self._session_network).install(
+                forwards_for(
+                    cid,
+                    self._container_ip,
+                    forwards,
+                    owner_agent_id=str(self.local_config.agent.id),
+                )
+            )
+
+    async def _attach_session_network(
+        self, container: DockerContainer, cid: str, cluster_info: ClusterInfo
+    ) -> None:
+        """Move this session's device into the gated container, then let its command run.
+
+        The gate is released in a finally: a container parked forever is worse than one whose
+        network failed, because nothing times it out and the failure has no message. The attach
+        itself is atomic — it rolls back its own partial ADDs — so releasing after a failure starts
+        a kernel with no network, which the caller's own error path then tears down.
+        """
+        if self._net_meta is None:
+            raise ContainerCreationError(
+                container_id=ContainerId(cid),
+                message="the session network was never set up for this kernel",
+            )
+        try:
+            task_pid = await wait_gated_pid(container, self._gate_dir)
+            result = await self._session_network.attach_container(
+                str(self.kernel_config["session_id"]),
+                cid,
+                # Docker names the container, so its id is not the kernel id the session claim was
+                # made under; the tracker needs both to retire that claim.
+                kernel_id=str(self.kernel_id),
+                meta=self._net_meta,
+                kernel_config=self.kernel_config,
+                cluster_info=cluster_info,
+                task_pid=task_pid,
+            )
+            self._container_ip = result.local_ip
+            # The gateway the session resolver listens on exists only now: the attach allocated
+            # the session's LOCAL block.
+            await self._point_resolv_conf_at_resolver()
+            if self._container_ip is None:
+                raise ContainerCreationError(
+                    container_id=ContainerId(cid),
+                    message="the LOCAL attachment yielded no address; cannot publish ports",
+                )
+        finally:
+            await asyncio.to_thread(release_gate, self._gate_dir)
+
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
+        if is_session_networked(cluster_info):
+            # BEP-1079: this session's data plane is BAI's, not Docker's. The container starts with
+            # no network at all and the agent moves a vxlan (or node-local bridge) device into its
+            # netns by PID, which is why it must also be held at a gate until that has happened.
+            # Handing it to Docker's networking as well would put it on two networks, one of which
+            # nothing routes.
+            self._net_meta = await self._session_network.ensure_session(
+                str(self.kernel_config["session_id"]),
+                str(self.kernel_id),
+                cluster_info["network_config"],
+            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": NO_NETWORK_MODE,
+                    # Docker writes its own /etc/resolv.conf, and for a `none` container that file
+                    # names no resolver this session can use. Bind ours over it: the upstream
+                    # servers now, the session's cluster resolver prepended once the attach has
+                    # created the gateway it listens on. Without that a clustered kernel cannot
+                    # resolve its peers and blocks at rendezvous — with the runner up and
+                    # listening, which is what makes it look like a slow start rather than a
+                    # missing resolver.
+                    "Binds": [f"{self._session_resolv_conf()}:/etc/resolv.conf:rw"],
+                },
+            })
+            self._write_session_resolv_conf()
+            self._session_networked = True
+            return
         # FIXME: find out way to inect network ID to kernel resource spec
         match cluster_info["network_config"].get("mode"):
             case "bridge":
@@ -1204,6 +1428,82 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         container_config["HostConfig"]["SecurityOpt"] = [security_opt]
 
+    async def _provision_or_name_the_container(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        cid: str,
+        cluster_info: ClusterInfo,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """`_provision_started_container`, with every failure named by the container it happened
+        to.
+
+        The container is already up by the time any of that runs, so a failure has to carry its
+        id out: a plain exception reached the agent's handler as "kernel failed" with no id,
+        `destroy_kernel` had nothing to act on, and the container went on running with its kernel
+        already gone from the registry.
+        """
+        try:
+            await self._provision_started_container(
+                docker, container, cid, cluster_info, resource_spec
+            )
+        except ContainerCreationError:
+            raise
+        except Exception as e:
+            raise ContainerCreationError(
+                container_id=cid,
+                message=f"failed after the container was started: {e!r}",
+            ) from e
+
+    async def _provision_started_container(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        cid: str,
+        cluster_info: ClusterInfo,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        """Everything done to a container that is already running.
+
+        Kept together because they share one property: the container exists, so a failure in any
+        of them has to carry its id out to whoever will destroy it. The caller turns anything
+        raised here into a `ContainerCreationError` naming the container.
+        """
+        if self._session_networked:
+            # The container is running but parked: its namespaces exist and its PID is final,
+            # and its command has not started. This is the only window in which the session's
+            # device can be moved in -- after the release the runner immediately binds its REPL
+            # and looks its peers up, and an attach racing that surfaces as a hang at
+            # rendezvous rather than as an error here.
+            await self._attach_session_network(container, cid, cluster_info)
+
+        if self.internal_data.get("sudo_session_enabled", False):
+            exec = await container.exec(
+                [
+                    # file ownership is guaranteed to be set as root:root since command is
+                    # executed on behalf of root user
+                    "sh",
+                    "-c",
+                    'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >'
+                    " /etc/sudoers.d/01-bai-work",
+                ],
+                user="root",
+            )
+            shell_response = await exec.start(detach=True)
+            if shell_response:
+                raise ContainerCreationError(
+                    container_id=cid,
+                    message=f"sudoers provision failed: {shell_response.decode()}",
+                )
+
+        additional_network_names: set[str] = set()
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
+            additional_network_names |= set(n)
+
+        await self._attach_additional_networks(docker, container, additional_network_names)
+
     async def _attach_additional_networks(
         self,
         docker: Docker,
@@ -1410,7 +1710,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if self.local_config.debug.log_kernel_config:
             log.debug("full container config: {!r}", pretty(container_config))
 
-        async def _rollback_container_creation() -> None:
+        async def _rollback_container_creation(container_exists: bool = False) -> None:
+            """Give back what this create took -- but only while nothing holds it.
+
+            ``container_exists`` decides whether there is anything to give back at all, and the
+            answer is all three or none. A container that exists may be running: it holds the
+            devices named in its own resource spec, it holds the host ports Docker published for
+            it, and its scratch is its filesystem. Reclaiming any of them while it is up hands a
+            live container's GPU or port to the next create -- and `docker start` can be cancelled
+            AFTER the daemon has acted on it, so "the start failed" does not mean "nothing is
+            running".
+
+            Where a container exists, all of it belongs to the kernel's teardown, which stops the
+            container first and then gives the ports back and rebuilds the allocation maps from
+            what is actually left. That teardown is queued by
+            `AbstractAgent._unwind_failed_create`.
+            """
+            if container_exists:
+                return
             await _clean_scratch(
                 loop,
                 self.local_config.container.scratch_type,
@@ -1421,6 +1738,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():
                     self.computers[dev_name].alloc_map.free(device_alloc)
+
+        if self._session_networked:
+            # BEP-1079: the container must exist, hold a netns and a stable PID, and NOT have run
+            # its command yet, so a vxlan/veth can be moved in first. Docker has no such split --
+            # `docker create` reports PID 0 and no netns -- so the entrypoint becomes a wrapper
+            # that parks at a FIFO after its namespaces exist. Releasing it execs the real command
+            # in place, which is what keeps the PID the attach used.
+            stage_gate(self._gate_dir)
+            apply_gate(container_config, self._gate_dir)
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
@@ -1435,6 +1761,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         message="Docker API returned None when creating container",
                     )
                 cid = container._id
+                # Recorded on the kernel object the moment the container exists, and before
+                # anything else can fail. Everything from here to the end of this method can
+                # raise, and the agent's handler destroys a failed kernel by the id it finds
+                # here: set later, as it was, a VXLAN attach that failed left the handler with
+                # nothing to destroy, `destroy_kernel` did nothing, and the container went on
+                # running with its kernel already gone from the registry.
+                kernel_obj.set_container_id(ContainerId(cid))
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
@@ -1450,7 +1783,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 raise
             except Exception as e:
                 # Oops, we have to restore the allocated resources!
-                await _rollback_container_creation()
+                await _rollback_container_creation(container_exists=container is not None)
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
@@ -1461,44 +1794,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             try:
                 await container.start()
             except asyncio.CancelledError as e:
-                await _rollback_container_creation()
+                # The container exists whatever this says: `docker start` can be cancelled after
+                # the daemon has acted on it, and a container that is up owns its own scratch.
+                await _rollback_container_creation(container_exists=True)
                 raise ContainerCreationError(
                     container_id=cid,
                     message="Container start was cancelled",
                 ) from e
             except Exception as e:
-                await _rollback_container_creation()
+                await _rollback_container_creation(container_exists=True)
                 raise ContainerCreationError(
                     container_id=cid,
                     message=f"Unexpected error during container start: {e!r}",
                 ) from e
 
-            if self.internal_data.get("sudo_session_enabled", False):
-                exec = await container.exec(
-                    [
-                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
-                        "sh",
-                        "-c",
-                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
-                    ],
-                    user="root",
-                )
-                shell_response = await exec.start(detach=True)
-                if shell_response:
-                    await _rollback_container_creation()
-                    raise ContainerCreationError(
-                        container_id=cid,
-                        message=f"sudoers provision failed: {shell_response.decode()}",
-                    )
+            await self._provision_or_name_the_container(
+                docker, container, cid, cluster_info, resource_spec
+            )
 
-            additional_network_names: set[str] = set()
-            for dev_name, device_alloc in resource_spec.allocations.items():
-                n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
-                additional_network_names |= set(n)
-
-            await self._attach_additional_networks(docker, container, additional_network_names)
-
-            kernel_obj.set_container_id(ContainerId(cid))
             container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
@@ -1520,7 +1833,28 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             created_host_ports: tuple[int, ...]
             repl_in_port = 0
             repl_out_port = 0
-            if container_network_info:
+            if self._session_networked:
+                # Docker publishes nothing for a `NetworkMode: none` container, so the pairing the
+                # agent allocated is the pairing — there is no daemon-side map to read back. The
+                # ports are made reachable by DNAT at the address the attach assigned, the same way
+                # the containerd backend does it.
+                kernel_host = str(advertised_kernel_host or container_bind_host)
+                await self._publish_session_ports(cid, host_ports, exposed_ports)
+                session_ports = dict(zip(exposed_ports, host_ports, strict=True))
+                # The container's own ports, not the host pairing: the repl is dialled at the
+                # container's LOCAL address (see repl_host below and DockerKernel), where the
+                # runner listens on 2000/2001. Handing over a host port here sends the agent's
+                # ZMQ at a port nothing published -- the runner is up and answering, and the
+                # creation still times out waiting for it.
+                repl_in_port, repl_out_port = _REPL_IN_PORT, _REPL_OUT_PORT
+                stdin_port = 0  # legacy
+                stdout_port = 0  # legacy
+                for sport in service_ports:
+                    sport["host_ports"] = tuple(
+                        session_ports[cport] for cport in sport["container_ports"]
+                    )
+                created_host_ports = tuple(host_ports)
+            elif container_network_info:
                 kernel_host = container_network_info.container_host
                 port_map = container_network_info.services
                 if "replin" not in port_map or "replout" not in port_map:
@@ -1550,7 +1884,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         )
                     host_port = int(ports[0]["HostPort"])
                     if host_port != host_ports[idx]:
-                        await _rollback_container_creation()
+                        await _rollback_container_creation(container_exists=True)
                         raise ContainerCreationError(
                             container_id=cid,
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
@@ -1578,6 +1912,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
+            # Under BEP-1079 the repl is not published: the agent is on this node and dials the
+            # container's own address. None everywhere else, where Docker's loopback publishing is
+            # what the kernel falls back to.
+            "repl_host": self._container_ip if self._session_networked else None,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
             "stdin_port": stdin_port,  # legacy
@@ -1599,6 +1937,23 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     checked_invalid_images: set[str]
     _seccomp_profile_as_path: bool
     _cgroup_path_cache: LRUCache[ContainerId, dict[CgroupController, Path]]
+    #: BEP-1079. The session half only — Docker keeps its own container lifecycle, so this object
+    #: has a locator and no runtime and refuses lifecycle calls by name.
+    _session_network: SessionNetwork
+    #: The address peers program into their FDB. None means this node cannot anchor a tunnel, and
+    #: ensure_session refuses a vxlan session outright rather than publishing an unreachable VTEP.
+    _vtep_ip: str | None
+    #: The raw configured address the VTEP was validated from, kept for the startup diagnostic.
+    _host_ip: str
+    #: Refreshes the published capabilities, so readiness does not go stale.
+    _network_identity_task: asyncio.Task[None] | None
+    #: The privileged network helper this agent uses, or None: the configured socket, unless the
+    #: cluster's driver is Docker Swarm -- see `effective_privnet_socket`.
+    _privnet_socket: str | None
+    #: Whether this node takes part in the BEP-1079 data plane at all. False under the Swarm
+    #: driver: no session ever arrives with a backend, so the identity that admits a node to one
+    #: is not published either.
+    _cluster_network_owned: bool
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1642,7 +1997,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             ),
         )
         pickle_loader = pickle_loader_writer_creator.create_loader()
-        pickle_writer = pickle_loader_writer_creator.create_writer()
         container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
             ContainerBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1651,13 +2005,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         )
         container_loader = container_loader_writer_creator.create_loader()
         container_writer = container_loader_writer_creator.create_writer()
+        # Container-based only: the pickle is no longer a second record of what is running here.
+        # It is read once by the adapter below, to carry a snapshot an older version left behind
+        # into the per-kernel scratch records.
         self._kernel_recovery = DockerKernelRegistryRecovery(
             loader=container_loader,
-            writers=[pickle_writer, container_writer],
+            writers=[container_writer],
         )
         self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
             pickle_loader,
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+            self._live_kernel_ids,
         )
 
     @override
@@ -1705,8 +2063,68 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_info["CgroupVersion"],
             )
             self.docker_info = docker_info
+        # BEP-1079. host_ip keeps the overlay on the L2 the agents advertise on rather than a
+        # hard-coded eth0; the VTEP is validated once here because it is what peers program into
+        # their FDB, and an address this node cannot be reached at must never reach a session's
+        # membership record.
+        container_cfg = self.local_config.container
+        host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        self._host_ip = host_ip
+        self._network_identity_task = None
+        configured_socket = self.local_config.agent.network_privnet_socket
+        cluster_driver = await self.etcd.get(cluster_driver_key(), scope=ConfigScopes.GLOBAL)
+        self._privnet_socket = effective_privnet_socket(configured_socket, cluster_driver)
+        self._cluster_network_owned = cluster_driver != "overlay"
+        if configured_socket is not None and self._privnet_socket is None:
+            log.info(
+                "the cluster-network driver is {!r} (Docker Swarm): the privileged network helper"
+                " at {} is not used on this node",
+                cluster_driver,
+                configured_socket,
+            )
+        self._vtep_ip = usable_vtep(host_ip)
+        # The interface the data plane is BUILT on, kept because it is half of what this node
+        # serves with. The vxlan device is created on this uplink for the life of the process, so
+        # an address that stays valid while moving to another NIC -- a failover, a re-cabling --
+        # leaves the node probing one interface and building on another.
+        self._serving_uplink = uplink_for_ip(self._vtep_ip or host_ip)
+        self._session_network = build_docker_session_network(
+            self.etcd,
+            agent_id=str(self.id),
+            host_ip=host_ip,
+            uplink=self._serving_uplink,
+            privnet_socket=self._privnet_socket,
+            local_subnet_layout=container_cfg.local_subnet_layout(),
+            agent_state_dir=self.local_config.agent.var_base_path,
+            vtep_ip=self._vtep_ip,
+            configured_dns=tuple(container_cfg.dns or ()),
+        )
+        await self._session_network.open()
+        # Rebuild what a restart emptied, BEFORE anything can ask the session network a question.
+        # Every field it holds is process memory, while the resources they name -- bridges, veths,
+        # IPAM leases, MASQ rules, etcd members -- outlive the process. Skipping it leaves a
+        # restarted agent resuming its kernels with no way to detach them, no way to tear their
+        # session down (the tracker is empty, so `untrack` finds nothing and teardown never runs),
+        # no reaction to peers joining or leaving, and no re-assertion of the firewall or XFRM
+        # drift that accumulated while it was down.
+        try:
+            await self._session_network.recover()
+        except Exception as e:
+            self._session_network.mark_recovery_failed(str(e))
+            # Not fatal to startup: an agent that cannot recover its network state can still serve
+            # new sessions, and refusing to start would take the node out over sessions that are
+            # already running. Loud, because everything above stays true until it is fixed.
+            log.exception(
+                "could not recover the session network state; restarted sessions on"
+                " this node may not tear down or re-converge until they are terminated"
+            )
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
+        # The advert is NOT published here. Everything below can still fail, and a failure here
+        # aborts the runtime before `shutdown` is ever called -- so an advert written at this
+        # point would stand for the whole freshness window over an agent that never started. It
+        # goes at the end, as the last thing this does, and anything that fails on the way there
+        # takes it away again.
         try:
             async with Docker() as docker:
                 gwbridge = await docker.networks.get("docker_gwbridge")
@@ -1756,9 +2174,175 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             allowlist=self.local_config.agent.allow_network_plugins,
             blocklist=self.local_config.agent.block_network_plugins,
         )
+        # The advert is NOT published here either. It admits the node to a cluster-network
+        # session, and the node cannot serve one until its RPC transport is up -- which happens
+        # after every `__ainit__` has returned. `start_serving` is where it goes.
+
+    async def _withdraw_network_identity(self) -> None:
+        """Stop advertising this node, and make sure nothing puts the advert back.
+
+        Three steps, in this order, because two is not enough. Deleting first shuts the door at
+        once -- while the advert stands a manager may still place work here, and the freshness
+        window would let it for ten minutes after this process is gone. But a refresh already
+        running can finish its publish AFTER that delete and put a fresh advert back over a node
+        that is shutting down. So the publisher is stopped and waited for, and only then is the
+        advert taken away for good.
+        """
+        for step in ("first", "final"):
+            try:
+                await withdraw_caps(self.etcd, str(self.id), self._boot_id)
+            except Exception:
+                log.exception("could not withdraw this agent's network capabilities ({})", step)
+            if step == "first" and self._network_identity_task is not None:
+                self._network_identity_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._network_identity_task
+                self._network_identity_task = None
+
+    @override
+    async def start_serving(self) -> None:
+        """Announce the node, and only then advertise what it can serve.
+
+        The advert is last of all: it is what admits this node to a cluster-network session, and
+        until the RPC transport is up there is nothing here to take one. Published from
+        `__ainit__` it stood over a process that could not yet serve, and a previous run's entry
+        in the manager's own table can keep that node looking ALIVE for its own timeout.
+        """
+        await super().start_serving()
+        if not self._cluster_network_owned:
+            # Nothing reads the advert under the Swarm driver, and probing what this node could
+            # serve would only report, every minute, an overlay it will never be asked for.
+            return
+        await self._publish_network_identity()
+        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
+
+    @override
+    async def stop_serving(self) -> None:
+        await self._withdraw_network_identity()
+        await super().stop_serving()
+
+    async def _publish_network_identity_forever(self) -> None:
+        """Keep this node's advertised capabilities honest while it runs.
+
+        Published once at startup, they answer a question that does not stay answered: the
+        privileged helper can die an hour later, and the node goes on advertising `vxlan` while
+        nothing on it can build a device. The VTEP does not change, so this is about readiness.
+        """
+        while True:
+            await asyncio.sleep(_NETWORK_IDENTITY_REFRESH_SEC)
+            try:
+                await self._publish_network_identity()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("could not refresh this agent's network capabilities")
+
+    async def _publish_network_identity(self) -> None:
+        """Advertise this node's overlay identity: its capabilities and its VTEP (BEP-1079).
+
+        The VTEP lets the manager pre-seed session membership, which is what removes the
+        peer-publish race for a multi-node overlay. See `network/caps.py`.
+        """
+        # What this node advertises is what it can actually SERVE, and that is fixed for the life
+        # of the process: the session network and the vxlan backend hold the endpoint they were
+        # built with, and every session already up was built on it. So the host is asked afresh
+        # each time -- an address can go while this process runs, a link drops, DHCP hands out
+        # another -- but the answer only ever decides whether to keep advertising, never what to
+        # advertise. Republishing a recomputed address would have said "ready" on a node whose
+        # serving path refuses the session, and refreshing the cached one kept the timestamp
+        # moving on an advert that had stopped being true. Both are the same mistake: the advert
+        # has to be about the serving state, not about the host.
+        serving = self._session_network.serving_vtep
+        live = usable_vtep(self._host_ip)
+        # BOTH halves of the serving identity. The address alone is not it: the same address can
+        # move to another NIC and stay perfectly usable, while the vxlan device goes on being
+        # created on the interface this process started with -- so the node would probe the new
+        # NIC, advertise it healthy, and build the tunnel on the old one. That fails outright if
+        # the old NIC is gone and blackholes silently if it is merely no longer the path.
+        uplink = uplink_for_ip(live) if live is not None else None
+        intact = live == serving and uplink == self._serving_uplink
+        self._vtep_ip = serving if intact else None
+        if not intact:
+            log.warning(
+                "this node's overlay identity has moved (serving {!r} on {!r}, host now holds"
+                " {!r} on {!r}); withdrawing from multi-node overlay work until this agent is"
+                " restarted",
+                serving,
+                self._serving_uplink,
+                live,
+                uplink,
+            )
+        # The VTEP key first, then the capabilities. The capability record is what ADMITS this
+        # node to a session, so it is written last of everything this refresh does: anything that
+        # can still fail after it has landed can leave a fresh advert standing over an agent whose
+        # start never finished, and the manager has no way to tell.
+        if self._vtep_ip is not None:
+            await publish_vtep(self.etcd, str(self.id), self._vtep_ip, self._boot_id)
+        else:
+            # Retract, not merely skip: the key is durable, so an address published on an earlier
+            # boot would otherwise keep being pre-seeded into peers' FDBs long after this node
+            # stopped holding it -- by which time it may belong to a different host entirely.
+            await withdraw_vtep(self.etcd, str(self.id), self._boot_id)
+            log.warning(
+                "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable"
+                " unicast IPv4 address held by an interface of this host that is up. Single-node"
+                " sessions work; a multi-node overlay (vxlan) session scheduled here will be"
+                " refused until it is set.",
+                self._host_ip,
+            )
+        # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
+        # failure to describe the uplink must not stop the agent from serving kernels.
+        try:
+            caps = await probe_caps(
+                # The interface sessions are served on, not the one the address is on now: a probe
+                # of the wrong NIC describes a path this node will not use.
+                self._serving_uplink,
+                privnet_socket=self._privnet_socket,
+                # Retried here rather than on a loop of its own: this already runs on a timer,
+                # and the answer it publishes is exactly what the retry changes.
+                recovery_problems=await self._session_network.retry_recovery_fail_close(),
+            )
+            await publish_caps(
+                self.etcd,
+                str(self.id),
+                caps,
+                backend=str(self.local_config.agent.backend),
+                vtep_ip=self._vtep_ip,
+                boot_id=self._boot_id,
+            )
+            for problem in caps.readiness:
+                # Once at startup, where an operator can act on it -- rather than at the first
+                # session scheduled here, which fails on one node with the reason buried in a
+                # create-time traceback.
+                log.warning("overlay readiness: {}", problem)
+        except Exception:
+            # An advert this node could not renew must not stand: it is what a manager reads to
+            # place work here, and leaving the last one behind is how a node that has stopped
+            # being able to say anything keeps being chosen.
+            # Withdrawn, not raised. A node that cannot describe its uplink can still serve
+            # single-node sessions, and refusing to start would take it out entirely over a
+            # diagnostic. With no advert standing it is simply not admitted to a cluster-network
+            # session, which is the answer that matters.
+            log.exception("could not publish this agent's network capabilities; withdrawing")
+            await withdraw_caps(self.etcd, str(self.id), self._boot_id)
+
+    @override
+    async def not_serving_reason(self) -> str | None:
+        # On a privnet-backed node every device, rule and address -- a single-node session's
+        # bridge as much as an overlay -- is made by that process, so a node that cannot reach it
+        # can serve no session at all. Only reachability: an overlay-specific problem (an
+        # unrecovered tunnel, a helper too old to fence) is published in the capability record
+        # and keeps overlay sessions away while single-node ones still run.
+        socket = self._privnet_socket
+        if socket is None:
+            return None
+        from ai.backend.agent.network.privnet.client import PrivNetClient
+
+        return await PrivNetClient(socket).reachable()
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
+        await self._withdraw_network_identity()
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()
@@ -1776,6 +2360,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker is not None:
             await self.docker.close()
+        await self._session_network.close()
+
+    async def _live_kernel_ids(self) -> frozenset[KernelId]:
+        """The kernels this runtime actually has a container for, as the adapter's ground truth."""
+        return frozenset(kernel_id for kernel_id, _ in await self.enumerate_containers())
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
@@ -1830,6 +2419,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if isinstance(command, list):
                 return cast(list[str], command)
             return None
+
+    @override
+    def port_publisher(self) -> PortPublisher:
+        """This backend does publish host ports, so its rules are the reclaim's to collect."""
+        return _port_publisher(self._session_network)
 
     @override
     async def enumerate_containers(
@@ -2240,10 +2834,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             self.network_plugin_ctx,
+            self._session_network,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
-            gwbridge_subnet=self.gwbridge_subnet,
             seccomp_profile_as_path=self._seccomp_profile_as_path,
+            gwbridge_subnet=self.gwbridge_subnet,
         )
 
     @override
@@ -2310,6 +2905,42 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 await self.error_monitor.capture_exception()
 
     @override
+    async def create_kernel(
+        self,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        restarting: bool = False,
+        throttle_sema: asyncio.Semaphore | None = None,
+    ) -> KernelCreationResult:
+        try:
+            return await super().create_kernel(
+                ownership_data,
+                kernel_image,
+                kernel_config,
+                cluster_info,
+                restarting=restarting,
+                throttle_sema=throttle_sema,
+            )
+        except ResourceError:
+            # "Kernel creation already in progress" — this call never got as far as claiming
+            # anything; the claim belongs to the creation that IS in progress. Releasing it here
+            # would tear the session network down under that live creation.
+            raise
+        except BaseException:
+            # The kernel claimed this node's session network in apply_network, long before its
+            # container existed. If it dies before that container is prepared it never enters the
+            # kernel registry — and a destroy for a kernel the agent has never heard of returns
+            # without queueing a clean, so clean_kernel (which normally releases the claim) never
+            # runs. BaseException, not Exception: a creation cancelled at shutdown leaks the claim
+            # just as surely. (A kernel that already has a container keeps its claim — that one is
+            # released by its own removal.)
+            await self._session_network.release_kernel(str(ownership_data.kernel_id))
+            raise
+
+    @override
     async def clean_kernel(
         self,
         kernel_id: KernelId,
@@ -2370,6 +3001,22 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         except OSError:
                             pass
 
+            if container_id is not None:
+                # BEP-1079: before the container goes. Removing it reclaims only the container-side
+                # veth via netns teardown — the host veth, the host-local IPAM address and the
+                # egress MASQ rule are ours to give back, and a kernel that skips this leaks them
+                # until the agent restarts. A no-op for a container this node never attached.
+                # The DNAT rules the publish installed are ours to give back too: nothing else
+                # reclaims them, and a host port still pointing at a dead container's address is
+                # handed straight to whichever kernel draws that port next.
+                try:
+                    await _port_publisher(self._session_network).remove_container(str(container_id))
+                except Exception:
+                    log.warning(
+                        "could not remove the published ports of container {}", container_id
+                    )
+                await self._session_network.detach_container(str(container_id))
+
             if not self.local_config.debug.skip_container_deletion and container_id is not None:
                 container = docker.containers.container(container_id)
                 try:
@@ -2379,12 +3026,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if (
                         e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
                     ) or e.status == HTTPStatus.NOT_FOUND:
-                        return
-                    log.exception(
-                        "unexpected docker error while deleting container (k:{}, c:{})",
-                        kernel_id,
-                        container_id,
-                    )
+                        # The container is gone, or on its way out under another deletion. That is
+                        # what this call wanted; it is not a reason to abandon the rest of the
+                        # clean. Returning here skipped `_clean_scratch` below, so every kernel
+                        # whose container died with its agent -- the whole of a SIGKILL restart --
+                        # kept its scratch directory for good. Measured: two scratch dirs left
+                        # behind per ungraceful restart, never collected by anything afterwards.
+                        # Nothing below depends on the delete having happened.
+                        log.debug(
+                            "container already gone while cleaning (k:{}, c:{}); continuing with"
+                            " the scratch",
+                            kernel_id,
+                            container_id,
+                        )
+                    else:
+                        log.exception(
+                            "unexpected docker error while deleting container (k:{}, c:{})",
+                            kernel_id,
+                            container_id,
+                        )
                 except TimeoutError:
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 

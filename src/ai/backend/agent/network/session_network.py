@@ -1,0 +1,2026 @@
+"""Compose the agent's session network with its container locator and lifecycle.
+
+Docker is the implemented runtime seam; the data-plane backend remains session-scoped.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import ipaddress
+import json
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+
+from ai.backend.agent.errors.network import (
+    ClusterDNSStartError,
+    ContainerLifecycleUnavailable,
+    ContainerSourceUnwired,
+    InvalidSessionNetworkDescriptor,
+    LocalSubnetSourceUnwired,
+    OverlayEncryptionUnavailable,
+    OverlayTeardownIncomplete,
+    SessionNetworkGone,
+    UnusableVtep,
+)
+from ai.backend.agent.network.cni import CniRunner
+from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
+from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.network.local_subnet import (
+    LocalSubnetAllocator,
+    LocalSubnetLayout,
+    cluster_host_ips,
+)
+from ai.backend.agent.network.locator import ContainerLocator
+from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.agent.network.orchestrator import (
+    AttachResult,
+    ContainerdKernelOrchestrator,
+    LaunchResult,
+)
+from ai.backend.agent.network.privnet.resolver import (
+    ClusterDNSServer,
+    ClusterResolver,
+    make_upstream_forwarder,
+)
+from ai.backend.agent.network.provisioner import CniProvisioner, ContainerNetworkProvisioner
+from ai.backend.agent.network.runtime import ExecResult, OciRuntime
+from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
+from ai.backend.agent.network.vni_registry import VniRegistry
+from ai.backend.common.network.keys import endpoint_key, session_meta_key, sessions_root
+from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
+    SESSION_META_GENERATION,
+    SESSION_META_READY,
+    SESSION_META_STATE,
+    EndpointPlan,
+    Member,
+    NetworkBackendKind,
+    SessionNetMeta,
+)
+from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
+    from ai.backend.common.etcd import AbstractKVStore
+    from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_DEFAULT_MTU = 1500
+_TEARDOWN_RETRY_INTERVAL = 5.0
+
+# The PID a detach plan carries for a container whose task is already gone. The detach turns it into
+# a netns path and the DEL side never opens it (the host veth goes by name, the address by owner),
+# so a dead kernel can still be detached — which is what frees its veth and its address.
+_DEAD_TASK_PID = 0
+
+
+def session_net_meta_from_network_config(
+    session_id: str, network_config: Mapping[str, Any]
+) -> SessionNetMeta:
+    """Parse the manager-provided network_config into a SessionNetMeta."""
+    vni_raw = network_config.get("vni")
+    key_raw = network_config.get("encryption_key")
+    gossip_key_raw = network_config.get("gossip_key")
+    # A meta written before the port became configurable carries no `vxlan_port`; falling back to
+    # the shipped default keeps such a session (and a rolling upgrade) on the port it is already
+    # using, instead of silently rebuilding its tunnel on a different one.
+    port_raw = network_config.get("vxlan_port")
+    generation_raw = network_config.get(SESSION_META_GENERATION)
+    try:
+        return SessionNetMeta(
+            session_id=session_id,
+            subnet=network_config["subnet"],
+            backend=NetworkBackendKind(network_config["backend"]),
+            mtu=int(network_config.get("mtu") or _DEFAULT_MTU),
+            vni=int(vni_raw) if vni_raw is not None else None,
+            vxlan_port=int(port_raw) if port_raw else DEFAULT_VXLAN_PORT,
+            encryption_key=str(key_raw) if key_raw else None,
+            encryption_key_id=(
+                str(network_config["encryption_key_id"])
+                if network_config.get("encryption_key_id")
+                else None
+            ),
+            gossip_key=str(gossip_key_raw) if gossip_key_raw else None,
+            generation=str(generation_raw) if generation_raw else None,
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        raise InvalidSessionNetworkDescriptor(
+            f"session {session_id} has an invalid network descriptor: {e}"
+        ) from e
+
+
+def _cleanup_debt_of(backend: Any) -> Mapping[str, str]:
+    """What a backend says it could not take back off this host, if it tracks that at all."""
+    owed = getattr(backend, "cleanup_debt", None)
+    return {} if owed is None else owed()
+
+
+class SessionNetwork:
+    _etcd: AbstractKVStore
+    _agent_id: str
+    _host_ip: str
+    _runtime: OciRuntime | None
+    _cni_runner: CniRunner
+    _backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]]
+    # Builds the per-session container-attach provisioner (one per session, so it can name its
+    # own session without having witnessed the attach). Overridable so the privileged network
+    # privnet can supply a proxy that RPCs attach/detach instead of running them here.
+    _make_provisioner: Callable[
+        [AbstractNetworkAgentPluginV2[Any], str], ContainerNetworkProvisioner
+    ]
+    _coordinators: dict[str, SessionNetworkCoordinator]
+    _orchestrators: dict[str, ContainerdKernelOrchestrator]
+    # The resolved backend per session (privnet proxy or an in-process plugin), so the cluster-DNS
+    # path can ask it to install/remove the :53 redirect without re-resolving from meta.
+    _session_backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
+    # Per-session cluster DNS server, bound to an ephemeral loopback port. Answers the session's
+    # cluster hostnames from its coordinator (session-scoped, so identical main1/sub1 across sessions
+    # never collide) and forwards everything else upstream. See cluster-name-resolution.md.
+    _dns_servers: dict[str, ClusterDNSServer]
+    # Operator-configured upstream nameservers (container.dns); the resolver forwards non-cluster
+    # queries to these (falling back to the host's own resolver when empty). Same source the
+    # container's /etc/resolv.conf uses, so cluster and non-cluster names agree.
+    _configured_dns: Sequence[str]
+    # Tracks container<->session so the last kernel's removal deterministically tears the
+    # session network down (otherwise overlay devices + etcd members leak).
+    _tracker: SessionContainerTracker
+    #: The node-wide VNI bindings, read to tell another agent's tunnels from ours.
+    _vni_registry: VniRegistry
+    # container_id -> (session_id, attach plan, task_pid): the network detach inputs captured
+    # at attach time, so the clean/remove phase can release the host veth + IPAM + MASQ even
+    # though it is a separate lifecycle call from attach. Without it those host-side resources
+    # leak (the container's netns removal only reclaims the container-side veth). Rebuilt from
+    # ground truth by `recover` after a restart.
+    _attachments: dict[str, tuple[str, EndpointPlan, int]]
+    # The durable journals this process owns, and so may reconcile on restart. Both are None when
+    # a privileged privnet owns the host state (it keeps its own records and outlives the agent).
+    _local_subnets: LocalSubnetAllocator | None
+    # Privnet-mode fallback for the LOCAL subnet lookup: this process holds no journal there, so it
+    # asks the privnet (which owns the pool). None in-process.
+    _privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None
+    _ipam: HostLocalIpam | None
+    # One lock per session, so the per-node data-plane setup runs once even when several kernels of
+    # the same session are created concurrently on this node (the agent gathers up to
+    # kernel_creation_concurrency create_kernel coroutines). Without it two ensure_session calls
+    # both pass the "already set up?" check across the setup await, and the second's
+    # setup_session_network deletes the vxlan/bridge the first just created.
+    _session_locks: dict[str, asyncio.Lock]
+    # How many tasks hold or wait on each session's lock, so it is dropped only when the last one
+    # leaves (see _keyed_lock for why its identity must outlive a single critical section).
+    _session_lock_users: dict[str, int]
+    # The same, for the session's cluster resolver. A separate lock because `ensure_session` calls
+    # `ensure_cluster_dns` while holding the one above, and an asyncio.Lock is not reentrant.
+    _dns_locks: dict[str, asyncio.Lock]
+    _dns_lock_users: dict[str, int]
+    # A last-kernel cleanup must not forget a session merely because fail-close hit a transient
+    # host error. The coordinator remains registered until one of these retries finishes teardown.
+    _teardown_retry_tasks: dict[str, asyncio.Task[None]]
+    # Reject a new kernel while a failed teardown still owns the old data plane. Reusing its
+    # stopped coordinator would race the retry deleting devices under the new kernel.
+    _tearing_down: set[str]
+    # This node's validated VTEP, or None when it has no address that can anchor a vxlan tunnel.
+    # A vxlan session refuses to set up here in that case, rather than publishing a VTEP its peers
+    # cannot reach and building an overlay that carries nothing.
+    _vtep_ip: str | None
+    # The privnet client this node's sessions are bound on, or None when there is no privnet.
+    # Shared rather than rebuilt per caller: it is what carries each session's incarnation onto
+    # the wire (see `PrivNetClient.bind_session`), so a second client built elsewhere sends
+    # requests the privnet cannot tell apart from a stale one's.
+    _privnet_client: Any
+    #: Backends whose surviving tunnels recovery could not bring down, and why.
+    _recovery_incomplete: dict[str, str]
+    #: Sessions this node holds state for but could not resume, and why.
+    _unresumed: dict[str, str]
+
+    def __init__(
+        self,
+        etcd: AbstractKVStore,
+        *,
+        agent_id: str,
+        host_ip: str,
+        runtime: OciRuntime | None = None,
+        cni_runner: CniRunner,
+        locator: ContainerLocator | None = None,
+        backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]],
+        provisioner_factory: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None,
+        local_subnets: LocalSubnetAllocator | None = None,
+        privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None,
+        ipam: HostLocalIpam | None = None,
+        vtep_ip: str | None = None,
+        configured_dns: Sequence[str] = (),
+        privnet_client: Any = None,
+    ) -> None:
+        self._etcd = etcd
+        self._agent_id = agent_id
+        self._host_ip = host_ip
+        self._vtep_ip = vtep_ip
+        self._privnet_client = privnet_client
+        self._recovery_incomplete = {}
+        self._unresumed = {}
+        # Two interfaces onto the node's containers, and deliberately two objects. The lifecycle
+        # half needs the whole runtime (images, exec, commit); the session half needs four calls.
+        # That is what lets a backend with no OciRuntime at all -- Docker, which drives its own
+        # daemon and keeps its own container lifecycle -- run this same session code: it brings a
+        # locator and no runtime. On the OCI-spec backends they are one client behind both, and
+        # nothing there is opened twice that was not already idempotent.
+        if locator is None:
+            # A backend supplies its own -- Docker's reads the Docker daemon, an OCI-spec backend's
+            # wraps its runtime client. Deriving one here would mean this layer knowing a concrete
+            # runtime, which is the coupling the locator seam exists to remove.
+            raise ContainerSourceUnwired("a session network needs a container locator")
+        self._runtime = runtime
+        self._locator = locator
+        self._cni_runner = cni_runner
+        self._backends = backends
+        self._make_provisioner = provisioner_factory or (
+            lambda backend, _session_id: CniProvisioner(backend, self._cni_runner)
+        )
+        self._coordinators = {}
+        self._orchestrators = {}
+        self._session_backends = {}
+        self._dns_servers = {}
+        self._configured_dns = tuple(configured_dns)
+        self._tracker = SessionContainerTracker()
+        self._vni_registry = VniRegistry()
+        self._attachments = {}
+        if (local_subnets is None) == (privnet_local_subnet is None):
+            # Exactly one, always: this process owns the node's pool, or the privnet does. Neither
+            # makes every local_subnet_of answer None — indistinguishable from "no block claimed",
+            # so peer layout loses its addresses and the resolver refuses to start, several layers
+            # from the actual mistake. Both would mean two owners of one pool. Refuse at the point
+            # the wiring is chosen; there is exactly one production caller, and a test harness that
+            # trips this is a harness that no longer resembles the agent.
+            raise LocalSubnetSourceUnwired(
+                "exactly one of local_subnets / privnet_local_subnet must be given"
+            )
+        self._local_subnets = local_subnets
+        # In privnet mode this process owns no LOCAL journal, so the subnet lookup single-node peer
+        # resolution needs is delegated to the privnet, which does own the pool. None in-process,
+        # where `_local_subnets` answers directly.
+        self._privnet_local_subnet = privnet_local_subnet
+        self._ipam = ipam
+        self._session_locks = {}
+        self._session_lock_users = {}
+        self._dns_locks = {}
+        self._dns_lock_users = {}
+        self._teardown_retry_tasks = {}
+        self._tearing_down = set()
+
+    async def open(self) -> None:
+        """Open both collaborators (e.g. establish the containerd gRPC channel).
+
+        Both, not one: they are one client behind two interfaces on the OCI-spec backends — where
+        open is idempotent — and genuinely two objects on a backend whose locator holds its own
+        connection.
+        """
+        if self._runtime is not None:
+            await self._runtime.open()
+        await self._locator.open()
+        # Same reason the privnet does it before recovery: a backend's host-global setup (the
+        # protection chains) belongs to the process's lifetime, and creating it lazily on the
+        # first session makes it look like state that appeared from nowhere.
+        for backend in self._backends.values():
+            try:
+                await backend.init()
+            except Exception:
+                log.warning(
+                    "network backend {} could not complete its startup setup; a session that"
+                    " needs it will retry and refuse if it still cannot",
+                    type(backend).__name__,
+                    exc_info=True,
+                )
+
+    async def close(self) -> None:
+        retry_tasks = tuple(self._teardown_retry_tasks.values())
+        for task in retry_tasks:
+            task.cancel()
+        if retry_tasks:
+            await asyncio.gather(*retry_tasks, return_exceptions=True)
+        self._teardown_retry_tasks.clear()
+        # Symmetric with `open()`, which calls `init()` on each of them. Without this the
+        # backends' own background work -- the VXLAN protection watchdog, which reprograms
+        # firewall and XFRM state every three seconds -- kept running through a graceful
+        # shutdown, against a host the agent had stopped managing.
+        for backend in self._backends.values():
+            try:
+                await backend.cleanup()
+            except Exception:
+                log.warning(
+                    "network backend {} did not shut down cleanly",
+                    type(backend).__name__,
+                    exc_info=True,
+                )
+        await self._locator.close()
+        if self._runtime is not None:
+            await self._runtime.close()
+
+    # --- restart recovery -------------------------------------------------------------------
+
+    def mark_recovery_failed(self, reason: str) -> None:
+        """Record that recovery did not complete at all.
+
+        The caller keeps the agent up -- a node that cannot recover can still serve new sessions,
+        and refusing to start would take it out over sessions already running -- but "cannot
+        recover" has to reach readiness, or the node goes on accepting overlay work while holding
+        state it can neither converge nor tear down.
+        """
+        self._unresumed["recovery"] = reason
+
+    def recovery_problems(self) -> dict[str, str]:
+        """Backends that could not fail-close their surviving tunnels, and why.
+
+        Empty is the healthy answer. While it is not, this node holds devices whose protection it
+        cannot vouch for, and it should not be handed a new overlay session.
+        """
+        return {
+            **self._recovery_incomplete,
+            **self._unrecovered_sessions(),
+            **self._backend_cleanup_debt(),
+        }
+
+    def _backend_cleanup_debt(self) -> dict[str, str]:
+        """What the backends could not take back off this host after a setup failed.
+
+        The in-process half; in privnet mode the privnet reports its own backends' debt.
+        """
+        debt: dict[str, str] = {}
+        for backend in self._backends.values():
+            debt.update(_cleanup_debt_of(backend))
+        return debt
+
+    async def retry_recovery_fail_close(self) -> dict[str, str]:
+        """Try again to close only what recovery could not. Returns what is still open.
+
+        `retry_fail_close`, never `prepare_recovery`. The preflight brings down EVERY tunnel this
+        backend owns and prunes every claim, which is right exactly once -- before anything is
+        trusted. Running it again on a timer would take down the sessions that recovered
+        successfully in between, drop their claims, and not reopen them: a capability refresh
+        would become the thing that kills the node's live traffic.
+        """
+        # Every backend that owes anything, not only the ones whose preflight failed: a setup
+        # that failed mid-way leaves rules behind long after recovery is over, and nothing else
+        # comes back for them.
+        owing = {name for name, backend in self._backends.items() if _cleanup_debt_of(backend)}
+        for name in dict.fromkeys([*self._recovery_incomplete, *sorted(owing)]):
+            backend = self._backends.get(name)
+            retry = getattr(backend, "retry_fail_close", None)
+            if backend is None or retry is None:
+                self._recovery_incomplete.pop(name, None)
+                continue
+            try:
+                remaining = await retry()
+            except Exception as e:
+                self._recovery_incomplete[name] = str(e)
+                continue
+            # Minus what the backend reports as cleanup debt: that goes out on its own below, and
+            # this dict is only for what recovery could not close. Conflating them would hold up
+            # the stale-claim prune over rules that have nothing to do with a surviving tunnel.
+            still_up = sorted(set(remaining) - set(_cleanup_debt_of(backend)))
+            if still_up:
+                self._recovery_incomplete[name] = f"still up: {', '.join(still_up)}"
+            else:
+                self._recovery_incomplete.pop(name, None)
+        if not self._recovery_incomplete:
+            # The devices are down, so a claim of ours that no live session accounts for is stale
+            # and nothing else will ever remove it. Deferred until now on purpose: pruning while a
+            # tunnel was still UP would drop the claim of a pair that may still be carrying.
+            await self._prune_stale_claims()
+        await self._retry_unresumed()
+        # The debt goes out with it: this return value IS what the agent publishes as its
+        # readiness, and a node whose backend refuses every new session must not look ready.
+        return {
+            **self._recovery_incomplete,
+            **self._unrecovered_sessions(),
+            **self._backend_cleanup_debt(),
+        }
+
+    async def _prune_stale_claims(self) -> None:
+        """Drop this node's pair claims for sessions it no longer holds."""
+        live = set(self._tracker.sessions())
+        for name, backend in self._backends.items():
+            prune = getattr(backend, "prune_pair_claims", None)
+            if prune is None:
+                continue
+            try:
+                if dropped := await prune(live):
+                    log.info("dropped {} stale ESP pair claim(s) from {}", dropped, name)
+            except Exception:
+                log.exception("could not prune stale ESP pair claims from {}", name)
+
+    async def _retry_unresumed(self) -> None:
+        """Try again to recover what would not recover, rather than only reporting it.
+
+        Never by re-running `recover()`. Its first step brings down every tunnel this node owns
+        and prunes every claim, which is correct exactly once -- before anything is trusted -- and
+        destructive on a timer: it would cut the sessions that recovered in between, and the
+        resume below would then install a SECOND coordinator for each of them without stopping
+        the first, leaving two sets of watch, reconcile and protection tasks changing the same
+        host state. So the preflight belongs to the process's lifetime, and this retries only the
+        part that failed.
+        """
+        try:
+            live, ours = await self._live_and_own_containers()
+        except Exception as e:
+            # Without the inventory there is nothing to resume against. The mark is REPLACED, not
+            # cleared first: clearing it before the attempt succeeds opens a window in which the
+            # local admission gate lets a new overlay session onto this node.
+            self._unresumed["recovery"] = str(e)
+            return
+        self._unresumed.pop("recovery", None)
+        by_session: dict[str, list[str]] = {}
+        for container_id, session_id in ours.items():
+            by_session.setdefault(session_id, []).append(container_id)
+        # A session marked unresumed that no longer has a container here is over: keeping the mark
+        # would hold this node out of overlay service for something that ended while it was down.
+        for session_id in [sid for sid in self._unresumed if sid not in by_session]:
+            self._unresumed.pop(session_id, None)
+            log.info("session {} is gone; dropping its unresumed mark", session_id)
+        for session_id in sorted(by_session):
+            if session_id in self._coordinators:
+                # Already coordinated. Re-running would install a SECOND coordinator without
+                # stopping the first, leaving two sets of watch and reconcile tasks changing the
+                # same host state -- and the previous pair is unreachable, so nothing can cancel
+                # them. The coordinator alone decides this: `_resume_session` registers it before
+                # the rest of the resume, so a session can be both coordinated and still marked
+                # unresumed, and asking for "unresumed AND coordinated" let exactly that one
+                # through on every tick.
+                #
+                # The mark is kept. What failed after the registration is not known here, and
+                # clearing it would report a recovery that did not happen -- the node stays out
+                # of overlay service, which is the safe side, until it is restarted.
+                if (reason := self._unresumed.get(session_id)) is not None:
+                    log.warning(
+                        "session {} is coordinated but was not fully resumed ({}); not resuming"
+                        " it again, which would double its watch and reconcile tasks",
+                        session_id,
+                        reason,
+                    )
+                continue
+            if not await self._resume_one(session_id, by_session[session_id]):
+                continue
+            log.info("session network for {} recovered on a later attempt", session_id)
+        await self._reclaim_orphans(live)
+
+    async def _finish_departed_sessions(self, resumed: set[str]) -> None:
+        """Tear down sessions this node is still a member of but has no kernels for.
+
+        The pass above walks the sessions of *live containers*. A session whose last container on
+        this node died while the agent was down has none, so nothing visits it and its member key
+        stays. The manager will not release the VNI while a member has not confirmed teardown, so
+        the session sits in TERMINATING for good: measured on two sessions with both kernels
+        already TERMINATED, the manager retrying `destroy_network` every fifteen seconds against a
+        node that was never going to answer, and their subnets never reused.
+
+        Resume-then-tear-down rather than deleting the member key: the withdrawal is fenced and
+        the same path also gives back the bridge, the LOCAL block and the ESP claim, none of which
+        removing a key would.
+
+        Only sessions whose meta reads back READY. Without a readable meta there is no data plane
+        to rebuild -- and the manager deletes the meta as the last step of `destroy_network`, so an
+        absent one means it is no longer waiting on anybody.
+
+        Safe here and nowhere else: recovery runs before the RPC transport serves, so a session
+        that is merely *starting* cannot be in this set — nothing can have joined since the read.
+        """
+        try:
+            departed = await self._sessions_naming_this_node() - resumed
+        except Exception as e:
+            log.exception("could not list the sessions this node is still a member of")
+            self._recovery_incomplete["departed-sessions"] = str(e)
+            return
+        for session_id in sorted(departed):
+            meta = await self._read_session_meta(session_id)
+            if meta is None:
+                continue
+            log.info(
+                "session {} still names this node but has no kernels here; finishing its teardown",
+                session_id,
+            )
+            try:
+                await self._resume_session(session_id, meta)
+                await self.teardown_session(session_id)
+            except Exception as e:
+                # One session that will not go must not stop the others, nor abort recovery. The
+                # retry task the teardown schedules keeps trying; this records why for readiness.
+                log.exception("could not finish the teardown of departed session {}", session_id)
+                self._recovery_incomplete[f"departed:{session_id}"] = str(e)
+
+    async def _sessions_naming_this_node(self) -> set[str]:
+        """Session ids whose etcd membership names this agent, from one prefix read."""
+        tree = await self._etcd.get_prefix(sessions_root())
+        joined: set[str] = set()
+        for session_id, node in (tree or {}).items():
+            if not isinstance(node, Mapping):
+                continue
+            members = node.get("members")
+            if isinstance(members, Mapping) and self._agent_id in members:
+                joined.add(session_id)
+        return joined
+
+    async def _resume_one(self, session_id: str, container_ids: Sequence[str]) -> bool:
+        """Resume one session AND re-derive its containers' tracking and detach plans.
+
+        Both halves. Resuming alone leaves every container untracked and detach-less: it cannot
+        give back its veth or its address when it goes, and the last one of a session cannot start
+        the teardown -- while `_unresumed` clears and readiness says the node is fine again.
+        """
+        try:
+            meta = await self._read_session_meta(session_id)
+        except Exception as e:
+            # Reading the metadata is part of the attempt, not a precondition of it. Outside the
+            # guard, a transient etcd error propagated out of the retry and left the whole pass
+            # half-done -- with this session's mark already removed by the caller.
+            self._unresumed[session_id] = f"could not read the session's network meta: {e}"
+            return False
+        if meta is None:
+            # The manager dropped the session while we were failing to resume it; there is nothing
+            # left to resume and its containers are orphans that clean_kernel removes.
+            self._unresumed.pop(session_id, None)
+            return False
+        try:
+            await self._resume_session(session_id, meta)
+        except Exception as e:
+            self._unresumed[session_id] = str(e)
+            return False
+        for container_id in container_ids:
+            self._tracker.track(session_id, container_id)
+            try:
+                attachment = await self._recover_attachment(container_id, session_id, meta)
+            except Exception:
+                # One container's plan failing must not undo the session's resume; it stays
+                # tracked but detach-less, and its host leftovers are reclaimed as orphans later.
+                log.exception("failed to recover attachment for container {}", container_id)
+                continue
+            if attachment is not None:
+                self._attachments[container_id] = attachment
+        self._unresumed.pop(session_id, None)
+        return True
+
+    def _unrecovered_sessions(self) -> dict[str, str]:
+        """Sessions this node holds state for but could not resume, as readiness problems.
+
+        Not only the fail-close: a session whose resume raised has its devices down and its
+        coordinator, tracker and detach plans missing, so it will neither converge nor tear down.
+        A node in that state should not be handed new overlay work either.
+        """
+        return {f"session:{session_id}": reason for session_id, reason in self._unresumed.items()}
+
+    async def recover(self) -> None:
+        """Rebuild this node's session-network state from ground truth after an agent restart.
+
+        Every field below is process memory that a restart empties, while the resources they
+        name — bridges, veths, IPAM leases, MASQ rules, etcd members — outlive the process. So a
+        restarted agent that skipped this would resume its kernels with no way to detach them
+        (`remove_container` finds no attachment), no way to tear their session down (the tracker
+        is empty), and no reaction to peers joining or leaving (no coordinator, no watch).
+
+        Ground truth is the containerd labels (which container belongs to which session) plus the
+        manager's etcd records (the session's meta, and each endpoint's overlay IP). Nothing is
+        read back from this process's own prior state, because there is none.
+
+        Finally the durable journals are reconciled against the live containers: a session or a
+        container that died while the agent was down still holds its /24 block, its address and
+        its host veth, and only this pass can give them back.
+        """
+        # Two different questions, two different scopes. What may this agent resume and track? Only
+        # its own kernels. What is still alive on this node, and therefore not an orphan? Every
+        # kernel, whoever owns it — the journals the reclaim gives back to are host-global. Both
+        # views come from ONE listing: asking containerd twice would let a container appear between
+        # the answers and end up in `ours` but not in `live`, or vanish and be reclaimed while this
+        # pass still treats it as live.
+        #
+        # But fail-close FIRST, before looking at anything. At this point no session metadata is
+        # trusted or even readable, and a surviving VXLAN from the previous life is UP carrying
+        # whatever it was carrying -- with the XFRM and firewall state that protected it possibly
+        # gone. The privnet path has always done this first; this one did not, so a rootful agent
+        # came back with its tunnels open. What stays open is recorded, so readiness can say so.
+        self._recovery_incomplete = {}
+        spare = await self._other_agents_live_vnis()
+        for name, backend in self._backends.items():
+            try:
+                await backend.prepare_recovery(spare)
+            except Exception as e:
+                # Not fatal: the sessions below still need adopting, and a backend that raised has
+                # already attempted every device it owns.
+                log.exception("network backend {} could not fail-close before recovery", name)
+                self._recovery_incomplete[name] = str(e)
+
+        live, ours = await self._live_and_own_containers()
+        metas: dict[str, SessionNetMeta] = {}
+        for session_id in sorted(set(ours.values())):
+            meta = await self._read_session_meta(session_id)
+            if meta is None:
+                # The manager dropped the session's meta while we were down; its containers are
+                # orphans that clean_kernel will remove. Leave them untracked rather than guess.
+                log.warning("no network meta for live session {}; not resuming", session_id)
+                continue
+            try:
+                await self._resume_session(session_id, meta)
+            except Exception as e:
+                # Recorded, not just logged: this session's coordinator, tracker and detach plans
+                # are missing, so it will neither converge nor tear down, and a readiness that
+                # said nothing would keep the node taking new overlay work regardless.
+                log.exception("failed to resume session network for {}", session_id)
+                self._unresumed[session_id] = str(e)
+                continue
+            self._unresumed.pop(session_id, None)
+            metas[session_id] = meta
+
+        for container_id, session_id in ours.items():
+            meta = metas.get(session_id)
+            if meta is None:
+                continue
+            self._tracker.track(session_id, container_id)
+            try:
+                attachment = await self._recover_attachment(container_id, session_id, meta)
+            except Exception:
+                # one container's plan re-derivation failing (e.g. its overlay endpoint dropped
+                # from etcd) must not abort recovery for the rest; it stays tracked but detach-less,
+                # and its host leftovers are reclaimed as orphans on a later clean.
+                log.exception("failed to recover attachment for container {}", container_id)
+                continue
+            if attachment is not None:
+                self._attachments[container_id] = attachment
+
+        await self._finish_departed_sessions(set(ours.values()))
+        await self._reclaim_orphans(live)
+
+    async def _live_containers(self) -> dict[str, str]:
+        """``{container_id: session_id}`` for every kernel container still running on this NODE —
+        including another agent's.
+
+        Deliberately unfiltered, because this is the ground truth the *reclaim* pass diffs against,
+        and the journals it reclaims from (the node's LOCAL subnet pool and its host-local IPAM) are
+        host-global: one store, shared by every agent on the machine. Take only our own containers
+        here and a second agent's live kernels look like orphans — their addresses get released,
+        their host veths deleted, and their sessions' /26 blocks handed to the next session, which
+        then deletes the bridge they are still on.
+
+        What must not be shared is *ownership*: resuming a session, tracking its containers and
+        adopting its data plane are ours to do only for our own kernels. Those paths filter (see
+        `_live_and_own_containers` / `_live_containers_of`).
+        """
+        live: dict[str, str] = {}
+        for container_id, container in (await self._locator.live_sessions()).items():
+            live[container_id] = container.session_id
+        return live
+
+    async def _live_and_own_containers(self) -> tuple[dict[str, str], dict[str, str]]:
+        """``(every kernel container on this node, the subset this agent owns)``, from one listing.
+
+        The two scopes answer different questions — see `_live_containers` — and taking them from a
+        single snapshot is what keeps them consistent with each other.
+        """
+        live: dict[str, str] = {}
+        ours: dict[str, str] = {}
+        for container_id, container in (await self._locator.live_sessions()).items():
+            live[container_id] = container.session_id
+            if container.owner_agent_id == self._agent_id:
+                ours[container_id] = container.session_id
+        return live, ours
+
+    async def _read_session_meta(self, session_id: str) -> SessionNetMeta | None:
+        raw = await self._etcd.get(session_meta_key(session_id))
+        if not raw:
+            return None
+        record = json.loads(raw)
+        # A record the manager is still building, or is undoing, names a subnet and a VNI that
+        # are committed to nobody -- and carries none of the rest of the meta. It is no more this
+        # node's to act on than an absent one. Our own single-node metas carry no state at all.
+        if record.get(SESSION_META_STATE, SESSION_META_READY) != SESSION_META_READY:
+            return None
+        return session_net_meta_from_network_config(session_id, record)
+
+    async def _persist_session_meta(self, meta: SessionNetMeta) -> None:
+        """Write a single-node session's meta to etcd so a restart's recover() can resume it.
+
+        The manager persists meta only for the multi-node overlay (CNINetworkPlugin), so a
+        single-node session would otherwise have none — and recover() reads meta from etcd. The
+        payload mirrors the manager's ``{subnet, vni, backend, mtu}`` so the same reader
+        (`session_net_meta_from_network_config`) parses both identically.
+        """
+        await self._etcd.put(
+            session_meta_key(meta.session_id),
+            json.dumps({
+                "subnet": meta.subnet,
+                "vni": meta.vni,
+                "backend": str(meta.backend),
+                "mtu": meta.mtu,
+                "vxlan_port": meta.vxlan_port,
+                "encryption_key": meta.encryption_key,
+            }),
+        )
+
+    async def _forget_session_meta_if_local(self, session_id: str) -> None:
+        """Delete the meta only if it is a single-node one this agent owns, and only if it is
+        still the one that was read.
+
+        Read-check-delete rather than unconditional delete: the manager reads a multi-node
+        session's meta during its own destroy (`destroy_network`), so removing that one here would
+        break it. A single-node meta is the agent's own and must be cleaned up.
+
+        The delete names the bytes the check was made on. A session id is reused, and between the
+        read and an unconditional delete the manager can publish a multi-node record under it --
+        which this would then remove, taking the subnet and VNI of a live session with nothing left
+        to name them.
+        """
+        raw = await self._etcd.get(session_meta_key(session_id))
+        if not raw:
+            return
+        record = json.loads(raw)
+        if record.get(SESSION_META_STATE, SESSION_META_READY) != SESSION_META_READY:
+            return
+        if record.get("backend") != str(NetworkBackendKind.BRIDGE):
+            return
+        if not await self._etcd.delete_if_value(session_meta_key(session_id), raw):
+            log.info(
+                "not forgetting session {}'s network record: it changed while this teardown was"
+                " reading it",
+                session_id,
+            )
+
+    async def _read_overlay_ip(self, session_id: str, container_id: str) -> str | None:
+        raw = await self._etcd.get(endpoint_key(session_id, container_id))
+        if not raw:
+            return None
+        ip = json.loads(raw).get("ip")
+        return str(ip) if ip else None
+
+    async def _resume_session(self, session_id: str, meta: SessionNetMeta) -> None:
+        backend = self._resolve_backend(meta)
+        coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
+        orchestrator = ContainerdKernelOrchestrator(
+            self._runtime, self._make_provisioner(backend, session_id)
+        )
+        # resume, not start: the devices are up and carrying this session's traffic.
+        await coordinator.resume(meta, self._self_member(meta))
+        self._coordinators[session_id] = coordinator
+        self._orchestrators[session_id] = orchestrator
+        self._session_backends[session_id] = backend
+        # The devices (and so the LOCAL gateway) already exist on a resume, so the resolver can come
+        # up right away — unlike a fresh session, whose block is not allocated until the first attach.
+        # Best-effort here, unlike the fail-loud create path: recovery must re-adopt the session's
+        # already-running containers even if the resolver stumbles (aborting would leave them with no
+        # detach path and leak their host resources — the recover() contract). A create instead
+        # fails its kernel, since a broken resolver means the new session cannot rendezvous.
+        try:
+            await self.ensure_cluster_dns(session_id)
+        except ClusterDNSStartError:
+            log.exception("could not start cluster DNS while resuming session {}", session_id)
+
+    async def _recover_attachment(
+        self, container_id: str, session_id: str, meta: SessionNetMeta
+    ) -> tuple[str, EndpointPlan, int] | None:
+        """Reconstruct the detach inputs captured at attach time.
+
+        The plan is re-derived rather than stored: `attach_endpoint` is a function of the session
+        meta and the manager-assigned overlay IP, both of which are durable in etcd, and its
+        node-local /24 comes from the journal, which is idempotent per session. The task PID is
+        asked of containerd. So the plan a restarted agent detaches with is the same plan the
+        pre-restart agent attached with.
+
+        A container whose task is gone still gets a plan — with a sentinel PID. Its containerd
+        *record* survives, so it is not an orphan by the reclaim's reckoning (which diffs against
+        the records), and it will be cleaned the ordinary way: clean_kernel -> remove_container ->
+        detach. Returning None here instead left that path with nothing to detach with, so the
+        kernel's host veth and its address stayed held for the life of the node — the leak the
+        comment here used to promise the orphan sweep would catch, and it never did. The PID is
+        only turned into a netns path, which the DEL side ignores (the veth is deleted by name and
+        the address released by owner), so there is nothing for it to be wrong about.
+        """
+        pid = await self._locator.container_pid(container_id)
+        backend = self._resolve_backend(meta)
+        kernel_config: dict[str, Any] = {}
+        if overlay_ip := await self._read_overlay_ip(session_id, container_id):
+            kernel_config["cluster_network_ip"] = overlay_ip
+        plan = await backend.attach_endpoint(cast(Any, kernel_config), cast(Any, {}), meta=meta)
+        return (session_id, plan, pid if pid is not None else _DEAD_TASK_PID)
+
+    @property
+    def serving_vtep(self) -> str | None:
+        """The tunnel endpoint this node will actually build a session on.
+
+        Fixed when this was constructed, because it is what every session already up was built
+        with and what peers have in their FDBs. Published as the node's advert rather than
+        whatever the host holds right now: the two are not the same thing, and it is this one that
+        decides whether a session offered to this node can be served at all.
+        """
+        return self._vtep_ip
+
+    async def _reclaim_orphans(self, live: Mapping[str, str]) -> None:
+        """Give back what the journals still hold for containers and sessions that are gone.
+
+        Both are keyed off the *live* ground truth (containers by id, sessions by the ids those
+        containers carry), never off which sessions successfully resumed: a session whose meta the
+        manager dropped, or whose resume raised, is still live if its containers are — reclaiming
+        its /24 would free a block whose bridge is up, and the next session to take it would delete
+        that live bridge. A block is reclaimed only when no live container names its session.
+
+        Both journals are None under a privileged privnet: it owns the host state and its own
+        records, and it outlives the agent, so there is nothing here to reclaim.
+        """
+        if self._ipam is not None:
+            await self._reclaim_orphan_addresses(self._ipam, frozenset(live))
+        if self._local_subnets is not None:
+            await self._reclaim_orphan_subnets(self._local_subnets, frozenset(live.values()))
+
+    async def _reclaim_orphan_addresses(
+        self, ipam: HostLocalIpam, live_containers: frozenset[str]
+    ) -> None:
+        """Release host-local addresses (and their host veths) owned by dead containers.
+
+        The journal names each owner as ``<container_id>/<ifname>``, and the host veth's name is a
+        pure function of that pair, so the DEL needs nothing the journal does not already hold.
+        Only host-local addresses are journalled, and those are always the LOCAL (NAT) attachment,
+        so reconstructing its config from the subnet reproduces what attach emitted.
+        """
+        for subnet in ipam.subnets():
+            for owner, ip in (await ipam.owners(subnet)).items():
+                container_id, _, ifname = owner.partition("/")
+                if not ifname or container_id in live_containers:
+                    continue
+                config = {"ipam": {"type": "host-local", "subnet": subnet}, "ipMasq": True}
+                try:
+                    await self._cni_runner(
+                        "DEL", ifname=ifname, netns="", container_id=container_id, config=config
+                    )
+                except Exception:
+                    log.exception("failed to reclaim address of dead container {}", container_id)
+                else:
+                    log.info("reclaimed address {} of dead container {}", ip, container_id)
+
+    async def _reclaim_orphan_subnets(
+        self, allocator: LocalSubnetAllocator, live_sessions: frozenset[str]
+    ) -> None:
+        """Release node-local /24 blocks whose session has no live container on this node.
+
+        Only the block is reclaimed, not the session's devices: naming them needs the meta the
+        manager may already have deleted, and a leftover device is cleared by name by the next
+        `setup_session_network` that reuses it. A leaked block would never come back — the pool
+        holds 256.
+        """
+        for session_id in await allocator.sessions():
+            if session_id in live_sessions:
+                continue
+            try:
+                await allocator.release(session_id)
+            except Exception:
+                # one failed release must not abort the sweep and strand the rest
+                log.exception("failed to reclaim subnet block of dead session {}", session_id)
+            else:
+                log.info("reclaimed node-local subnet block of dead session {}", session_id)
+
+    def _resolve_backend(self, meta: SessionNetMeta) -> AbstractNetworkAgentPluginV2[Any]:
+        try:
+            return self._backends[str(meta.backend)]
+        except KeyError:
+            raise InvalidSessionNetworkDescriptor(
+                f"no data-plane backend registered for '{meta.backend}' "
+                f"(available: {sorted(self._backends)})"
+            ) from None
+
+    def _self_member(self, meta: SessionNetMeta) -> Member:
+        """This node's membership record — the one every peer reads and programs into its FDB.
+
+        The VTEP published here is the *validated* one, never the raw configured address: a peer
+        guards on `vtep_ip is None` only, so an empty or unspecified string would sail through and
+        become `bridge fdb append ... dst ''` (fails) or `dst 0.0.0.0` (points nowhere).
+
+        With no usable VTEP this raises rather than publishing a null one, and it does so here --
+        the one place both the create path and the RESTART path build the record -- because a null
+        is not merely useless to peers, it is destructive: their reconcile drops every endpoint
+        whose member has no VTEP, so a restarted node that republished null would have its peers
+        tear the FDB/ARP entries for all of its running kernels out from under a healthy session.
+        Refusing leaves the previously published record (and this node's live devices) untouched;
+        recover() logs the session and moves on.
+        """
+        if meta.backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
+            raise UnusableVtep(
+                f"agent {self._agent_id} cannot take part in the multi-node overlay session"
+                f" {meta.session_id}: container.advertised-host/bind-host is not a routable unicast"
+                " address this host holds. Set it to the address peers reach this node on."
+            )
+        return Member(
+            agent_id=self._agent_id,
+            host_ip=self._host_ip,
+            vtep_ip=self._vtep_ip if meta.backend is NetworkBackendKind.VXLAN else None,
+            # Written by this node, so it is an acknowledgement: while it stands, the manager
+            # must not hand this session's VNI to anybody else.
+            joined=True,
+        )
+
+    @contextlib.asynccontextmanager
+    async def _session_locked(self, session_id: str) -> AsyncIterator[None]:
+        """Hold this session's setup/teardown lock."""
+        async with self._keyed_lock(self._session_locks, self._session_lock_users, session_id):
+            yield
+
+    @contextlib.asynccontextmanager
+    async def _dns_locked(self, session_id: str) -> AsyncIterator[None]:
+        """Hold this session's cluster-resolver lock.
+
+        Its own, not the setup/teardown one: `ensure_session` holds that while starting the
+        resolver, and an asyncio.Lock is not reentrant.
+        """
+        async with self._keyed_lock(self._dns_locks, self._dns_lock_users, session_id):
+            yield
+
+    @contextlib.asynccontextmanager
+    async def _keyed_lock(
+        self, locks: dict[str, asyncio.Lock], users: dict[str, int], key: str
+    ) -> AsyncIterator[None]:
+        """Hold the lock ``locks[key]``, minting and dropping it around the last user.
+
+        The lock is refcounted rather than simply popped on teardown, because its *identity* has to
+        stay stable for as long as anyone holds or waits on it. `Lock.release()` only schedules the
+        first waiter — the releasing task runs on to its next await — so a teardown that dropped the
+        lock from the dict right after releasing it would leave the woken waiter holding an orphan,
+        while the next arrival minted a fresh lock and entered the critical section alongside it:
+        the very concurrent setup this lock exists to prevent. Registering as a user *before* the
+        first await, and dropping the entry only when the last user leaves, keeps one lock per
+        in-flight session and still lets the dict shrink to empty.
+        """
+        lock = locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            locks[key] = lock
+        users[key] = users.get(key, 0) + 1
+        try:
+            async with lock:
+                yield
+        finally:
+            remaining = users[key] - 1
+            if remaining:
+                users[key] = remaining
+            else:
+                del users[key]
+                locks.pop(key, None)
+
+    def _refuse_while_unrecovered(self, meta: SessionNetMeta) -> None:
+        """Refuse a new overlay session while this node has not finished recovering.
+
+        Readiness tells the manager, but the manager reads it on its own schedule and a request
+        decided before that read still arrives here. Building a new VXLAN beside state this node
+        can neither converge nor tear down is the case that has to be refused locally, at the
+        moment it is asked, not the moment the capability was published.
+        """
+        if meta.backend is not NetworkBackendKind.VXLAN:
+            return  # a node-local bridge session shares nothing with the unrecovered state
+        problems = self.recovery_problems()
+        if not problems:
+            return
+        raise OverlayEncryptionUnavailable(
+            "refusing a new overlay session on this node: recovery has not completed"
+            f" ({'; '.join(f'{where}: {why}' for where, why in sorted(problems.items()))})."
+            " Until it does, this node holds devices, XFRM state and firewall rules it can"
+            " neither converge nor tear down, and a new session would be built beside them."
+        )
+
+    async def ensure_session(
+        self, session_id: str, kernel_id: str, network_config: Mapping[str, Any]
+    ) -> SessionNetMeta:
+        """Resolve the session's backend, set up this node's data plane, publish membership, and
+        register the per-session coordinator + orchestrator.
+
+        The kernel is registered as a *user* of the session network here, before its container
+        exists: a kernel is created in stages (image pull, scratch, container), and the agent runs
+        those stages for several kernels of a session concurrently. Counting only containers would
+        make a sibling that dies early look like the session's last kernel and tear the whole data
+        plane down under the ones still being built (see SessionContainerTracker.reserve).
+        """
+        meta = session_net_meta_from_network_config(session_id, network_config)
+        self._refuse_while_unrecovered(meta)
+        if meta.backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
+            # Refuse the session here rather than build an overlay this node cannot be reached on.
+            # Silently joining would strand the whole session: the peers program our unusable VTEP,
+            # their traffic to our kernels is dropped, and it surfaces as a hang at rendezvous.
+            raise UnusableVtep(
+                f"agent {self._agent_id} cannot join the multi-node overlay session {session_id}:"
+                " container.advertised-host/bind-host is not a routable unicast address this host"
+                " holds. Set it to the address peers reach this node on."
+            )
+        # Serialize per session: the "already set up?" check and the setup that follows straddle an
+        # await, so two concurrent kernels of one session would both set the data plane up and the
+        # second would delete the first's devices (setup_session_network clears leftovers by name).
+        async with self._session_locked(session_id):
+            if session_id in self._tearing_down:
+                raise SessionNetworkGone(
+                    f"session {session_id}'s previous data plane is still being torn down; retry "
+                    "after host-network cleanup completes"
+                )
+            # Claim the session before the idempotency check, so a teardown of this session cannot
+            # be decided (by a sibling's removal) between our check and the kernel we are here for.
+            self._tracker.reserve(session_id, kernel_id)
+            if session_id in self._coordinators:
+                # Already set up on this node (e.g. a second kernel of the same session placed
+                # here). Session-network setup is per node, not per kernel — do it once.
+                return meta
+            coordinator: SessionNetworkCoordinator | None = None
+            backend: AbstractNetworkAgentPluginV2[Any] | None = None
+            adopted = False
+            try:
+                backend = self._resolve_backend(meta)
+                coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
+                orchestrator = ContainerdKernelOrchestrator(
+                    self._runtime, self._make_provisioner(backend, session_id)
+                )
+                # "No coordinator" does not mean "no data plane": a session whose resume failed on
+                # the last restart (or whose meta briefly vanished) keeps running its kernels while
+                # this process knows nothing about it. Rebuilding under them would delete the very
+                # bridge they are enslaved to and purge the addresses they hold — so ask containerd,
+                # not our own memory, and adopt what is already carrying their traffic.
+                #
+                # "Is the data plane up?" is a question about the NODE, not about this agent: the
+                # session's bridge and its LOCAL block are keyed on the block index in the node's
+                # shared journal, so a kernel of this session belonging to another agent on this
+                # host is running on the very same devices. Probing only our own kernels would have
+                # us take the setup path and delete them out from under it.
+                running, survivors = await self._running_containers_of(session_id)
+                if running:
+                    adopted = True
+                    await coordinator.resume(meta, self._self_member(meta))
+                else:
+                    await coordinator.start(meta, self._self_member(meta))
+                    # The block this session just claimed can only hold *stale* claims: it has no
+                    # containers. Clearing them is what makes a pinned address safe to hand out,
+                    # whichever way the block came back to the pool — a teardown purges it too, but
+                    # a block reclaimed as an orphan on restart does not, and a claim leaked by a
+                    # failed detach is exactly what a later pin would collide with (and, since a pin
+                    # that cannot be honoured fails its kernel, keep colliding with).
+                    await self._purge_local_addresses(session_id)
+                # Persist the meta so a restart's recover() can resume this session. The manager
+                # writes etcd meta only for the multi-node overlay (CNINetworkPlugin); a single-node
+                # session gets none, so without this recover() reads no meta, cannot resume the
+                # session, and silently skips its teardown — leaking the LOCAL bridge, its subnet
+                # block and its IPAM. Inside the try so a write failure unwinds the half-built
+                # session rather than leaving one that can never be recovered or torn down.
+                if meta.backend is NetworkBackendKind.BRIDGE:
+                    await self._persist_session_meta(meta)
+            except BaseException:
+                # Unwind what WE built, and nothing else. A failed *setup* leaves a coordinator that
+                # may already have published this node's membership and started its watch tasks, and
+                # that is about to go out of scope unregistered — nobody could ever stop it — so it
+                # is stopped (which also gives back the half-built devices and the LOCAL block).
+                #
+                # A failed *adopt* must not be stopped: stop() deletes the devices and releases the
+                # block of a data plane this node did not build and whose kernels are still running
+                # on it. And the failure that trips the adopt is the same transient etcd error that
+                # made the resume fail in the first place — correlated, not hypothetical.
+                #
+                # BaseException, and shielded: a cancelled kernel creation is the ordinary way this
+                # is interrupted, and it left the coordinator unregistered with its watch tasks
+                # running and this node's membership published -- a session nothing on this node
+                # could stop, on devices no teardown would ever look for.
+                if coordinator is not None and not adopted:
+                    await asyncio.shield(
+                        asyncio.ensure_future(self._stop_quietly(coordinator, session_id, backend))
+                    )
+                self._tracker.release_pending(kernel_id)
+                raise
+            # Register only AFTER a successful start, so a partial failure (which raises here)
+            # doesn't leave a half-set-up coordinator that the idempotency check above would
+            # then skip on retry — a retry must re-run the full setup cleanly.
+            self._coordinators[session_id] = coordinator
+            self._orchestrators[session_id] = orchestrator
+            self._session_backends[session_id] = backend
+            # NB: the resolver is NOT started here. A fresh session has no LOCAL block yet (privnet
+            # allocates it at the first attach), so its gateway is unknown until then — the DNS
+            # server comes up post-attach via ensure_cluster_dns. Adopted survivors already have
+            # devices, so cover them now.
+            if survivors:
+                await self.ensure_cluster_dns(session_id)
+            await self._adopt_containers(survivors, session_id, meta)
+            return meta
+
+    async def _running_containers_of(self, session_id: str) -> tuple[list[str], list[str]]:
+        """``(every running container of this session on the node, the ones this agent owns)``.
+
+        Two lists because the two questions are different, and conflating them is destructive:
+
+        - **Is this session's data plane up?** A question about the NODE. The session's bridge and
+          its LOCAL block are keyed on the block index in the node's shared journal, so a kernel of
+          this session owned by another agent on this host runs on the very same devices. Probing
+          only our own would have us rebuild them under it.
+        - **Which kernels do I adopt?** Ours only: adopting means taking them as users of the
+          session and re-deriving their detach plans. Another agent's kernels are its business.
+
+        A running *task* is the test, not a container record: containerd keeps the record of a
+        stopped container (and debug.skip-container-deletion keeps it forever), and one of those
+        must not make the session look alive — it would send every later kernel down the adopt path,
+        joining a data plane that was torn down long ago.
+        """
+        live, ours = await self._live_and_own_containers()
+        running: list[str] = []
+        mine: list[str] = []
+        for container_id, sid in live.items():
+            if sid != session_id:
+                continue
+            if await self._locator.container_pid(container_id) is None:
+                continue
+            running.append(container_id)
+            if container_id in ours:
+                mine.append(container_id)
+        return running, mine
+
+    async def _adopt_containers(
+        self, container_ids: Sequence[str], session_id: str, meta: SessionNetMeta
+    ) -> None:
+        """Take over the kernels of a session this node was already running.
+
+        They are what hold the session network open, so a session adopted without them would be
+        torn down the moment the kernel that adopted it left — deleting the devices and releasing
+        the addresses of containers that are still running. Their detach inputs are re-derived the
+        same way a restart re-derives them (from etcd + the journals), so their removal can still
+        free the host veth and the address they hold.
+        """
+        for container_id in container_ids:
+            self._tracker.track(session_id, container_id)
+            try:
+                attachment = await self._recover_attachment(container_id, session_id, meta)
+            except Exception:
+                # As in recover(): one container's plan re-derivation failing leaves it tracked but
+                # detach-less (its host leftovers are reclaimed as orphans), and must not stop the
+                # session — or the kernel adopting it — from coming up.
+                log.exception("failed to adopt the attachment of container {}", container_id)
+                continue
+            if attachment is not None:
+                self._attachments[container_id] = attachment
+
+    @property
+    def privnet_client(self) -> Any:
+        """The privnet client this node's sessions are bound on, or None without a privnet.
+
+        Handed out rather than rebuilt at each use: the binding that puts a session's incarnation
+        on the wire lives on this object (`PrivNetClient.bind_session`), and a second client built
+        from the same socket sends requests carrying none -- which the privnet cannot tell from a
+        stale incarnation's, and which it is therefore right to refuse.
+        """
+        return self._privnet_client
+
+    def session_of(self, container_id: str) -> str | None:
+        """The session a live container belongs to, from the attach record (rebuilt by `recover`
+        after a restart). The privnet's port verbs need it to reach the right session lock."""
+        attachment = self._attachments.get(container_id)
+        return attachment[0] if attachment is not None else None
+
+    async def local_subnet_of(self, session_id: str) -> str | None:
+        """This session's node-local LOCAL subnet (the /26 both backends carve from the node pool),
+        so a single-node cluster session can lay out deterministic peer IPs in it and write
+        /etc/hosts.
+
+        A *lookup*, never an allocation: the session's block is claimed by setup_session_network,
+        which has already run by the time a kernel is prepared. Allocating here instead would let a
+        kernel that is still being prepared while its session is torn down (a sibling died first)
+        mint a fresh block for a dead session — one no teardown will ever release, since the
+        session's coordinator is gone, so it would leak from the node's pool until a restart.
+
+        In privnet mode this process owns no LOCAL journal, so the lookup is delegated to the
+        privnet, which does — a read-only query for the block it already assigned. None only when
+        neither source is wired (or the privnet holds no block for the session).
+        """
+        if self._local_subnets is not None:
+            return await self._local_subnets.subnet_of(session_id)
+        if self._privnet_local_subnet is not None:
+            return await self._privnet_local_subnet(session_id)
+        return None
+
+    def register_cluster_names(self, session_id: str, names: Mapping[str, str]) -> None:
+        """Register locally-computed peer names (single-node ``cluster_host_ips``) with the session's
+        resolver, so it can answer them without an etcd ``endpoints/`` table — the containerd analog
+        of Docker's network ``Aliases`` feeding dockerd's embedded DNS. No-op if the session is not
+        set up here."""
+        coordinator = self._coordinators.get(session_id)
+        if coordinator is not None:
+            coordinator.register_static_names(session_id, names)
+
+    async def restore_cluster_names(self, session_id: str, peers: Sequence[str]) -> None:
+        """Recompute and re-register a single-node session's peer names after an agent restart.
+
+        `register_cluster_names` is called from ONE place — the kernel-creation path — and the
+        table it feeds is process memory. A restart therefore resumes the kernels (the journal
+        replay does that) while the resolver comes back knowing none of their names: the session's
+        containers still ping each other by address, and every cluster hostname stops resolving.
+        Measured after an agent restart: `getent hosts sub1` answered nothing while
+        `getent hosts cr.backend.ai` still resolved, because the resolver was up and forwarding —
+        only its own table was empty.
+
+        Multi-node sessions do not have this problem, and must not be touched here: their names
+        come from the manager's etcd ``endpoints/`` table, which a restart re-reads. Only the
+        single-node layout is *computed* by the agent, and computation is exactly what makes it
+        recoverable — `cluster_host_ips` is pure, and both of its inputs outlive the process (the
+        subnet in the LOCAL journal, the ordered peer list in the kernel's own environment).
+        """
+        if len(peers) <= 1:
+            return  # not a cluster, or the lone kernel: nothing for the resolver to answer
+        meta = await self._read_session_meta(session_id)
+        if meta is None or meta.backend is not NetworkBackendKind.BRIDGE:
+            return  # multi-node overlay: the etcd endpoints table is its source, not this
+        subnet = await self.local_subnet_of(session_id)
+        if subnet is None:
+            return  # no block held here; the session is not ours to answer for
+        self.register_cluster_names(session_id, cluster_host_ips(subnet, peers))
+
+    async def local_gateway_of(self, session_id: str) -> str | None:
+        """This session's LOCAL bridge gateway — the first usable host of its LOCAL subnet (the
+        ``isGateway`` address, mirroring ``cluster_host_ips``). It is where the session's cluster
+        DNS server listens and what a container's ``/etc/resolv.conf`` points at. ``None`` when the
+        subnet is unknown (no block claimed / not wired)."""
+        subnet = await self.local_subnet_of(session_id)
+        if subnet is None:
+            return None
+        try:
+            return str(next(iter(ipaddress.IPv4Network(subnet).hosts())))
+        except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, StopIteration):
+            return None
+
+    async def ensure_cluster_dns(self, session_id: str) -> None:
+        """Bring up the session's cluster DNS server on its LOCAL gateway, if not already up.
+
+        Idempotent, and deliberately called **after a container attaches**: in privnet mode the
+        session's LOCAL block (and thus its gateway) is not allocated until the first attach, so the
+        gateway is unknown at ``ensure_session`` time. The resolver binds an **ephemeral loopback
+        port** (``127.0.0.1:0`` — always available, can never collide) and then asks the privileged
+        layer (the privnet, or the in-process backend) to redirect the session gateway's ``:53`` to
+        that port. The container still points its ``/etc/resolv.conf`` at ``gateway:53``.
+
+        Bind-then-redirect (in this order) is what makes an ephemeral port recovery-safe: a restart
+        re-binds a *new* port and re-installs the redirect to it, replacing the stale rule.
+
+        **Fail-loud**: phase 5 removed the ``/etc/hosts`` peer map, so a resolver that does not come
+        up leaves cluster names unresolvable and the session would hang at rendezvous with no visible
+        cause — a bind failure, a missing post-attach gateway, or a failed redirect all raise. A
+        genuinely absent session (no coordinator) is still a silent no-op.
+
+        **Once per session, and every caller waits for all of it.** The check is made under the
+        lock and nowhere else, so an entry in ``_dns_servers`` means up AND redirected: a start
+        that fails or is cancelled takes its entry back out before it releases."""
+        async with self._dns_locked(session_id):
+            if session_id in self._dns_servers:
+                return  # up and redirected, by this session's first kernel on this node
+            await self._start_cluster_dns(session_id)
+
+    async def _start_cluster_dns(self, session_id: str) -> None:
+        """Bind the resolver and redirect the gateway's :53 to it. Holds `_dns_locked`."""
+        coordinator = self._coordinators.get(session_id)
+        backend = self._session_backends.get(session_id)
+        if coordinator is None or backend is None:
+            return  # session not set up on this node; nothing to serve
+        if session_id in self._tearing_down:
+            # A teardown has already stopped this session's resolver and is on its way to the
+            # coordinator. An attach arriving in between would put a live resolver and a :53
+            # redirect back on a session nothing is left to take them down for.
+            return
+        if await self.local_subnet_of(session_id) is None:
+            # After an attach the LOCAL block exists; its absence means the gateway is unknown and
+            # the :53 redirect would be a silent no-op (resolver up but unreachable). Fail loudly.
+            raise ClusterDNSStartError(
+                f"no LOCAL block for session {session_id}; cannot redirect the cluster resolver"
+            )
+        upstreams = resolve_container_dns(self._configured_dns).nameservers
+        resolver = ClusterResolver(
+            SessionClusterNames(coordinator, session_id), make_upstream_forwarder(upstreams)
+        )
+        server = ClusterDNSServer(resolver, "127.0.0.1", port=0)  # ephemeral, guaranteed-free
+        try:
+            await server.start()
+        except OSError as e:
+            raise ClusterDNSStartError(
+                f"could not bind the cluster resolver for session {session_id}: {e}"
+            ) from e
+        self._dns_servers[session_id] = server
+        # Redirect :53 -> the loopback port only AFTER the resolver is live, so it never points at a
+        # dead socket. A failure here means cluster names are unresolvable — unwind and fail loudly.
+        try:
+            await backend.setup_dns_redirect(session_id, server.port)
+        except BaseException as e:
+            # BaseException: a cancelled start -- the kernel-creation timeout, the agent stopping
+            # -- otherwise left the entry standing for a redirect that never landed, and the next
+            # kernel read it as a resolver that was up. Cancellation propagates as itself; only a
+            # real failure is renamed.
+            self._dns_servers.pop(session_id, None)
+            await server.stop()  # closes a transport and never suspends, so cancellation is safe
+            if isinstance(e, Exception):
+                raise ClusterDNSStartError(
+                    f"could not redirect :53 to the cluster resolver for session {session_id}: {e}"
+                ) from e
+            raise
+        log.info(
+            "cluster DNS for session {} listening on 127.0.0.1:{} (:53 redirected by the privnet)",
+            session_id,
+            server.port,
+        )
+
+    async def _stop_cluster_dns(self, session_id: str) -> None:
+        """Take the session's resolver down, under the lock that brings it up.
+
+        Otherwise a teardown crossing a start leaves a live resolver for a session that is gone.
+        """
+        async with self._dns_locked(session_id):
+            server = self._dns_servers.pop(session_id, None)
+            if server is not None:
+                with contextlib.suppress(Exception):
+                    await server.stop()
+
+    async def teardown_session(self, session_id: str) -> None:
+        # Under the same per-session lock as setup, so a teardown racing the last kernel's setup
+        # cannot tear down devices mid-creation (or leave a coordinator the setup is still filling).
+        async with self._session_locked(session_id):
+            self._tearing_down.add(session_id)
+            try:
+                await self._teardown_session_locked(session_id)
+            except asyncio.CancelledError:
+                self._tearing_down.discard(session_id)
+                raise
+            except Exception:
+                self._schedule_teardown_retry(session_id)
+                raise
+            self._tearing_down.discard(session_id)
+            await self._cancel_teardown_retry(session_id)
+
+    async def _teardown_session_locked(self, session_id: str) -> None:
+        coordinator = self._coordinators.get(session_id)
+        backend = self._session_backends.get(session_id)
+        # Stop our resolver whenever we stop serving the session on this node — on both the
+        # withdraw and the full-teardown exit below — so its loopback socket never leaks.
+        await self._stop_cluster_dns(session_id)
+        if coordinator is None:
+            self._orchestrators.pop(session_id, None)
+            self._session_backends.pop(session_id, None)
+            return
+        # OUR last kernel of the session is gone — but the devices and the LOCAL block are the
+        # NODE's, keyed on the shared journal's block index, so a kernel of this session belonging
+        # to another agent on this host is still running on them. Withdraw without pulling the
+        # floor out from under it; the agent whose kernel outlives ours tears the data plane down.
+        await self._retry_pending_detaches(session_id)
+        running, _ours = await self._running_containers_of(session_id)
+        if running:
+            log.info(
+                "session {} still has {} running container(s) of another agent on this node;"
+                " withdrawing without tearing the data plane down",
+                session_id,
+                len(running),
+            )
+            await self._withdraw_without_teardown(session_id, coordinator, backend)
+        else:
+            if backend is not None:
+                with contextlib.suppress(Exception):
+                    await backend.teardown_dns_redirect(session_id)
+            # Before the block goes back, not after: once released, the same CIDR can be handed to
+            # the next session, and purging it then would wipe *that* session's claims.
+            await self._purge_local_addresses(session_id)
+            await coordinator.stop(session_id)
+            # The agent owns single-node meta; the manager owns the multi-node overlay's.
+            await self._forget_session_meta_if_local(session_id)
+        # Ownership is removed only after the coordinator and backend completed. A failed
+        # fail-close therefore leaves the same objects available to the retry task.
+        self._coordinators.pop(session_id, None)
+        self._orchestrators.pop(session_id, None)
+        self._session_backends.pop(session_id, None)
+
+    async def _withdraw_without_teardown(
+        self,
+        session_id: str,
+        coordinator: SessionNetworkCoordinator,
+        backend: AbstractNetworkAgentPluginV2[Any] | None,
+    ) -> None:
+        """Let a session go while its devices stay for a co-located agent's kernels.
+
+        The backend first, then the coordinator. Stopping the coordinator removes this node's
+        member key -- the manager's signal that this agent has let the session go -- so removing
+        that first and then failing to withdraw leaves the manager believing the VNI is free while
+        the ESP pair claim, the watchdog responsibility and the privnet's journal record are all
+        still here. The failure propagates for the same reason.
+        """
+        if backend is not None:
+            await backend.withdraw_session_network(session_id)
+        await coordinator.stop(session_id, teardown_data_plane=False)
+
+    async def _purge_local_addresses(self, session_id: str) -> None:
+        """Drop the IPAM claims in this session's LOCAL block, whose containers are all gone."""
+        if self._ipam is None or self._local_subnets is None:
+            return  # a privileged privnet owns both journals, and reclaims them itself
+        if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
+            await self._ipam.purge_subnet(subnet)
+
+    def _require_runtime(self) -> OciRuntime:
+        """The container runtime, or a named refusal.
+
+        None here means the backend that built this brought only a locator and keeps its own
+        container lifecycle; a call reaching this is a call routed to the wrong object.
+        """
+        if self._runtime is None:
+            raise ContainerLifecycleUnavailable(
+                "this session network was built without a container runtime"
+            )
+        return self._runtime
+
+    def _orchestrator_of(self, session_id: str) -> ContainerdKernelOrchestrator:
+        """The session's orchestrator, or a diagnosable error if its network is gone.
+
+        It can be gone under a kernel that is still being created: a sibling that fails early used
+        to look like the session's last kernel and take the whole session network with it. The
+        tracker's reservation is what prevents that now — this is the guard that keeps the leftover
+        case a named error rather than a bare KeyError from a dict lookup.
+        """
+        orchestrator = self._orchestrators.get(session_id)
+        if orchestrator is None:
+            raise SessionNetworkGone(
+                f"the network of session {session_id} is not set up on this node (it was torn down"
+                " while this kernel was being created)"
+            )
+        return orchestrator
+
+    async def launch_container(
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: list[str],
+        oci_spec: dict[str, Any],
+        meta: SessionNetMeta,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+    ) -> LaunchResult:
+        result = await self._orchestrator_of(session_id).launch(
+            container_id,
+            image_ref=image_ref,
+            command=command,
+            oci_spec=oci_spec,
+            meta=meta,
+            kernel_config=kernel_config,
+            cluster_info=cluster_info,
+            on_planned=self._record_attachment(session_id, container_id),
+        )
+        self._tracker.track(session_id, container_id)
+        # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
+        # resolver up (idempotent: only the first attach on this node actually starts it).
+        await self.ensure_cluster_dns(session_id)
+        return result
+
+    async def create_container(
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: list[str],
+        oci_spec: dict[str, Any],
+    ) -> None:
+        """Create the container (not started) — maps to AbstractAgent.prepare_container."""
+        await self._orchestrator_of(session_id).create(
+            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
+        )
+        self._tracker.track(session_id, container_id)
+
+    async def start_and_attach_container(
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        meta: SessionNetMeta,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+    ) -> LaunchResult:
+        """Start the container + attach CNI — maps to AbstractAgent.start_container."""
+        result = await self._orchestrator_of(session_id).start_and_attach(
+            container_id,
+            meta=meta,
+            kernel_config=kernel_config,
+            cluster_info=cluster_info,
+            on_planned=self._record_attachment(session_id, container_id),
+        )
+        # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
+        # resolver up (idempotent: only the first attach on this node actually starts it).
+        await self.ensure_cluster_dns(session_id)
+        return result
+
+    async def attach_container(
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        kernel_id: str,
+        meta: SessionNetMeta,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        task_pid: int,
+    ) -> AttachResult:
+        """Attach a container this session network did not start, given its PID.
+
+        For a backend that keeps its own container lifecycle (Docker): it has already started the
+        container, held it at a gate so its namespaces exist and its PID is final while its command
+        has not run, and calls this in that window. Everything after the attach — recording it for
+        teardown, bringing the session resolver up — is the same as for a container this object
+        started itself, which is why it lives here rather than in the caller.
+        """
+        # Converge this node's peers BEFORE the container's command runs. The kernel runner
+        # bootstraps against the cluster -- it resolves its peers and dials them -- and a peer whose
+        # ESP pair is not programmed yet has no path, so the runner blocks on a barrier that cannot
+        # complete and the agent's own service-app handshake times out behind it. Measured on three
+        # nodes: two had converged (device, FDB, SAs) while the third had not yet joined, and every
+        # kernel died with "Failed to retrieve service app info".
+        #
+        # The periodic reconcile would get there on its own, but not before the gate is released;
+        # this is the one moment where waiting is cheaper than retrying.
+        await self._converge_peers(session_id)
+        result = await self._orchestrator_of(session_id).attach(
+            container_id,
+            meta=meta,
+            kernel_config=kernel_config,
+            cluster_info=cluster_info,
+            task_pid=task_pid,
+            on_planned=self._record_attachment(session_id, container_id),
+        )
+        # Tracked here for the same reason `launch_container` tracks what it started: the tracker
+        # is what decides when the session's last kernel on this node is gone, and a container it
+        # never heard of can never be that one. Untracked, this session's teardown simply never
+        # ran -- measured on three nodes: after the session reached TERMINATED every node still
+        # held its vxlan device, its bridge, its ESP state and its plaintext-drop rule.
+        self._tracker.attach(session_id, kernel_id, container_id)
+        # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
+        # resolver up (idempotent: only the first attach on this node actually starts it).
+        await self.ensure_cluster_dns(session_id)
+        return result
+
+    def _record_attachment(
+        self, session_id: str, container_id: str
+    ) -> Callable[[EndpointPlan, int], None]:
+        """Capture a container's detach inputs the moment its plan exists, before it is applied.
+
+        What `_retry_pending_detaches` reads for the DEL that could not run. Recording early
+        costs a record whose detach is a no-op; recording late cost every cancelled attach.
+        """
+
+        def record(plan: EndpointPlan, task_pid: int) -> None:
+            self._attachments[container_id] = (session_id, plan, task_pid)
+
+        return record
+
+    async def _converge_peers(self, session_id: str) -> None:
+        """Program every peer this node knows of, before a container starts talking to them.
+
+        Best-effort by design: a peer that cannot be programmed leaves the coordinator's record
+        unapplied, so the periodic reconcile retries it, and an attach that refused to wait would
+        be strictly worse than one that starts a kernel whose peers arrive a moment later.
+        """
+        coordinator = self._coordinators.get(session_id)
+        if coordinator is None:
+            return
+        try:
+            await coordinator.reconcile_peers(session_id)
+        except Exception:
+            log.exception("could not converge the peers of session {} before attach", session_id)
+
+    async def terminate_container(
+        self, session_id: str, container_id: str, *, plan: EndpointPlan, task_pid: int
+    ) -> None:
+        await self._orchestrator_of(session_id).terminate(
+            container_id, plan=plan, task_pid=task_pid
+        )
+
+    async def exec_in_container(
+        self,
+        container_id: str,
+        args: Sequence[str],
+        *,
+        uid: int | None = None,
+        gid: int | None = None,
+        cwd: str | None = None,
+        timeout_sec: float = 30.0,
+    ) -> ExecResult:
+        return await self._require_runtime().exec_in_container(
+            container_id, args, uid=uid, gid=gid, cwd=cwd, timeout_sec=timeout_sec
+        )
+
+    async def image_entrypoint(self, image_ref: str) -> list[str] | None:
+        return await self._require_runtime().image_entrypoint(image_ref)
+
+    async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
+        await self._require_runtime().pull_image(image_ref, auth=auth)
+
+    async def push_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
+        await self._require_runtime().push_image(image_ref, auth=auth)
+
+    async def remove_image(self, image_ref: str, *, sync: bool = False) -> None:
+        await self._require_runtime().remove_image(image_ref, sync=sync)
+
+    async def image_exists(self, image_ref: str) -> bool:
+        return await self._require_runtime().image_exists(image_ref)
+
+    async def image_config_digest(self, image_ref: str) -> str | None:
+        return await self._require_runtime().image_config_digest(image_ref)
+
+    async def image_digest(self, image_ref: str) -> str | None:
+        return await self._require_runtime().image_digest(image_ref)
+
+    async def kill_container(self, container_id: str, *, signal: int) -> None:
+        await self._require_runtime().kill_container(container_id, signal=signal)
+
+    async def stop_container(self, container_id: str, *, grace_period: float) -> None:
+        await self._require_runtime().stop_container(container_id, grace_period=grace_period)
+
+    async def detach_container(self, container_id: str) -> None:
+        """Give back one container's network, for a backend that removes its own containers.
+
+        The detach half of `remove_container`. Call it *before* removing the container: removing it
+        reclaims only the container-side veth (via netns teardown), so the host veth, the host-local
+        IPAM address and the egress MASQ rule are this call's to free.
+
+        Releasing the session claim is part of it. Unlike `remove_container` — which can fail
+        *because* the runtime is unreachable, and so must not assume the container is gone — the
+        caller here removes the container itself and reports its own failures; a kernel that never
+        reaches this leaves its claim to be reclaimed as an orphan on the next restart.
+        """
+        await self._detach_attachment(container_id)
+        await self._release_container(container_id)
+
+    async def _other_agents_live_vnis(self) -> frozenset[int]:
+        """VNIs a *different* agent on this node holds and is still running containers on.
+
+        A host can run more than one agent, and the fail-close preflight cannot read this
+        process's session metadata -- so without this it brings down every overlay tunnel on the
+        node, including ones it has nothing to do with, and the agent that owns them only notices
+        on its next watchdog tick.
+
+        Both halves are required. The registry alone would let a dead agent's stale binding keep a
+        tunnel up for good; the containers alone do not say which VNI carries them. Anything this
+        cannot establish is left to the preflight, which closes it.
+        """
+        registry = self._vni_registry
+        if registry.unusable_reason() is not None:
+            return frozenset()
+        try:
+            running = await self._live_session_owners()
+        except Exception:
+            log.exception("could not list this node's containers; sparing no tunnel")
+            return frozenset()
+        if not running:
+            return frozenset()
+        spare: set[int] = set()
+        for vni in await registry.bound_vnis():
+            for holder in await registry.holders(vni):
+                # All three, and the same agent throughout. `built` because a binding that only
+                # reserved the VNI describes no device to spare. The owner matched against the
+                # container's own owner because "some agent holds this VNI and some container of
+                # that session is running" is satisfied by a dead agent's leftover binding beside
+                # a container belonging to somebody else -- or to us -- and would then except our
+                # own unverified tunnel from the fail-close it exists for.
+                if (
+                    holder.agent_id != self._agent_id
+                    and holder.built
+                    and (holder.session_id, holder.agent_id) in running
+                ):
+                    spare.add(vni)
+                    break
+        return frozenset(spare)
+
+    async def _live_session_owners(self) -> set[tuple[str, str]]:
+        """``{(session_id, owning agent)}`` for every kernel container running on this node.
+
+        The owner is the half that matters here: a container says which session it belongs to and
+        which agent placed it, and only the pair identifies a tunnel as another agent's.
+        """
+        return {
+            (container.session_id, container.owner_agent_id)
+            for container in (await self._locator.live_sessions()).values()
+            if container.owner_agent_id is not None
+        }
+
+    async def _stop_quietly(
+        self,
+        coordinator: SessionNetworkCoordinator,
+        session_id: str,
+        backend: AbstractNetworkAgentPluginV2[Any] | None = None,
+    ) -> None:
+        """Stop a coordinator that never got registered, reporting rather than raising.
+
+        The caller is already unwinding and has a failure to re-raise; a second one from the
+        cleanup would replace it with something less useful.
+
+        An unwind that fails is not dropped, though. `stop()` withdraws this node's member record
+        only once the data plane is actually gone, and the manager reads that record to decide
+        whether the session's VNI and subnet may be given back -- so a half-built session left
+        here keeps the whole session in TERMINATING for as long as this process runs. Measured on
+        a two-node rig while the node's privnet was down: 48 minutes, of which 28 were after the
+        privnet was back, and only an agent restart ended it.
+        """
+        try:
+            await coordinator.stop(session_id)
+        except Exception:
+            log.exception(
+                "could not unwind the half-built network of session {}; retrying until it comes"
+                " down",
+                session_id,
+            )
+            self._park_for_teardown_retry(session_id, coordinator, backend)
+
+    def _park_for_teardown_retry(
+        self,
+        session_id: str,
+        coordinator: SessionNetworkCoordinator,
+        backend: AbstractNetworkAgentPluginV2[Any] | None,
+    ) -> None:
+        """Hand a half-built session to the retry that finishes failed teardowns.
+
+        The same machinery a failed `teardown_session` uses, and for the same reason: the host
+        error that stopped it is usually transient, and the only thing that can act on it coming
+        back is something that tries again. `_tearing_down` refuses a new kernel of this session
+        on this node in the meantime -- rebuilding on top of half-built devices that a retry is
+        about to delete is the one outcome worse than refusing.
+        """
+        self._coordinators.setdefault(session_id, coordinator)
+        if backend is not None:
+            self._session_backends.setdefault(session_id, backend)
+        self._tearing_down.add(session_id)
+        self._schedule_teardown_retry(session_id)
+
+    async def _retry_pending_detaches(self, session_id: str) -> None:
+        """Detach again for every container of this session whose detach did not go through.
+
+        `_detach_attachment` keeps the record when the detach fails, and its host veth, address
+        and MASQ rule are still standing. This is the last point at which the plan that names
+        them is available -- the coordinator stops next.
+
+        Raises:
+            OverlayTeardownIncomplete: one of them still could not be detached. Teardown must not
+                walk past that: the coordinator is about to go, and with it the last thing that
+                knew what those leftovers were. Raising keeps this node's ownership and puts the
+                session back in front of the teardown retry.
+        """
+        pending = [
+            container_id
+            for container_id, (owner, _plan, _pid) in self._attachments.items()
+            if owner == session_id
+        ]
+        stuck = [
+            container_id
+            for container_id in pending
+            if not await self._detach_attachment(container_id)
+        ]
+        if stuck:
+            raise OverlayTeardownIncomplete(
+                f"session {session_id} still has {len(stuck)} container(s)"
+                f" ({', '.join(sorted(stuck))}) whose network could not be given back"
+            )
+
+    async def _detach_attachment(self, container_id: str) -> bool:
+        """Undo the attach recorded for this container, if there is one. Best-effort: a detach
+        hiccup must not block container removal (or session teardown).
+
+        The record is dropped only once the detach it describes has actually happened. Dropping it
+        first threw away the plan and task PID that name the host veth, the address and the MASQ
+        rule a failed detach leaves behind, so nothing could retry it.
+        """
+        attachment = self._attachments.get(container_id)
+        if attachment is None:
+            return True
+        session_id, plan, task_pid = attachment
+        orchestrator = self._orchestrators.get(session_id)
+        if orchestrator is None:
+            # The session is gone and took its orchestrator with it; there is nothing left to
+            # detach from and no later call that could use the record.
+            self._attachments.pop(container_id, None)
+            return True
+        try:
+            await orchestrator.detach(container_id, plan=plan, task_pid=task_pid)
+        except Exception:
+            log.exception(
+                "network detach failed for container {}; keeping its attachment so the session's"
+                " teardown can try again",
+                container_id,
+            )
+            return False
+        self._attachments.pop(container_id, None)
+        return True
+
+    async def remove_container(self, container_id: str) -> None:
+        # Detach the container's network first, using the plan captured at attach: this frees
+        # the host veth, releases the host-local IPAM address, and removes the egress MASQ rule
+        # when the last container of the subnet leaves. Removing the container reclaims only the
+        # container-side veth (via netns teardown), so skipping detach leaks host-side state.
+        # Best-effort: a detach hiccup must not block container removal (or session teardown).
+        await self._detach_attachment(container_id)
+        try:
+            await self._require_runtime().remove_container(container_id)
+        except Exception:
+            # The clean event is not retried (the agent drops the kernel from its registry either
+            # way), so a kernel left tracked here holds its session network open for good. But
+            # untracking unconditionally is the worse trade: this call can fail *because* containerd
+            # is unreachable, and the teardown that would follow deletes devices and releases the
+            # LOCAL block of a container that may still be running. So untrack only if containerd
+            # confirms the container is gone; if it cannot be asked, keep the claim (a visible leak,
+            # reclaimed as an orphan on the next restart) rather than cut a live kernel off.
+            log.exception("removing container {} failed", container_id)
+            with contextlib.suppress(Exception):
+                if await self._require_runtime().container_status(container_id) is None:
+                    await self._release_container(container_id)
+            raise
+        await self._release_container(container_id)
+
+    async def _release_container(self, container_id: str) -> None:
+        scope = self._tracker.untrack(container_id)
+        if scope is not None:
+            await self._teardown_session_network(scope)
+
+    async def release_kernel(self, kernel_id: str) -> None:
+        """Give up a kernel's claim on the session network when it will never reach removal.
+
+        A kernel that fails before its container exists is never cleaned by the agent (it enters the
+        kernel registry only once the container is prepared, and a destroy for a kernel it has never
+        heard of returns without queueing a clean), so nothing would ever release the claim its
+        `ensure_session` made — the session's devices, its LOCAL block and its etcd membership would
+        be pinned until the agent restarted. A no-op for a kernel that has a container: that one is
+        released by its own removal.
+        """
+        scope = self._tracker.release_pending(kernel_id)
+        if scope is not None:
+            await self._teardown_session_network(scope)
+
+    async def _teardown_session_network(self, scope: TeardownScope) -> None:
+        """The last kernel of a session on this node is gone — tear its network down
+        deterministically via the per-session coordinator (data-plane devices + etcd
+        member). Best-effort: a teardown failure must not break kernel cleanup, but it is
+        logged so leaks are visible."""
+        try:
+            if scope.session_id in self._coordinators:
+                await self.teardown_session(scope.session_id)
+        except Exception:
+            log.exception("session network teardown failed for {}", scope.session_id)
+
+    def _schedule_teardown_retry(self, session_id: str) -> None:
+        task = self._teardown_retry_tasks.get(session_id)
+        if task is not None and not task.done():
+            return
+        self._teardown_retry_tasks[session_id] = asyncio.create_task(
+            self._retry_session_teardown(session_id)
+        )
+
+    async def _cancel_teardown_retry(self, session_id: str) -> None:
+        task = self._teardown_retry_tasks.get(session_id)
+        if task is None or task is asyncio.current_task():
+            return
+        self._teardown_retry_tasks.pop(session_id, None)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    async def _retry_session_teardown(self, session_id: str) -> None:
+        try:
+            while session_id in self._coordinators:
+                await asyncio.sleep(_TEARDOWN_RETRY_INTERVAL)
+                try:
+                    await self.teardown_session(session_id)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("session network teardown retry failed for {}", session_id)
+                else:
+                    return
+        finally:
+            current = asyncio.current_task()
+            if self._teardown_retry_tasks.get(session_id) is current:
+                self._teardown_retry_tasks.pop(session_id, None)
+
+
+def build_session_network(
+    etcd: AbstractKVStore,
+    *,
+    agent_id: str,
+    host_ip: str,
+    uplink: str = "eth0",
+    runtime: OciRuntime | None = None,
+    locator: ContainerLocator | None = None,
+    cni_runner: CniRunner | None = None,
+    backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
+    privnet_socket: str | None = None,
+    local_subnet_layout: LocalSubnetLayout | None = None,
+    agent_state_dir: Path | None = None,
+    vtep_ip: str | None = None,
+    configured_dns: Sequence[str] = (),
+) -> SessionNetwork:
+    """Assemble a SessionNetwork with default real collaborators.
+
+    Defaults: the native containerd gRPC runtime client, the native veth/bridge attach
+    runner (host-native iproute2/iptables — no ``/opt/cni/bin`` dependency), and both the
+    vxlan (multi-node overlay) and bridge (single-node local) backends on ``uplink``. Any
+    collaborator can be overridden (used by ContainerdAgent, and injectable in tests).
+
+    Passing a ``locator`` and no ``runtime`` builds the session half alone, for a backend that
+    keeps its own container lifecycle — see ai.backend.agent.docker.session_network. The default
+    containerd runtime is then NOT constructed: a Docker node has no containerd to connect to.
+    """
+    # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
+    from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
+    from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
+    from ai.backend.agent.network.local_subnet import get_local_subnet_allocator
+    from ai.backend.agent.network.native_attacher import (
+        NativeBridgeAttachRunner,
+        get_host_local_ipam,
+    )
+
+    # The attacher keeps its own IPAM handle, so the anchored path has to reach it too — a
+    # constant under /var/lib/backend.ai is shared by every agent on the host and root-owned.
+    ipam_state_dir = (agent_state_dir / "net-ipam") if agent_state_dir is not None else None
+    cni_runner = cni_runner or NativeBridgeAttachRunner(
+        uplink=uplink, ipam_state_dir=ipam_state_dir
+    )
+
+    # With a privnet socket, every privileged host op (bridge setup/teardown + veth/netns
+    # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN privnet, so this (agent) process
+    # needs no network privilege: the backend becomes a proxy and the per-container
+    # provisioner RPCs the privnet. See ai.backend.agent.network.privnet.
+    make_provisioner: (
+        Callable[[AbstractNetworkAgentPluginV2[Any], str], ContainerNetworkProvisioner] | None
+    ) = None
+    # Journals this process may reconcile on restart; left None under a privnet, which owns the
+    # host state, keeps its own records, and outlives the agent.
+    owned_local_subnets: LocalSubnetAllocator | None = None
+    owned_ipam: HostLocalIpam | None = None
+    # In privnet mode the LOCAL subnet lookup is a read-only RPC to the pool's owner; None
+    # in-process, where owned_local_subnets answers directly.
+    privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None
+    privnet_client: Any = None
+    if privnet_socket is not None:
+        from ai.backend.agent.network.privnet.client import (
+            PrivNetBackendProxy,
+            PrivNetClient,
+            PrivNetProvisioner,
+        )
+
+        client = PrivNetClient(privnet_socket)
+        privnet_client = client
+        proxy = PrivNetBackendProxy({}, {}, client=client, uplink=uplink)
+        backends = {
+            str(NetworkBackendKind.VXLAN): proxy,
+            str(NetworkBackendKind.BRIDGE): proxy,
+        }
+
+        def _privnet_provisioner_factory(
+            _backend: AbstractNetworkAgentPluginV2[Any], session_id: str
+        ) -> ContainerNetworkProvisioner:
+            return PrivNetProvisioner(client, session_id)
+
+        make_provisioner = _privnet_provisioner_factory
+        privnet_local_subnet = client.local_subnet_of
+    else:
+        # The owner of the node-local pool: shared by both backends here (they carve their LOCAL
+        # block out of the same pool) and — deliberately — by every other agent on the node.
+        #
+        # The store is NOT anchored to the agent's var-base-path. It was, briefly, and that is a
+        # collision: an index names the bridge device `bailo<index>` and the subnet its gateway
+        # sits on, both node-global, so a per-agent index space has every agent starting at 0 and
+        # the second one's setup deleting the first one's bridge by name. Measured on a
+        # multi-backend node: a running containerd cluster session went from 0% to 100% loss the
+        # moment an apptainer session was created beside it. `owner` is what lets several agents
+        # share one journal — see `local_subnet`.
+        owned_local_subnets = get_local_subnet_allocator(
+            layout=local_subnet_layout,
+            owner=agent_id,
+            # Whatever this agent already claimed in its own store before the journal became
+            # node-wide. Adopted, not re-picked: those blocks carry live sessions.
+            legacy_dir=(agent_state_dir / "net-local-subnet") if agent_state_dir else None,
+        )
+        # The IPAM store, unlike the one above, IS anchored: it hands out addresses *within* a
+        # session's own block, so two agents holding disjoint blocks cannot collide through it —
+        # and a constant under /var/lib/backend.ai is root-owned, which an unprivileged agent
+        # cannot write.
+        owned_ipam = get_host_local_ipam(ipam_state_dir)
+        if backends is None:
+            backends = {
+                str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
+                    {},
+                    {},
+                    uplink=uplink,
+                    local_subnets=owned_local_subnets,
+                    # Several agents can run the backend in-process on one host, and the ESP pair
+                    # they share is node-wide state. The claim is tagged with the agent id for the
+                    # same reason the LOCAL subnet claim next to it is: so a co-located agent
+                    # replaying the journal can tell whose sessions are whose, and so a restart
+                    # can find and drop the claims its previous life left behind.
+                    journal_owner=agent_id,
+                ),
+                str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin(
+                    {}, {}, uplink=uplink, local_subnets=owned_local_subnets
+                ),
+            }
+    return SessionNetwork(
+        etcd,
+        agent_id=agent_id,
+        host_ip=host_ip,
+        runtime=runtime,
+        locator=locator,
+        cni_runner=cni_runner,
+        backends=backends,
+        provisioner_factory=make_provisioner,
+        local_subnets=owned_local_subnets,
+        privnet_local_subnet=privnet_local_subnet,
+        ipam=owned_ipam,
+        vtep_ip=vtep_ip,
+        configured_dns=configured_dns,
+        privnet_client=privnet_client,
+    )

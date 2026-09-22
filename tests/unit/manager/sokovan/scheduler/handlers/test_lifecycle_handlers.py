@@ -11,13 +11,16 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import copy
 import uuid
 from collections.abc import Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -31,7 +34,12 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions impo
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult, SchedulingSkip
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import StartFailure
+from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
+    ScheduleResult,
+    SchedulingSkip,
+)
 from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
 from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForPullWithImages,
@@ -45,6 +53,11 @@ from ai.backend.manager.views.sokovan.session import (
 # =============================================================================
 # ScheduleSessionsLifecycleHandler Tests (SC-SS-001 ~ SC-SS-005)
 # =============================================================================
+
+
+def replace_kernel_status(kernel: Any) -> Any:
+    """A second kernel of the same session, left in whatever state the first started in."""
+    return copy.deepcopy(kernel)
 
 
 class TestScheduleSessionsLifecycleHandler:
@@ -626,6 +639,125 @@ class TestStartSessionsLifecycleHandler:
         # Verify success reason
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
+
+    @pytest.mark.parametrize(
+        ("statuses", "container_ids", "expected"),
+        [
+            # Every kernel where a start begins from.
+            ([KernelStatus.PREPARED, KernelStatus.PREPARED], [None, None], "start"),
+            # The crash half-state: kernels reset, session did not follow.
+            ([KernelStatus.PENDING, KernelStatus.PENDING], [None, None], "requeue"),
+            # A mixture with nothing dispatched. Nothing is running, so the whole session goes
+            # back in the queue rather than being half rebuilt.
+            ([KernelStatus.PENDING, KernelStatus.PREPARED], [None, None], "requeue"),
+            ([KernelStatus.PENDING, KernelStatus.SCHEDULED], [None, None], "requeue"),
+            # A kernel that may hold a container, by status...
+            ([KernelStatus.PENDING, KernelStatus.RUNNING], [None, None], "not_ours"),
+            ([KernelStatus.PENDING, KernelStatus.CREATING], [None, None], "not_ours"),
+            ([KernelStatus.PENDING, KernelStatus.TERMINATING], [None, None], "not_ours"),
+            ([KernelStatus.PENDING, KernelStatus.TERMINATED], [None, None], "not_ours"),
+            # ...or because it still names one. A stale container id under a PENDING kernel is
+            # exactly the case where "it looks unbound" is wrong.
+            ([KernelStatus.PENDING, KernelStatus.PENDING], [None, "cid-1"], "not_ours"),
+        ],
+    )
+    async def test_what_it_does_with_each_shape_of_session(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+        statuses: list[KernelStatus],
+        container_ids: list[str | None],
+        expected: str,
+    ) -> None:
+        """The handler's kernel filter is coarse -- the repository returns a session if ANY of its
+        kernels matches -- so three shapes arrive here and each wants a different answer."""
+        session = prepared_session
+        while len(session.kernel_infos) < len(statuses):
+            session.kernel_infos.append(copy.deepcopy(session.kernel_infos[0]))
+        for kernel, status, container_id in zip(
+            session.kernel_infos, statuses, container_ids, strict=True
+        ):
+            kernel.lifecycle.status = status
+            kernel.resource.container_id = container_id
+            kernel.resource.agent = None if status == KernelStatus.PENDING else "a1"
+        mock_repository.search_sessions_with_kernels_and_user.return_value = (
+            sessions_for_start_factory([session])
+        )
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [session])
+
+        session_id = session.session_info.identity.id
+        match expected:
+            case "start":
+                assert [t.session_id for t in result.successes] == [session_id]
+                mock_launcher.start_sessions_for_handler.assert_awaited_once()
+            case "requeue":
+                assert [t.session_id for t in result.failures] == [session_id]
+                assert result.failures[0].disposition is FailureDisposition.REPLACE
+                mock_launcher.start_sessions_for_handler.assert_not_awaited()
+            case "not_ours":
+                assert [t.session_id for t in result.skipped] == [session_id]
+                assert not result.failures
+                mock_launcher.start_sessions_for_handler.assert_not_awaited()
+
+    async def test_a_session_with_no_kernels_is_requeued_not_started(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        prepared_session: SessionWithKernels,
+    ) -> None:
+        prepared_session.kernel_infos.clear()
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+
+        assert result.failures[0].disposition is FailureDisposition.REPLACE
+        mock_launcher.start_sessions_for_handler.assert_not_awaited()
+
+    def test_it_also_selects_a_session_whose_kernels_were_already_reset(self) -> None:
+        """The session's move to PENDING and its kernels' reset are two transactions, and the
+        kernels go first. A manager dying between them leaves a PREPARED session whose kernels are
+        already PENDING -- and this handler is the only way out of it. Without PENDING here
+        nothing selects that session at all: the scheduler wants PENDING SESSIONS."""
+        assert KernelStatus.PENDING in (
+            StartSessionsLifecycleHandler.target_kernel_statuses() or []
+        )
+        assert KernelStatus.PREPARED in (
+            StartSessionsLifecycleHandler.target_kernel_statuses() or []
+        )
+
+    async def test_a_session_the_launcher_could_not_start_is_a_failure(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+    ) -> None:
+        """A session whose kernels were never asked for has not started. Reported as a success it
+        moved to CREATING on an agent it cannot run on and sat there until something timed it
+        out; reported as a failure it is retried and then re-placed on another agent."""
+        sessions_for_start = sessions_for_start_factory([prepared_session])
+        mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
+        failing = prepared_session.session_info.identity.id
+        mock_launcher.start_sessions_for_handler = AsyncMock(
+            return_value={
+                failing: StartFailure(
+                    "NetworkBackendMismatch: it is not advertising vxlan",
+                    FailureDisposition.REPLACE,
+                )
+            }
+        )
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+
+        assert [t.session_id for t in result.failures] == [failing]
+        assert not result.successes
+        # Carried through, so the coordinator gives the placement up now rather than retrying it
+        # five times on the node that refused it.
+        assert result.failures[0].disposition is FailureDisposition.REPLACE
 
     async def test_empty_session_list_returns_empty(
         self,

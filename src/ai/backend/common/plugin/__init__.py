@@ -195,6 +195,14 @@ class BasePluginContext[P: AbstractPlugin]:
         for plugin_instance in self.plugins.values():
             await plugin_instance.cleanup()
 
+    #: How long to wait before fetching again a configuration that could not be READ, doubling
+    #: to the ceiling. Unbounded in count, because the alternative is losing the change.
+    _CONFIG_RETRY_BACKOFF_SEC = 0.5
+    _CONFIG_RETRY_CEILING_SEC = 30.0
+    #: Where the doubling stops. Past this the delay is the ceiling anyway, and the shift is only
+    #: a way to overflow.
+    _CONFIG_RETRY_MAX_SHIFT = 8
+
     async def _watcher(self, plugin_name: str) -> None:
         # As wait_timeout applies to the waiting for an internal async queue,
         # so short timeouts for polling the changes does not incur gRPC/network overheads.
@@ -202,10 +210,56 @@ class BasePluginContext[P: AbstractPlugin]:
             f"config/plugins/{self._group_key}/{plugin_name}",
             wait_timeout=0.2,
         ):
+            # Retried, not merely survived. The watch event that carried this change is consumed
+            # either way, so a failure that is only logged leaves the change unapplied until some
+            # LATER edit happens to arrive -- which, for a configuration an operator has finished
+            # editing, is never.
+            attempt = 0
+            while not await self._apply_config(plugin_name):
+                # Until it is read, not a fixed number of tries. The watch event that carried this
+                # change is consumed either way, so giving up leaves the change unapplied until
+                # some LATER edit arrives -- and for a configuration an operator has finished
+                # editing, that is never. An etcd outage longer than a handful of seconds is
+                # ordinary; the backoff is capped and this is cancelled with the task.
+                await asyncio.sleep(
+                    min(
+                        self._CONFIG_RETRY_BACKOFF_SEC * (2**attempt),
+                        self._CONFIG_RETRY_CEILING_SEC,
+                    )
+                )
+                # Stops climbing once the ceiling is reached. Left to grow, `2**attempt` overflows
+                # a float somewhere past a thousand tries -- about eight hours of retrying -- and
+                # the watcher this loop exists to keep alive dies of the arithmetic.
+                attempt = min(attempt + 1, self._CONFIG_RETRY_MAX_SHIFT)
+
+    async def _apply_config(self, plugin_name: str) -> bool:
+        """Read the plugin's configuration and hand it over. False if that could not be done.
+
+        :return: ``True`` when the plugin holds a configuration it accepted -- which includes it
+            REFUSING the new one, because a refusal is an answer and retrying will get the same.
+        """
+        try:
             new_config = await self.etcd.get_prefix(
                 f"config/plugins/{self._group_key}/{plugin_name}/",
             )
+        except Exception:
+            # A momentary etcd failure. The value is still there to be read, so this is worth
+            # coming back for.
+            log.exception("could not read plugin {}'s configuration; retrying", plugin_name)
+            return False
+        try:
             await self.plugins[plugin_name].update_plugin_config(new_config)
+        except Exception:
+            # The plugin looked at it and said no. Retrying hands it the same value, so this is
+            # reported and left: the operator's next edit is what changes the answer. What must
+            # not happen either way is the watcher ending -- it used to, on the first of either
+            # failure, and every later change including the correction went undelivered.
+            log.exception(
+                "plugin {} refused a configuration update; keeping the one it has and continuing"
+                " to watch",
+                plugin_name,
+            )
+        return True
 
     async def watch_config_changes(self, plugin_name: str) -> None:
         wtask = asyncio.create_task(self._watcher(plugin_name))

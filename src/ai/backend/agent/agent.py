@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import errno
+import ipaddress
 import logging
 import pickle
 import re
@@ -11,6 +12,7 @@ import signal
 import sys
 import time
 import traceback
+import uuid
 import weakref
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
@@ -49,6 +51,7 @@ from uuid import UUID
 
 import aiotools
 import attrs
+import psutil
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -76,7 +79,10 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
-from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.network.caps import publish_backend
+from ai.backend.agent.network.local_subnet import pool_route_conflicts
+from ai.backend.agent.network.port_forward import PortForward, PortPublisher, is_orphaned
+from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
     CollectContainerStatTask,
@@ -412,6 +418,15 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     @abstractmethod
     async def prepare_scratch(self) -> None:
         pass
+
+    async def destroy_scratch(self) -> None:
+        """Undo `prepare_scratch`, for a create that does not get past it.
+
+        Not abstract, and a no-op by default: a backend that has nothing to undo is not wrong, and
+        one that does can say so. What is wrong is leaving it: the scratch is real, it takes disk,
+        and the create's failure path only rebuilds the resource accounting -- so a kernel whose
+        network attach was refused left its directory behind with nothing coming back for it.
+        """
 
     @abstractmethod
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
@@ -847,7 +862,14 @@ class AbstractAgent[
     port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
+    #: How many containers this NODE may be building at once. One semaphore for the agent, not one
+    #: per request: the number answers "what can this host start at the same time", and a
+    #: per-request one lets N concurrent sessions each run the configured number.
+    kernel_creation_sema: asyncio.Semaphore
     _local_cron: LocalCron | None
+    #: Whether this node is currently telling the manager it can take work. Flipped by the
+    #: heartbeat -- see `not_serving_reason`.
+    _announcing: bool
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
@@ -924,6 +946,9 @@ class AbstractAgent[
         self.etcd = etcd
         self.local_config = local_config
         self.id = AgentId(local_config.agent.defaulted_id)
+        # Which run of this agent this is. Published before anything else, so an advert an earlier
+        # run left under the same id is contradicted from the moment this one starts.
+        self._boot_id = uuid.uuid4().hex
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_class = agent_class
         self.agent_public_key = agent_public_key
@@ -940,10 +965,28 @@ class AbstractAgent[
             else None,
         )
         self._local_cron = None
+        self._announcing = True
         self.port_pool = PortPool(
             local_config.container.port_range,
             cooldown_sec=local_config.container.port_reuse_cooldown_sec,
         )
+        self._warn_if_the_local_pool_is_already_routed(local_config)
+        if (exposed := ephemeral_overlap(local_config.container.port_range)) is not None:
+            # Said once, loudly, because the failure it causes is otherwise unattributable: a
+            # session fails to start with EADDRINUSE on a port nothing of ours is using, the next
+            # one succeeds, and the pool's own bookkeeping is correct throughout.
+            log.warning(
+                "host ports {}..{} can also be handed out by the kernel as the source port of an"
+                " outgoing connection ({} covers them and ip_local_reserved_ports does not), so a"
+                " kernel's published port may fail to bind with EADDRINUSE through no fault of"
+                " this agent. Reserve them:"
+                " sysctl -w net.ipv4.ip_local_reserved_ports={}-{}",
+                exposed[0],
+                exposed[1],
+                "net.ipv4.ip_local_port_range",
+                local_config.container.port_range[0],
+                local_config.container.port_range[1],
+            )
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)
@@ -966,6 +1009,18 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        self.kernel_creation_sema = asyncio.Semaphore(
+            self.local_config.agent.kernel_creation_concurrency
+        )
+        # Advertise which container runtime this agent runs. The manager pairs the cluster-network
+        # driver against it: a driver only one backend can serve must not be handed to an agent of
+        # the other kind, or the session comes up with kernels that cannot reach each other and
+        # nothing says so. Without this the guard reads an absent key and permits everything.
+        # Before anything backend-specific publishes, so an advert left by an earlier run is
+        # already contradicted by the time a manager could read the two together.
+        await publish_backend(
+            self.etcd, str(self.id), str(self.local_config.agent.backend), self._boot_id
+        )
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
@@ -1081,20 +1136,54 @@ class AbstractAgent[
         # Report commit status
         periodic_tasks.append(ReportKernelCommitStatusTask(self))
 
+        # Built here, started in `start_serving`. The first task on it is the heartbeat, which
+        # runs with no initial delay -- and a heartbeat is on its own enough for the manager to
+        # mark this node ALIVE and schedule work onto it. Starting it from inside `__ainit__`
+        # therefore announces the node while the backend's own start is still ahead of it, and
+        # before there is an RPC server to take the work that follows.
         self._local_cron = LocalCron(periodic_tasks)
-        await self._local_cron.start()
 
         loop = current_loop()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
-        # Notify the gateway.
-        await self.anycast_event(AgentStartedEvent(reason="self-started"))
+        # The gateway is NOT told here. This runs from inside `__ainit__`, and a backend's own
+        # `__ainit__` has work of its own still to do after calling up to this one -- the docker
+        # agent's socket relay, its network plugin context, the advert that says it can serve a
+        # cluster-network session. Announcing at this point marks the agent ALIVE and schedulable
+        # while all of that is still ahead of it, and a failure in any of it aborts the runtime
+        # before `shutdown` ever runs. `announce_started` is called once the agent is actually
+        # built; see `AgentRuntime._create_agent`.
 
         # passive events
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
+
+    async def start_serving(self) -> None:
+        """Begin telling the manager this node is here, once it can actually take work.
+
+        Both halves, and both are announcements: the started event says so outright, and the
+        heartbeat says so by arriving -- the manager marks a node ALIVE on a heartbeat alone. So
+        neither may happen until the whole of `__ainit__` (this class's and the backend's) has
+        finished AND the RPC server is handling calls. Anything before that point marks the node
+        schedulable while the work it would be sent cannot be served, and a failure in between
+        aborts the process before shutdown can take the announcement back.
+        """
+        if self._local_cron is not None:
+            await self._local_cron.start()
+        await self.anycast_event(AgentStartedEvent(reason="self-started"))
+
+    async def stop_serving(self) -> None:
+        """Stop announcing this node, for a start that got as far as announcing and then failed.
+
+        Idempotent, and separate from `shutdown`: `aobject.new` does not call cleanup when
+        `__ainit__` raises, and a failure after the transport is entered unwinds without it
+        either. What must not survive is the heartbeat -- a manager marks a node ALIVE on that
+        alone -- so it is stopped here whatever else happens to the process.
+        """
+        if self._local_cron is not None:
+            await self._local_cron.stop()
 
     async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """
@@ -1263,10 +1352,33 @@ class AbstractAgent[
             log.exception("unexpected error in commit status reporting")
             return
 
+    async def not_serving_reason(self) -> str | None:
+        """Why this node must not be offered work right now, or None when it may be.
+
+        A backend answers for the thing every one of its sessions depends on and that can go away
+        under a running agent. The base agent has no such thing.
+        """
+        return None
+
     async def heartbeat(self) -> None:
         """
         Send my status information and available kernel images to the manager(s).
+
+        Or do not: the manager marks a node ALIVE on a heartbeat alone, so the heartbeat IS the
+        claim that this node can take work, and it is withheld while that is not true. The node
+        is announced as restarting the moment it stops being able, rather than found lost forty
+        seconds later, and announced again by the first heartbeat after it can.
         """
+        reason = await self.not_serving_reason()
+        if reason is not None:
+            if self._announcing:
+                self._announcing = False
+                log.warning("not taking work until this is resolved: {}", reason)
+                await self.anycast_event(AgentTerminatedEvent(reason="agent-restart"))
+            return
+        if not self._announcing:
+            self._announcing = True
+            log.info("taking work again")
         slot_key_and_units: dict[ResourceSlotName, SlotTypes] = {}
         res_slots: dict[SlotName, Decimal] = {}
         try:
@@ -1695,6 +1807,13 @@ class AbstractAgent[
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
     ) -> None:
+        # The manager sends the session's `status_info` as this reason, and that column is free
+        # text: `rig-cleanup`, `All kernels cancelled`, `UNKNOWN`. It is annotated as the enum but
+        # arrives over RPC as whatever string was in the database, and `_handle_clean_event` puts
+        # it straight into a pydantic event -- which refuses it, kills the lifecycle task, and so
+        # never sends `KernelTerminatedAnycastEvent`. The kernel is gone and the manager is never
+        # told. Coerced here because this is the one funnel every lifecycle event passes through.
+        reason = KernelLifecycleEventReason.from_value(reason) or KernelLifecycleEventReason.UNKNOWN
         cid: ContainerId | None = None
         try:
             kernel_obj = self.kernel_registry[kernel_id]
@@ -1765,6 +1884,96 @@ class AbstractAgent[
         """
         Enumerate the containers with the given status filter.
         """
+
+    def port_publisher(self) -> PortPublisher | None:
+        """The object that installs and withdraws this backend's host-port DNAT rules.
+
+        None for a backend that publishes none (Kubernetes reaches a pod through the cluster's own
+        service layer; the dummy backend touches no host state), and those need no reclaim either.
+        """
+        return None
+
+    async def _published_host_ports(self) -> dict[ContainerId, set[int]]:
+        """This agent's own DNAT-published ports, by container.
+
+        Read from the rules themselves, which is the only record of them: a session-networked
+        kernel is published by the agent, not by Docker, so nothing in `container.ports` names
+        these. Empty on a listing that cannot be read -- the caller is restoring, and a port it
+        fails to reserve is the pre-existing behaviour, not a new one.
+        """
+        publisher = self.port_publisher()
+        if publisher is None:
+            return {}
+        try:
+            forwards = await publisher.list_forwards()
+        except Exception:
+            log.exception("could not read this node's published ports while restoring")
+            return {}
+        by_container: dict[ContainerId, set[int]] = {}
+        for forward in forwards:
+            by_container.setdefault(ContainerId(forward.container_id), set()).add(forward.host_port)
+        return by_container
+
+    async def _reclaim_stale_port_forwards(self) -> None:
+        """Give back the host ports of rules whose container this runtime no longer has.
+
+        `port_forward.py` makes iptables the record -- which is what lets a restarted agent find
+        published ports with no journal of its own -- but nothing collected a rule whose container
+        went away while the agent was down, so they accumulated for the life of the host.
+
+        They are not inert. The rule sits in nat PREROUTING, matched before Docker's own DNAT for
+        the same host port, so it wins and sends the connection to the address a long-dead session
+        had. That port is then a black hole for whatever is published on it next, and the port pool
+        hands the low ports out again from the start on every restart -- so the same ports are
+        poisoned every time. Measured on a live node: 153 stale rules over host ports 33100-33121;
+        every session that drew one failed to start after ~70s while its container sat healthy and
+        answering at its own address. It reads as a flaky agent, never as a firewall rule.
+
+        Here rather than in one backend because the rules are shared machinery: whoever publishes
+        through `port_forward` leaks the same way, and a backend added later would have to remember
+        to do this. Liveness is asked of `enumerate_containers`, so each backend answers for its own
+        runtime -- a docker agent must never judge a containerd agent's rules, and `is_orphaned`
+        refuses them anyway by owner.
+        """
+        publisher = self.port_publisher()
+        if publisher is None:
+            return
+        try:
+            forwards = await publisher.list_forwards()
+        except Exception as e:
+            # Best-effort: a node that cannot read the rules is no worse off than before this
+            # existed, and refusing to start over it would be worse than the leak.
+            log.warning("could not read the host port forwards to reclaim stale ones ({})", e)
+            return
+        if not forwards:
+            return
+        self._report_unowned_port_forwards(forwards)
+        live = {
+            str(container.id)
+            for _kernel_id, container in await self.enumerate_containers(
+                ACTIVE_STATUS_SET | DEAD_STATUS_SET
+            )
+        }
+        owner = str(self.local_config.agent.id)
+        now = time.time()
+        orphans = [f for f in forwards if is_orphaned(f, live, now=now, owner_agent_id=owner)]
+        stale = sorted({f.container_id for f in orphans})
+        if not stale:
+            return
+        reclaimed: list[int] = []
+        for container_id in stale:
+            try:
+                reclaimed.extend(await publisher.remove_container(container_id))
+            except Exception:
+                # One container's rules refusing to go must not keep the rest poisoned.
+                log.exception("could not reclaim the port forwards of {}", container_id)
+        if reclaimed:
+            log.warning(
+                "reclaimed {} host port(s) from {} container(s) this runtime no longer has: {}",
+                len(reclaimed),
+                len(stale),
+                f"{min(reclaimed)}..{max(reclaimed)}" if len(reclaimed) > 1 else reclaimed[0],
+            )
 
     async def reconstruct_resource_usage(self) -> None:
         """
@@ -2266,6 +2475,11 @@ class AbstractAgent[
                         self._iterate_batch_result(kernel_obj.kernel_id),
                     ),
                 )
+        # The ports this agent published itself, which Docker does not report: a session-networked
+        # kernel runs with no Docker network and is reached only through the agent's DNAT rules, so
+        # `container.ports` is empty for it and its live host ports would be handed out again on
+        # the first session after a restart.
+        published_host_ports = await self._published_host_ports()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
@@ -2279,6 +2493,8 @@ class AbstractAgent[
                     for p in container.ports:
                         if p.host_port is not None:
                             self.port_pool.discard(p.host_port)
+                    for host_port in published_host_ports.get(container.id, ()):
+                        self.port_pool.discard(host_port)
                     # Restore compute resources.
                     async with self.resource_lock:
                         for computer_ctx in self.computers.values():
@@ -2317,9 +2533,111 @@ class AbstractAgent[
                         container_id=container.id,
                     )
 
+        # After the container scan above, and only after it: that scan `discard`s the ports our
+        # own live kernels hold, and those must stay out of the pool entirely rather than come
+        # back when a cooldown lapses. What is left is what the HOST holds and we do not -- a
+        # departing container's docker-proxy, a socket in TIME_WAIT -- and the pool was built
+        # with every port marked never-used, so those would be handed straight out.
+        # Reclaim first, then defer: the reclaim removes rules and gives their ports back, and the
+        # defer decides which of the ports now in the pool the host is still using.
+        await self._reclaim_stale_port_forwards()
+        self._defer_ports_the_host_still_holds()
+
         log.info("starting with resource allocations")
         for computer_name, computer_ctx in self.computers.items():
             log.info("{}: {!r}", computer_name, dict(computer_ctx.alloc_map.allocations))
+
+    @staticmethod
+    def _warn_if_the_local_pool_is_already_routed(local_config: AgentUnifiedConfig) -> None:
+        """Say when something else on this host already routes into the LOCAL pool.
+
+        An index out of the pool names a subnet AND the gateway its bridge answers on, so a second
+        claimant on that range puts two gateways behind one address -- traffic from some containers
+        works and from others does not. `host_ipv4_addresses` already refuses a block whose address
+        is held HERE; this is the half it cannot see, a network declared elsewhere whose route only
+        appears once something uses it.
+
+        Measured on this rig: Docker Swarm's `ingress` is 172.30.0.0/24 against the pool's default
+        172.30.0.0/16, so the swarm endpoint at 172.30.0.3 sat inside the /26 a live session held.
+        Nothing broke only because no swarm service was published.
+
+        A warning, not a refusal: the pool is the operator's, an overlap is not yet a collision,
+        and a node whose routes cannot be read is not one to hold back.
+        """
+        try:
+            pool = ipaddress.IPv4Network(local_config.container.local_network_pool, strict=False)
+        except ValueError:
+            return  # the allocator refuses an unparseable pool; that is its error to raise
+        conflicts = pool_route_conflicts(pool)
+        if not conflicts:
+            return
+        log.warning(
+            "the LOCAL bridge pool {} overlaps {} route(s) this host already carries ({}): a"
+            " session's block there would put a second gateway on a range something else owns."
+            " Set container.local-network-pool to a range nothing else routes, on a drained node.",
+            pool,
+            len(conflicts),
+            ", ".join(f"{prefix} via {iface}" for prefix, iface in conflicts[:4]),
+        )
+
+    def _report_unowned_port_forwards(self, forwards: Sequence[PortForward]) -> list[int]:
+        """Say so when a rule records no owner. It is a defect signal, not a rule to collect.
+
+        Nothing this code writes is untagged -- the owner arrived with the tag, and `port_forward`
+        has never shipped without it -- so a rule with no owner is a leftover of an older build,
+        and it holds its host port for the life of the node. `is_orphaned` will not touch it: the
+        liveness question is answered by THIS agent's runtime, and an unowned rule may belong to a
+        co-located agent whose containers this runtime cannot see, so reclaiming it could cut a
+        live kernel off from its published ports.
+
+        Which leaves saying it. Silence turned 34 of them on one node into ports that failed to
+        bind months later, with nothing on the node explaining why. Returns the ports it named.
+        """
+        unowned = sorted(f.host_port for f in forwards if f.owner_agent_id is None)
+        if not unowned:
+            return unowned
+        log.warning(
+            "{} host port forward(s) record no owner ({}): nothing this agent writes is untagged,"
+            " so these are left over from an older build and will hold those ports for the life of"
+            " this node. They are not reclaimed -- an unowned rule may be a co-located agent's,"
+            " whose containers this runtime cannot see. Remove them once no container of theirs is"
+            " running: iptables-save -t nat | grep 'bai:' | sed 's/^-A /-D /'",
+            len(unowned),
+            f"{unowned[0]}..{unowned[-1]}" if len(unowned) > 1 else unowned[0],
+        )
+        return unowned
+
+    def _defer_ports_the_host_still_holds(self) -> None:
+        """Put the cooldown back on ports the OS is still using, at startup.
+
+        The pool's whole purpose is to keep a just-released port out of circulation until the
+        kernel has finished with it, and a fresh pool has no memory of that: every port starts as
+        never-used, so the first sessions after a restart bind against ports the host has not let
+        go and fail with EADDRINUSE. Measured on a restarted node: 9 of 12 sessions failed that
+        way, against 3 of 12 once the same node had settled.
+
+        Best-effort. Reading the host's sockets can be refused, and a node that cannot read them
+        is no worse off than before this existed -- so it says so and carries on rather than
+        refusing to start.
+        """
+        try:
+            in_use = {conn.laddr.port for conn in psutil.net_connections(kind="tcp") if conn.laddr}
+        except (psutil.Error, OSError) as e:
+            log.warning(
+                "could not read the host's sockets, so the port pool starts with no cooldown"
+                " on ports the host may still hold ({})",
+                e,
+            )
+            return
+        deferred = sorted(in_use & set(self.port_pool.remaining()))
+        if not deferred:
+            return
+        self.port_pool.defer_many(deferred)
+        log.info(
+            "{} host port(s) are still in use; holding them back for the reuse cooldown ({})",
+            len(deferred),
+            f"{deferred[0]}..{deferred[-1]}" if len(deferred) > 1 else deferred[0],
+        )
 
     @abstractmethod
     async def init_kernel_context(
@@ -2562,6 +2880,73 @@ class AbstractAgent[
             service.start_command = f"{service.start_command} {shlex.join(extra_args)}"
         return models
 
+    async def _unwind_failed_create(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        made: Sequence[Callable[[], Awaitable[None]]],
+    ) -> None:
+        """Take back what a failed or cancelled create left on this host.
+
+        Which of two things, depending on whether a CONTAINER exists. Once one does, its teardown
+        belongs to the kernel lifecycle -- which stops it, detaches its networks and removes its
+        scratch, in that order -- and running the create's own undo would cut across that: the
+        scratch of a container still running, deleted before the lifecycle worker gets to it. So
+        the container is destroyed through the lifecycle and nothing else is touched.
+
+        Before there is a container there is no lifecycle to hand to, and the undo stack is what
+        gives the scratch back.
+
+        Both are shielded: what is being unwound here is usually a cancellation, and a cleanup
+        cancelled halfway is the leak it exists to prevent.
+
+        The ownership boundary is container CREATION, not container start and not the handover at
+        the end. A container that exists may be running -- `docker start` can be cancelled after
+        the daemon has acted on it -- and a running container holds its devices, its published
+        ports and its scratch. All three go back through its teardown, in the one order that is
+        safe: stop it, then release.
+        """
+        running = self.kernel_registry.get(kernel_id)
+        if running is not None and running.container_id is not None:
+            # One DESTROY, from here and nowhere else. The container-creation handler above used
+            # to inject one of its own, and the lifecycle does not collapse two for the same
+            # kernel -- it ran the whole teardown twice.
+            # This is also the path a cancelled create takes, which no `except Exception`
+            # anywhere below reaches: without it the container was left running, its kernel
+            # already out of the registry and nothing queued to destroy it.
+            #
+            # And NOTHING else from here. Not the undo stack, and not
+            # `reconstruct_resource_usage`: the teardown this queues gives the ports back and
+            # rebuilds the allocation maps itself, once the container is actually gone. Doing
+            # either now would do it while the container is still up, which is how a device a
+            # live kernel is using gets handed to the next create.
+            await asyncio.shield(
+                asyncio.ensure_future(
+                    self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_CREATE,
+                        container_id=running.container_id,
+                    )
+                )
+            )
+            return
+        for undo in reversed(made):
+            try:
+                await asyncio.shield(asyncio.ensure_future(undo()))
+            except Exception:
+                log.exception(
+                    "create_kernel(kernel:{}, session:{}) could not undo what it had already"
+                    " made on this host",
+                    kernel_id,
+                    session_id,
+                )
+        # No container of this create's exists, so the allocation maps can be rebuilt from the
+        # ones that do. This is the net under a failure that happened before the backend's own
+        # rollback could run -- a scratch that could not be prepared, say.
+        await self.reconstruct_resource_usage()
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -2763,9 +3148,22 @@ class AbstractAgent[
                         kernel_id,
                         session_id,
                     )
+                # What this create has made on the host, in the order it was made. Everything
+                # after the scratch can fail -- the network attach most of all, since it is the
+                # one that talks to another process and refuses a session this node cannot serve
+                # -- and the failure path above only reconstructs the resource accounting. The
+                # scratch directory it leaves behind is real, occupies the disk, and nothing comes
+                # back for it: this is what the dataplane harness records as a leak after a
+                # privnet failure.
+                made: list[Callable[[], Awaitable[None]]] = []
                 try:
                     # Prepare scratch spaces and dotfiles inside it.
                     if not restarting:
+                        # Registered BEFORE it is made. Preparing a scratch is several
+                        # directories and a filesystem, so a failure part-way through has already
+                        # made something -- and registering afterwards would step over exactly
+                        # that case. `destroy_scratch` tolerates a scratch that is not all there.
+                        made.append(ctx.destroy_scratch)
                         await ctx.prepare_scratch()
                         log.info(
                             "create_kernel(kernel:{}, session:{}) scratch prepared",
@@ -3065,33 +3463,27 @@ class AbstractAgent[
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
                         log.error(
-                            "Kernel failed to create container. Kernel is going to be destroyed. (k:{}, detail:{})",
+                            "Kernel failed to create container. Kernel is going to be destroyed."
+                            " (k:{}, detail:{})",
                             kernel_id,
                             msg,
                         )
-                        cid = e.container_id
+                        # The container is named on the kernel object, and NOTHING is destroyed
+                        # here. `_unwind_failed_create` below is the single owner of that: two
+                        # handlers each injecting a DESTROY for the same kernel had the lifecycle
+                        # run the teardown twice, because it does not collapse them.
                         async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_CREATE,
-                            container_id=ContainerId(cid),
-                        )
+                            self.kernel_registry[ctx.kernel_id].set_container_id(
+                                ContainerId(e.container_id)
+                            )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
                         ) from e
                     except Exception as e:
                         log.warning(
-                            "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
+                            "Kernel failed to create container (k:{}). Kernel is going to be"
+                            " destroyed.",
                             kernel_id,
-                        )
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
@@ -3106,6 +3498,9 @@ class AbstractAgent[
                         session_id,
                         pretty_container_id,
                     )
+                    # Belt and braces with the container check in the failure path below: by
+                    # here the container is up and its teardown belongs to the kernel lifecycle.
+                    made.clear()
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
                         if "container_id" in container_data:
@@ -3346,8 +3741,10 @@ class AbstractAgent[
                     # The startup command for the batch-type sessions will be executed by the manager
                     # upon firing of the "session_started" event.
                     return kernel_creation_info
-                except Exception:
-                    await self.reconstruct_resource_usage()
+                except BaseException:
+                    # BaseException, not Exception: a cancelled create leaves the same host state
+                    # behind as a failed one, and it is the launcher's timeout that cancels.
+                    await self._unwind_failed_create(kernel_id, session_id, made)
                     raise
 
     async def start_model_service_and_handle_failure(

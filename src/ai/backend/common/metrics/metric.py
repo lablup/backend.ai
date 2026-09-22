@@ -758,6 +758,111 @@ class EventPropagatorMetricObserver:
             self._propagator_alias_count.labels(domain=domain, alias_id=alias_id).dec()
 
 
+class NetworkPoolMetricObserver:
+    """The overlay pool's reconciliation, as numbers a dashboard can alert on.
+
+    The reconciler is the only thing that reaches a subnet or VNI claim no session record,
+    tombstone or debt note names. When it cannot run, the pool silently shrinks: nothing fails,
+    every session still starts, and the shortage shows up much later as a create that finds no
+    free block. So its failure has to be visible while it is still cheap.
+    """
+
+    _instance: Self | None = None
+
+    _reconcile_failures: Counter
+    _pool_exhaustions: Counter
+    _reconcile_pending: Gauge
+    _reclaimed_claims: Counter
+    _unrecoverable_incarnations: Gauge
+    _invalid_records: Counter
+    _reconcile_duration: Histogram
+    _reconcile_in_progress: Gauge
+    _reconcile_last_success: Gauge
+
+    def __init__(self) -> None:
+        self._reconcile_failures = Counter(
+            name="backendai_network_pool_reconcile_failure_count",
+            documentation="Total number of overlay pool reconciliation passes that raised",
+        )
+        self._pool_exhaustions = Counter(
+            name="backendai_network_pool_exhaustion_count",
+            documentation="Total number of exhausted cluster-network allocation attempts",
+            labelnames=["resource"],
+        )
+        self._reconcile_pending = Gauge(
+            name="backendai_network_pool_reconcile_pending",
+            documentation=("1 while a reconciliation pass this manager owes has not yet succeeded"),
+            multiprocess_mode="livemax",
+        )
+        self._reclaimed_claims = Counter(
+            name="backendai_network_pool_reclaimed_claim_count",
+            documentation="Total number of overlay pool claims reclaimed by reconciliation",
+        )
+        self._unrecoverable_incarnations = Gauge(
+            name="backendai_network_pool_unrecoverable_incarnation_count",
+            documentation=(
+                "Session incarnations whose overlay state could neither be released nor written"
+                " down; only a reconciliation pass can reach them"
+            ),
+            multiprocess_mode="livemax",
+        )
+
+        self._invalid_records = Counter(
+            name="backendai_network_pool_invalid_record_count",
+            documentation=(
+                "Overlay records or claims that could not be read as what they must be, and were"
+                " stepped over"
+            ),
+        )
+        self._reconcile_duration = Histogram(
+            name="backendai_network_pool_reconcile_duration_seconds",
+            documentation="Duration of overlay pool reconciliation passes",
+            labelnames=["success"],
+            buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+        )
+        self._reconcile_in_progress = Gauge(
+            name="backendai_network_pool_reconcile_in_progress",
+            documentation="1 while this manager is running an overlay reconciliation pass",
+            multiprocess_mode="livemax",
+        )
+        self._reconcile_last_success = Gauge(
+            name="backendai_network_pool_reconcile_last_success_timestamp_seconds",
+            documentation="Unix timestamp of the most recent successful reconciliation pass",
+            multiprocess_mode="livemax",
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_invalid_record(self) -> None:
+        self._invalid_records.inc()
+
+    def observe_pool_exhausted(self, resource: str) -> None:
+        self._pool_exhaustions.labels(resource=resource).inc()
+
+    def observe_reconcile_started(self) -> None:
+        self._reconcile_in_progress.set(1)
+
+    def observe_reconcile_succeeded(
+        self, *, reclaimed: int, unrecoverable: int, duration: float
+    ) -> None:
+        self._reconcile_pending.set(0)
+        self._reclaimed_claims.inc(reclaimed)
+        self._unrecoverable_incarnations.set(unrecoverable)
+        self._reconcile_duration.labels(success=SUCCESS_LABEL_TRUE).observe(duration)
+        self._reconcile_last_success.set(time.time())
+        self._reconcile_in_progress.set(0)
+
+    def observe_reconcile_failed(self, *, duration: float) -> None:
+        self._reconcile_failures.inc()
+        self._reconcile_pending.set(1)
+        self._reconcile_duration.labels(success=SUCCESS_LABEL_FALSE).observe(duration)
+        self._reconcile_in_progress.set(0)
+
+
 class CommonMetricRegistry:
     _instance: Self | None = None
 
@@ -767,6 +872,7 @@ class CommonMetricRegistry:
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
     event_propagator_observer: EventPropagatorMetricObserver
+    network_pool: NetworkPoolMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
@@ -775,6 +881,7 @@ class CommonMetricRegistry:
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
         self.event_propagator_observer = EventPropagatorMetricObserver.instance()
+        self.network_pool = NetworkPoolMetricObserver.instance()
 
     @classmethod
     def instance(cls) -> Self:

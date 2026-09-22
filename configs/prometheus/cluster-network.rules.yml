@@ -1,0 +1,49 @@
+groups:
+  - name: backendai-cluster-network
+    rules:
+      - alert: BackendAIClusterNetworkReconcilePending
+        expr: max(backendai_network_pool_reconcile_pending) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Cluster-network reconciliation has not converged
+          description: Inspect `backend.ai mgr network audit` before the overlay pool is exhausted.
+      - alert: BackendAIClusterNetworkReconcileStale
+        expr: absent(backendai_network_pool_reconcile_last_success_timestamp_seconds) or (time() - max(backendai_network_pool_reconcile_last_success_timestamp_seconds) > 1800)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: No successful cluster-network reconciliation in 30 minutes
+          description: Verify manager-to-etcd connectivity and the reconciliation leader lease.
+      - alert: BackendAIClusterNetworkUnrecoverableState
+        expr: max(backendai_network_pool_unrecoverable_incarnation_count) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Cluster-network state requires operator repair
+          description: Run the network audit and preserve its output before attempting repair.
+      - alert: BackendAIClusterNetworkPoolExhausted
+        expr: sum by (resource) (increase(backendai_network_pool_exhaustion_count_total[10m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: Cluster-network allocation exhausted for {{ $labels.resource }}
+          description: Audit and repair orphaned claims, then expand the configured pool if needed.
+      - alert: BackendAIClusterNetworkInvalidRecords
+        expr: sum(increase(backendai_network_pool_invalid_record_count_total[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Invalid cluster-network records were observed
+          description: Audit etcd network state and quarantine only records confirmed to be orphaned.
+      - alert: BackendAIClusterNetworkReconcileSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(backendai_network_pool_reconcile_duration_seconds_bucket[30m]))) > 60
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Cluster-network reconciliation p95 exceeds 60 seconds
+          description: Check etcd latency and the number of session, subnet, and VNI records.

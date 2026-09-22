@@ -175,6 +175,21 @@ class AgentRuntime:
             await self._metadata_server.cleanup()
         await self._resource_allocator.__aexit__(*exc_info)
 
+    async def start_serving(self) -> None:
+        """Let every agent start announcing itself, once the process can take work.
+
+        Called by the server after the RPC listener is handling calls -- see
+        `AbstractAgent.start_serving` for why neither the started event nor the heartbeat may
+        happen before that.
+        """
+        for agent in self.get_agents():
+            await agent.start_serving()
+
+    async def stop_serving(self) -> None:
+        """Stop every agent announcing itself. See `AbstractAgent.stop_serving`."""
+        for agent in self.get_agents():
+            await agent.stop_serving()
+
     def get_agents(self) -> list[AbstractAgent[Any, Any]]:
         return list(self._agents.values())
 

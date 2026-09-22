@@ -34,16 +34,21 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.errors.agent import AgentNotAllocated
+from ai.backend.manager.errors.kernel import InvalidSessionData
+from ai.backend.manager.errors.network import ManagerNetworkMisconfigured
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.network.pairing import resolve_driver_for_agents
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.results import FailureDisposition
 from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -55,6 +60,17 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def cluster_hostname_of(kernel: KernelBindingData) -> str:
+    """The kernel's cluster hostname — its explicit ``cluster_hostname`` or the ``<role><idx>``
+    fallback. Single source of truth: this exact name is written to ``BACKENDAI_CLUSTER_HOST``,
+    ``BACKENDAI_CLUSTER_HOSTS`` and the ``cluster_hosts`` IP map, and the agent matches its own
+    against those to write /etc/hosts. Any drift between the derivations here silently sends a
+    clustered kernel's own name to loopback (see the agent's ``_peer_host_map``), so it must be
+    computed in exactly one place.
+    """
+    return kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}"
+
+
 @dataclass
 class SessionLauncherArgs:
     repository: SchedulerRepository
@@ -62,6 +78,18 @@ class SessionLauncherArgs:
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
+
+
+@dataclass(frozen=True)
+class StartFailure:
+    """Why a session did not start, and what should happen to it.
+
+    Two kinds, and the difference is whether anything was asked of an agent. Neither is a session
+    that started, which is what the handler used to report for both.
+    """
+
+    reason: str
+    disposition: FailureDisposition
 
 
 class SessionLauncher:
@@ -165,7 +193,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> dict[SessionId, StartFailure]:
         """
         Start sessions on agents for the given sessions.
 
@@ -177,6 +205,12 @@ class SessionLauncher:
 
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image ID
+        :return: the sessions that could NOT be started, and why. The caller has to act on this:
+            a session whose kernels were never asked for has not started, and reporting it as
+            started leaves it sitting in CREATING until something times it out, on an agent it
+            was placed on and cannot run on. A network setup that the agent refuses -- it is not
+            advertising the data plane, or stopped while this was being built -- is exactly that
+            case, and the answer to it is another agent, not a longer wait.
         """
         with RecorderContext[SessionId].shared_phase(
             "trigger_kernel_creation",
@@ -186,28 +220,30 @@ class SessionLauncher:
                 "create_kernels",
                 success_detail="Kernel creation requested",
             ):
-                await self._start_sessions_concurrently(sessions, image_configs)
+                return await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> dict[SessionId, StartFailure]:
         """
         Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
+        :return: the sessions that could not be started, and why.
         """
 
-        async def start_with_timeout(session: SessionDataForStart) -> None:
+        async def start_with_timeout(session: SessionDataForStart) -> StartFailure | None:
             async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                await self._start_single_session(session, image_configs)
+                return await self._start_single_session(session, image_configs)
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
             return_exceptions=True,
         )
+        failed: dict[SessionId, StartFailure] = {}
         for session, result in zip(sessions, results, strict=True):
             if isinstance(result, BaseException):
                 log.warning(
@@ -215,17 +251,31 @@ class SessionLauncher:
                     session.session_id,
                     exc_info=result,
                 )
+                # Unknown how far it got, so it is treated as the worse of the two: something may
+                # be running, and a second placement on top of it would be worse than a teardown.
+                failed[session.session_id] = StartFailure(
+                    f"{type(result).__name__}: {result}", FailureDisposition.ABANDON
+                )
+            elif result is not None:
+                failed[session.session_id] = result
+        return failed
 
     async def _start_single_session(
         self,
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> StartFailure | None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
+        :return: why this session did not start, and which of the two kinds of failure it is.
+            Nothing asked of any agent -- a network the node will not set up -- is a placement
+            that will fail identically every time, so it is given up and made again elsewhere.
+            Anything after kernel creation has been REQUESTED cannot be placed a second time,
+            because some of it may be running: that is a teardown. Neither is a session that
+            started, and reporting either as one left it in CREATING on a node it was not on.
         """
         log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
         log_args = (
@@ -237,10 +287,16 @@ class SessionLauncher:
         )
         log.debug(log_fmt + "try-starting", *log_args)
 
+        # Whether anything has been asked of an agent yet. Every failure is one of two things and
+        # this is the only thing that tells them apart: before, the placement is the problem and
+        # the session can be made again elsewhere; after, something may be running and there is
+        # no second placement to make. What no failure may be is a session that started.
+        dispatched = False
+
         try:
             # Ensure we have kernels to start
             if len(session.kernels) == 0:
-                raise ValueError(f"Session {session.session_id} has no kernels")
+                raise InvalidSessionData(f"Session {session.session_id} has no kernels")
 
             # Get resource policy and idle timeout
             # In production, this would come from database lookups
@@ -249,8 +305,33 @@ class SessionLauncher:
                 # Would need proper resource policy lookup
                 pass
 
-            # Setup network configuration
-            network_setup = await self._setup_network_configuration(session)
+            # Setup network configuration. Its failure is reported rather than swallowed: nothing
+            # has been asked of an agent at this point, so this session can still be placed
+            # elsewhere -- see the return contract above.
+            try:
+                network_setup = await self._setup_network_configuration(session)
+            except Exception as e:
+                error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
+                log.warning(log_fmt + "failed-network-setup", *log_args, exc_info=True)
+                await self._repository.update_session_error_info(session.session_id, error_info)
+                # Recorded against the session so the next placement excludes it: this node's
+                # data plane refused the session, and offering it the same one again is the one
+                # outcome we know does not work.
+                agents = sorted({
+                    AgentId(k.agent_id) for k in session.kernels if k.agent_id is not None
+                })
+                if agents:
+                    try:
+                        await self._valkey_schedule.record_session_failed_agents(
+                            session.session_id, agents
+                        )
+                    except Exception:
+                        log.warning(
+                            log_fmt + "failed to record failed agents in Valkey",
+                            *log_args,
+                            exc_info=True,
+                        )
+                return StartFailure(f"{type(e).__name__}: {e}", FailureDisposition.REPLACE)
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
             # Setup environment variables - similar to registry.py
@@ -284,6 +365,15 @@ class SessionLauncher:
                     else ""
                 ),
             }
+
+            # cluster_hostname -> assigned IP for the whole session (all kernels, all agents), so
+            # a backend without built-in cluster DNS can write /etc/hosts for peer resolution.
+            # Only populated where the manager pre-assigns IPs (overlay sessions).
+            cluster_hosts: dict[str, str] = {}
+            for kernel in session.kernels:
+                hostname = cluster_hostname_of(kernel)
+                if (ip := network_setup.endpoint_ips.get(str(kernel.kernel_id))) is not None:
+                    cluster_hosts[hostname] = ip
 
             # Group kernels by agent to minimize RPC calls
             kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
@@ -323,7 +413,7 @@ class SessionLauncher:
                             k.image_id,
                             image_str,
                         )
-                        raise ValueError(
+                        raise InvalidSessionData(
                             f"Image {image_str} (id={k.image_id}) not found in database"
                             " - session start failed"
                         )
@@ -387,6 +477,8 @@ class SessionLauncher:
                         "agent_addr": k.agent_addr or "",
                         "scaling_group": k.resource_group,
                         "endpoint_id": None,  # For inference endpoints
+                        # BEP-1079: manager-assigned overlay IP (multi-node), else None.
+                        "cluster_network_ip": network_setup.endpoint_ips.get(kernel_id_str),
                     }
                     kernel_configs.append(kernel_config)
 
@@ -419,15 +511,29 @@ class SessionLauncher:
                         kernel_image_refs,
                     )
 
+            failed_agent_ids: list[AgentId] = []
             agent_ids_ordered: list[AgentId] = []
             create_tasks: list[Awaitable[None]] = []
             for agent_id, agent_kernels in kernels_by_agent.items():
                 agent_ids_ordered.append(agent_id)
                 create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
+            if not create_tasks:
+                # No kernel has an agent, so nothing was ever going to be asked of one. Reported
+                # as a placement to make again rather than as a session that started: this used
+                # to fall through to "started" and leave the session in CREATING with no kernels
+                # anywhere.
+                log.warning(
+                    log_fmt + "no kernel of this session is assigned to an agent", *log_args
+                )
+                return StartFailure(
+                    "no kernel of this session is assigned to an agent",
+                    FailureDisposition.REPLACE,
+                )
             if create_tasks:
+                dispatched = True
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
-                failed_agent_ids = [
+                failed_agent_ids += [
                     aid
                     for aid, result in zip(agent_ids_ordered, results, strict=True)
                     if isinstance(result, BaseException)
@@ -449,15 +555,39 @@ class SessionLauncher:
                             exc_info=True,
                         )
 
+            if failed_agent_ids:
+                # Some kernels were requested and some were refused. There is no second placement
+                # to make -- what was accepted may be running -- so this is a teardown, and saying
+                # so now is the difference between a session torn down and a session sitting in
+                # CREATING until something times it out. Reported whether or not any agent
+                # accepted: a session missing kernels is not a session.
+                log.warning(
+                    log_fmt + "failed-on {} of {} agent(s)",
+                    *log_args,
+                    len(failed_agent_ids),
+                    len(agent_ids_ordered),
+                )
+                return StartFailure(
+                    f"kernel creation was refused by {len(failed_agent_ids)} of"
+                    f" {len(agent_ids_ordered)} agent(s)",
+                    FailureDisposition.ABANDON,
+                )
             log.info(log_fmt + "started", *log_args)
 
         except Exception as e:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
-            # Update error info in status_data without changing status
-            # Session will be handled by timeout detection in Coordinator
             await self._repository.update_session_error_info(session.session_id, error_info)
+            # Never None. Falling through to "no failure" here is what let a session with no
+            # kernels, a failed SSH keypair or any other preparation error be reported as started
+            # and moved to CREATING. Which of the two it is depends only on whether an agent has
+            # been asked for anything yet.
+            return StartFailure(
+                f"{type(e).__name__}: {e}",
+                FailureDisposition.ABANDON if dispatched else FailureDisposition.REPLACE,
+            )
+        return None
 
     async def _setup_network_configuration(
         self,
@@ -472,6 +602,7 @@ class SessionLauncher:
         network_name: str | None = None
         network_config: dict[str, Any] = {}
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
+        endpoint_ips: dict[str, str] = {}
 
         network_type = session.network_type or NetworkType.VOLATILE
 
@@ -489,7 +620,9 @@ class SessionLauncher:
                 network_name = f"bai-singlenode-{session.session_id}"
                 first_kernel = session.kernels[0]
                 if not first_kernel.agent_id:
-                    raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
+                    raise AgentNotAllocated(
+                        f"No agent assigned for kernel {first_kernel.kernel_id}"
+                    )
                 try:
                     async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
                         await client.create_local_network(network_name)
@@ -501,10 +634,32 @@ class SessionLauncher:
                     "network_name": network_name,
                 }
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
-                # Create overlay network for multi-node sessions
-                driver = self._config_provider.config.network.inter_container.default_driver
+                member_agents = sorted({
+                    str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
+                })
+                # The runtime limits the compatible drivers. Docker supports the established
+                # Swarm path and the initial CNI implementation, while other runtimes fail closed
+                # until their CNI attachment is implemented. The configured default selects among
+                # the runtime's supported drivers and remains the fallback for legacy agents that
+                # have not published a backend.
+                configured = self._config_provider.config.network.inter_container.default_driver
+                driver = await resolve_driver_for_agents(
+                    self._network_plugin_ctx.etcd,
+                    member_agents,
+                    configured_driver=configured,
+                )
                 if driver is None:
-                    raise ValueError("No inter-container network driver is configured.")
+                    raise ManagerNetworkMisconfigured(
+                        "No inter-container network driver is configured."
+                    )
+                if driver != configured:
+                    log.info(
+                        "using the '{}' cluster-network driver for session {} (the member agents'"
+                        " backend requires it; configured default was '{}')",
+                        driver,
+                        session.session_id,
+                        configured,
+                    )
 
                 # Check if plugin is available
                 if driver not in self._network_plugin_ctx.plugins:
@@ -514,17 +669,44 @@ class SessionLauncher:
                         driver,
                         available_plugins,
                     )
-                    raise KeyError(
+                    raise ManagerNetworkMisconfigured(
                         f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
                         f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
                     )
 
                 network_plugin = self._network_plugin_ctx.plugins[driver]
+                # Pass the participating agents and the operator's backend override so
+                # runtime-neutral plugins (BEP-1079 CNINetworkPlugin) can select and
+                # allocate the per-session data plane. The Swarm overlay plugin ignores
+                # these extra options.
+                forced_backend = self._config_provider.config.network.inter_container.forced_backend
+                # One endpoint per kernel; the manager assigns each a disjoint overlay IP
+                # (BEP-1079 central IPAM). container_id == kernel_id (the agent keys its
+                # endpoint/CNI on the kernel id).
+                endpoints = [
+                    {
+                        "container_id": str(kernel.kernel_id),
+                        "agent_id": str(kernel.agent_id),
+                        # Stored in the endpoints/ table so the per-session cluster name
+                        # resolver can answer this kernel's hostname (BEP-1079).
+                        "cluster_hostname": cluster_hostname_of(kernel),
+                    }
+                    for kernel in session.kernels
+                    if kernel.agent_id
+                ]
                 try:
                     network_info = await network_plugin.create_network(
-                        identifier=str(session.session_id)
+                        identifier=str(session.session_id),
+                        options={
+                            "member_agents": member_agents,
+                            "forced_backend": forced_backend,
+                            "endpoints": endpoints,
+                        },
                     )
                     network_config = dict(network_info.options)
+                    # endpoint_ips is a launcher-only side channel (per-kernel), not part of
+                    # the cluster-wide network_config broadcast to every agent.
+                    endpoint_ips = dict(network_config.pop("endpoint_ips", {}))
                     network_name = network_info.network_id
                 except Exception:
                     log.exception(
@@ -567,6 +749,7 @@ class SessionLauncher:
             network_name=network_name,
             network_config=network_config,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
+            endpoint_ips=endpoint_ips,
         )
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:

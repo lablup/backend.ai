@@ -5,6 +5,7 @@ Result type for scheduling operations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from ai.backend.common.types import (
     AccessKey,
@@ -67,6 +68,28 @@ class ScheduleResult:
 # ============================================================================
 
 
+class FailureDisposition(StrEnum):
+    """What a handler knows about a failure that the retry counters cannot work out.
+
+    The default classification is by attempts and elapsed time, which is right when a failure
+    might succeed if tried again. Some do not: a session whose placement is on a node that will
+    not serve it fails identically every time, and one whose kernels have already been requested
+    somewhere cannot be placed a second time at all. Retrying either is five wasted cycles and
+    then the wrong terminal state.
+    """
+
+    #: Nothing was asked of any agent, so nothing is running and the session could in principle
+    #: be placed somewhere else. It is NOT sent straight back to PENDING: the retry budget is
+    #: counted per phase, and a round trip through PENDING resets it, so that is a livelock rather
+    #: than a re-placement (see `ScheduleCoordinator._classify_failures`, which has the measured
+    #: numbers). It is classified normally -- retried, then given up -- while the agents that
+    #: refused it are recorded against the session so a later scheduling round avoids them.
+    REPLACE = "replace"
+    #: Work was already requested somewhere. There is no second placement to make: it has to be
+    #: torn down.
+    ABANDON = "abandon"
+
+
 @dataclass
 class SessionTransitionInfo:
     """Session transition information for history recording and event broadcasting.
@@ -83,6 +106,8 @@ class SessionTransitionInfo:
     error_code: str | None = None
     creation_id: str | None = None
     access_key: AccessKey | None = None
+    #: Set where the handler knows something the retry counters do not. See `FailureDisposition`.
+    disposition: FailureDisposition | None = None
 
 
 @dataclass

@@ -1,0 +1,245 @@
+"""How a Docker kernel reaches, and gives back, its session network (BEP-1079).
+
+Every case here is one that leaks or hangs rather than erroring, which is why they are pinned:
+
+* attaching after the command has started races the runner's own init and shows up as a hang at
+  rendezvous, not as a failure here — so the attach must happen while the container is gated;
+* a gate never released parks the container forever, with nothing to time it out;
+* a container removed without a detach leaves its host veth, its IPAM address and its MASQ rule
+  behind until the agent restarts.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+
+from ai.backend.agent.docker.gate import GATE_READY_TIMEOUT_SEC, stage_gate, wait_gated_pid
+from ai.backend.agent.docker.session_network import make_docker_locator
+from ai.backend.agent.errors.agent import ContainerStartupFailedError
+from ai.backend.agent.errors.network import OverlayTeardownIncomplete
+from ai.backend.agent.gate import READY_MARKER
+from ai.backend.agent.network.session_network import SessionNetwork
+
+
+class _FakeContainer:
+    """A container that is running and parked, unless told otherwise."""
+
+    def __init__(self, pid: int = 4242, running: bool = True) -> None:
+        self.pid = pid
+        self.running = running
+
+    async def show(self) -> dict[str, Any]:
+        return {
+            "State": {
+                "Running": self.running,
+                "Pid": self.pid if self.running else 0,
+                "Status": "running" if self.running else "exited",
+                "ExitCode": 0 if self.running else 1,
+            }
+        }
+
+
+class TestWaitingForTheGate:
+    async def test_it_returns_the_parked_pid(self, tmp_path: Path) -> None:
+        gate_dir = tmp_path / "gate"
+        stage_gate(gate_dir)
+        (gate_dir / READY_MARKER).touch()
+        assert await wait_gated_pid(_FakeContainer(pid=777), gate_dir) == 777
+
+    async def test_a_container_that_died_first_is_reported_not_waited_on(
+        self, tmp_path: Path
+    ) -> None:
+        # A broken image or a bad command; without this it would be waited on for the whole
+        # timeout and then reported as slow rather than as broken.
+        gate_dir = tmp_path / "gate"
+        stage_gate(gate_dir)
+        with pytest.raises(ContainerStartupFailedError, match="exited before reaching the gate"):
+            await wait_gated_pid(_FakeContainer(running=False), gate_dir)
+
+    async def test_a_gate_that_never_opens_times_out(self, tmp_path: Path) -> None:
+        gate_dir = tmp_path / "gate"
+        stage_gate(gate_dir)
+        with pytest.raises(TimeoutError):
+            await wait_gated_pid(_FakeContainer(), gate_dir, timeout_sec=0.3)
+
+    async def test_a_parked_container_with_no_pid_is_refused(self, tmp_path: Path) -> None:
+        # Docker reports 0 rather than null; attaching to PID 0 would target the host.
+        gate_dir = tmp_path / "gate"
+        stage_gate(gate_dir)
+        (gate_dir / READY_MARKER).touch()
+        container = _FakeContainer(pid=0)
+        with pytest.raises(ContainerStartupFailedError, match="no PID"):
+            await wait_gated_pid(container, gate_dir)
+
+    def test_the_default_timeout_is_finite(self) -> None:
+        # An unbounded wait here is a kernel creation that never returns and never errors.
+        assert 0 < GATE_READY_TIMEOUT_SEC < 300
+
+
+class TestGivingTheNetworkBack:
+    async def test_detach_releases_the_recorded_attachment(self) -> None:
+        detached: list[tuple[str, int]] = []
+
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                detached.append((container_id, task_pid))
+
+        net = SessionNetwork(
+            cast(Any, object()),
+            agent_id="i-docker",
+            host_ip="127.0.0.1",
+            runtime=None,
+            locator=make_docker_locator(),
+            cni_runner=cast(Any, object()),
+            backends={},
+            local_subnets=cast(Any, object()),
+            ipam=cast(Any, object()),
+        )
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        await net.detach_container("c1")
+
+        assert detached == [("c1", 4242)]
+        # Popped, so a second clean (the agent retries nothing, but a restart re-walks) cannot
+        # detach a veth some other container has since been given.
+        assert "c1" not in net._attachments
+
+    async def test_detaching_a_container_we_never_attached_is_a_noop(self) -> None:
+        # Every Docker kernel reaches clean_kernel, including the ones whose session network was
+        # Docker's own; this must not raise for them.
+
+        net = SessionNetwork(
+            cast(Any, object()),
+            agent_id="i-docker",
+            host_ip="127.0.0.1",
+            runtime=None,
+            locator=make_docker_locator(),
+            cni_runner=cast(Any, object()),
+            backends={},
+            local_subnets=cast(Any, object()),
+            ipam=cast(Any, object()),
+        )
+        await net.detach_container("never-attached")
+
+    async def test_a_failing_detach_does_not_block_removal(self) -> None:
+        # The container is going either way; a detach hiccup that propagated would leave the
+        # kernel in the registry with no container behind it.
+
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                raise RuntimeError("iproute2 said no")
+
+        net = SessionNetwork(
+            cast(Any, object()),
+            agent_id="i-docker",
+            host_ip="127.0.0.1",
+            runtime=None,
+            locator=make_docker_locator(),
+            cni_runner=cast(Any, object()),
+            backends={},
+            local_subnets=cast(Any, object()),
+            ipam=cast(Any, object()),
+        )
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        await net.detach_container("c1")
+
+
+class TestADetachThatDidNotGoThrough:
+    """The plan and task PID in the attachment record are the only things that name the host
+    veth, the host-local address and the MASQ rule left behind. Dropping the record on a failed
+    detach threw them away, so nothing could free them."""
+
+    @staticmethod
+    def _net() -> SessionNetwork:
+        return SessionNetwork(
+            cast(Any, object()),
+            agent_id="i-docker",
+            host_ip="127.0.0.1",
+            runtime=None,
+            locator=make_docker_locator(),
+            cni_runner=cast(Any, object()),
+            backends={},
+            local_subnets=cast(Any, object()),
+            ipam=cast(Any, object()),
+        )
+
+    async def test_the_attachment_survives_the_failure(self) -> None:
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                raise RuntimeError("iproute2 said no")
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        await net.detach_container("c1")
+
+        assert "c1" in net._attachments
+
+    async def test_teardown_stops_when_it_still_cannot_detach(self) -> None:
+        # The coordinator goes next, and with it the last thing that knows what the leftovers
+        # are. Walking past a failed detach here is what makes the veth and the address
+        # permanent; raising puts the session back in front of the teardown retry.
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                raise RuntimeError("iproute2 said no")
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        with pytest.raises(OverlayTeardownIncomplete):
+            await net._retry_pending_detaches("s1")
+        assert "c1" in net._attachments
+
+    async def test_teardown_tries_it_again(self) -> None:
+        attempts: list[int] = []
+
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                attempts.append(task_pid)
+                if len(attempts) == 1:
+                    raise RuntimeError("iproute2 said no")
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        await net.detach_container("c1")
+        await net._retry_pending_detaches("s1")
+
+        assert attempts == [4242, 4242]
+        assert "c1" not in net._attachments
+
+    async def test_another_session_is_left_alone(self) -> None:
+        detached: list[str] = []
+
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                detached.append(container_id)
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 1)
+        net._attachments["c2"] = ("s2", cast(Any, object()), 2)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+        net._orchestrators["s2"] = cast(Any, _Orchestrator())
+
+        await net._retry_pending_detaches("s1")
+
+        assert detached == ["c1"]
+        assert "c2" in net._attachments
+
+    async def test_a_session_whose_orchestrator_is_gone_drops_the_record(self) -> None:
+        # Nothing left to detach from, and no later call that could use it.
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+
+        await net.detach_container("c1")
+
+        assert "c1" not in net._attachments
