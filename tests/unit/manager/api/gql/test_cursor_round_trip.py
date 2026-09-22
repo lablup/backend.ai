@@ -13,11 +13,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
-from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
-from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     LivenessStatus,
@@ -45,7 +40,7 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     SearchModelCardsPayload,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardAccessLevel
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     RolePermissionPresetNode,
     SearchRolePermissionPresetsPayload,
@@ -55,7 +50,6 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     SearchRolePresetsPayload,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
-    RuntimeVariantModelDefinitionInfo,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
 )
@@ -68,6 +62,10 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
+from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.gql.base import decode_cursor, encode_cursor
 from ai.backend.manager.api.gql.deployment.resolver.replica import replicas as replicas_resolver
 from ai.backend.manager.api.gql.deployment.resolver.revision_preset import (
@@ -99,7 +97,6 @@ def _superadmin() -> UserData:
         is_superadmin=True,
         role=UserRole.SUPERADMIN,
         domain_name="default",
-        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -143,8 +140,6 @@ def _runtime_variants() -> list[RuntimeVariantNode]:
         RuntimeVariantNode(
             id=uuid.uuid4(),
             name=f"variant-{n}",
-            reads_vfolder_config_files=False,
-            default_model_definition=RuntimeVariantModelDefinitionInfo(),
             created_at=_NOW,
         )
         for n in range(_ITEM_COUNT)
@@ -175,7 +170,7 @@ def _role_presets() -> list[RolePresetNode]:
         RolePresetNode(
             id=RolePresetID(uuid.uuid4()),
             name=f"role-preset-{n}",
-            scope_type=DomainEntityType(),
+            scope_type=RBACElementTypeDTO.DOMAIN,
             auto_assign=False,
             deleted=False,
             created_at=_NOW,
@@ -190,8 +185,8 @@ def _role_permission_presets() -> list[RolePermissionPresetNode]:
         RolePermissionPresetNode(
             id=RolePermissionPresetID(uuid.uuid4()),
             role_preset_id=RolePresetID(uuid.uuid4()),
-            entity_type=VFolderEntityType(),
-            permission=PermissionBitDTO.READ,
+            entity_type=RBACElementTypeDTO.VFOLDER,
+            operation=OperationTypeDTO.READ,
             created_at=_NOW,
         )
         for _ in range(_ITEM_COUNT)
