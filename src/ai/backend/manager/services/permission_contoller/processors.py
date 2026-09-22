@@ -44,11 +44,11 @@ from .actions import (
     UpdateRoleAction,
 )
 from .actions.bulk_get_permissions import BulkGetPermissionsAction
+from .actions.bulk_get_roles import BulkGetRolesAction
 from .actions.bulk_lookup_role_assignment_ends import (
     BulkLookupRoleAssignmentRolesAction,
     BulkLookupRoleAssignmentUsersAction,
 )
-from .actions.bulk_get_roles import BulkGetRolesAction
 from .actions.delete_permission import DeletePermissionAction
 from .actions.get_entity_types import (
     PublicGetEntityTypesAction,
