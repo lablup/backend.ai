@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.rbac import ProjectScope
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.container_registry_quota.db_source import (
-    PerProjectRegistryQuotaDBSource,
-)
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 
 per_project_registry_quota_repository_resilience = Resilience(
     policies=[
@@ -37,13 +36,33 @@ per_project_registry_quota_repository_resilience = Resilience(
 # NOTE: Only one implementation exists for now, so no ABC is used.
 # Introduce an abstract base class when multiple implementations are needed.
 class PerProjectRegistryQuotaRepository:
-    _db_source: PerProjectRegistryQuotaDBSource
+    _db_source: ContainerRegistryDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = PerProjectRegistryQuotaDBSource(db)
+    def __init__(self, registry_db_source: ContainerRegistryDBSource) -> None:
+        self._db_source = registry_db_source
 
     @per_project_registry_quota_repository_resilience.apply()
-    async def fetch_container_registry_row(
+    async def fetch_container_registry_info(
         self, scope_id: ProjectScope
     ) -> PerProjectContainerRegistryInfo:
-        return await self._db_source.fetch_container_registry_row(scope_id)
+        registry_id = await self._db_source.lookup_image_commit_registry_id(
+            ProjectID(scope_id.project_id)
+        )
+        registry = await self._db_source.fetch_by_id(registry_id)
+        if not registry.project:
+            raise ContainerRegistryNotFound(
+                f"Container registry {registry.registry_name} carries no project to hold the quota. (project: {scope_id.project_id})"
+            )
+
+        return PerProjectContainerRegistryInfo(
+            id=registry.id,
+            url=registry.url,
+            registry_name=registry.registry_name,
+            type=registry.type,
+            project=registry.project,
+            username=registry.username or "",
+            password=registry.password or "",
+            ssl_verify=registry.ssl_verify if registry.ssl_verify is not None else True,
+            is_global=registry.is_global if registry.is_global is not None else False,
+            extra=registry.extra or {},
+        )

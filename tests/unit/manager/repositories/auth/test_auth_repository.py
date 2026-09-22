@@ -35,6 +35,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -389,7 +390,7 @@ class TestAuthRepository:
                 dotfiles=group.dotfiles,
                 resource_policy=group.resource_policy,
                 type=group.type,
-                container_registry=group.container_registry,
+                container_registry=ProjectSearchableFields.own.to_data(group).container_registry,
             )
         yield group_data
 
