@@ -58,7 +58,7 @@ class StorageBackendTypeRow(LifecycleTimestampsMixin, Base):
 class StorageBackendRow(LifecycleTimestampsMixin, Base):
     """A storage appliance a service can reach.
 
-    Carries no status: only the services that mount its volumes can reach it, each over
+    Carries no status: only the services that hold its volumes can reach it, each over
     its own network path, so the observation lives on `service_storage_backends`. How the
     appliance is reached is the service's own configuration and is not stored here.
     """

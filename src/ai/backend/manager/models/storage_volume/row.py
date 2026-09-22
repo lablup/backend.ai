@@ -30,8 +30,8 @@ __all__ = (
 class StorageVolumeRow(LifecycleTimestampsMixin, Base):
     """A volume on a storage backend, identified by the name every service declares it under.
 
-    Carries neither a path nor a status: the path differs per service, and a volume no
-    service reports is unreachable rather than unhealthy.
+    Carries no status: a volume no service reports is unreachable rather than unhealthy.
+    Mounts are the holding service's own concern and are not recorded here.
     """
 
     __tablename__ = "storage_volumes"
@@ -70,7 +70,10 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
 
 
 class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
-    """A storage volume as one service mounts it."""
+    """A storage volume as one service holds it.
+
+    The status is what the service's volume implementation derives from its mounts.
+    """
 
     __tablename__ = "service_storage_volumes"
 
@@ -86,7 +89,6 @@ class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
         sa.ForeignKey("storage_volumes.id", ondelete="RESTRICT"),
         primary_key=True,
     )
-    mount_path: Mapped[str] = mapped_column("mount_path", sa.String, nullable=False)
     status: Mapped[ServiceStorageStatus] = mapped_column(
         "status", StrEnumType(ServiceStorageStatus), nullable=False
     )
