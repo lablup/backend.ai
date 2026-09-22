@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
+    build_orders,
     build_pagination,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -52,7 +53,8 @@ class BaseAdapter(BaseFilterAdapter):
         Handles pagination mode selection (cursor forward/backward/offset/default)
         via the shared ``build_pagination()`` utility. Domain adapters supply
         pre-converted ``conditions`` and ``orders`` from their private conversion
-        methods; cursor and tiebreaker orders are taken from ``pagination_spec``.
+        methods; cursor and tiebreaker orders are taken from ``pagination_spec``,
+        and cursor pagination drops ``orders``.
 
         The optional ``base_conditions`` are prepended before ``conditions``
         (e.g., a foreign-key scope filter applied before user-supplied filters).
@@ -83,6 +85,7 @@ class BaseAdapter(BaseFilterAdapter):
             all_conditions.extend(base_conditions)
         all_conditions.extend(conditions)
 
+<<<<<<< HEAD
         all_orders: list[QueryOrder] = list(orders)
         if not all_orders and not options.has_cursor:
             all_orders.append(pagination_spec.forward_order)
@@ -90,3 +93,54 @@ class BaseAdapter(BaseFilterAdapter):
 
         pagination = build_pagination(options, pagination_spec)
         return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
+=======
+        final_orders = build_orders(options, pagination_spec, orders)
+        pagination = build_pagination(options, pagination_spec)
+        return BatchQuerier(
+            conditions=all_conditions,
+            orders=final_orders,
+            pagination=pagination,
+        )
+
+    def _build_searcher[TSearcher: Searcher[Any, Any]](
+        self,
+        searcher_class: type[TSearcher],
+        conditions: list[QueryCondition],
+        orders: list[QueryOrder],
+        pagination_spec: PaginationSpec,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> TSearcher:
+        """Build a domain :class:`Searcher` with the same pagination handling as
+        :meth:`_build_querier`.
+
+        A searcher carries the SELECT and the row conversion as well, so the ORM row
+        never leaves the repository layer. Domains move here as they migrate;
+        ``_build_querier`` goes away once the last one has.
+
+        No ``base_conditions``: it was how a fixed filter — a foreign-key scope, mostly —
+        got prepended before there was a scope to say it with. A scoped search now names
+        its scopes on the action, so a caller reaching for this should be adding a
+        ``OperationScope`` instead.
+        """
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=pagination_spec,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+        return searcher_class(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
+        )
+>>>>>>> 82b68f24 (fix(BA-8084): drop the caller's order under cursor pagination (#14922))

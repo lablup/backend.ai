@@ -6,6 +6,7 @@ both the GQL adapter (BaseGQLAdapter) and domain adapters (BaseAdapter).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor
@@ -75,6 +76,26 @@ class PaginationSpec:
     tiebreaker_order: QueryOrder
     """Tiebreaker order for deterministic pagination (e.g., RowClass.id.asc()).
     Applied as the last ORDER BY clause to ensure stable ordering."""
+
+
+def build_orders(
+    options: PaginationOptions,
+    spec: PaginationSpec,
+    orders: Sequence[QueryOrder],
+) -> list[QueryOrder]:
+    """The ORDER BY clauses a search applies after the pagination's own order.
+
+    Cursor pagination sorts by the spec alone, so the caller's ``orders`` are
+    dropped; offset pagination applies them, or the spec's forward order if empty.
+    """
+    result: list[QueryOrder] = []
+    if not options.has_cursor:
+        result.extend(orders if orders else [spec.forward_order])
+    if options.last is not None:
+        result.append(spec.backward_tiebreaker_order)
+    else:
+        result.append(spec.tiebreaker_order)
+    return result
 
 
 def build_pagination(

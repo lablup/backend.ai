@@ -419,6 +419,27 @@ class TestBaseGQLAdapterBuildPagination:
         assert len(querier.orders) == 1
         assert querier.orders[0] is mock_tiebreaker_order
 
+    def test_cursor_pagination_drops_order_by(
+        self,
+        adapter: BaseGQLAdapter,
+        pagination_spec: PaginationSpec,
+    ) -> None:
+        """Cursor pagination sorts by the spec alone, so order_by is dropped."""
+        mock_order_by = MagicMock()
+        mock_query_order = MagicMock()
+        mock_order_by.to_query_order.return_value = mock_query_order
+
+        querier = adapter.build_querier(
+            PaginationOptions(first=10),
+            pagination_spec,
+            order_by=[mock_order_by],
+        )
+
+        assert isinstance(querier.pagination, CursorForwardPagination)
+        assert mock_query_order not in querier.orders
+        assert len(querier.orders) == 1
+        assert querier.orders[0].compare(_ItemRow.id.asc())
+
     def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
         self,
         adapter: BaseGQLAdapter,
