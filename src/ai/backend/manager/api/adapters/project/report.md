@@ -12,7 +12,7 @@ Not exercised by any scenario: admin_delete, admin_purge, admin_restore, admin_s
 
 Given
 
-- image commit을 위한 Container Registry 설정은 True, 일반 사용자의 읽기 권한은 True
+- image commit을 위한 Container Registry가 설정되어 있다. 일반 사용자는 프로젝트 읽기 권한이 있다.
   - 도메인 domain-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
@@ -39,7 +39,7 @@ Then
 
 Given
 
-- image commit을 위한 Container Registry 설정은 False, 일반 사용자의 읽기 권한은 True
+- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 있다.
   - 도메인 domain-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
@@ -66,7 +66,7 @@ Then
 
 Given
 
-- image commit을 위한 Container Registry 설정은 False, 일반 사용자의 읽기 권한은 False
+- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 없다.
   - 도메인 domain-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1

@@ -51,7 +51,12 @@ class ProjectWithReadPermission(Given[SeedingSession, ProjectAndTarget]):
 
     @override
     def describe(self) -> str:
-        return f"image commit을 위한 Container Registry 설정은 {self.configured}, 일반 사용자의 읽기 권한은 {self.may_read}"
+        registry = "설정되어 있다" if self.configured else "설정되어 있지 않다"
+        permission = "있다" if self.may_read else "없다"
+        return (
+            f"image commit을 위한 Container Registry가 {registry}. "
+            f"일반 사용자는 프로젝트 읽기 권한이 {permission}."
+        )
 
     @override
     async def lay(self, seeding: SeedingSession) -> ProjectAndTarget:
