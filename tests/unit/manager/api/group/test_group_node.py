@@ -5,6 +5,7 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -15,14 +16,25 @@ import graphene
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient
+from graphene.types import inputobjecttype
+from graphql import GraphQLInputObjectType, Undefined, coerce_input_value
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
-from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
+from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
+from ai.backend.manager.api.gql_legacy.group import (
+    CreateGroup,
+    Group,
+    GroupNode,
+    ModifyGroupInput,
+)
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.models.user import UserRole
 
@@ -184,42 +196,35 @@ class TestGroupNodeQuery:
     """
 
     @pytest.fixture
-    def mock_group_row(self) -> MagicMock:
-        """ProjectRow mock with VFolderHostPermissionMap (contains sets).
-
-        This simulates what VFolderHostPermissionColumn.process_result_value() returns
-        when loading data from the database.
-        """
-        row = MagicMock()
-        row.id = uuid4()
-        row.name = "test-group"
-        row.description = "Test group"
-        row.is_active = True
-        row.created_at = datetime.now(tz=UTC)
-        row.updated_at = datetime.now(tz=UTC)
-        row.domain_name = "default"
-        row.total_resource_slots = ResourceSlot({})
-        # VFolderHostPermissionColumn.process_result_value() returns VFolderHostPermissionMap
-        # which contains sets, not lists
-        row.allowed_vfolder_hosts = VFolderHostPermissionMap({
-            "local:volume1": {VFolderHostPermission.CREATE, VFolderHostPermission.MODIFY},
-        })
-        row.integration_id = None
-        row.resource_policy = "default"
-        row.type = ProjectType.GENERAL
-        row.container_registry = {}
-        return row
+    def group_data(self) -> ProjectData:
+        return ProjectData(
+            id=uuid4(),
+            name="test-group",
+            description="Test group",
+            is_active=True,
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
+            domain_name="default",
+            total_resource_slots=ResourceSlot({}),
+            allowed_vfolder_hosts=VFolderHostPermissionMap({
+                "local:volume1": {VFolderHostPermission.CREATE, VFolderHostPermission.MODIFY},
+            }),
+            integration_name=None,
+            container_registry=None,
+            resource_policy="default",
+            type=ProjectType.GENERAL,
+            dotfiles=b"",
+        )
 
     @pytest.fixture
-    def query_schema(self, mock_group_row: MagicMock) -> graphene.Schema:
+    def query_schema(self, group_data: ProjectData) -> graphene.Schema:
         """Create GraphQL schema with GroupNode query."""
 
         class Query(graphene.ObjectType):  # type: ignore[misc]
             group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
 
             async def resolve_group_node(self, info: graphene.ResolveInfo, id: str) -> GroupNode:
-                # Simulate GroupNode.from_row() with mock row
-                return GroupNode.from_row(info.context, mock_group_row)
+                return GroupNode.from_data(group_data)
 
         return graphene.Schema(query=Query)
 
@@ -283,3 +288,92 @@ class TestGroupNodeQuery:
         # Assert: GroupNode query returned valid data
         group_node = data.get("data", {}).get("groupNode", {})
         assert group_node.get("allowedVfolderHosts") is not None
+
+
+class TestRegistryTargetInput:
+    @pytest.mark.parametrize(
+        "configuration", [{}, {"containerRegistry": None}, {"containerRegistry": "{}"}]
+    )
+    def test_omitted_null_and_empty_clear_the_target(
+        self, configuration: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(inputobjecttype, "_INPUT_OBJECT_TYPE_DEFAULT_VALUE", Undefined)
+
+        schema = graphene.Schema(types=[ModifyGroupInput])
+        input_type = schema.graphql_schema.get_type("ModifyGroupInput")
+        assert isinstance(input_type, GraphQLInputObjectType)
+        props = coerce_input_value(configuration, input_type)
+        target = props.to_action(uuid4()).updater.container_registry
+        assert not target.is_nop()
+        assert target.optional_value() is None
+
+
+async def test_registry_field_is_lazy_and_batches_group_types() -> None:
+    first, second = ProjectID(uuid4()), ProjectID(uuid4())
+
+    async def resolve_groups(root: Any, info: graphene.ResolveInfo) -> list[Group]:
+        return [Group(id=first), Group(id=second)]
+
+    async def resolve_nodes(root: Any, info: graphene.ResolveInfo) -> list[GroupNode]:
+        return [GroupNode(id=first, row_id=first)]
+
+    query = type(
+        "Query",
+        (graphene.ObjectType,),
+        {
+            "groups": graphene.List(Group),
+            "nodes": graphene.List(GroupNode),
+            "resolve_groups": resolve_groups,
+            "resolve_nodes": resolve_nodes,
+        },
+    )
+
+    ctx = MagicMock()
+    ctx.dataloader_manager = DataLoaderManager()
+    project = ProjectData(
+        id=first,
+        name="project",
+        description=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        modified_at=datetime.now(UTC),
+        integration_name=None,
+        domain_name="default",
+        total_resource_slots=ResourceSlot(),
+        allowed_vfolder_hosts=VFolderHostPermissionMap(),
+        dotfiles=b"",
+        resource_policy="default",
+        type=ProjectType.GENERAL,
+        container_registry=ImageCommitRegistry("harbor", "images"),
+    )
+    loader = ctx.processors.project.bulk_get.run = AsyncMock(
+        return_value=PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ProjectData].succeeded(
+                    first, project, description="resolved"
+                ),
+                PartialBulkEntityResult[ProjectData].succeeded(
+                    second,
+                    replace(project, id=second, container_registry=None),
+                    description="resolved",
+                ),
+            ]
+        )
+    )
+    schema = graphene.Schema(query=query)
+    plain = await schema.execute_async("{ groups { id } }", context_value=ctx)
+    assert plain.errors is None
+    loader.assert_not_awaited()
+    loaded = await schema.execute_async(
+        "{ groups { containerRegistry } nodes { containerRegistry } }", context_value=ctx
+    )
+    assert loaded.errors is None
+    assert loaded.data == {
+        "groups": [
+            {"containerRegistry": '{"registry": "harbor", "project": "images"}'},
+            {"containerRegistry": None},
+        ],
+        "nodes": [{"containerRegistry": '{"registry": "harbor", "project": "images"}'}],
+    }
+    loader.assert_awaited_once()
+    assert list(loader.call_args.args[0].ids) == [first, second]
