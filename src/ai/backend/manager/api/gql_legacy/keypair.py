@@ -401,7 +401,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     async def batch_load_by_email(
         cls,
         graph_ctx: GraphQueryContext,
-        user_ids: Sequence[uuid.UUID],
+        emails: Sequence[str],
         *,
         domain_name: str | None = None,
         is_active: bool | None = None,
@@ -425,7 +425,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .where(keypairs.c.user.in_(user_ids))
+            .where(users.c.email.in_(emails))
             .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
@@ -438,8 +438,8 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 conn,
                 query,
                 cls,
-                user_ids,
-                lambda row: row.user,
+                emails,
+                lambda row: row.email,
             )
 
     @classmethod
