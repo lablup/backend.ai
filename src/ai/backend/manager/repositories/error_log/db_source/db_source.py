@@ -34,6 +34,11 @@ error_log_db_source_resilience = Resilience(
 )
 
 
+# `association_groups_users` is no longer written; project membership lives in the
+# entity graph. Moving the reads below changes which users answer, so they are left
+# to a follow-up.
+
+
 class ErrorLogDBSource:
     _db: ExtendedAsyncSAEngine
 
