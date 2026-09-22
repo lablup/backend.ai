@@ -1,4 +1,4 @@
-"""This node's overlay identity, advertised while it can serve (BEP-1078).
+"""This node's overlay identity, advertised while it can serve (BEP-1079).
 
 Two records under the agent's etcd prefix: its VTEP, which lets the manager pre-seed session
 membership, and its capabilities, which is what ADMITS the node to a cluster-network session. Both

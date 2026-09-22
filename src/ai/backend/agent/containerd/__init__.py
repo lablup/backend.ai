@@ -1,9 +1,9 @@
-"""The containerd agent backend (BEP-1078).
+"""The containerd agent backend (BEP-1079).
 
 Selectable via ``agent.backend = "containerd"``. It drives containerd's native gRPC API -- no
 nerdctl, no ctr -- for the container and image lifecycle, reuses the runtime-neutral compute
 plugins (the same cgroup-based CPU/memory readers every Linux container has), provisions krunner
-natively, and joins a session's network through the shared BEP-1078 session network with its own
+natively, and joins a session's network through the shared BEP-1079 session network with its own
 OCI runtime and locator.
 """
 

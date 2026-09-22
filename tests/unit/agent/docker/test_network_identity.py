@@ -1,4 +1,4 @@
-"""When a Docker agent announces itself and advertises its overlay identity (BEP-1078).
+"""When a Docker agent announces itself and advertises its overlay identity (BEP-1079).
 
 What the advert contains is pinned in tests/unit/agent/network/test_identity.py; these pin when
 the Docker agent publishes it, and what it answers when asked whether it can take work.

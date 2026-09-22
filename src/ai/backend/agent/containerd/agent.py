@@ -1620,7 +1620,7 @@ class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
     _runtime: OciRuntime
-    #: BEP-1078: the shared session half, driving this backend's runtime and locator.
+    #: BEP-1079: the shared session half, driving this backend's runtime and locator.
     _session_network: SessionNetwork
     #: The validated VTEP (see network.vtep); None when this node holds no address that can
     #: anchor a vxlan tunnel, which disables multi-node overlay sessions here.
@@ -1654,7 +1654,7 @@ class ContainerdAgent(
         # get_intrinsic_mounts): a shared one would expose every agent's socket on the host.
         self._agent_sock_path = ipc_base_path / "container" / f"agent-{self.id}" / "agent.sock"
         self._agent_sock_task = None
-        # BEP-1078. host_ip keeps the overlay on the L2 the agents advertise on rather than a
+        # BEP-1079. host_ip keeps the overlay on the L2 the agents advertise on rather than a
         # hard-coded eth0; the VTEP is validated once here because it is what peers program into
         # their FDB, and an address this node cannot be reached at must never reach a session's
         # membership record. None disables the multi-node overlay on this node (ensure_session

@@ -1,4 +1,4 @@
-"""What a node advertises about its overlay identity, and when it takes it back (BEP-1078).
+"""What a node advertises about its overlay identity, and when it takes it back (BEP-1079).
 
 The manager pre-seeds session membership straight from the published VTEP and admits a node to a
 cluster-network session on its capability record. Both guards fall back to "allow" on an absent

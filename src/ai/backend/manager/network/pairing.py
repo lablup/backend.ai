@@ -30,7 +30,7 @@ CAPS_CLOCK_SKEW_SEC = 60.0
 
 # Keep this list implementation-backed: a backend is listed under a driver only once its agent
 # discovery exposes a container locator and publishes cluster-network capabilities. containerd
-# speaks no Swarm, so it serves only the BEP-1078 driver.
+# speaks no Swarm, so it serves only the BEP-1079 driver.
 DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
     "cni": frozenset({"docker", "containerd"}),
     "overlay": frozenset({"docker"}),
