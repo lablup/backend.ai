@@ -8,11 +8,11 @@ Not exercised by any scenario: admin_delete, admin_purge, admin_restore, admin_s
 
 #### [read-targets-in-request-order](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
 
-읽기 권한이 있으면 요청 순서대로 저장 대상을 응답한다
+읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다
 
 Given
 
-- 프로젝트 저장 대상은 True, 일반 사용자의 읽기 권한은 True
+- image commit을 위한 Container Registry 설정은 True, 일반 사용자의 읽기 권한은 True
   - 도메인 domain-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
@@ -26,20 +26,20 @@ Given
 
 When
 
-- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 저장 대상을 두 번 요청한다
+- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
 
 Then
 
-- 요청마다 대상이나 빈 값 또는 권한 거부를 응답한다
+- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
   - targets = [ImageCommitRegistry(registry_name='registry.example.com', project_name='images'), ImageCommitRegistry(registry_name='registry.example.com', project_name='images')]
 
 #### [read-unconfigured-targets](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
 
-읽기 권한이 있고 대상이 없으면 빈 값을 응답한다
+읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다
 
 Given
 
-- 프로젝트 저장 대상은 False, 일반 사용자의 읽기 권한은 True
+- image commit을 위한 Container Registry 설정은 False, 일반 사용자의 읽기 권한은 True
   - 도메인 domain-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
@@ -53,20 +53,20 @@ Given
 
 When
 
-- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 저장 대상을 두 번 요청한다
+- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
 
 Then
 
-- 요청마다 대상이나 빈 값 또는 권한 거부를 응답한다
+- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
   - targets = [None, None]
 
 #### [target-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
 
-읽기 권한이 없으면 저장 대상 조회를 거부한다
+읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다
 
 Given
 
-- 프로젝트 저장 대상은 False, 일반 사용자의 읽기 권한은 False
+- image commit을 위한 Container Registry 설정은 False, 일반 사용자의 읽기 권한은 False
   - 도메인 domain-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 project-1
@@ -77,11 +77,11 @@ Given
 
 When
 
-- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 저장 대상을 두 번 요청한다
+- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
 
 Then
 
-- 요청마다 대상이나 빈 값 또는 권한 거부를 응답한다
+- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
   - count = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission

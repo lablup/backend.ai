@@ -35,12 +35,12 @@ status: draft
 `batch_load_by_ids`, `batch_load_fields`, `get`, `scoped_search`,
 `search_by_domain_name`, `search_by_user`, `unassign_users`.
 
-## 이미지 저장 대상 조회
+## image commit을 위한 Container Registry 조회
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 허용된 프로젝트의 저장 대상을 읽는다 | 프로젝트 읽기 권한과 저장 대상이 있음 | 여러 프로젝트의 저장 대상 조회 | 요청 순서대로 저장 대상을 반환 |
-| 대상 없는 프로젝트를 읽는다 | 프로젝트 읽기 권한은 있으나 저장 대상이 없음 | 저장 대상 조회 | 빈 값 반환 |
-| 권한 없는 프로젝트의 조회를 거부한다 | 프로젝트 읽기 권한이 없음 | 저장 대상 조회 | 해당 프로젝트만 권한 부족으로 거부 |
+| 설정된 Container Registry를 읽는다 | 프로젝트 읽기 권한과 image commit을 위한 Container Registry 설정이 있음 | 여러 프로젝트의 image commit을 위한 Container Registry 조회 | 요청 순서대로 Container Registry를 반환 |
+| Container Registry가 설정되지 않은 프로젝트를 읽는다 | 프로젝트 읽기 권한은 있으나 image commit을 위한 Container Registry 설정이 없음 | image commit을 위한 Container Registry 조회 | 빈 값 반환 |
+| 권한 없는 프로젝트의 조회를 거부한다 | 프로젝트 읽기 권한이 없음 | image commit을 위한 Container Registry 조회 | 해당 프로젝트만 권한 부족으로 거부 |
 
-일반 프로젝트 조회에는 저장 대상 조회가 포함되지 않는다. GraphQL에서 해당 필드를 요청하면 별도로 일괄 조회한다.
+일반 프로젝트 조회에는 image commit을 위한 Container Registry 조회가 포함되지 않는다. GraphQL에서 해당 필드를 요청하면 별도로 일괄 조회한다.
