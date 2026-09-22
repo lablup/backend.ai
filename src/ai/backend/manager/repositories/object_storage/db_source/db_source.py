@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.errors.object_storage import (
@@ -61,21 +60,20 @@ class ObjectStorageDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
-                sa.select(StorageNamespaceRow)
+                sa.select(ObjectStorageRow)
+                .join(
+                    StorageNamespaceRow,
+                    StorageNamespaceRow.storage_id == ObjectStorageRow.id,
+                )
                 .where(StorageNamespaceRow.id == storage_namespace_id)
-                .options(selectinload(StorageNamespaceRow.object_storage_row))
             )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(
-                    f"Object storage with namespace ID {storage_namespace_id} not found."
-                )
-            if row.object_storage_row is None:
-                raise ObjectStorageNotFoundError(
                     f"Object storage not found for namespace ID {storage_namespace_id}."
                 )
-            return ObjectStorageSearchableFields.own.to_data(row.object_storage_row)
+            return ObjectStorageSearchableFields.own.to_data(row)
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """

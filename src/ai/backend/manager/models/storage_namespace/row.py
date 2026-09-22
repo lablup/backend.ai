@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
@@ -14,18 +13,9 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.object_storage import ObjectStorageRow
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("StorageNamespaceRow",)
-
-
-def _get_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.object_storage import ObjectStorageRow
-
-    return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
 class StorageNamespaceRow(Base):
@@ -47,8 +37,3 @@ class StorageNamespaceRow(Base):
         nullable=False,
     )
     namespace: Mapped[str] = mapped_column("namespace", sa.String, nullable=False)
-
-    object_storage_row: Mapped[ObjectStorageRow] = relationship(
-        "ObjectStorageRow",
-        primaryjoin=_get_storage_namespace_join_cond,
-    )
