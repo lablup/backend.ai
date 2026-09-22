@@ -658,7 +658,7 @@ class DeploymentDBSource:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .values(lifecycle_stage=lifecycle)
+                .values(EndpointRow.lifecycle_values(lifecycle))
             )
             result = await db_sess.execute(query)
             updated = cast(CursorResult[Any], result).rowcount > 0
@@ -758,7 +758,7 @@ class DeploymentDBSource:
                         EndpointRow.lifecycle_stage.in_(prevoius_statuses),
                     )
                 )
-                .values(lifecycle_stage=new_status)
+                .values(EndpointRow.lifecycle_values(new_status))
             )
             await db_sess.execute(query)
 

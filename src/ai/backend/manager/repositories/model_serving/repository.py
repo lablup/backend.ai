@@ -309,9 +309,7 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
-            if lifecycle_stage == EndpointLifecycle.DESTROYED:
-                update_values["destroyed_at"] = sa.func.now()
+            update_values: dict[str, Any] = EndpointRow.lifecycle_values(lifecycle_stage)
             if replicas is not None:
                 update_values["replicas"] = replicas
 

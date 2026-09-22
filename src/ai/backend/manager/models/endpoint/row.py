@@ -359,6 +359,18 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
 
     @classmethod
+    def lifecycle_values(cls, lifecycle: EndpointLifecycle) -> dict[str, Any]:
+        """Column values every write that advances ``lifecycle_stage`` must apply.
+
+        Reaching ``DESTROYED`` stamps ``destroyed_at``, which the retention
+        sweep and the searchable fields read.
+        """
+        values: dict[str, Any] = {"lifecycle_stage": lifecycle}
+        if lifecycle == EndpointLifecycle.DESTROYED:
+            values["destroyed_at"] = sa.func.now()
+        return values
+
+    @classmethod
     async def get(
         cls,
         session: AsyncSession,
