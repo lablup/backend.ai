@@ -1,0 +1,5 @@
+import{a8 as g,i as p,am as y,bA as f,gB as K,j as T,bH as b,gC as x,gD as S}from"./index-Dd8bt51s.js";/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+ */const h=t=>{const[e,u]=g(`hiddenColumnKeys.${t}`);return[e,u]},j=t=>{"use memo";const e=p.c(17),{open:u,onRequestClose:c,columns:C,hiddenColumnKeys:r}=t;let s,n,o,l;if(e[0]!==C||e[1]!==r||e[2]!==u){const m=y(C,R);s=K,n=u,o=m;let d;e[7]!==r?(d=r??[],e[7]=r,e[8]=d):d=e[8],l=f(y(m,"key"),d),e[0]=C,e[1]=r,e[2]=u,e[3]=s,e[4]=n,e[5]=o,e[6]=l}else s=e[3],n=e[4],o=e[5],l=e[6];let i;e[9]!==c?(i=m=>c(m?{selectedColumnKeys:m.selectedColumnKeys}:void 0),e[9]=c,e[10]=i):i=e[10];let a;return e[11]!==s||e[12]!==n||e[13]!==o||e[14]!==l||e[15]!==i?(a=T.jsx(s,{open:n,columns:o,visibleColumnKeys:l,disableReorder:!0,onRequestClose:i}),e[11]=s,e[12]=n,e[13]=o,e[14]=l,e[15]=i,e[16]=a):a=e[16],a};function R(t){const e=b(t.key);return{key:e,label:x(S(t)).trim()||e,required:!!t.required}}export{j as T,h as u};
+//# sourceMappingURL=TableColumnsSettingModal-DgR7v79I.js.map
