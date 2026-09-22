@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
@@ -15,6 +15,7 @@ from ai.backend.manager.models.service_catalog.row import (
     ServiceCatalogEndpointRow,
     ServiceCatalogRow,
 )
+from ai.backend.manager.models.service_catalog.types import ServiceCatalogEndpointRowJson
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
@@ -150,7 +151,7 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
     """Derived: the endpoint rows as JSON, aggregated by the searcher's subquery."""
 
     @staticmethod
-    def _endpoint_from_json(endpoint: dict[str, Any]) -> ServiceCatalogEndpointData:
+    def _endpoint_from_json(endpoint: ServiceCatalogEndpointRowJson) -> ServiceCatalogEndpointData:
         """One element of ``ServiceCatalogRow.endpoint_rows``, keyed by column name."""
         return ServiceCatalogEndpointData(
             id=ServiceCatalogID(UUID(endpoint["id"])),
