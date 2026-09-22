@@ -186,6 +186,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             event_producer=setup_input.event_producer,
             sokovan_orchestrator=sokovan_orchestrator,
             retention_repository=setup_input.retention_repository,
+            valkey_live=setup_input.valkey_live,
         )
         leader_election = await stack.enter_dependency(
             leader_dep,
