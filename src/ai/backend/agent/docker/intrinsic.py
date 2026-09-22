@@ -88,14 +88,16 @@ def _allocated_cpu_millicores(
     ctx: StatContext,
     container_ids: Iterable[str],
 ) -> dict[str, Decimal]:
-    wanted = set(container_ids)
-    result: dict[str, Decimal] = {}
+    target_container_ids = set(container_ids)
+    millicores_by_container: dict[str, Decimal] = {}
     for kernel in ctx.agent.kernel_registry.values():
-        if kernel.container_id is None or kernel.container_id not in wanted:
+        if kernel.container_id is None or kernel.container_id not in target_container_ids:
             continue
-        cores = kernel.resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")]
-        result[kernel.container_id] = sum(cores.values(), Decimal(0)) * _MILLICORES_PER_CORE
-    return result
+        cpu_slots_by_core = kernel.resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")]
+        millicores_by_container[kernel.container_id] = (
+            sum(cpu_slots_by_core.values(), Decimal(0)) * _MILLICORES_PER_CORE
+        )
+    return millicores_by_container
 
 
 @dataclasses.dataclass(frozen=True)
