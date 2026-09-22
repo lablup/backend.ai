@@ -31,6 +31,13 @@ pants_ignore = [
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 unmatched_build_file_globs = "error"
+# A repo-wide goal (`check ::`, `test ::`) holds more than the 4GiB default, so pantsd
+# is restarted mid-run. The restart lands in the middle of a write to the machine-wide
+# LMDB store at ~/.cache/pants/lmdb_store, which every checkout shares, and a torn
+# freelist there stops pants in all of them until the store is rebuilt.
+# The value is a resident-size ceiling per daemon, and there is one daemon per
+# checkout, so a machine running several at once needs headroom for each.
+pantsd_max_memory_usage = "6GiB"
 
 [anonymous-telemetry]
 enabled = false
