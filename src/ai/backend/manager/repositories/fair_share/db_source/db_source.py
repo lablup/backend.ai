@@ -79,6 +79,11 @@ if TYPE_CHECKING:
 __all__ = ("FairShareDBSource",)
 
 
+# `association_groups_users` is no longer written; project membership lives in the
+# entity graph. Moving the reads below changes which users answer, so they are left
+# to a follow-up.
+
+
 class FairShareDBSource:
     """Database source for Fair Share operations."""
 
