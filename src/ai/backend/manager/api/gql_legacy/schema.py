@@ -40,6 +40,9 @@ from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+    LookupProjectResourcePolicyAction,
+)
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
@@ -2215,6 +2218,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         name: str,
     ) -> ProjectResourcePolicy:
         ctx: GraphQueryContext = info.context
+        # Same rule as the keypair and user policies: the resolved policy answers for
+        # the read.
+        await ctx.processors.project_resource_policy.lookup.run(
+            LookupProjectResourcePolicyAction(name=name)
+        )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "ProjectResourcePolicy.by_name",

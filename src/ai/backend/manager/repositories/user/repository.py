@@ -43,6 +43,9 @@ from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
@@ -69,6 +72,7 @@ user_repository_resilience = Resilience(
 class UserRepository:
     _db_source: UserDBSource
     _v2_ops: V2DBOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _key_provider_pool: KeyProviderPool
 
     def __init__(
@@ -76,10 +80,14 @@ class UserRepository:
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
-        self._db_source = UserDBSource(db, v2_ops_provider, share_ops_provider, key_provider_pool)
+        self._db_source = UserDBSource(
+            db, v2_ops_provider, share_ops_provider, policy_ops_provider, key_provider_pool
+        )
         self._v2_ops = v2_ops_provider
+        self._policy_ops = policy_ops_provider
         self._key_provider_pool = key_provider_pool
 
     @user_repository_resilience.apply()
@@ -256,7 +264,7 @@ class UserRepository:
     async def _create_keypair(
         self, user_id: UserID, creator: KeyPairCreator
     ) -> GeneratedKeyPairData:
-        async with self._v2_ops.write_ops() as w:
+        async with self._policy_ops.write_ops() as w:
             keypair = await w.create_field(
                 user_id,
                 KeypairCreator(
@@ -267,6 +275,7 @@ class UserRepository:
                     rate_limit=creator.rate_limit,
                 ),
             )
+            await w.restate_keypair_resource_policy_share(user_id)
         return GeneratedKeyPairData(keypair=keypair)
 
     @user_repository_resilience.apply()
@@ -277,20 +286,22 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def purge_keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Remove one keypair unless it is the key its user authorizes with."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._policy_ops.write_ops() as w:
             data = await w.purge_field_entity(NonDefaultKeypairPurger(keypair_id=keypair_id))
             if data is None:
                 raise KeyPairNotFound(f"Keypair not found: {keypair_id}")
+            await w.restate_keypair_resource_policy_share(UserID(data.user_id))
             return data
 
     @user_repository_resilience.apply()
     async def update_keypair(self, updater: KeypairUpdater) -> KeyPairData:
         """Write one keypair's settings unless the write would deactivate the key its
         user authorizes with."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._policy_ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
                 raise KeyPairNotFound(f"Keypair not found: {updater.target_id_value()}")
+            await w.restate_keypair_resource_policy_share(UserID(data.user_id))
             return data
 
     @user_repository_resilience.apply()

@@ -13,9 +13,11 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
@@ -25,6 +27,7 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
     CreateProjectDotfileActionResult,
@@ -74,6 +77,15 @@ class ProjectService:
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
+
+    async def create_project(
+        self, action: CreateProjectAction
+    ) -> CreatedEntityOpsResult[ProjectData]:
+        """Register a project. Not the generic create: a project is also lent the
+        resource policy it is subject to, in the same transaction."""
+        return CreatedEntityOpsResult(
+            data=await self._group_repository.create_project(action.to_creator())
+        )
 
     async def update_group(self, action: UpdateProjectAction) -> UpdateProjectActionResult:
         group_data = await self._group_repository.modify_validated(action.updater)

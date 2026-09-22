@@ -5,6 +5,7 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     AdminSearchKeypairResourcePoliciesInput,
     AdminSearchProjectResourcePoliciesInput,
@@ -20,7 +21,10 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateUserResourcePolicyInput,
 )
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
-from ai.backend.manager.api.rest.v2.path_params import ResourcePolicyNamePathParam
+from ai.backend.manager.api.rest.v2.path_params import (
+    ProjectIdPathParam,
+    ResourcePolicyNamePathParam,
+)
 
 
 class V2ResourcePolicyHandler:
@@ -161,4 +165,11 @@ class V2ResourcePolicyHandler:
         result = await self._adapter.admin_delete_project_resource_policy(
             DeleteProjectResourcePolicyInput(name=path.parsed.name)
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_project_resource_policy(
+        self,
+        path: PathParam[ProjectIdPathParam],
+    ) -> APIResponse:
+        result = await self._adapter.get_project_resource_policy(ProjectID(path.parsed.project_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

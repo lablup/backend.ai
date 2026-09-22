@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     AdminSearchKeypairResourcePoliciesInput,
     AdminSearchProjectResourcePoliciesInput,
     AdminSearchUserResourcePoliciesInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -259,3 +263,19 @@ async def admin_project_resource_policies_v2(
         ),
         count=payload.total_count,
     )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get the resource policy the named project is subject to.",
+    )
+)  # type: ignore[misc]
+async def scoped_project_resource_policy_v2(
+    info: Info[StrawberryGQLContext],
+    project_id: strawberry.ID,
+) -> ProjectResourcePolicyV2GQL | None:
+    node = await info.context.adapters.resource_policy.get_project_resource_policy(
+        ProjectID(UUID(project_id))
+    )
+    return ProjectResourcePolicyV2GQL.from_pydantic(node)
