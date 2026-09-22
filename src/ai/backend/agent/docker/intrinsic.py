@@ -84,7 +84,7 @@ pruned_disk_types = frozenset([
 ])
 
 
-def _allocated_cpu_millicores(
+def _allocated_millicores_by_container(
     ctx: StatContext,
     container_ids: Iterable[str],
 ) -> dict[str, Decimal]:
@@ -356,7 +356,7 @@ class CPUPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        allocated_millicores = _allocated_cpu_millicores(ctx, container_ids)
+        allocated_millicores = _allocated_millicores_by_container(ctx, container_ids)
 
         q = Decimal("0.000")
         per_container_cpu_used = {}
@@ -428,7 +428,7 @@ class CPUPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        allocated_millicores = _allocated_cpu_millicores(ctx, pid_map.values())
+        allocated_millicores = _allocated_millicores_by_container(ctx, pid_map.values())
         for (pid, cid), cpu_used in zip(pid_map_list, results, strict=True):
             if cpu_used is None:
                 continue
