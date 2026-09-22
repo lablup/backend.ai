@@ -1,4 +1,4 @@
-"""프로젝트 설정과 별도로 저장 대상을 읽는다."""
+"""프로젝트 설정과 별도로 image commit을 위한 Container Registry를 읽는다."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -51,7 +51,7 @@ class ProjectWithReadPermission(Given[SeedingSession, ProjectAndTarget]):
 
     @override
     def describe(self) -> str:
-        return f"프로젝트 저장 대상은 {self.configured}, 일반 사용자의 읽기 권한은 {self.may_read}"
+        return f"image commit을 위한 Container Registry 설정은 {self.configured}, 일반 사용자의 읽기 권한은 {self.may_read}"
 
     @override
     async def lay(self, seeding: SeedingSession) -> ProjectAndTarget:
@@ -81,7 +81,7 @@ class ReadingTargets(When[ProjectAndTarget, ProjectAdapter, Targets]):
 
     @override
     def describe(self, laid: ProjectAndTarget) -> str:
-        return "같은 프로젝트의 저장 대상을 두 번 요청한다"
+        return "같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다"
 
     @override
     async def call(self, adapter: ProjectAdapter, laid: ProjectAndTarget) -> Targets:
@@ -97,7 +97,7 @@ class TargetsInRequestOrder(Then[ProjectAndTarget, Targets]):
 
     @override
     def says(self) -> str:
-        return "요청마다 대상이나 빈 값 또는 권한 거부를 응답한다"
+        return "요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다"
 
     @override
     def look(self, laid: ProjectAndTarget, answered: Answered[Targets]) -> list[Verdict]:
@@ -146,15 +146,16 @@ class ReadTargetsScenario(Scenario[SeedingSession, ProjectAndTarget, ProjectAdap
 SCENARIOS = [
     ReadTargetsScenario(
         "read-targets-in-request-order",
-        "읽기 권한이 있으면 요청 순서대로 저장 대상을 응답한다",
+        "읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다",
         configured=True,
     ),
     ReadTargetsScenario(
-        "read-unconfigured-targets", "읽기 권한이 있고 대상이 없으면 빈 값을 응답한다"
+        "read-unconfigured-targets",
+        "읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다",
     ),
     ReadTargetsScenario(
         "target-read-requires-permission",
-        "읽기 권한이 없으면 저장 대상 조회를 거부한다",
+        "읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다",
         may_read=False,
     ),
 ]
