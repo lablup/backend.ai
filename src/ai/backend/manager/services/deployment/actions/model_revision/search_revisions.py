@@ -4,33 +4,28 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.scopes import (
-    DeploymentRevisionOperationScope,
+    DeploymentRevisionTarget,
 )
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchRevisionsAction(OperationScopeOpsAction[DeploymentRevisionRow, ModelRevisionData]):
-    """Page through the revisions of one deployment.
+class SearchRevisionsAction(BulkScopedSearchOpsAction[DeploymentRevisionRow, ModelRevisionData]):
+    """Page through the revisions of the deployments named, combined with OR.
 
-    The deployment is the scope, so ops applies that condition. Reading every
-    deployment's revisions is the global variant, which says so in its shape.
+    Every deployment is authorized before the read runs. Reading every deployment's
+    revisions is the global variant, which says so in its shape.
     """
 
-    deployment_id: DeploymentID
+    deployment_ids: Sequence[DeploymentID]
     searcher: ModelRevisionSearcher
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
 
     @override
     @classmethod
@@ -38,14 +33,15 @@ class SearchRevisionsAction(OperationScopeOpsAction[DeploymentRevisionRow, Model
         return "search_revisions"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (
-            ScopeRef(scope_type=ScopeType(DEPLOYMENT_ENTITY_TYPE), scope_id=self.deployment_id),
-        )
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.deployment_ids)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentRevisionOperationScope(deployment_id=self.deployment_id),)
+        return [
+            DeploymentRevisionTarget(deployment_id=deployment_id)
+            for deployment_id in self.deployment_ids
+        ]
 
     @override
     def to_searcher(self) -> ModelRevisionSearcher:

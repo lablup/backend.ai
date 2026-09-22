@@ -14,7 +14,6 @@ from sqlalchemy.sql.selectable import Select
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -95,26 +94,6 @@ class ResourcePresetRow(Base):
             return result
         except sa.exc.IntegrityError:
             return None
-
-    @classmethod
-    async def delete(
-        cls,
-        query_option: QueryOption,
-        *,
-        db_session: AsyncSession,
-    ) -> None:
-        base_delete_stmt = sa.delete(ResourcePresetRow)
-        filtered_stmt = query_option(base_delete_stmt)
-        await db_session.execute(filtered_stmt)
-
-    def to_dataclass(self) -> ResourcePresetData:
-        return ResourcePresetData(
-            id=ResourcePresetID(self.id),
-            name=self.name,
-            resource_slots=self.resource_slots,
-            shared_memory=self.shared_memory,
-            resource_group_name=self.scaling_group_name,
-        )
 
 
 # For compatibility

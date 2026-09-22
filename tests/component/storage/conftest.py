@@ -4,11 +4,11 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
-from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
+from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -53,7 +53,9 @@ def object_storage_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ObjectStorageProcessors:
     artifact_repository = ArtifactRepository(database_engine, V2DBOpsProvider(database_engine))
-    object_storage_repository = ObjectStorageRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     service = ObjectStorageService(
         artifact_repository=artifact_repository,
@@ -64,9 +66,9 @@ def object_storage_processors(
         config_provider=config_provider,
     )
     return ObjectStorageProcessors(
-        processor_registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+        processor_registry.group(GroupMeta(ObjectStorageEntityType())),
+        processor_registry.group(GroupMeta(ArtifactEntityType())).field_group(
+            FieldGroupMeta(ArtifactRevisionFieldType()),
             ArtifactRevisionData,
             LookupArtifactRevisionOwnerAction,
             LookupBulkArtifactRevisionOwnerAction,
@@ -78,9 +80,12 @@ def object_storage_processors(
 @pytest.fixture()
 def storage_namespace_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> StorageNamespaceProcessors:
     return StorageNamespaceProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
+        group=ops_processor_group(
+            database_engine, GroupMeta(StorageNamespaceEntityType()), config_provider
+        )
     )
 
 
@@ -90,13 +95,13 @@ def vfs_storage_processors(
     storage_manager: StorageSessionManager,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
-    vfs_storage_repository = VFSStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFSStorageService(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
     return VFSStorageProcessors(
-        processor_registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(VFSStorageEntityType())), service
     )
 
 

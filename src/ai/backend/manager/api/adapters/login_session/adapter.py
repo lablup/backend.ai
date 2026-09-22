@@ -35,6 +35,7 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
     GlobalRevokeLoginSessionAction,
@@ -45,18 +46,21 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
     SearchLoginSessionsAction,
 )
 from ai.backend.manager.services.auth.actions.unblock_user import GlobalUnblockUserAction
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _LOGIN_SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginSessionOrders.created_at(ascending=False),
-    backward_order=LoginSessionOrders.created_at(ascending=True),
-    forward_condition_factory=LoginSessionConditions.by_cursor_forward,
-    backward_condition_factory=LoginSessionConditions.by_cursor_backward,
-    tiebreaker_order=LoginSessionRow.id.asc(),
+    cursor_column=LoginSessionRow.id,
 )
 
 
 class LoginSessionAdapter(BaseAdapter):
     """Adapter for login session domain operations."""
+
+    _auth: AuthProcessors
+
+    def __init__(self, auth: AuthProcessors) -> None:
+        self._auth = auth
 
     async def admin_search(
         self, input: AdminSearchLoginSessionsInput
@@ -76,8 +80,8 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.global_search_login_sessions.run(
-            GlobalSearchLoginSessionsAction(searcher=searcher)
+        action_result = await self._auth.global_search_login_sessions.run(
+            GlobalSearchLoginSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchLoginSessionsPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -108,8 +112,8 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.search_login_sessions.run(
-            SearchLoginSessionsAction(user_id=UserID(me.user_id), searcher=searcher)
+        action_result = await self._auth.search_login_sessions.run(
+            SearchLoginSessionsAction(user_ids=[UserID(me.user_id)], searcher=searcher)
         )
         return MySearchLoginSessionsPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -120,14 +124,14 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def my_revoke(self, input: MyRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke a login session owned by the current user."""
-        action_result = await self._processors.auth.revoke_login_session.run(
+        action_result = await self._auth.revoke_login_session.run(
             RevokeLoginSessionAction(session_id=LoginSessionID(input.session_id))
         )
         return RevokeLoginSessionPayload(success=action_result.success)
 
     async def admin_revoke(self, input: AdminRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke any login session (admin, no ownership check)."""
-        action_result = await self._processors.auth.global_revoke_login_session.run(
+        action_result = await self._auth.global_revoke_login_session.run(
             GlobalRevokeLoginSessionAction(
                 session_id=input.session_id,
             )
@@ -136,7 +140,7 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def admin_unblock_user(self, input: AdminUnblockUserInput) -> UnblockUserPayload:
         """Clear the failed-login rate limit block for a user (admin only)."""
-        action_result = await self._processors.auth.global_unblock_user.run(
+        action_result = await self._auth.global_unblock_user.run(
             GlobalUnblockUserAction(username=input.username)
         )
         return UnblockUserPayload(success=action_result.success)
@@ -225,6 +229,7 @@ class LoginSessionAdapter(BaseAdapter):
     def _data_to_node(data: LoginSessionData) -> LoginSessionNode:
         return LoginSessionNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             access_key=data.access_key,
             status=LoginSessionStatus(data.status.value),

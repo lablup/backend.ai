@@ -24,8 +24,8 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
@@ -45,19 +45,17 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
-from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -73,18 +71,16 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 @pytest.fixture()
 def vfolder_admin_processors(
-    database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderAdminProcessors:
-    repo = VFolderAdminRepository(database_engine)
-    service = VFolderAdminService(vfolder_admin_repository=repo)
-    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
+    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFolderEntityType())))
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
     vfolder_processors: VFolderProcessors,
     vfolder_admin_processors: VFolderAdminProcessors,
     vfolder_file_processors: VFolderFileProcessors,
@@ -96,6 +92,7 @@ def server_module_registries(
     v1_reg = register_vfolder_routes(
         VFolderHandler(
             auth=auth_processors,
+            user=user_processors,
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
@@ -108,7 +105,9 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
     processors.vfolder_admin = vfolder_admin_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(
+        processors.vfolder, MagicMock(), processors.vfolder_admin, MagicMock(), MagicMock()
+    )
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))
@@ -179,7 +178,7 @@ async def _fetch_scope_graph(
                 sa.select(sa.func.count())
                 .select_from(scopes)
                 .where(
-                    scopes.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    scopes.c.entity_type == VFolderEntityType(),
                     scopes.c.entity_id == vfolder_id,
                 )
             )
@@ -194,9 +193,9 @@ async def _fetch_scope_graph(
                     )
                 )
                 .where(
-                    members.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    members.c.entity_type == VFolderEntityType(),
                     members.c.entity_id == vfolder_id,
-                    scopes.c.entity_type == PROJECT_SCOPE_TYPE,
+                    scopes.c.entity_type == ProjectEntityType(),
                     scopes.c.entity_id == owner_project_id,
                 )
             )
@@ -317,7 +316,7 @@ class TestVFolderClonePolicyCheck:
 
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.clone(
-                cloneable_project_vfolder["name"],
+                str(cloneable_project_vfolder["id"]),
                 CloneVFolderReq(target_name="cloned-should-fail"),
             )
         assert exc_info.value.status == 400
@@ -349,7 +348,7 @@ class TestVFolderClonePolicyCheck:
         await vfolder_factory(name="user-vf-2-clone-ok")
 
         result = await admin_registry.vfolder.clone(
-            cloneable_project_vfolder["name"],
+            str(cloneable_project_vfolder["id"]),
             CloneVFolderReq(target_name="cloned-should-succeed"),
         )
         assert result.root.name == "cloned-should-succeed"
@@ -380,7 +379,7 @@ class TestVFolderCloneResponseFormat:
         """
         _configure_clone_storage_mock(storage_manager)
 
-        source_name = cloneable_project_vfolder["name"]
+        source_name = str(cloneable_project_vfolder["id"])
         raw = await admin_registry._client._request(
             "POST",
             f"/folders/{source_name}/clone",

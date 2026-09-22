@@ -83,6 +83,10 @@ from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
+from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
+from ai.backend.manager.actions.v2.membership.monitor.base import MembershipActionMonitor
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
+from ai.backend.manager.actions.v2.membership.validator.base import MembershipActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateEntityOpsAction,
     AtomicCreateGlobalEntityOpsAction,
@@ -104,6 +108,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     DeleteSingleEntityOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
+    GlobalSearcherOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkGetEntityOpsAction,
@@ -112,6 +117,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     PurgeEntityOpsAction,
     RestorePartialBulkOpsAction,
     RestoreSingleEntityOpsAction,
+    ScopedSearchOpsAction,
     SearchGlobalOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
@@ -169,6 +175,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalCreateWithFieldsService,
     GlobalPartialBulkPurgeService,
     GlobalRoleManagedEntityCreateService,
+    GlobalSearcherService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
@@ -179,6 +186,7 @@ from ai.backend.manager.services.ops.service import (
     RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
+    ScopedSearchService,
     SearchService,
     UpdateService,
 )
@@ -311,20 +319,20 @@ class ProcessorGroup[TData: EntityData]:
         action_cls: type[TAction],
         func: Callable[[TAction], Awaitable[PartialBulkResult[TValue]]],
         *,
-        atomic_validators: Sequence[AtomicBulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> PartialBulkActionProcessor[TAction, TValue]:
         """Several entities read or written by a service, answered for one by one.
 
         The service answers with the standard result, so the processor is the one that
-        completes and orders it. Gated atomically for now: nothing narrows until the
-        permission check answers per entity.
+        completes and orders it. Gated per entity: a denied one is a failed item, and
+        the service runs over the action narrowed to the rest.
         """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
         return PartialBulkActionProcessor(
             func,
             monitors=(*self._deps.monitors.bulk, *monitors),
-            atomic_validators=(*self._deps.validators.atomic_bulk, *atomic_validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def legacy_partial_bulk[TAction: BaseBulkAction, TResult: BasePartialBulkActionResult](
@@ -397,7 +405,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> PublicActionProcessor[TAction, TResult]:
         """Global state every authenticated caller may read.
 
-        The SUPERADMIN gate is replaced by an authentication check; the constructor
+        The global gate is replaced by an authentication check; the constructor
         rejects anything that is not a read, so a write cannot reach this path.
         """
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PUBLIC, ActionBacking.CUSTOM)
@@ -445,6 +453,22 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def membership[TAction: BaseMembershipAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[MembershipActionValidator] = (),
+        monitors: Sequence[MembershipActionMonitor] = (),
+    ) -> MembershipActionProcessor[TAction, TResult]:
+        """An entity of this type entering scopes or leaving them."""
+        self._record(action_cls, ActionKind.MEMBERSHIP, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return MembershipActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.membership, *monitors),
+            validators=(*self._deps.validators.membership, *validators),
         )
 
     def lookup[TAction: BaseLookupAction, TResult: BaseLookupActionResult](
@@ -683,7 +707,21 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+    def scoped_search_ops[TAction: ScopedSearchOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator[ScopedSearchOpsAction[Any, Any]]] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, ScopedBatchOpsResult[TData]]:
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            ScopedSearchService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -692,7 +730,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TData]]:
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
+            GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

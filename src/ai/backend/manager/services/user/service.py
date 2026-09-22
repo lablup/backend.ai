@@ -11,7 +11,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
@@ -67,16 +67,12 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
-    AdminSearchKeypairsAction,
-    AdminSearchKeypairsActionResult,
     GetKeypairAction,
     GetKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     PurgeKeypairAction,
     PurgeKeypairActionResult,
-    SearchMyKeypairsAction,
-    SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
     UpdateKeypairAction,
@@ -325,15 +321,6 @@ class UserService:
         )
         return SwitchDefaultAccessKeyActionResult(success=True)
 
-    async def search_my_keypairs(
-        self, action: SearchMyKeypairsAction
-    ) -> SearchMyKeypairsActionResult:
-        """Search keypairs owned by the current user."""
-        result = await self._user_repository.search_my_keypairs(
-            scope=action.scope(), querier=action.querier
-        )
-        return SearchMyKeypairsActionResult(result=result)
-
     async def admin_create_keypair(
         self, action: AdminCreateKeypairAction
     ) -> AdminCreateKeypairActionResult:
@@ -342,13 +329,6 @@ class UserService:
             user_id=action.user_id, creator=action.creator
         )
         return AdminCreateKeypairActionResult(generated_data=generated)
-
-    async def admin_search_keypairs(
-        self, action: AdminSearchKeypairsAction
-    ) -> AdminSearchKeypairsActionResult:
-        """Admin search all keypairs."""
-        result = await self._user_repository.admin_search_keypairs(querier=action.querier)
-        return AdminSearchKeypairsActionResult(result=result)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 
@@ -417,7 +397,7 @@ class UserService:
     async def update_bootstrap_script(
         self, action: UpdateBootstrapScriptAction
     ) -> UpdateBootstrapScriptActionResult:
-        script = action.script.strip()
+        script = normalize_newlines(action.script).strip()
         if len(script) > MAXIMUM_DOTFILE_SIZE:
             raise DotfileCreationFailed("Maximum bootstrap script length reached")
         keypair = await self._user_repository.admin_get_keypair(action.access_key)

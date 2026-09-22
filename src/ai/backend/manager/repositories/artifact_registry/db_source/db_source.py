@@ -8,6 +8,9 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
+from ai.backend.manager.models.artifact_registries.searchable_fields import (
+    ArtifactRegistrySearchableFields,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -27,7 +30,7 @@ class ArtifactRegistryDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
-            return row.to_dataclass()
+            return ArtifactRegistrySearchableFields.own.to_data(row)
 
     async def get_artifact_registry_data_by_name(self, registry_name: str) -> ArtifactRegistryData:
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -37,7 +40,7 @@ class ArtifactRegistryDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {registry_name} not found")
-            return row.to_dataclass()
+            return ArtifactRegistrySearchableFields.own.to_data(row)
 
     async def get_artifact_registry_type(self, registry_id: uuid.UUID) -> ArtifactRegistryType:
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -55,4 +58,4 @@ class ArtifactRegistryDBSource:
         async with self._db.begin_readonly_session() as session:
             result = await session.execute(sa.select(ArtifactRegistryRow))
             rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
+            return [ArtifactRegistrySearchableFields.own.to_data(row) for row in rows]

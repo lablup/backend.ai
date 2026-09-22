@@ -24,7 +24,9 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -36,6 +38,7 @@ from ai.backend.common.types import (
     MountPermission,
     SessionId,
     SlotName,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -56,7 +59,6 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
-    AutoScalingRuleSearchResult,
     DeploymentConfig,
     DeploymentHandlerCategory,
     DeploymentInfo,
@@ -64,7 +66,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoWithAutoScalingRules,
     DeploymentOptions,
     DeploymentPolicyData,
-    DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentRevisionReadBundle,
     DeploymentWithHistory,
@@ -86,23 +87,29 @@ from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
+from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchers import (
+    DeploymentAccessTokenSearcher,
+    DeploymentIDSearcher,
+    DeploymentInfoSearcher,
+)
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentUpdater,
     EndpointLifecycleBatchUpdater,
 )
+from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.deployment.types import (
     DeploymentHistoryToCreate,
     RouteData,
@@ -112,6 +119,10 @@ from ai.backend.manager.repositories.deployment.types import (
     RouteSessionKernelInfo,
 )
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
@@ -161,6 +172,7 @@ class DeploymentRepository:
     _valkey_stat: ValkeyStatClient
     _valkey_live: ValkeyLiveClient
     _valkey_schedule: ValkeyScheduleClient
+    _permission_check: RbacPermissionCheckRepository
 
     def __init__(
         self,
@@ -170,6 +182,7 @@ class DeploymentRepository:
         valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
         valkey_schedule: ValkeyScheduleClient,
+        permission_check: RbacPermissionCheckRepository,
     ) -> None:
         self._db_source = DeploymentDBSource(db, reconcile_ops_provider, storage_manager)
         self._reconcile_ops = reconcile_ops_provider
@@ -177,6 +190,7 @@ class DeploymentRepository:
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
         self._valkey_schedule = valkey_schedule
+        self._permission_check = permission_check
 
     # Endpoint operations
 
@@ -332,10 +346,10 @@ class DeploymentRepository:
     async def search_deployments_with_last_history(
         self,
         *,
-        querier: BatchQuerier,
+        searcher: DeploymentInfoSearcher,
         category: DeploymentHandlerCategory,
     ) -> list[DeploymentWithHistory]:
-        """Search deployments via ``querier`` and attach the last history
+        """Search deployments via ``searcher`` and attach the last history
         row scoped to ``category`` (or ``None``) to each result.
 
         The coordinator compares ``last_history.phase`` with the current
@@ -343,7 +357,7 @@ class DeploymentRepository:
         carry retry counts forward.
         """
         return await self._db_source.search_deployments_with_last_history(
-            querier=querier,
+            searcher=searcher,
             category=category,
         )
 
@@ -531,34 +545,48 @@ class DeploymentRepository:
         return await self._storage_source.fetch_model_definition(vfolder_location, candidates)
 
     @deployment_repository_resilience.apply()
-    async def resolve_vfolder_permissions(
-        self,
-        vfolder_ids: Sequence[VFolderUUID],
-    ) -> dict[VFolderUUID, MountPermission]:
-        """Snapshot the stored permission of each vfolder as a ``MountPermission``.
-
-        Used at revision-write time to resolve caller-supplied
-        ``MountInfo.mount_perm=None`` (inherit) into a concrete value
-        before persisting — see
-        ``DeploymentDBSource.resolve_vfolder_permissions`` for the exact
-        (minimal) check set.
-        """
-        return await self._db_source.resolve_vfolder_permissions(vfolder_ids)
-
-    @deployment_repository_resilience.apply()
     async def resolve_user_vfolder_permissions(
         self,
         user_id: uuid.UUID,
         vfolder_ids: Sequence[VFolderUUID],
     ) -> dict[VFolderUUID, MountPermission]:
-        """Resolve the requester's effective permission on each vfolder.
+        """The level the requester mounts each vfolder at, frozen onto the revision.
 
-        Used at revision-write time to ground the model vfolder mount
-        permission into the requesting user's own permission (and to reject
-        a request exceeding it) — see
-        ``DeploymentDBSource.resolve_user_vfolder_permissions``.
+        Raises ``VFolderNotFound`` for a vfolder the requester may not read and
+        ``VFolderPermissionError`` for one that mounts to them at no level.
         """
-        return await self._db_source.resolve_user_vfolder_permissions(user_id, vfolder_ids)
+        requester = UserID(user_id)
+        held = await self._permission_check.held_permissions(requester, vfolder_ids)
+        inputs = await self._db_source.vfolder_mount_policy_inputs(requester, vfolder_ids)
+        permissions: dict[VFolderUUID, MountPermission] = {}
+        unreadable: list[str] = []
+        unmountable: list[str] = []
+        for vfolder_id in vfolder_ids:
+            bits = held.get(vfolder_id, Permission.NONE)
+            folder = inputs.get(vfolder_id)
+            if folder is None or not bits.covers(Permission.READ):
+                unreadable.append(str(vfolder_id))
+                continue
+            level = resolve_mount_policy(
+                requester,
+                owner_user_id=folder.owner_user_id,
+                default_mount_permission=folder.default_mount_permission,
+                held=bits,
+                user_policy=folder.user_policy,
+            )
+            if level == VFolderMountPolicy.NONE:
+                unmountable.append(str(vfolder_id))
+                continue
+            permissions[vfolder_id] = MountPermission(level.value)
+        if unreadable:
+            raise VFolderNotFound(
+                f"VFolder not accessible by user {user_id}: {', '.join(unreadable)}"
+            )
+        if unmountable:
+            raise VFolderPermissionError(
+                f"VFolder not mountable by user {user_id}: {', '.join(unmountable)}"
+            )
+        return permissions
 
     @deployment_repository_resilience.apply()
     async def fetch_deployment_config(
@@ -669,25 +697,25 @@ class DeploymentRepository:
     async def search_route_datas(
         self,
         *,
-        querier: BatchQuerier,
+        searcher: RouteDataSearcher,
     ) -> list[RouteData]:
-        """Search routes via :class:`BatchQuerier`.
+        """Search routes.
 
-        The caller composes ``querier`` with every filter that applies;
-        pagination is part of the querier (use ``NoPagination`` for
+        The caller composes ``searcher`` with every filter that applies;
+        pagination is part of the searcher (use ``NoPagination`` for
         unbounded scans).
         """
-        return await self._db_source.search_route_datas(querier=querier)
+        return await self._db_source.search_route_datas(searcher=searcher)
 
     async def search_route_datas_with_last_history(
         self,
         *,
-        querier: BatchQuerier,
+        searcher: RouteDataSearcher,
         category: RouteHandlerCategory,
     ) -> list[RouteData]:
         """Search routes with last history per category attached."""
         return await self._db_source.search_route_datas_with_last_history(
-            querier=querier, category=category
+            searcher=searcher, category=category
         )
 
     @deployment_repository_resilience.apply()
@@ -1177,22 +1205,22 @@ class DeploymentRepository:
     async def fetch_route_connection_infos(
         self,
         *,
-        route_querier: BatchQuerier,
+        route_searcher: RouteInfoSearcher,
     ) -> Mapping[uuid.UUID, list[AppProxyRouteEntry]]:
-        """Resolve routing-table entries per endpoint via a caller-composed querier."""
+        """Resolve routing-table entries per endpoint via a caller-composed searcher."""
         return await self._db_source.fetch_route_connection_infos(
-            route_querier=route_querier,
+            route_searcher=route_searcher,
         )
 
     @deployment_repository_resilience.apply()
-    async def search_deployment_ids(self, *, querier: BatchQuerier) -> list[DeploymentID]:
-        """Search deployment ids using ``BatchQuerier``.
+    async def search_deployment_ids(self, *, searcher: DeploymentIDSearcher) -> list[DeploymentID]:
+        """Search deployment ids.
 
         Filter composition is moved to the call site via
-        :class:`DeploymentConditions` so the selection criteria
+        the deployment's searchable fields so the selection criteria
         (e.g. active-lifecycle filter) is explicit.
         """
-        return await self._db_source.search_deployment_ids(querier=querier)
+        return await self._db_source.search_deployment_ids(searcher=searcher)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_id_by_session(
@@ -1343,10 +1371,10 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_revisions(
         self,
-        querier: BatchQuerier,
+        searcher: ModelRevisionSearcher,
     ) -> RevisionSearchResult:
         """Search deployment revisions with pagination and filtering."""
-        return await self._db_source.search_revisions(querier)
+        return await self._db_source.search_revisions(searcher)
 
     @deployment_repository_resilience.apply()
     async def get_latest_revision_number(
@@ -1431,12 +1459,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def delete_deployment_policy(
         self,
-        purger: Purger[DeploymentPolicyRow],
-    ) -> PurgerResult[DeploymentPolicyRow] | None:
-        """Delete a deployment policy by primary key.
+        purger: DeploymentPolicyPurger,
+    ) -> DeploymentPolicyData | None:
+        """Delete a deployment policy.
 
         Returns:
-            PurgerResult containing the deleted row, or None if no policy existed.
+            The deleted policy, or None if no policy existed.
         """
         return await self._db_source.delete_deployment_policy(purger)
 
@@ -1479,26 +1507,18 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def search_routes(
         self,
-        querier: BatchQuerier,
+        searcher: RouteInfoSearcher,
     ) -> RouteSearchResult:
-        """Search routes with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-
-        Returns:
-            RouteSearchResult with items, total_count, and pagination info
-        """
-        return await self._db_source.search_routes(querier)
+        """Search routes with pagination and filtering."""
+        return await self._db_source.search_routes(searcher)
 
     @deployment_repository_resilience.apply()
     async def search_revision_resource_slots(
         self,
-        revision_id: DeploymentRevisionID,
-        querier: BatchQuerier,
+        searcher: RevisionResourceSlotSearcher,
     ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
         """Search resource slots allocated to a deployment revision."""
-        return await self._db_source.search_revision_resource_slots(revision_id, querier)
+        return await self._db_source.search_revision_resource_slots(searcher)
 
     @deployment_repository_resilience.apply()
     async def get_route(
@@ -1516,31 +1536,15 @@ class DeploymentRepository:
         return await self._db_source.get_route(route_id)
 
     @deployment_repository_resilience.apply()
-    async def search_endpoints(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentInfoSearchResult:
-        """Search endpoints (modern, light: revision *ids* only)."""
-        return await self._db_source.search_endpoints(querier)
-
-    @deployment_repository_resilience.apply()
     async def search_legacy_endpoints(
         self,
-        querier: BatchQuerier,
+        searcher: DeploymentInfoSearcher,
     ) -> DeploymentInfoSearchResult:
         """Search endpoints (legacy, full: includes the current/deploying
-        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        revision data). DO NOT USE in new code — the v2 surface reads through
+        ``DeploymentSearcher``.
         """
-        return await self._db_source.search_legacy_endpoints(querier)
-
-    @deployment_repository_resilience.apply()
-    async def search_endpoints_in_scopes(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> DeploymentInfoSearchResult:
-        """The modern search of :meth:`search_endpoints`, restricted to the scopes (OR)."""
-        return await self._db_source.search_endpoints_in_scopes(querier, scopes)
+        return await self._db_source.search_legacy_endpoints(searcher)
 
     # ========== Access Token Operations ==========
 
@@ -1572,57 +1576,22 @@ class DeploymentRepository:
     async def bulk_delete_access_tokens(
         self,
         token_ids: list[uuid.UUID],
-    ) -> list[uuid.UUID]:
+    ) -> list[ModelDeploymentAccessTokenData]:
         """Delete multiple access tokens."""
         return await self._db_source.bulk_delete_access_tokens(token_ids)
 
     # ========== Additional Search Operations ==========
 
     @deployment_repository_resilience.apply()
-    async def search_auto_scaling_rules(
-        self,
-        querier: BatchQuerier,
-    ) -> AutoScalingRuleSearchResult:
-        """Search auto-scaling rules with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            AutoScalingRuleSearchResult with items, total_count, and pagination info.
-        """
-        return await self._db_source.search_auto_scaling_rules(querier)
-
     @deployment_repository_resilience.apply()
     async def search_access_tokens(
         self,
-        querier: BatchQuerier,
+        searcher: DeploymentAccessTokenSearcher,
     ) -> AccessTokenSearchResult:
-        """Search access tokens with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            AccessTokenSearchResult with items, total_count, and pagination info.
-        """
-        return await self._db_source.search_access_tokens(querier)
+        """Search access tokens with pagination and filtering."""
+        return await self._db_source.search_access_tokens(searcher)
 
     @deployment_repository_resilience.apply()
-    async def search_deployment_policies(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentPolicySearchResult:
-        """Search deployment policies with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            DeploymentPolicySearchResult with items, total_count, and pagination info.
-        """
-        return await self._db_source.search_deployment_policies(querier)
-
     @deployment_repository_resilience.apply()
     async def apply_strategy_mutations(
         self,

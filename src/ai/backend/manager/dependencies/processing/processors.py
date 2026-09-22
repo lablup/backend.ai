@@ -10,7 +10,6 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.v2 import validators as v2_validators
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.factory import create_processors
 from ai.backend.manager.services.processors import (
     ProcessorArgs,
@@ -27,7 +26,6 @@ class ProcessorsProviderInput:
     action_monitors: ActionMonitors
     event_hub: EventHub
     event_fetcher: EventFetcher
-    validators: ActionValidators
     v2_validators: v2_validators.ActionValidators
 
 
@@ -59,6 +57,5 @@ class ProcessorsDependency(
                 validators=setup_input.v2_validators,
             ),
             setup_input.action_monitors,
-            setup_input.validators,
         )
         yield bundle

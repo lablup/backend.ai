@@ -7,8 +7,10 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringInMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.manager.models.clauses import QueryCondition
+
+type StringColumn = sa.orm.InstrumentedAttribute[Any] | sa.sql.expression.ColumnElement[Any]
 
 
 def make_correlated_exists(
@@ -36,7 +38,7 @@ def make_correlated_exists(
 
 
 def make_string_in_factory(
-    column: sa.orm.InstrumentedAttribute[Any],
+    column: StringColumn,
 ) -> Callable[[StringInMatchSpec], QueryCondition]:
     """Create a factory for string ``IN`` conditions on the given column.
 
@@ -75,43 +77,50 @@ def make_string_in_factory(
     return factory
 
 
-def make_nested_string_in_factory(
-    column: sa.orm.InstrumentedAttribute[Any],
-    exists_wrapper: Callable[
-        [sa.sql.expression.ColumnElement[bool]], sa.sql.expression.ColumnElement[bool]
-    ],
-) -> Callable[[StringInMatchSpec], QueryCondition]:
-    """Create a factory for string ``IN`` conditions wrapped in an EXISTS subquery.
+class StringConditions:
+    """String match condition factories for one column.
 
-    Same semantics as ``make_string_in_factory`` but wraps the produced
-    ``IN`` predicate inside the supplied ``exists_wrapper`` so that the
-    resulting condition matches rows whose related entity satisfies the
-    column predicate.
-
-    Usage::
-
-        class DomainConditions:
-            by_user_username_in = staticmethod(
-                make_nested_string_in_factory(
-                    UserRow.username,
-                    lambda c: DomainConditions._exists_user(c),
-                )
-            )
+    Exposes ``contains``, ``equals``, ``starts_with``, ``ends_with`` and ``in_``,
+    the factories ``convert_string_filter`` asks for. A column mapped through a
+    ``TypeDecorator`` over ``VARCHAR`` is passed as
+    ``sa.type_coerce(MyRow.col, sa.String())`` so the bind value stays a string.
     """
 
-    def factory(spec: StringInMatchSpec) -> QueryCondition:
+    _column: StringColumn
+
+    def __init__(self, column: StringColumn) -> None:
+        self._column = column
+
+    def _like(self, pattern: str, spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.func.lower(column).in_([v.lower() for v in spec.values])
-            else:
-                condition = column.in_(spec.values)
-            if spec.negated:
-                condition = sa.not_(condition)
-            return exists_wrapper(condition)
+            condition = (
+                self._column.ilike(pattern) if spec.case_insensitive else self._column.like(pattern)
+            )
+            return sa.not_(condition) if spec.negated else condition
 
         return inner
 
-    return factory
+    def contains(self, spec: StringMatchSpec) -> QueryCondition:
+        return self._like(f"%{spec.value}%", spec)
+
+    def starts_with(self, spec: StringMatchSpec) -> QueryCondition:
+        return self._like(f"{spec.value}%", spec)
+
+    def ends_with(self, spec: StringMatchSpec) -> QueryCondition:
+        return self._like(f"%{spec.value}", spec)
+
+    def equals(self, spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(self._column) == spec.value.lower()
+            else:
+                condition = self._column == spec.value
+            return sa.not_(condition) if spec.negated else condition
+
+        return inner
+
+    def in_(self, spec: StringInMatchSpec) -> QueryCondition:
+        return make_string_in_factory(self._column)(spec)
 
 
 def make_int_conditions(

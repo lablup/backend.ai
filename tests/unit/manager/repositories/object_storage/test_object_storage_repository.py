@@ -12,10 +12,11 @@ import pytest
 
 from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
 from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -124,7 +125,9 @@ class TestObjectStorageRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ObjectStorageRepository, None]:
         """Create ObjectStorageRepository instance with database"""
-        repo = ObjectStorageRepository(db=db_with_cleanup)
+        repo = ObjectStorageRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
         yield repo
 
     # =========================================================================
@@ -203,7 +206,7 @@ class TestObjectStorageRepository:
         sample_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ObjectStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -212,7 +215,7 @@ class TestObjectStorageRepository:
             orders=[],
         )
 
-        result = await object_storage_repository.search(querier=querier)
+        result = await object_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -223,7 +226,7 @@ class TestObjectStorageRepository:
         sample_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ObjectStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -232,7 +235,7 @@ class TestObjectStorageRepository:
             orders=[],
         )
 
-        result = await object_storage_repository.search(querier=querier)
+        result = await object_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -243,7 +246,7 @@ class TestObjectStorageRepository:
         sample_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ObjectStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -252,7 +255,7 @@ class TestObjectStorageRepository:
             orders=[],
         )
 
-        result = await object_storage_repository.search(querier=querier)
+        result = await object_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -267,7 +270,7 @@ class TestObjectStorageRepository:
         sample_storages_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching Object storages ordered by name ascending"""
-        querier = BatchQuerier(
+        searcher = ObjectStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -281,7 +284,7 @@ class TestObjectStorageRepository:
             orders=[ObjectStorageRow.name.asc()],
         )
 
-        result = await object_storage_repository.search(querier=querier)
+        result = await object_storage_repository.search(searcher=searcher)
 
         result_names = [storage.name for storage in result.items]
         assert result_names == sorted(result_names)
@@ -292,7 +295,7 @@ class TestObjectStorageRepository:
         sample_storages_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching Object storages ordered by name descending"""
-        querier = BatchQuerier(
+        searcher = ObjectStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -306,7 +309,7 @@ class TestObjectStorageRepository:
             orders=[ObjectStorageRow.name.desc()],
         )
 
-        result = await object_storage_repository.search(querier=querier)
+        result = await object_storage_repository.search(searcher=searcher)
 
         result_names = [storage.name for storage in result.items]
         assert result_names == sorted(result_names, reverse=True)
@@ -321,7 +324,7 @@ class TestObjectStorageRepository:
         sample_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching Object storages with pagination, filter, and ordering combined"""
-        querier = BatchQuerier(
+        searcher = ObjectStorageSearcher(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -330,7 +333,7 @@ class TestObjectStorageRepository:
             orders=[ObjectStorageRow.name.asc()],
         )
 
-        result = await object_storage_repository.search(querier=querier)
+        result = await object_storage_repository.search(searcher=searcher)
 
         # Total matching storages: 25, so total_count should be 25
         assert result.total_count == 25

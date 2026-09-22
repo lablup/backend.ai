@@ -11,6 +11,9 @@ from ai.backend.manager.data.storage_namespace.types import (
     StorageNamespaceData,
 )
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -39,7 +42,7 @@ class StorageNamespaceDBSource:
                 raise StorageNamespaceNotFoundError(
                     f"Storage namespace with namespace {namespace} not found."
                 )
-            return row.to_dataclass()
+            return StorageNamespaceSearchableFields.own.to_data(row)
 
     async def get_by_id(self, storage_namespace_id: uuid.UUID) -> StorageNamespaceData:
         """
@@ -55,4 +58,4 @@ class StorageNamespaceDBSource:
                 raise StorageNamespaceNotFoundError(
                     f"Storage namespace ID {storage_namespace_id} not found."
                 )
-            return row.to_dataclass()
+            return StorageNamespaceSearchableFields.own.to_data(row)

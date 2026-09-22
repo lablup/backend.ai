@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ArtifactAvailability,
@@ -66,6 +67,9 @@ class ArtifactRevisionNode(BaseResponseModel):
     """Node model representing an artifact revision entity."""
 
     id: UUID = Field(description="Artifact revision ID")
+    field_id: UUID = Field(
+        description=f"UUID of the artifact revision. Added in {NEXT_RELEASE_VERSION}.",
+    )
     artifact_id: UUID = Field(description="Parent artifact ID")
     version: str = Field(description="Revision version string")
     size: str | None = Field(default=None, description="Revision size in bytes")
@@ -84,6 +88,9 @@ class ArtifactNode(BaseResponseModel):
     """Node model representing an artifact entity with optional nested revisions."""
 
     id: UUID = Field(description="Artifact ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the artifact. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Artifact name")
     type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")
@@ -212,6 +219,9 @@ class ArtifactGQLNode(BaseResponseModel):
     """GQL-layer node DTO with resolved registry and source URLs."""
 
     id: UUID = Field(description="Artifact ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the artifact. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Artifact name")
     type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")

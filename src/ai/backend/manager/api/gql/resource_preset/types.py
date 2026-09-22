@@ -34,6 +34,7 @@ from ai.backend.common.dto.manager.v2.resource_preset.response import (
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
     UpdateResourcePresetPayload as UpdateResourcePresetPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
@@ -95,6 +96,12 @@ class ResourcePresetOrderFieldGQL(StrEnum):
 class ResourcePresetGQL(PydanticNodeMixin[ResourcePresetNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the resource preset."
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the resource preset.",
+        ),
     )
     name: str = gql_field(description="Resource preset name.")
     resource_slots: list[ResourceSlotEntryGQL] = gql_field(
@@ -202,9 +209,9 @@ class CreateResourcePresetPayloadGQL(PydanticOutputMixin[CreateResourcePresetPay
 )
 class UpdateResourcePresetInputGQL(PydanticInputMixin[UpdateResourcePresetInputDTO]):
     id: UUID = gql_field(description="UUID of the resource preset to update.")
-    name: str | None = gql_field(default=None, description="Updated name.")
+    name: str | None = gql_field(default=strawberry.UNSET, description="Updated name.")
     resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
-        default=None, description="Updated resource slot allocations."
+        default=strawberry.UNSET, description="Updated resource slot allocations."
     )
     shared_memory: BinarySizeInputGQL | None = gql_field(
         default=strawberry.UNSET,

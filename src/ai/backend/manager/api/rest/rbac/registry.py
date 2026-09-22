@@ -37,20 +37,8 @@ def register_rbac_routes(handler: RBACHandler, route_deps: RouteDeps) -> RouteRe
 
     # Scope routes
     reg.add("GET", "/scope-types", handler.get_scope_types, middlewares=[auth_required])
-    reg.add(
-        "POST",
-        "/scopes/{scope_type}/search",
-        handler.search_scopes,
-        middlewares=[auth_required],
-    )
 
     # Entity routes
     reg.add("GET", "/entity-types", handler.get_entity_types, middlewares=[auth_required])
-    reg.add(
-        "POST",
-        "/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search",
-        handler.search_entities,
-        middlewares=[auth_required],
-    )
 
     return reg

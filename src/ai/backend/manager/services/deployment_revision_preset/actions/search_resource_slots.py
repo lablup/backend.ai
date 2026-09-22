@@ -4,15 +4,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment_preset import (
-    DEPLOYMENT_PRESET_ENTITY_TYPE,
-    DeploymentPresetID,
-)
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
-    DeploymentPresetSlotOperationScope,
+    DeploymentPresetSlotTarget,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
@@ -23,36 +20,29 @@ from ai.backend.manager.models.scopes import OperationScope
 
 @dataclass
 class SearchPresetResourceSlotsAction(
-    OperationScopeOpsAction[PresetResourceSlotRow, PresetResourceSlotData]
+    BulkScopedSearchOpsAction[PresetResourceSlotRow, PresetResourceSlotData]
 ):
-    """Page through the slot amounts inside one preset.
+    """Page through the slot amounts inside the presets named, combined with OR.
 
-    The preset is the scope, so ops applies that condition. There is no unpaginated
-    variant -- a caller that wants every slot passes no pagination.
+    Every preset is authorized before the read runs. There is no unpaginated variant --
+    a caller that wants every slot passes no pagination.
     """
 
-    preset_id: DeploymentPresetID
+    preset_ids: Sequence[DeploymentPresetID]
     searcher: PresetResourceSlotSearcher
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_PRESET_ENTITY_TYPE
-
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (
-            ScopeRef(scope_type=ScopeType(DEPLOYMENT_PRESET_ENTITY_TYPE), scope_id=self.preset_id),
-        )
-
-    @override
-    def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentPresetSlotOperationScope(preset_id=self.preset_id),)
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "search_deployment_preset_resource_slots"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.preset_ids)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return [DeploymentPresetSlotTarget(preset_id=preset_id) for preset_id in self.preset_ids]
 
     @override
     def to_searcher(self) -> PresetResourceSlotSearcher:

@@ -62,6 +62,7 @@ from ai.backend.manager.services.export.actions import (
     GetReportAction,
     ListReportsAction,
 )
+from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
 
 from .adapter import ExportAdapter
@@ -72,10 +73,17 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class _CSVExportResult(Protocol):
     """Structural type shared by all CSV export action results."""
 
-    field_names: list[str]
-    row_iterator: AsyncIterator[Sequence[Sequence[Any]]]
-    encoding: str
-    filename: str
+    @property
+    def field_names(self) -> list[str]: ...
+
+    @property
+    def row_iterator(self) -> AsyncIterator[Sequence[Sequence[Any]]]: ...
+
+    @property
+    def encoding(self) -> str: ...
+
+    @property
+    def filename(self) -> str: ...
 
 
 USERS_REPORT_KEY = "users"
@@ -324,8 +332,8 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export session data as CSV scoped to a project."""
-        report_result = await self._export.get_report.run(
-            GetReportAction(report_key=SESSIONS_REPORT_KEY)
+        report_result = await self._export.public_get_report.run(
+            PublicGetReportAction(report_key=SESSIONS_REPORT_KEY)
         )
         query = self._adapter.build_session_query(
             report=report_result.report,
@@ -357,8 +365,8 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export user data as CSV scoped to a domain."""
-        report_result = await self._export.get_report.run(
-            GetReportAction(report_key=USERS_REPORT_KEY)
+        report_result = await self._export.public_get_report.run(
+            PublicGetReportAction(report_key=USERS_REPORT_KEY)
         )
         query = self._adapter.build_user_query(
             report=report_result.report,
@@ -390,8 +398,8 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export session data as CSV scoped to the current user."""
-        report_result = await self._export.get_report.run(
-            GetReportAction(report_key=SESSIONS_REPORT_KEY)
+        report_result = await self._export.public_get_report.run(
+            PublicGetReportAction(report_key=SESSIONS_REPORT_KEY)
         )
         query = self._adapter.build_session_query(
             report=report_result.report,
@@ -422,8 +430,8 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export keypair data as CSV scoped to the current user."""
-        report_result = await self._export.get_report.run(
-            GetReportAction(report_key=KEYPAIRS_REPORT_KEY)
+        report_result = await self._export.public_get_report.run(
+            PublicGetReportAction(report_key=KEYPAIRS_REPORT_KEY)
         )
         query = self._adapter.build_keypair_query(
             report=report_result.report,

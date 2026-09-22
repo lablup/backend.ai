@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from typing import Any, Self, override
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import CIStrEnum
 
 
@@ -48,6 +51,21 @@ class ModelDeploymentStatus(CIStrEnum):
             if alias is not None:
                 return cls(alias)
         return super()._missing_(value)
+
+    @classmethod
+    def from_lifecycle(cls, lifecycle: EndpointLifecycle) -> ModelDeploymentStatus:
+        """The v2 status of a lifecycle phase; replica scaling is ``scaling_state``, not a status."""
+        match lifecycle:
+            case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
+                return cls.PENDING
+            case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
+                return cls.READY
+            case EndpointLifecycle.DEPLOYING:
+                return cls.DEPLOYING
+            case EndpointLifecycle.DESTROYING:
+                return cls.STOPPING
+            case EndpointLifecycle.DESTROYED:
+                return cls.STOPPED
 
 
 class DeploymentStrategy(CIStrEnum):

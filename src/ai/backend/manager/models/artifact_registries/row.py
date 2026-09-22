@@ -7,10 +7,8 @@ from typing import TYPE_CHECKING, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -72,11 +70,3 @@ class ArtifactRegistryRow(Base):
     @override
     def __str__(self) -> str:
         return f"ArtifactRegistryRow(id={self.id}, registry_id={self.registry_id}, type={self.type}, name={self.name})"
-
-    def to_dataclass(self) -> ArtifactRegistryData:
-        return ArtifactRegistryData(
-            id=ArtifactRegistryID(self.id),
-            registry_id=self.registry_id,
-            name=self.name,
-            type=ArtifactRegistryType(self.type),
-        )

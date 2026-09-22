@@ -33,14 +33,13 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
-from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
+from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -111,10 +110,10 @@ container_registry_iv = t.Dict({}) | t.Dict({
 class AssocGroupUserRow(Base):
     """DEPRECATED -- scheduled for sunset.
 
-    Project membership is moving to ``association_scopes_entities`` (ASE) with
-    ``scope_type=PROJECT, entity_type=USER`` as the single source of truth. New
-    code MUST query ASE; do not add new readers or writers against this table.
-    The table itself will be dropped after every reader is migrated.
+    Project membership is moving to the virtual entity graph, where the user is a
+    member of the project's virtual entity. New code MUST read the graph; do not add
+    new readers or writers against this table. The table itself will be dropped after
+    every reader is migrated.
     """
 
     __tablename__ = "association_groups_users"
@@ -139,8 +138,8 @@ class AssocGroupUserRow(Base):
     )
 
 
-# DEPRECATED: scheduled for sunset; project membership lives in
-# `association_scopes_entities`. Do not use in new code.
+# DEPRECATED: scheduled for sunset; project membership lives in the virtual entity
+# graph. Do not use in new code.
 association_groups_users = AssocGroupUserRow.__table__
 
 
@@ -239,30 +238,12 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[ProjectID]:
         return cls.id
 
     @classmethod
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
-
-    def to_data(self) -> ProjectData:
-        return ProjectData(
-            id=self.id,
-            name=self.name,
-            description=self.description,
-            is_active=self.is_active,
-            created_at=self.created_at,
-            modified_at=self.updated_at,
-            integration_name=self.integration_id,  # DB column is integration_id
-            domain_name=self.domain_name,
-            total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            dotfiles=self.dotfiles,
-            resource_policy=self.resource_policy,
-            type=self.type,
-            container_registry=self.container_registry,
-        )
 
     @classmethod
     async def get(
@@ -334,7 +315,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
         Returns:
             The ProjectRow instance that matches the project ID.
         Raises:
-            ObjectNotFound: If the project not found.
+            ProjectNotFound: If the project not found.
         """
         rows = await cls.query_by_condition(
             [by_id(project_id)],
@@ -342,7 +323,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
             db=db,
         )
         if not rows:
-            raise ObjectNotFound(f"Project with id {project_id} not found")
+            raise ProjectNotFound(f"Project with id {project_id} not found")
         return rows[0]
 
 
@@ -720,32 +701,6 @@ class ProjectPermissionContextBuilder(
         cls,
     ) -> frozenset[ProjectPermission]:
         return MEMBER_PERMISSIONS
-
-
-async def get_projects(
-    target_scope: ScopeType,
-    requested_permission: ProjectPermission,
-    project_id: uuid.UUID | None = None,
-    project_name: str | None = None,
-    *,
-    ctx: ClientContext,
-    db_conn: SAConnection,
-) -> list[ProjectModel]:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        builder = ProjectPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        query_stmt = await permission_ctx.build_query()
-        if query_stmt is None:
-            return []
-        if project_id is not None:
-            query_stmt = query_stmt.where(ProjectRow.id == project_id)
-        if project_name is not None:
-            query_stmt = query_stmt.where(ProjectRow.name == project_name)
-        result: list[ProjectModel] = []
-        async for row in await db_session.stream_scalars(query_stmt):
-            permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(ProjectModel.from_row(row, permissions))
-    return result
 
 
 async def get_permission_ctx(

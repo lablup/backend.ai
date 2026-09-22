@@ -16,7 +16,7 @@ class ContainerRegistryData(EntityData):
     username: str | None
     password: str | None
     ssl_verify: bool | None
-    is_global: bool | None
+    is_global: bool
     # TODO: Add proper type
     extra: dict[str, Any] | None
 
@@ -53,3 +53,12 @@ class PerProjectContainerRegistryInfo:
     ssl_verify: bool
     is_global: bool
     extra: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ImageCommitRegistry:
+    registry_name: str
+    project_name: str | None
+
+    def to_json(self) -> dict[str, str | None]:
+        return {"registry": self.registry_name, "project": self.project_name}

@@ -16,6 +16,7 @@ from ai.backend.client.cli.v2.helpers import (
     load_v2_config,
     print_result,
 )
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 
 
 @click.group()
@@ -35,8 +36,9 @@ def deployment() -> None:
 @click.option("--name-contains", default=None, type=str, help="Filter by name (contains).")
 @click.option(
     "--status",
+    type=click.Choice([status.value for status in ModelDeploymentStatus], case_sensitive=False),
     multiple=True,
-    help="Filter by status (repeatable, e.g., --status ACTIVE --status DEGRADED).",
+    help="Filter by status (repeatable, e.g., --status DEPLOYING --status READY).",
 )
 @click.option(
     "--open-to-public",
@@ -222,12 +224,15 @@ def update(
     from ai.backend.common.dto.manager.v2.deployment.request import (
         UpdateDeploymentInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     body = UpdateDeploymentInput(
-        name=name,
-        replica_count=replicas,
-        open_to_public=open_to_public,
-        preferred_domain_name=preferred_domain_name,
+        name=name if name is not None else UNSET,
+        replica_count=replicas if replicas is not None else UNSET,
+        open_to_public=open_to_public if open_to_public is not None else UNSET,
+        preferred_domain_name=(
+            preferred_domain_name if preferred_domain_name is not None else UNSET
+        ),
     )
 
     async def _run() -> None:

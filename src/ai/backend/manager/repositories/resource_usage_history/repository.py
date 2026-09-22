@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -20,17 +21,22 @@ from ai.backend.common.resilience import (
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_usage_history.types import (
-    DomainUsageBucketData,
     KernelUsageRecordData,
-    ProjectUsageBucketData,
-    UserUsageBucketData,
 )
+from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
+)
+from ai.backend.manager.models.specs.creator import NestedFieldToCreate
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
@@ -42,12 +48,7 @@ from .db_source import ResourceUsageHistoryDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.fair_share import UsageBucketAggregationResult
-    from ai.backend.manager.models.resource_usage_history import (
-        DomainUsageBucketRow,
-        KernelUsageRecordRow,
-        ProjectUsageBucketRow,
-        UserUsageBucketRow,
-    )
+    from ai.backend.manager.models.resource_usage_history import KernelUsageRecordRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -77,35 +78,40 @@ class ResourceUsageHistoryRepository:
 
     _db_source: ResourceUsageHistoryDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = ResourceUsageHistoryDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
+        self._db_source = ResourceUsageHistoryDBSource(db, v2_ops)
 
     # ==================== Kernel Usage Records ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def create_kernel_usage_record(
         self,
-        creator: Creator[KernelUsageRecordRow],
+        kernel_id: KernelID,
+        creator: KernelUsageRecordCreator,
     ) -> KernelUsageRecordData:
         """Create a single kernel usage record."""
-        return await self._db_source.create_kernel_usage_record(creator)
+        return await self._db_source.create_kernel_usage_record(kernel_id, creator)
 
     @resource_usage_history_repository_resilience.apply()
     async def bulk_create_kernel_usage_records(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
     ) -> list[KernelUsageRecordData]:
         """Bulk create kernel usage records.
 
         This is the primary method used by UsageAggregationService to record
         per-period usage slices for all running kernels.
         """
-        return await self._db_source.bulk_create_kernel_usage_records(bulk_creator)
+        return await self._db_source.bulk_create_kernel_usage_records(creations)
 
     @resource_usage_history_repository_resilience.apply()
     async def bulk_create_kernel_usage_records_with_observation_update(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
         kernel_observation_times: Mapping[uuid.UUID, datetime],
     ) -> tuple[list[KernelUsageRecordData], int]:
         """Bulk create kernel usage records and update observation timestamps atomically.
@@ -124,13 +130,15 @@ class ResourceUsageHistoryRepository:
             Tuple of (created records data, number of kernels with updated observation times)
         """
         return await self._db_source.bulk_create_kernel_usage_records_with_observation_update(
-            bulk_creator, kernel_observation_times
+            creations, kernel_observation_times
         )
 
     @resource_usage_history_repository_resilience.apply()
     async def record_fair_share_observation(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
         kernel_observation_times: Mapping[uuid.UUID, datetime],
         aggregation_result: UsageBucketAggregationResult,
         decay_unit_days: int = 1,
@@ -157,97 +165,49 @@ class ResourceUsageHistoryRepository:
             Tuple of (created records data, number of kernels with updated observation times)
         """
         return await self._db_source.record_fair_share_observation(
-            bulk_creator, kernel_observation_times, aggregation_result, decay_unit_days
+            creations, kernel_observation_times, aggregation_result, decay_unit_days
         )
 
     @resource_usage_history_repository_resilience.apply()
     async def search_kernel_usage_records(
         self,
-        querier: BatchQuerier,
+        searcher: KernelUsageRecordSearcher,
     ) -> KernelUsageRecordSearchResult:
         """Search kernel usage records with pagination."""
-        return await self._db_source.search_kernel_usage_records(querier)
+        return await self._db_source.search_kernel_usage_records(searcher)
 
     # ==================== Domain Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
-    async def create_domain_usage_bucket(
-        self,
-        creator: Creator[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Create a new domain usage bucket."""
-        return await self._db_source.create_domain_usage_bucket(creator)
-
-    @resource_usage_history_repository_resilience.apply()
-    async def upsert_domain_usage_bucket(
-        self,
-        upserter: Upserter[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Upsert a domain usage bucket."""
-        return await self._db_source.upsert_domain_usage_bucket(upserter)
-
-    @resource_usage_history_repository_resilience.apply()
     async def search_domain_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: DomainUsageBucketOperationScope | None = None,
+        searcher: DomainUsageBucketSearcher,
+        scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        return await self._db_source.search_domain_usage_buckets(querier, scope)
+        return await self._db_source.search_domain_usage_buckets(searcher, scope)
 
     # ==================== Project Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
-    async def create_project_usage_bucket(
-        self,
-        creator: Creator[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Create a new project usage bucket."""
-        return await self._db_source.create_project_usage_bucket(creator)
-
-    @resource_usage_history_repository_resilience.apply()
-    async def upsert_project_usage_bucket(
-        self,
-        upserter: Upserter[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Upsert a project usage bucket."""
-        return await self._db_source.upsert_project_usage_bucket(upserter)
-
-    @resource_usage_history_repository_resilience.apply()
     async def search_project_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: ProjectUsageBucketOperationScope | None = None,
+        searcher: ProjectUsageBucketSearcher,
+        scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        return await self._db_source.search_project_usage_buckets(querier, scope)
+        return await self._db_source.search_project_usage_buckets(searcher, scope)
 
     # ==================== User Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
-    async def create_user_usage_bucket(
-        self,
-        creator: Creator[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Create a new user usage bucket."""
-        return await self._db_source.create_user_usage_bucket(creator)
-
-    @resource_usage_history_repository_resilience.apply()
-    async def upsert_user_usage_bucket(
-        self,
-        upserter: Upserter[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Upsert a user usage bucket."""
-        return await self._db_source.upsert_user_usage_bucket(upserter)
-
-    @resource_usage_history_repository_resilience.apply()
     async def search_user_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: UserUsageBucketOperationScope | None = None,
+        searcher: UserUsageBucketSearcher,
+        scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        return await self._db_source.search_user_usage_buckets(querier, scope)
+        return await self._db_source.search_user_usage_buckets(searcher, scope)
 
     # ==================== Aggregation Queries ====================
 

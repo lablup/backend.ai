@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHandler
@@ -19,6 +19,10 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
@@ -37,7 +41,7 @@ def resource_group_processors(
     repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo)
     return ResourceGroupProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 
@@ -47,9 +51,9 @@ def domain_processors(
 ) -> DomainProcessors:
     """The handler resolves the caller's domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
@@ -65,13 +69,14 @@ def project_processors(
         repository=ProjectRepository(
             database_engine,
             V2DBOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
             config_provider,
             valkey_clients.stat,
             storage_manager,
         )
     )
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, repositories)
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.app_config_definition import (
-    APP_CONFIG_DEFINITION_ENTITY_TYPE,
+    AppConfigDefinitionEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
@@ -19,8 +19,8 @@ class CreateAppConfigDefinitionAction(
 ):
     """Register a config name.
 
-    Global-shaped: the definition catalog belongs to no scope. The scope shape it wore
-    before always named the global one with an empty id.
+    Global-shaped: the definition catalog is created in the `global` scope. The scope
+    shape it wore before always named the global one with an empty id.
     """
 
     creator: AppConfigDefinitionCreator
@@ -28,7 +28,7 @@ class CreateAppConfigDefinitionAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return APP_CONFIG_DEFINITION_ENTITY_TYPE
+        return AppConfigDefinitionEntityType()
 
     @override
     @classmethod

@@ -3,7 +3,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import LegacyDeploymentData
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
 
 
@@ -13,7 +13,7 @@ class GlobalSearchLegacyDeploymentsAction(DeploymentGlobalAction):
     NOT USE in new code — v2 / GraphQL use ``GlobalSearchDeploymentsAction``.
     """
 
-    querier: BatchQuerier
+    searcher: DeploymentInfoSearcher
 
     @override
     @classmethod

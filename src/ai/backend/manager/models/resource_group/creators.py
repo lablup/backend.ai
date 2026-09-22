@@ -8,7 +8,7 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import ResourceGroupConflict
@@ -26,13 +26,19 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.specs.creator import RoleManagedGlobalEntityCreator
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
 
 @dataclass
-class ResourceGroupCreator(RoleManagedGlobalEntityCreator[ResourceGroupRow, ResourceGroupData]):
+class ResourceGroupCreator(
+    CreatedInGlobal[ResourceGroupRow], RoleManagedEntityCreator[ResourceGroupRow, ResourceGroupData]
+):
     """Registers a resource group, the scope its agents and sessions are created under.
 
     Joins nothing: the domain and project associations are written by the allow and
@@ -59,7 +65,7 @@ class ResourceGroupCreator(RoleManagedGlobalEntityCreator[ResourceGroupRow, Reso
 
     @override
     def template_value(self, row: ResourceGroupRow) -> ScopeTemplateValue:
-        return ScopeTemplateValue(id=row.id, name=row.name, type=RESOURCE_GROUP_SCOPE_TYPE)
+        return ScopeTemplateValue(id=row.id, name=row.name, type=ResourceGroupEntityType())
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -90,7 +96,7 @@ class ResourceGroupCreator(RoleManagedGlobalEntityCreator[ResourceGroupRow, Reso
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return row.to_dataclass()
+        return ResourceGroupSearchableFields.own.to_data(row)
 
 
 @dataclass

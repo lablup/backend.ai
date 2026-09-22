@@ -11,6 +11,9 @@ from ai.backend.manager.data.retention.types import RetentionCategory
 from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 
 
@@ -36,10 +39,18 @@ class TestRetentionPolicyRow:
     @pytest.fixture
     async def db(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-        async with with_tables(database_connection, [RetentionPolicyRow]):
-            yield database_connection
+        async with with_tables(
+            global_entity_ids,
+            [
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                RetentionPolicyRow,
+            ],
+        ):
+            yield global_entity_ids
 
     async def test_insert_and_read_back(self, db: ExtendedAsyncSAEngine) -> None:
         async with db.begin_session() as sess:

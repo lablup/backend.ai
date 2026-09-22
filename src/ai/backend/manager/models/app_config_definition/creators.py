@@ -9,13 +9,15 @@ from ai.backend.common.data.entity.app_config_definition import (
 )
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class AppConfigDefinitionCreator(
-    GlobalEntityCreator[AppConfigDefinitionRow, AppConfigDefinitionData]
+    CreatedInGlobal[AppConfigDefinitionRow],
+    EntityCreator[AppConfigDefinitionRow, AppConfigDefinitionData],
 ):
     """Creator for one registered config name."""
 

@@ -1,24 +1,26 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Annotated, cast
 
 import strawberry
 from strawberry import Info
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
     AgentResourceGQL,
     AgentStatsGQL,
+    AgentUsageGQL,
     AgentV2Connection,
     AgentV2Edge,
     AgentV2GQL,
     UpdateAgentResourceGroupInputGQL,
     UpdateAgentResourceGroupPayloadGQL,
 )
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -49,6 +51,16 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
 )  # type: ignore[misc]
 async def agents_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        AgentUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; agents the caller cannot read are "
+                "left out."
+            )
+        ),
+    ] = None,
     filter: AgentFilterGQL | None = None,
     order_by: list[AgentOrderByGQL] | None = None,
     before: str | None = None,
@@ -61,6 +73,7 @@ async def agents_v2(
     check_admin_only()
     result = await info.context.adapters.agent.admin_search(
         AdminSearchAgentsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -72,7 +85,7 @@ async def agents_v2(
         )
     )
     nodes = [AgentV2GQL.from_pydantic(item) for item in result.items]
-    edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
+    edges = [AgentV2Edge(node=node, cursor=encode_cursor(node.entity_id)) for node in nodes]
     return AgentV2Connection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(

@@ -4,6 +4,12 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.membership.validator.rbac import (
+    VirtualEntityMembershipActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
     VirtualEntityRelationActionRBACValidator,
 )
@@ -14,33 +20,19 @@ from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators.rbac.legacy import (
-    LegacyScopeActionRBACValidator,
-    LegacySingleEntityActionRBACValidator,
-)
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-
-
-@dataclass
-class RBACValidators:
-    scope: ScopeActionRBACValidator
-
-
-@dataclass
-class LegacyRBACValidators:
-    scope: LegacyScopeActionRBACValidator
-    single_entity: LegacySingleEntityActionRBACValidator
 
 
 @dataclass
 class VirtualEntityRBACValidators:
-    """RBAC validators for the v2 action bases (actions/v2/{single_entity,bulk,scope,relation})."""
+    """RBAC validators for the v2 action bases (actions/v2/{single_entity,bulk,scope,relation,membership,global_scope})."""
 
     scope: VirtualEntityScopeActionRBACValidator
     single_entity: VirtualEntitySingleEntityActionRBACValidator
     partial_bulk: VirtualEntityPartialBulkActionRBACValidator
     atomic_bulk: VirtualEntityAtomicBulkActionRBACValidator
     relation: VirtualEntityRelationActionRBACValidator
+    membership: VirtualEntityMembershipActionRBACValidator
+    global_scope: VirtualEntityGlobalActionRBACValidator
 
     def to_action_validators(self) -> V2ActionValidators:
         """Place every validator in this bundle into its shape's slot.
@@ -53,4 +45,6 @@ class VirtualEntityRBACValidators:
             atomic_bulk=[self.atomic_bulk],
             scope=[self.scope],
             relation=[self.relation],
+            membership=[self.membership],
+            global_scope=[self.global_scope],
         )

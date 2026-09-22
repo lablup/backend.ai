@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
@@ -43,14 +44,21 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.testutils.db import with_tables
 
@@ -61,11 +69,11 @@ class TestResourcePresetCacheInvalidation:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 # FK dependency order: parents before children
                 DomainRow,
@@ -93,19 +101,24 @@ class TestResourcePresetCacheInvalidation:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 association_groups_users,  # association table
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
-    async def test_scaling_group_name(
+    async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[tuple[str, ResourceGroupID], None]:
         """Create test scaling group and return group name"""
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
 
@@ -120,22 +133,28 @@ class TestResourcePresetCacheInvalidation:
             )
             db_sess.add(resource_group)
             await db_sess.flush()
+            # A preset bound to the group is created in it, so the group needs its node.
+            db_sess.add(
+                VirtualEntityRow(entity_type=ResourceGroupEntityType(), entity_id=resource_group.id)
+            )
+            await db_sess.flush()
+            resource_group_id = resource_group.id
 
-        yield group_name
+        yield group_name, resource_group_id
 
     @pytest.fixture
     async def sample_preset_creator(
         self,
-        test_scaling_group_name: str,
-    ) -> AsyncGenerator[Creator[ResourcePresetRow], None]:
+        test_scaling_group: tuple[str, ResourceGroupID],
+    ) -> AsyncGenerator[ResourcePresetCreator, None]:
         """Create sample resource preset creator for testing"""
-        creator = Creator(
-            spec=ResourcePresetCreatorSpec(
-                name=f"test-preset-{uuid.uuid4().hex[:8]}",
-                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                shared_memory="1 GiB",
-                resource_group_name=test_scaling_group_name,
-            )
+        name, resource_group_id = test_scaling_group
+        creator = ResourcePresetCreator(
+            name=f"test-preset-{uuid.uuid4().hex[:8]}",
+            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+            shared_memory="1 GiB",
+            resource_group_name=name,
+            resource_group_id=resource_group_id,
         )
         yield creator
 
@@ -180,13 +199,14 @@ class TestResourcePresetCacheInvalidation:
             db=db_with_cleanup,
             valkey_stat=valkey_stat,
             config_provider=mock_config_provider,
+            v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )
         yield repo
 
     async def test_create_preset_invalidates_cache(
         self,
         resource_preset_repository: ResourcePresetRepository,
-        sample_preset_creator: Creator[ResourcePresetRow],
+        sample_preset_creator: ResourcePresetCreator,
     ) -> None:
         """Test that creating a preset invalidates all preset caches"""
         # Get reference to cache source and valkey stat

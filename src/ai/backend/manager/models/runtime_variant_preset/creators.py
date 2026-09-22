@@ -17,7 +17,11 @@ from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantP
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantPresetConflict
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
+    RuntimeVariantPresetSearchableFields,
+)
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 __all__ = (
@@ -30,7 +34,8 @@ RANK_GAP = 100
 
 @dataclass
 class RuntimeVariantPresetCreator(
-    GlobalEntityCreator[RuntimeVariantPresetRow, RuntimeVariantPresetData]
+    CreatedInPublic[RuntimeVariantPresetRow],
+    EntityCreator[RuntimeVariantPresetRow, RuntimeVariantPresetData],
 ):
     """Insert a preset, ranked last within its runtime variant.
 
@@ -46,6 +51,8 @@ class RuntimeVariantPresetCreator(
     default_value: str | None
     key: str
     required: bool
+    added_version: str | None
+    deprecated_version: str | None
     category: str | None
     display_name: str | None
     ui_option: UIOption | None
@@ -77,6 +84,8 @@ class RuntimeVariantPresetCreator(
         row.default_value = self.default_value
         row.key = self.key
         row.required = self.required
+        row.added_version = self.added_version
+        row.deprecated_version = self.deprecated_version
         row.category = self.category
         row.display_name = self.display_name
         row.ui_option = self.ui_option
@@ -84,7 +93,7 @@ class RuntimeVariantPresetCreator(
 
     @override
     def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
-        return row.to_data()
+        return RuntimeVariantPresetSearchableFields.own.to_data(row)
 
     def _next_rank(self) -> sa.sql.elements.ColumnElement[int]:
         return (

@@ -16,7 +16,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -26,6 +26,7 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -44,6 +45,9 @@ from ai.backend.manager.models.resource_policy.creators import (
 )
 from ai.backend.manager.models.resource_policy.purgers import (
     KeyPairResourcePolicyPurger,
+)
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.resource_policy.updaters import (
     KeyPairResourcePolicyUpdater,
@@ -76,11 +80,11 @@ class TestKeypairResourcePolicyOps:
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -115,9 +119,10 @@ class TestKeypairResourcePolicyOps:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def sample_resource_slots(self) -> ResourceSlot:
@@ -178,7 +183,7 @@ class TestKeypairResourcePolicyOps:
             policy_row = sample_creator.build_row()
             db_sess.add(policy_row)
             await db_sess.commit()
-            return policy_row.to_dataclass()
+            return KeyPairResourcePolicySearchableFields.own.to_data(policy_row)
 
     @pytest.fixture
     async def multiple_policies(
@@ -316,7 +321,7 @@ class TestKeypairResourcePolicyOps:
         policy_creator: KeyPairResourcePolicyCreator,
     ) -> None:
         """Test creating a new keypair resource policy with various configurations"""
-        result = await ops.create_global_entity(policy_creator)
+        result = await ops.create_entity(policy_creator)
 
         assert result.name == policy_creator.name
         assert result.default_for_unspecified == policy_creator.default_for_unspecified

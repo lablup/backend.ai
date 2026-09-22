@@ -12,12 +12,12 @@ from ai.backend.client.v2.auth import HMACAuth, NoAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.app_config import (
-    APP_CONFIG_ALLOW_LIST_ENTITY_TYPE,
-    APP_CONFIG_ENTITY_TYPE,
-    AppConfigScopeID,
-)
-from ai.backend.common.data.entity.app_config_definition import APP_CONFIG_DEFINITION_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config import AppConfigEntityType, AppConfigScopeID
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -46,15 +46,19 @@ from ai.backend.manager.api.rest.v2.app_config_definition.handler import (
 from ai.backend.manager.api.rest.v2.app_config_definition.registry import (
     register_v2_app_config_definition_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config.repository import AppConfigRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.app_config.service import AppConfigService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.processors import ops_processor_group
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -63,21 +67,29 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture()
-def app_config_processors(database_engine: ExtendedAsyncSAEngine) -> AppConfigProcessors:
-    """The real read path: no RBAC validator, since the adapter fills the principal itself."""
+def app_config_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> AppConfigProcessors:
+    """The real read path: only the global gate, since the adapter fills the principal itself."""
     registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )
     return AppConfigProcessors(
-        registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
-        ops_processor_group(database_engine, GroupMeta(APP_CONFIG_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
-        registry.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
-        AppConfigService(OpsRepository(V2DBOpsProvider(database_engine))),
+        registry.group(GroupMeta(AppConfigEntityType())),
+        ops_processor_group(database_engine, GroupMeta(AppConfigEntityType()), config_provider),
+        registry.group(GroupMeta(AppConfigDefinitionEntityType())),
+        registry.group(GroupMeta(AppConfigAllowListEntityType())),
+        AppConfigService(
+            OpsRepository(V2DBOpsProvider(database_engine)),
+            AppConfigRepository(V2DBOpsProvider(database_engine)),
+        ),
     )
 
 
@@ -87,7 +99,7 @@ def app_config_adapter(app_config_processors: AppConfigProcessors) -> AppConfigA
     carrying the real processors on that attribute is enough."""
     processors = MagicMock()
     processors.app_config = app_config_processors
-    return AppConfigAdapter(processors)
+    return AppConfigAdapter(processors.app_config)
 
 
 @pytest.fixture()
@@ -96,7 +108,7 @@ def app_config_definition_adapter(
 ) -> AppConfigDefinitionAdapter:
     processors = MagicMock()
     processors.app_config = app_config_processors
-    return AppConfigDefinitionAdapter(processors)
+    return AppConfigDefinitionAdapter(processors.app_config)
 
 
 @pytest.fixture()
@@ -105,7 +117,7 @@ def app_config_allow_list_adapter(
 ) -> AppConfigAllowListAdapter:
     processors = MagicMock()
     processors.app_config = app_config_processors
-    return AppConfigAllowListAdapter(processors)
+    return AppConfigAllowListAdapter(processors.app_config)
 
 
 @pytest.fixture()
@@ -171,7 +183,7 @@ async def seed_colliding_fragments(
                 for scope_type in AppConfigScopeType
             ])
             await sess.flush()
-            sess.add_all([
+            rows = [
                 AppConfigFragmentRow(
                     config_name=config_name,
                     scope_type=scope_type,
@@ -180,7 +192,27 @@ async def seed_colliding_fragments(
                 )
                 for scope_type, config in configs.items()
                 if config is not None
-            ])
+            ]
+            sess.add_all(rows)
+            await sess.flush()
+            # A fragment is created in the scope that holds it, which is how a read
+            # reaches it.
+            seeder = VirtualEntitySeeder()
+            owners = {
+                AppConfigScopeType.DOMAIN: (
+                    DomainEntityType(),
+                    domain_fixture.domain_id,
+                ),
+                AppConfigScopeType.USER: (
+                    UserEntityType(),
+                    regular_user_fixture.user_uuid,
+                ),
+            }
+            for row in rows:
+                owner = owners.get(row.scope_type)
+                if owner is None:
+                    continue
+                await seeder.create_in(sess, AppConfigFragmentEntityType(), row.id, [owner])
 
     yield seed
     async with database_engine.begin_session() as sess:

@@ -10,6 +10,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -41,6 +42,12 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     """Keypair entity accessible via Relay Node interface."""
 
     id: NodeID[str] = gql_field(description="Access key (primary key, used as the Relay Node ID).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the keypair.",
+        ),
+    )
     access_key: str = gql_field(description="The access key string.")
     is_active: bool | None = gql_field(description="Whether the keypair is currently active.")
     is_admin: bool | None = gql_field(description="Whether the keypair has admin privileges.")
@@ -84,7 +91,7 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
 
 KeyPairEdge = Edge[KeyPairGQL]

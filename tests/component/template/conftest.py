@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
 from ai.backend.manager.api.rest.cluster_template.registry import register_cluster_template_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -27,6 +24,10 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.template.repository import TemplateRepository
@@ -36,22 +37,14 @@ from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
 
 
-def _mock_action_validators() -> MagicMock:
-    mock_rbac = MagicMock(spec=RBACValidators)
-    mock_rbac.scope = AsyncMock()
-    mock_validators = MagicMock(spec=ActionValidators)
-    mock_validators.rbac = mock_rbac
-    return mock_validators
-
-
 @pytest.fixture()
 def template_processors(
     database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
 ) -> TemplateProcessors:
-    repo = TemplateRepository(database_engine)
+    repo = TemplateRepository(database_engine, ShareOpsProvider(database_engine))
     service = TemplateService(repository=repo)
     return TemplateProcessors(
-        processor_registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(SessionTemplateEntityType())), service
     )
 
 
@@ -66,13 +59,14 @@ def project_processors(
     group_repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()

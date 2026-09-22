@@ -11,11 +11,11 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 
 @dataclass(frozen=True)
-class IdleCheckerAssignmentOperationScope(OperationScope):
+class IdleCheckerAssignmentTarget(ScopeTarget):
     """Idle checker bindings attached to one scope entity.
 
     One scope = one item of a scoped binding query; the repository layer
@@ -25,6 +25,10 @@ class IdleCheckerAssignmentOperationScope(OperationScope):
     """
 
     scope: EntityIdentifier
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.scope
 
     @override
     def to_condition(self) -> QueryCondition:

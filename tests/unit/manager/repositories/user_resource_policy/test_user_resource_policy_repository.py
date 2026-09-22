@@ -4,8 +4,8 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -25,6 +25,9 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -105,7 +108,7 @@ class TestUserResourcePolicyRepository:
             db_sess.add(policy_row)
             await db_sess.flush()
 
-        yield policy_row.to_dataclass()
+        yield UserResourcePolicySearchableFields.own.to_data(policy_row)
 
     async def test_get_by_name_success(
         self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData

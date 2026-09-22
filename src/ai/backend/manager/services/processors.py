@@ -239,6 +239,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.runtime_variant.processors import (
         RuntimeVariantProcessors,
     )
+    from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
     from ai.backend.manager.services.runtime_variant_preset.processors import (
         RuntimeVariantPresetProcessors,
     )
@@ -282,6 +283,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.processors import (
         VFolderFileProcessors,
         VFolderInviteProcessors,
+        VFolderMountPolicyProcessors,
         VFolderProcessors,
         VFolderSharingProcessors,
     )
@@ -294,14 +296,14 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.services.invite import (
         VFolderInviteService,
     )
+    from ai.backend.manager.services.vfolder.services.mount_policy import (
+        VFolderMountPolicyService,
+    )
     from ai.backend.manager.services.vfolder.services.sharing import (
         VFolderSharingService,
     )
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,
-    )
-    from ai.backend.manager.services.vfolder.services.vfolder_admin import (
-        VFolderAdminService,
     )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,
@@ -365,10 +367,10 @@ class Services:
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
-    vfolder_admin: VFolderAdminService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
+    vfolder_mount_policy: VFolderMountPolicyService
     session: SessionService
     manager_admin: ManagerAdminService
     secret: SecretService
@@ -380,6 +382,7 @@ class Services:
     rbac_relation: RbacRelationService
     rbac_role: RbacRoleService
     rbac_roster: RbacRosterService
+    runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
@@ -431,6 +434,7 @@ class Processors:
     vfolder_admin: VFolderAdminProcessors
     vfolder_invite: VFolderInviteProcessors
     vfolder_sharing: VFolderSharingProcessors
+    vfolder_mount_policy: VFolderMountPolicyProcessors
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
@@ -481,7 +485,8 @@ class ProcessorsBundle:
     """What processor assembly hands back, without widening the Processors contract:
     the processors themselves, plus the one registry every v2-wired package
     registered through — its wired_specs() is the catalog of every registered
-    action."""
+    action — and the services for internal callers that run without a request user."""
 
     processors: Processors
+    services: Services
     registry: ProcessorRegistry[Any]

@@ -20,7 +20,8 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
@@ -32,15 +33,20 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.fair_share.conditions import (
-    RGDomainFairShareConditions,
-    RGProjectFairShareConditions,
-    RGUserFairShareConditions,
+from ai.backend.manager.models.fair_share.deprecated_search import (
+    DeprecatedDomainFairShareFields,
+    DeprecatedProjectFairShareFields,
+    DeprecatedUserFairShareFields,
 )
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
+)
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
@@ -66,16 +72,19 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareCreatorSpec,
     FairShareRepository,
-    ProjectFairShareCreatorSpec,
-    UserFairShareCreatorSpec,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 EMPTY_RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
@@ -111,6 +120,9 @@ class TestSearchDomainFairSharesEntityBased:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -143,7 +155,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def domain_with_record(
@@ -173,14 +185,13 @@ class TestSearchDomainFairSharesEntityBased:
             )
             await db_sess.commit()
 
-        await fair_share_repository.create_domain_fair_share(
-            Creator(
-                spec=DomainFairShareCreatorSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+        await fair_share_repository.upsert_domain_fair_share(
+            DomainFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
@@ -340,14 +351,13 @@ class TestSearchDomainFairSharesEntityBased:
             await db_sess.commit()
 
         for name in domain_names[:2]:
-            await fair_share_repository.create_domain_fair_share(
-                Creator(
-                    spec=DomainFairShareCreatorSpec(
-                        resource_group=resource_group,
-                        resource_group_id=RESOURCE_GROUP_ID,
-                        domain_name=name,
-                        weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                    )
+            await fair_share_repository.upsert_domain_fair_share(
+                DomainFairShareUpserter(
+                    resource_group=resource_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
+                    domain_name=name,
+                    # Explicit weight for use_default=False
+                    weight=TriState.update(Decimal("2.0")),
                 )
             )
         return domain_names
@@ -359,7 +369,7 @@ class TestSearchDomainFairSharesEntityBased:
         fair_share_repository: FairShareRepository,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
-        scope = DomainFairShareOperationScope(resource_group_id=ResourceGroupID(uuid.uuid4()))
+        scope = DomainFairShareTarget(resource_group_id=ResourceGroupID(uuid.uuid4()))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -377,7 +387,7 @@ class TestSearchDomainFairSharesEntityBased:
         resource_group_without_domains: str,
     ) -> None:
         """Valid resource_group with no domains should return empty result (not error)."""
-        scope = DomainFairShareOperationScope(resource_group_id=EMPTY_RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=EMPTY_RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -398,7 +408,7 @@ class TestSearchDomainFairSharesEntityBased:
         domain_with_record: DomainFixtureData,
     ) -> None:
         """Domain with fair share record should have complete details with use_default=False."""
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -424,7 +434,7 @@ class TestSearchDomainFairSharesEntityBased:
         domain_without_record: str,
     ) -> None:
         """Domain without fair share record should have default values with use_default=True."""
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -451,7 +461,7 @@ class TestSearchDomainFairSharesEntityBased:
         domain_without_record: str,
     ) -> None:
         """Search should return both domains with complete data (record vs default)."""
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -487,7 +497,7 @@ class TestSearchDomainFairSharesEntityBased:
         Both domains appear in results; fair share data is from the queried RG.
         """
         fixture = two_scaling_groups_with_domains
-        scope = DomainFairShareOperationScope(resource_group_id=fixture.rg1_id)
+        scope = DomainFairShareTarget(resource_group_id=fixture.rg1_id)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -512,7 +522,7 @@ class TestSearchDomainFairSharesEntityBased:
         five_domains_two_with_records: list[str],
     ) -> None:
         """Pagination total_count should include entities without records."""
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[],
@@ -539,11 +549,11 @@ class TestSearchDomainFairSharesEntityBased:
         which is NULL for entities without records, causing SQL to exclude them.
         RG conditions reference ResourceGroupForDomainRow.domain_id (INNER JOIN'd), which is never NULL.
         """
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(
+                DeprecatedDomainFairShareFields.name.filter.equals(
                     StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
                 ),
             ],
@@ -565,13 +575,13 @@ class TestSearchDomainFairSharesEntityBased:
         domain_without_record: str,
     ) -> None:
         """RG-context filter should return both domains (with and without records)."""
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
 
         # Filter for domain_without_record only
         querier_without = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(
+                DeprecatedDomainFairShareFields.name.filter.equals(
                     StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
                 ),
             ],
@@ -588,7 +598,7 @@ class TestSearchDomainFairSharesEntityBased:
         querier_with = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(
+                DeprecatedDomainFairShareFields.name.filter.equals(
                     StringMatchSpec(
                         domain_with_record.domain_name, case_insensitive=False, negated=False
                     )
@@ -634,7 +644,7 @@ class TestSearchDomainFairSharesEntityBased:
         domain_not_in_rg: str,
     ) -> None:
         """BA-4682: Domain not in any RG should appear in search results with defaults."""
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -683,6 +693,9 @@ class TestSearchProjectFairSharesEntityBased:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -742,7 +755,7 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def project_with_record(
@@ -776,21 +789,26 @@ class TestSearchProjectFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
 
             db_sess.add(
                 ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
 
-        await fair_share_repository.create_project_fair_share(
-            Creator(
-                spec=ProjectFairShareCreatorSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    project_id=project_id,
-                    domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+        await fair_share_repository.upsert_project_fair_share(
+            ProjectFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                project_id=project_id,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return project_id
@@ -826,6 +844,12 @@ class TestSearchProjectFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
 
             db_sess.add(
                 ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
@@ -841,7 +865,7 @@ class TestSearchProjectFairSharesEntityBased:
         domain_name: str,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             resource_group_id=ResourceGroupID(uuid.uuid4()),
             domain_name=domain_name,
         )
@@ -864,7 +888,7 @@ class TestSearchProjectFairSharesEntityBased:
         project_with_record: uuid.UUID,
     ) -> None:
         """Project with fair share record should have details populated."""
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
         )
@@ -889,7 +913,7 @@ class TestSearchProjectFairSharesEntityBased:
         project_without_record: uuid.UUID,
     ) -> None:
         """Project without fair share record should have default values with use_default=True."""
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
         )
@@ -920,7 +944,7 @@ class TestSearchProjectFairSharesEntityBased:
         project_without_record: uuid.UUID,
     ) -> None:
         """Search should return both projects with and without records."""
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
         )
@@ -958,14 +982,14 @@ class TestSearchProjectFairSharesEntityBased:
         which is NULL for entities without records. RG conditions reference
         ResourceGroupForProjectRow.group (INNER JOIN'd), which is never NULL.
         """
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
         )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGProjectFairShareConditions.by_project_id(
+                DeprecatedProjectFairShareFields.id.filter.equals(
                     UUIDEqualMatchSpec(value=project_without_record, negated=False)
                 ),
             ],
@@ -1010,6 +1034,13 @@ class TestSearchProjectFairSharesEntityBased:
                     resource_policy=policy_name,
                 )
             )
+            await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
             await db_sess.commit()
         return project_id
 
@@ -1022,7 +1053,7 @@ class TestSearchProjectFairSharesEntityBased:
         project_not_in_rg: uuid.UUID,
     ) -> None:
         """BA-4682: Project not in any RG should appear in search results with defaults."""
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
         )
@@ -1074,6 +1105,9 @@ class TestSearchUserFairSharesEntityBased:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -1158,6 +1192,12 @@ class TestSearchUserFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
+            await VirtualEntitySeeder().create_in(
+                db_sess, ProjectEntityType(), project_id, [(DomainEntityType(), domain_id)]
+            )
 
             db_sess.add(
                 ResourceGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
@@ -1170,7 +1210,7 @@ class TestSearchUserFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> FairShareRepository:
-        return FairShareRepository(db_with_cleanup)
+        return FairShareRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     async def _create_user(
         self,
@@ -1258,16 +1298,15 @@ class TestSearchUserFairSharesEntityBased:
         """Create a user with fair share record."""
         user_uuid = await self._create_user(db_with_cleanup, domain_name, project_id)
 
-        await fair_share_repository.create_user_fair_share(
-            Creator(
-                spec=UserFairShareCreatorSpec(
-                    resource_group=resource_group,
-                    resource_group_id=RESOURCE_GROUP_ID,
-                    user_uuid=user_uuid,
-                    project_id=project_id,
-                    domain_name=domain_name,
-                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+        await fair_share_repository.upsert_user_fair_share(
+            UserFairShareUpserter(
+                resource_group=resource_group,
+                resource_group_id=RESOURCE_GROUP_ID,
+                user_uuid=user_uuid,
+                project_id=project_id,
+                domain_name=domain_name,
+                # Explicit weight for use_default=False
+                weight=TriState.update(Decimal("2.0")),
             )
         )
         return user_uuid
@@ -1292,7 +1331,7 @@ class TestSearchUserFairSharesEntityBased:
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
 
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             resource_group_id=ResourceGroupID(uuid.uuid4()),
             domain_name=domain_name,
             project_id=project_id,
@@ -1318,7 +1357,7 @@ class TestSearchUserFairSharesEntityBased:
     ) -> None:
         """User with fair share record should have details populated."""
 
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
             project_id=project_id,
@@ -1347,7 +1386,7 @@ class TestSearchUserFairSharesEntityBased:
     ) -> None:
         """User without fair share record should have default values with use_default=True."""
 
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
             project_id=project_id,
@@ -1382,7 +1421,7 @@ class TestSearchUserFairSharesEntityBased:
     ) -> None:
         """Search should return both users with and without records."""
 
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
             project_id=project_id,
@@ -1422,7 +1461,7 @@ class TestSearchUserFairSharesEntityBased:
         which is NULL for entities without records. RG conditions reference
         AssocGroupUserRow.user_id (INNER JOIN'd), which is never NULL.
         """
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_name,
             project_id=project_id,
@@ -1430,7 +1469,7 @@ class TestSearchUserFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGUserFairShareConditions.by_user_uuid(
+                DeprecatedUserFairShareFields.membership_user_id.filter.equals(
                     UUIDEqualMatchSpec(value=user_without_record, negated=False)
                 ),
             ],

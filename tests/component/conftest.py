@@ -46,11 +46,11 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -111,6 +111,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -125,9 +126,6 @@ from ai.backend.manager.models.project import (
     ProjectRow,
     ProjectType,
     association_groups_users,
-)
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
@@ -157,8 +155,12 @@ from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
 )
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -169,7 +171,11 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
     etcd_container,
     postgres_container,
     redis_container,
@@ -314,8 +320,8 @@ def bootstrap_config(
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
             "name": test_db,
-            "user": "postgres",
-            "password": "develove",
+            "user": POSTGRES_USER,
+            "password": POSTGRES_PASSWORD,
             "pool_size": 8,
             "pool_recycle": -1,
             "pool_pre_ping": False,
@@ -435,7 +441,7 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{POSTGRES_MAINTENANCE_DB}")
         .with_port(bootstrap_config.db.addr.port)
         .with_user(bootstrap_config.db.user)
     )
@@ -472,7 +478,7 @@ def database(
             await conn.execute(
                 sa.text(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    "WHERE pid <> pg_backend_pid();"
+                    f"WHERE datname = '{test_db}' AND pid <> pg_backend_pid();"
                 )
             )
             await conn.execute(sa.text(f'DROP DATABASE "{test_db}";'))
@@ -584,7 +590,11 @@ async def database_engine(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Provide a function-scoped ExtendedAsyncSAEngine for repository/service fixtures."""
     async with connect_database(bootstrap_config.db) as db:
-        yield db
+        await GlobalEntityIDLoader(db).load()
+        try:
+            yield db
+        finally:
+            GlobalEntityIDCache.clear()
 
 
 @pytest.fixture()
@@ -610,7 +620,7 @@ async def domain_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.DOMAIN,
+                entity_type=DomainEntityType(),
                 entity_id=row.id,
             )
         )
@@ -632,7 +642,7 @@ async def domain_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.DOMAIN,
+                VirtualEntityRow.__table__.c.entity_type == DomainEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == row.id,
             )
         )
@@ -744,14 +754,8 @@ async def resource_policy_fixture(
         if personal:
             await conn.execute(
                 VirtualEntityRow.__table__.delete().where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                     VirtualEntityRow.__table__.c.entity_id.in_(personal),
-                )
-            )
-            await conn.execute(
-                AssociationScopesEntitiesRow.__table__.delete().where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id.in_([str(pid) for pid in personal]),
                 )
             )
             await conn.execute(ProjectRow.__table__.delete().where(ProjectRow.id.in_(personal)))
@@ -854,7 +858,7 @@ async def group_fixture(
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=group_id,
             )
         )
@@ -876,7 +880,7 @@ async def group_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
@@ -901,7 +905,7 @@ class VirtualEntitySeeder:
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.USER,
+                entity_type=UserEntityType(),
                 entity_id=str(user_uuid),
             )
         )
@@ -946,7 +950,7 @@ class VirtualEntitySeeder:
         await conn.execute(
             sa.insert(VirtualEntityRow.__table__).values(
                 id=virtual_entity_id,
-                entity_type=ScopeType.PROJECT,
+                entity_type=ProjectEntityType(),
                 entity_id=str(project_id),
             )
         )
@@ -977,7 +981,7 @@ class VirtualEntitySeeder:
         project_scope_id = (
             await conn.execute(
                 sa.select(VirtualEntityRow.__table__.c.id).where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == group_id,
                 )
             )
@@ -985,7 +989,7 @@ class VirtualEntitySeeder:
         user_scope_id = (
             await conn.execute(
                 sa.select(VirtualEntityRow.__table__.c.id).where(
-                    VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                    VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                     VirtualEntityRow.__table__.c.entity_id == str(user_uuid),
                 )
             )
@@ -1069,14 +1073,6 @@ async def admin_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.USER,
-                entity_id=str(data.user_uuid),
-            )
-        )
         await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
@@ -1094,17 +1090,12 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
         # The entity-membership and scope-binding rows cascade from the virtual entity.
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )
@@ -1176,14 +1167,6 @@ async def regular_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.USER,
-                entity_id=str(data.user_uuid),
-            )
-        )
         await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
@@ -1198,17 +1181,12 @@ async def regular_user_fixture(
             )
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
         # The entity-membership and scope-binding rows cascade from the virtual entity.
         await conn.execute(
             VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
                 VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )
@@ -1548,11 +1526,13 @@ def auth_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     group_repository = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -1570,19 +1550,28 @@ def auth_processors(
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        processor_registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(GlobalEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
 
 
 @pytest.fixture()
-def processor_registry(database_engine: ExtendedAsyncSAEngine) -> ProcessorRegistry[Any]:
-    """The registry every v2-wired processor group is built from."""
+def processor_registry(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorRegistry[Any]:
+    """The registry every v2-wired processor group is built from.
+
+    Only the global gate is real here: these tests run global actions as the caller they
+    set, and the other shapes are gated by the domain conftest that needs them.
+    """
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=V2ActionValidators(),
+            validators=V2ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )

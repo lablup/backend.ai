@@ -9,6 +9,8 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     UserUsageBucketFilter as UserUsageBucketFilterDTO,
 )
@@ -18,6 +20,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UserUsageBucketNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -63,6 +66,12 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
     """User-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the usage bucket.",
+        ),
+    )
     user_uuid: UUID = gql_field(description="UUID of the user this usage bucket belongs to.")
     project_id: UUID = gql_field(description="UUID of the project the user belongs to.")
     domain_name: str = gql_field(description="Name of the domain the user belongs to.")
@@ -120,7 +129,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.user_uuid)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_uuid))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -138,7 +147,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_added_field(
         BackendAIGQLMeta(

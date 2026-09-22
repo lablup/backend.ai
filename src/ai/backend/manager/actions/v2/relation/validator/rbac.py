@@ -1,7 +1,6 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
@@ -10,8 +9,8 @@ from ai.backend.manager.actions.v2.relation.validator.base import RelationAction
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.virtual_entity import OwnCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 
 __all__ = ("VirtualEntityRelationActionRBACValidator",)
@@ -25,12 +24,12 @@ class VirtualEntityRelationActionRBACValidator(RelationActionValidator):
     permission refuses the whole run — you must be able to touch both to relate them.
     """
 
-    _repository: PermissionControllerRepository
+    _repository: RbacPermissionCheckRepository
     _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
-        repository: PermissionControllerRepository,
+        repository: RbacPermissionCheckRepository,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._repository = repository
@@ -47,10 +46,10 @@ class VirtualEntityRelationActionRBACValidator(RelationActionValidator):
         if user.is_superadmin:
             return
 
-        entities: list[EntityIdentifier] = [
-            RuntimeEntityID(scope.scope_type, scope.scope_id) for scope in meta.scope_targets
+        keys = [
+            OwnCheckKey(user_id=UserID(user.user_id), entity=entity)
+            for entity in meta.scope_targets
         ]
-        keys = [OwnCheckKey(user_id=UserID(user.user_id), entity=entity) for entity in entities]
         permission = meta.operation_type.to_permission()
         owned = await self._repository.owned_permissions(keys)
         denied = [

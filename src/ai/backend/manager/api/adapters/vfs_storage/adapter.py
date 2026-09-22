@@ -22,16 +22,18 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.vfs_storage.conditions import VFSStorageConditions
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
+from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.purge import PurgeVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStorageAction
+from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.types import OptionalState
 
 DEFAULT_PAGINATION_LIMIT = 10
@@ -40,9 +42,14 @@ DEFAULT_PAGINATION_LIMIT = 10
 class VFSStorageAdapter(BaseAdapter):
     """Adapter for VFS storage domain operations."""
 
+    _vfs_storage: VFSStorageProcessors
+
+    def __init__(self, vfs_storage: VFSStorageProcessors) -> None:
+        self._vfs_storage = vfs_storage
+
     async def create(self, input: CreateVFSStorageInput) -> CreateVFSStoragePayload:
         """Create a new VFS storage."""
-        action_result = await self._processors.vfs_storage.global_create.run(
+        action_result = await self._vfs_storage.global_create.run(
             CreateVFSStorageAction(
                 creator=VFSStorageCreator(
                     name=input.name,
@@ -62,8 +69,8 @@ class VFSStorageAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
         searcher = VFSStorageSearcher(pagination=pagination, conditions=[], orders=[])
-        action_result = await self._processors.vfs_storage.global_search_vfs_storages.run(
-            SearchVFSStoragesAction(searcher=searcher)
+        action_result = await self._vfs_storage.global_search_vfs_storages.run(
+            SearchVFSStoragesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchVFSStoragesPayload(
             items=[self._vfs_storage_data_to_dto(item) for item in action_result.items],
@@ -72,34 +79,40 @@ class VFSStorageAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[VFSStorageNode | None]:
-        """Batch load VFS storages by IDs for DataLoader use.
+    async def batch_load_by_ids(
+        self, ids: Sequence[VFSStorageID]
+    ) -> list[VFSStorageNode | Exception | None]:
+        """Batch load VFS storages by id for DataLoader use.
 
-        Returns VFSStorageNode DTOs in the same order as the input ids list.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        searcher = VFSStorageSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[VFSStorageConditions.by_ids(ids)],
-        )
-        action_result = await self._processors.vfs_storage.global_search_vfs_storages.run(
-            SearchVFSStoragesAction(searcher=searcher)
-        )
-        storage_map = {item.id: self._vfs_storage_data_to_dto(item) for item in action_result.items}
-        return [storage_map.get(VFSStorageID(storage_id)) for storage_id in ids]
+        entity_ids = [VFSStorageID(value) for value in ids]
+        result = await self._vfs_storage.bulk_get.run(BulkGetVFSStoragesAction(ids=entity_ids))
+        return [
+            self._vfs_storage_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def get(self, storage_id: UUID) -> VFSStorageNode:
         """Retrieve a single VFS storage by ID."""
-        action_result = await self._processors.vfs_storage.get.run(
+        action_result = await self._vfs_storage.get.run(
             GetVFSStorageAction(storage_id=VFSStorageID(storage_id))
         )
         return self._vfs_storage_data_to_dto(action_result.data)
 
     async def list_all(self) -> list[VFSStorageNode]:
         """List all VFS storages without pagination."""
-        action_result = await self._processors.vfs_storage.global_list_storages.run(
-            ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
+        action_result = await self._vfs_storage.global_list_storages.run(
+            ListVFSStorageAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=VFSStorageSearcher(pagination=NoPagination())
+                )
+            )
         )
         return [self._vfs_storage_data_to_dto(item) for item in action_result.items]
 
@@ -119,16 +132,14 @@ class VFSStorageAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        action_result = await self._processors.vfs_storage.update.run(
-            UpdateVFSStorageAction(updater=updater)
-        )
+        action_result = await self._vfs_storage.update.run(UpdateVFSStorageAction(updater=updater))
         return UpdateVFSStoragePayload(
             vfs_storage=self._vfs_storage_data_to_dto(action_result.data)
         )
 
     async def delete(self, input: DeleteVFSStorageInput) -> DeleteVFSStoragePayload:
         """Delete a VFS storage."""
-        action_result = await self._processors.vfs_storage.purge.run(
+        action_result = await self._vfs_storage.purge.run(
             PurgeVFSStorageAction(storage_id=input.id)
         )
         return DeleteVFSStoragePayload(id=action_result.data.id)
@@ -137,6 +148,7 @@ class VFSStorageAdapter(BaseAdapter):
     def _vfs_storage_data_to_dto(data: VFSStorageData) -> VFSStorageNode:
         return VFSStorageNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             host=data.host,
             base_path=str(data.base_path),

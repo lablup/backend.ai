@@ -11,8 +11,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
     CreateDomainResponse,
@@ -26,15 +26,24 @@ from ai.backend.manager.api.rest.domain.handler import DomainHandler
 from ai.backend.manager.api.rest.domain.registry import register_domain_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
@@ -43,15 +52,36 @@ DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 def domain_processors(
     database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
 ) -> DomainProcessors:
-    repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+    repo = DomainRepository(database_engine, RelationOpsProvider(database_engine))
     service = DomainService(repo)
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
-def project_processors(processor_registry: ProcessorRegistry[Any]) -> ProjectProcessors:
-    """Only the ops-backed create is exercised here, so the service is a stub."""
-    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
+def project_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    storage_manager: StorageSessionManager,
+    valkey_clients: Any,
+    processor_registry: ProcessorRegistry[Any],
+) -> ProjectProcessors:
+    """Registering a domain registers its model-store project, so the project service
+    is the real one."""
+    repository = ProjectRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
+    )
+    service = ProjectService(
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+        valkey_stat_client=valkey_clients.stat,
+        group_repositories=ProjectRepositories(repository=repository),
+    )
+    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
 
 
 @pytest.fixture()

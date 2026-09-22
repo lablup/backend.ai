@@ -8,7 +8,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -19,6 +19,7 @@ from ai.backend.manager.api.rest.vfs_storage.registry import register_vfs_storag
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
@@ -36,13 +37,13 @@ def vfs_storage_processors(
     storage_manager: StorageSessionManager,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
-    vfs_storage_repository = VFSStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFSStorageService(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
     return VFSStorageProcessors(
-        processor_registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(VFSStorageEntityType())), service
     )
 
 

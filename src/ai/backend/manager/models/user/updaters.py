@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -15,6 +14,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -56,7 +56,7 @@ class UserUpdater(DataUpdater[UserRow, UserData]):
         return UserRow.uuid
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> UserID:
         return self.user_id
 
     @override
@@ -99,7 +99,7 @@ class UserUpdater(DataUpdater[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+        return UserSearchableFields.own.to_data(row)
 
     @property
     def group_ids_value(self) -> list[str] | None:

@@ -22,14 +22,23 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
+    ArtifactRegistryData,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.models.reservoir_registry.conditions import ReservoirRegistryConditions
+from ai.backend.manager.data.reservoir_registry.types import (
+    ReservoirRegistryConnectionData,
+    ReservoirRegistryData,
+)
 from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegistryCreator
 from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
 from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
+    GetArtifactRegistryMetasAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
+    BulkGetReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirRegistryAction,
 )
@@ -48,6 +57,7 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.search impo
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
     UpdateReservoirRegistryAction,
 )
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.types import OptionalState
 
 DEFAULT_PAGINATION_LIMIT = 10
@@ -56,9 +66,14 @@ DEFAULT_PAGINATION_LIMIT = 10
 class ReservoirRegistryAdapter(BaseAdapter):
     """Adapter for Reservoir registry domain operations."""
 
+    _artifact_registry: ArtifactRegistryProcessors
+
+    def __init__(self, artifact_registry: ArtifactRegistryProcessors) -> None:
+        self._artifact_registry = artifact_registry
+
     async def create(self, input: CreateReservoirRegistryInput) -> CreateReservoirRegistryPayload:
         """Create a new Reservoir registry."""
-        action_result = await self._processors.artifact_registry.create_reservoir_registry.run(
+        action_result = await self._artifact_registry.create_reservoir_registry.run(
             CreateReservoirRegistryAction(
                 creator=ReservoirRegistryCreator(
                     endpoint=input.endpoint,
@@ -82,7 +97,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
         searcher = ReservoirRegistrySearcher(pagination=pagination, conditions=[], orders=[])
-        action_result = await self._processors.artifact_registry.search_reservoir_registries.run(
+        action_result = await self._artifact_registry.search_reservoir_registries.run(
             SearchReservoirRegistriesAction(searcher=searcher)
         )
         return AdminSearchReservoirRegistriesPayload(
@@ -94,7 +109,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
 
     async def get(self, registry_id: UUID) -> ReservoirRegistryNode:
         """Retrieve a single Reservoir registry by ID."""
-        action_result = await self._processors.artifact_registry.get_reservoir_registry.run(
+        action_result = await self._artifact_registry.get_reservoir_registry.run(
             GetReservoirRegistryAction(
                 registry_id=ArtifactRegistryID(registry_id), reservoir_id=registry_id
             )
@@ -131,7 +146,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
         )
-        action_result = await self._processors.artifact_registry.update_reservoir_registry.run(
+        action_result = await self._artifact_registry.update_reservoir_registry.run(
             UpdateReservoirRegistryAction(
                 registry_id=ArtifactRegistryID(input.id),
                 updater=updater,
@@ -144,33 +159,55 @@ class ReservoirRegistryAdapter(BaseAdapter):
 
     async def get_many(self, registry_ids: list[UUID]) -> list[ReservoirRegistryNode]:
         """Retrieve multiple Reservoir registries by IDs."""
-        action_result = await self._processors.artifact_registry.get_reservoir_registries.run(
+        action_result = await self._artifact_registry.get_reservoir_registries.run(
             GetReservoirRegistriesAction(registry_ids=registry_ids)
         )
         return [self._reservoir_registry_data_to_dto(item) for item in action_result.result]
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[ReservoirRegistryNode | None]:
-        """Batch load Reservoir registries by IDs for DataLoader use.
+    async def batch_load_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[ReservoirRegistryNode | Exception | None]:
+        """Batch load Reservoir registries by IDs for DataLoader use, checked per registry.
 
-        Returns ReservoirRegistryNode DTOs in the same order as the input ids list.
+        The name is read from the artifact registry row, for the registries that were read.
         """
         if not ids:
             return []
-        searcher = ReservoirRegistrySearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[ReservoirRegistryConditions.by_ids(ids)],
+        result = await self._artifact_registry.bulk_get_reservoir_registries.run(
+            BulkGetReservoirRegistriesAction(
+                ids=[ArtifactRegistryID(registry_id) for registry_id in ids]
+            )
         )
-        action_result = await self._processors.artifact_registry.search_reservoir_registries.run(
-            SearchReservoirRegistriesAction(searcher=searcher)
+        metas = (
+            await self._artifact_registry.get_registry_metas.run(
+                GetArtifactRegistryMetasAction(
+                    registry_ids=[ArtifactRegistryID(entity_id) for entity_id in result.values()]
+                )
+            )
+        ).values()
+        return [
+            self._connection_to_dto(item.value, metas[item.entity_id])
+            if item.value is not None and item.entity_id in metas
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
+    def _connection_to_dto(
+        self, connection: ReservoirRegistryConnectionData, meta: ArtifactRegistryData
+    ) -> ReservoirRegistryNode:
+        return ReservoirRegistryNode(
+            id=connection.id,
+            entity_id=connection.entity_id(),
+            name=meta.name,
+            endpoint=connection.endpoint,
+            access_key=connection.access_key,
+            secret_key=connection.secret_key,
+            api_version=connection.api_version,
         )
-        registry_map = {
-            item.id: self._reservoir_registry_data_to_dto(item) for item in action_result.registries
-        }
-        return [registry_map.get(registry_id) for registry_id in ids]
 
     async def delete(self, input: DeleteReservoirRegistryInput) -> DeleteReservoirRegistryPayload:
         """Delete a Reservoir registry."""
-        action_result = await self._processors.artifact_registry.delete_reservoir_registry.run(
+        action_result = await self._artifact_registry.delete_reservoir_registry.run(
             DeleteReservoirRegistryAction(registry_id=ArtifactRegistryID(input.id))
         )
         return DeleteReservoirRegistryPayload(id=action_result.deleted_reservoir_id)
@@ -179,6 +216,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
     def _reservoir_registry_data_to_dto(data: ReservoirRegistryData) -> ReservoirRegistryNode:
         return ReservoirRegistryNode(
             id=data.id,
+            entity_id=data.id,
             name=data.name,
             endpoint=data.endpoint,
             access_key=data.access_key,

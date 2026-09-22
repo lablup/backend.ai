@@ -65,8 +65,8 @@ class UserResourcePolicyProcessors:
     def __init__(self, group: ProcessorGroup[UserResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetUserResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupUserResourcePolicyAction)
-        self.search = group.scope_search_ops(SearchUserResourcePoliciesAction)
-        self.global_search = group.global_search_ops(GlobalSearchUserResourcePoliciesAction)
+        self.search = group.scoped_search_ops(SearchUserResourcePoliciesAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchUserResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateUserResourcePolicyAction)
         self.update = group.single_update_ops(UpdateUserResourcePolicyAction)
         self.purge = group.entity_purge_ops(PurgeUserResourcePolicyAction)

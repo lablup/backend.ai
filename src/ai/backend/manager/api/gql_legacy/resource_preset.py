@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
@@ -19,10 +20,9 @@ from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.resource_preset import ResourcePresetRow, resource_presets
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_preset.actions.lookup import (
     LookupResourcePresetAction,
 )
@@ -185,15 +185,29 @@ class CreateResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
         ),
     )
 
-    def to_creator(self, name: str) -> Creator[ResourcePresetRow]:
-        return Creator(
-            spec=ResourcePresetCreatorSpec(
-                name=name,
-                resource_slots=ResourceSlot.from_user_input(self.resource_slots, None),
-                shared_memory=self.shared_memory if self.shared_memory else None,
-                resource_group_name=self.scaling_group_name if self.scaling_group_name else None,
-            )
+    def to_creator(
+        self, name: str, resource_group_id: ResourceGroupID | None
+    ) -> ResourcePresetCreator:
+        return ResourcePresetCreator(
+            name=name,
+            resource_slots=ResourceSlot.from_user_input(self.resource_slots, None),
+            shared_memory=self.shared_memory if self.shared_memory else None,
+            resource_group_name=self.scaling_group_name if self.scaling_group_name else None,
+            resource_group_id=resource_group_id,
         )
+
+
+async def _resolve_resource_group_id(
+    graph_ctx: GraphQueryContext, name: str | None
+) -> ResourceGroupID | None:
+    """The id of the group a preset is bound to; the preset row records only its name,
+    and what the preset belongs to is named by id."""
+    if not name:
+        return None
+    lookup = await graph_ctx.processors.resource_group.lookup.run(
+        LookupResourceGroupAction(name=ResourceGroupName(name))
+    )
+    return lookup.resolved_entity_id
 
 
 async def _resolve_preset_id(
@@ -224,24 +238,20 @@ class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
         ),
     )
 
-    def to_updater(self, id: UUID | None, name: str | None) -> Updater[ResourcePresetRow]:
+    def to_updater(self, preset_id: ResourcePresetID) -> ResourcePresetUpdater:
         resource_slots = (
             ResourceSlot.from_json(self.resource_slots) if self.resource_slots else Undefined
         )
 
-        pk_value = id if id is not None else (name if name is not None else "")
-        return Updater(
-            spec=ResourcePresetUpdaterSpec(
-                resource_slots=OptionalState[ResourceSlot].from_graphql(resource_slots),
-                name=OptionalState[str].from_graphql(self.name),
-                shared_memory=TriState[BinarySize].from_graphql(
-                    BinarySize.finite_from_str(self.shared_memory)
-                    if self.shared_memory is not Undefined and self.shared_memory is not None
-                    else self.shared_memory
-                ),
-                resource_group_name=TriState[str].from_graphql(self.scaling_group_name),
+        return ResourcePresetUpdater(
+            preset_id=preset_id,
+            resource_slots=OptionalState[ResourceSlot].from_graphql(resource_slots),
+            name=OptionalState[str].from_graphql(self.name),
+            shared_memory=TriState[BinarySize].from_graphql(
+                BinarySize.finite_from_str(self.shared_memory)
+                if self.shared_memory is not Undefined and self.shared_memory is not None
+                else self.shared_memory
             ),
-            pk_value=pk_value,
         )
 
 
@@ -270,8 +280,9 @@ class CreateResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
 
+        resource_group_id = await _resolve_resource_group_id(graph_ctx, props.scaling_group_name)
         result = await graph_ctx.processors.resource_preset.create_preset.run(
-            CreateResourcePresetAction(creator=props.to_creator(name))
+            CreateResourcePresetAction(creator=props.to_creator(name, resource_group_id))
         )
 
         return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))
@@ -303,6 +314,9 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
         name: str | None,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+            SetResourcePresetResourceGroupAction,
+        )
         from ai.backend.manager.services.resource_preset.actions.update_preset import (
             UpdateResourcePresetAction,
         )
@@ -311,8 +325,14 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
 
         preset_id = await _resolve_preset_id(graph_ctx, id, name)
         await graph_ctx.processors.resource_preset.update_preset.run(
-            UpdateResourcePresetAction(preset_id=preset_id, updater=props.to_updater(id, name))
+            UpdateResourcePresetAction(updater=props.to_updater(preset_id))
         )
+        if props.scaling_group_name is not Undefined:
+            await graph_ctx.processors.resource_preset.set_preset_resource_group.run(
+                SetResourcePresetResourceGroupAction(
+                    preset_id=preset_id, resource_group_name=props.scaling_group_name
+                )
+            )
 
         return cls(True, "success")
 

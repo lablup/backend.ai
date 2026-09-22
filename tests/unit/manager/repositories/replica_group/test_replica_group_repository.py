@@ -14,9 +14,11 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.schema.deployment import (
     IntOrPercent,
     ReplicaGroupRolloutSpec,
@@ -47,7 +49,9 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
+from ai.backend.manager.models.replica_group.searchable_fields import (
+    ReplicaGroupSearchableFields,
+)
 from ai.backend.manager.models.replica_group.updaters import (
     ReplicaGroupDeployUpdater,
     ReplicaGroupScalingUpdater,
@@ -284,8 +288,8 @@ class TestReplicaGroupRepository:
             await db_sess.flush()
             # A session group joins its project and its owner, which must be in the
             # graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.flush()
             db_sess.add(
                 EndpointRow(
@@ -390,7 +394,9 @@ class TestReplicaGroupRepository:
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         rolling_group_id, _ = two_group_ids
-        conditions = [ReplicaGroupConditions.by_lifecycles([ReplicaGroupLifecycle.ROLLING])]
+        conditions = [
+            ReplicaGroupSearchableFields.own.lifecycle.filter.in_([ReplicaGroupLifecycle.ROLLING])
+        ]
 
         result = await replica_group_repository.search_deploy_scheduling_views(conditions)
 
@@ -405,7 +411,9 @@ class TestReplicaGroupRepository:
     ) -> None:
         resource_group_id, _ = two_group_ids
         conditions = [
-            ReplicaGroupConditions.by_scaling_statuses([ReplicaGroupScalingStatus.SCALING])
+            ReplicaGroupSearchableFields.own.scaling_status.filter.in_([
+                ReplicaGroupScalingStatus.SCALING
+            ])
         ]
 
         result = await replica_group_repository.search_scaling_scheduling_views(conditions)
@@ -438,7 +446,11 @@ class TestReplicaGroupRepository:
 
         assert result.updated_group_ids == {first_id, second_id}
 
-        conditions = [ReplicaGroupConditions.by_ids([first_id, second_id])]
+        conditions = [
+            ReplicaGroupSearchableFields.own.field_id.filter.in_(
+                UUIDInMatchSpec(values=[first_id, second_id], negated=False)
+            )
+        ]
         groups = await replica_group_repository.search_deploy_scheduling_views(conditions)
         lifecycle_by_id = {group.group_id: group.lifecycle for group in groups}
         assert lifecycle_by_id[first_id] is ReplicaGroupLifecycle.DRAINING
@@ -497,7 +509,11 @@ class TestReplicaGroupRepository:
                 )
             await db_sess.commit()
 
-        conditions = [ReplicaGroupConditions.by_ids([group_id])]
+        conditions = [
+            ReplicaGroupSearchableFields.own.field_id.filter.in_(
+                UUIDInMatchSpec(values=[group_id], negated=False)
+            )
+        ]
         fetch = await replica_group_repository.fetch_autoscale_reconcile_views(
             conditions, ReplicaGroupHandlerCategory.LIFECYCLE
         )
@@ -535,7 +551,11 @@ class TestReplicaGroupRepository:
 
         assert result.updated_group_ids == {first_id, second_id}
 
-        conditions = [ReplicaGroupConditions.by_ids([first_id, second_id])]
+        conditions = [
+            ReplicaGroupSearchableFields.own.field_id.filter.in_(
+                UUIDInMatchSpec(values=[first_id, second_id], negated=False)
+            )
+        ]
         groups = await replica_group_repository.search_scaling_scheduling_views(conditions)
         count_by_id = {group.group_id: group.desired_current_replica_count for group in groups}
         assert count_by_id[first_id] == 5

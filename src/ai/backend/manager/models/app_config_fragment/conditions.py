@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -150,6 +149,8 @@ class AppConfigFragmentConditions:
 
         return inner
 
+    # Matches the row's own scope columns, not the ownership graph: the graph answers what a
+    # scope reaches, and a domain reaches every fragment its users hold.
     @staticmethod
     def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
         """The ``domain`` scope for ``domain_id``."""
@@ -162,6 +163,7 @@ class AppConfigFragmentConditions:
 
         return inner
 
+    # Matches the row's own scope columns, not the ownership graph, as by_domain_visibility.
     @staticmethod
     def by_user_visibility(user_id: UserID) -> QueryCondition:
         """The ``user`` scope for ``user_id``."""
@@ -215,43 +217,5 @@ class AppConfigFragmentConditions:
     def by_updated_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AppConfigFragmentRow.updated_at == dt
-
-        return inner
-
-    # --- cursor (created_at-based) pagination ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigFragmentRow.created_at)
-                .where(AppConfigFragmentRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigFragmentRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigFragmentRow.created_at)
-                .where(AppConfigFragmentRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigFragmentRow.created_at > subquery
 
         return inner

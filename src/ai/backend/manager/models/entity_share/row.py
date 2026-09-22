@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.types import EntityID, EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import (
-    EntityShareData,
     EntityShareStatus,
 )
 from ai.backend.manager.models.base import GUID, Base, IntFlagType, StrEnumType
@@ -113,7 +113,7 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
     recipient_entity_type: Mapped[EntityType | None] = mapped_column(
         "recipient_entity_type", sa.String(length=32), nullable=True
     )
-    recipient_entity_id: Mapped[EntityID | None] = mapped_column(
+    recipient_entity_id: Mapped[UUID | None] = mapped_column(
         "recipient_entity_id", GUID(), nullable=True
     )
     recipient_email: Mapped[str | None] = mapped_column(
@@ -122,7 +122,7 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
     target_entity_type: Mapped[EntityType] = mapped_column(
         "target_entity_type", sa.String(length=32), nullable=False
     )
-    target_entity_id: Mapped[EntityID] = mapped_column("target_entity_id", GUID(), nullable=False)
+    target_entity_id: Mapped[UUID] = mapped_column("target_entity_id", GUID(), nullable=False)
     permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap", IntFlagType(Permission), nullable=True
     )
@@ -136,24 +136,3 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
         default=EntityShareStatus.PENDING,
         server_default=EntityShareStatus.PENDING.value,
     )
-
-    def _recipient(self) -> RuntimeEntityID | None:
-        node_type = self.recipient_entity_type
-        node_id = self.recipient_entity_id
-        if node_type is None or node_id is None:
-            return None
-        return RuntimeEntityID(node_type, node_id)
-
-    def to_data(self) -> EntityShareData:
-        return EntityShareData(
-            id=self.id,
-            sharer_user_id=self.sharer_user_id,
-            recipient=self._recipient(),
-            recipient_email=self.recipient_email,
-            target=RuntimeEntityID(self.target_entity_type, self.target_entity_id),
-            permission_cap=self.permission_cap,
-            expires_at=self.expires_at,
-            status=self.status,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

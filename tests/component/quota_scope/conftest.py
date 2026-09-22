@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -15,6 +15,7 @@ from ai.backend.manager.api.rest.quota_scope.registry import register_quota_scop
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
@@ -26,10 +27,10 @@ def vfs_storage_processors(
     storage_manager: AsyncMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
-    repo = VFSStorageRepository(database_engine)
+    repo = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFSStorageService(repo, storage_manager=storage_manager)
     return VFSStorageProcessors(
-        processor_registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(VFSStorageEntityType())), service
     )
 
 

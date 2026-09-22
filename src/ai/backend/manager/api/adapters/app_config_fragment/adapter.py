@@ -52,6 +52,7 @@ from ai.backend.manager.models.app_config_fragment.purgers import AppConfigFragm
 from ai.backend.manager.models.app_config_fragment.queriers import (
     AppConfigFragmentQuerier,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.app_config_fragment.searchers import (
     AppConfigFragmentSearcher,
 )
@@ -61,6 +62,7 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -85,21 +87,24 @@ from ai.backend.manager.services.app_config.actions.fragment.purge import (
 from ai.backend.manager.services.app_config.actions.fragment.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 
 
 @lru_cache(maxsize=1)
 def _get_app_config_fragment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigFragmentOrders.created_at(ascending=False),
-        backward_order=AppConfigFragmentOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigFragmentConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigFragmentConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigFragmentOrders.id(ascending=True),
+        cursor_column=AppConfigFragmentRow.id,
     )
 
 
 class AppConfigFragmentAdapter(BaseAdapter):
     """Adapter for raw app config fragment write and search operations."""
+
+    _app_config: AppConfigProcessors
+
+    def __init__(self, app_config: AppConfigProcessors) -> None:
+        self._app_config = app_config
 
     # --- fragment writes and reads (RBAC-gated at the processor) ---
 
@@ -129,7 +134,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         """Route by who owns the fragments: a public write answers to no scope, so it runs
         behind the SUPERADMIN gate instead."""
         if owner is None:
-            written = await self._processors.app_config.fragment_global_bulk_upsert.run(
+            written = await self._app_config.fragment_global_bulk_upsert.run(
                 GlobalBulkUpsertAppConfigFragmentsAction(
                     upserters=[
                         PublicAppConfigFragmentUpserter(
@@ -140,7 +145,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
                 )
             )
         else:
-            written = await self._processors.app_config.fragment_bulk_upsert.run(
+            written = await self._app_config.fragment_bulk_upsert.run(
                 BulkUpsertAppConfigFragmentsAction(
                     owner=owner,
                     upserters=[
@@ -157,13 +162,13 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
-        action_result = await self._processors.app_config.fragment_get.run(
+        action_result = await self._app_config.fragment_get.run(
             GetAppConfigFragmentAction(querier=AppConfigFragmentQuerier(fragment_id=fragment_id))
         )
         return self._fragment_to_node(action_result.data)
 
     async def purge(self, fragment_id: AppConfigFragmentID) -> PurgeAppConfigFragmentPayload:
-        action_result = await self._processors.app_config.fragment_purge.run(
+        action_result = await self._app_config.fragment_purge.run(
             PurgeAppConfigFragmentAction(purger=AppConfigFragmentPurger(fragment_id=fragment_id))
         )
         return PurgeAppConfigFragmentPayload(id=action_result.data.id)
@@ -171,7 +176,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     async def bulk_purge(
         self, input: BulkPurgeAppConfigFragmentInput
     ) -> BulkPurgeAppConfigFragmentPayload:
-        action_result = await self._processors.app_config.fragment_bulk_purge.run(
+        action_result = await self._app_config.fragment_bulk_purge.run(
             BulkPurgeAppConfigFragmentAction(
                 purgers=[
                     AppConfigFragmentPurger(fragment_id=fragment_id) for fragment_id in input.ids
@@ -200,7 +205,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         if not fragment_ids:
             return []
         entity_ids = [AppConfigFragmentID(value) for value in fragment_ids]
-        result = await self._processors.app_config.fragment_bulk_get.run(
+        result = await self._app_config.fragment_bulk_get.run(
             BulkGetAppConfigFragmentsAction(ids=entity_ids)
         )
         return [
@@ -245,7 +250,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             limit=len(config_names),
         )
-        action_result = await self._processors.app_config.fragment_scoped_search.run(
+        action_result = await self._app_config.fragment_scoped_search.run(
             ScopedSearchAppConfigFragmentAction(owner=owner, searcher=searcher)
         )
         # Answer at the position each name was asked for, so a name with no fragment at this
@@ -277,8 +282,10 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config.fragment_admin_search.run(
-            AdminSearchAppConfigFragmentAction(searcher=searcher)
+        action_result = await self._app_config.fragment_admin_search.run(
+            AdminSearchAppConfigFragmentAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.items],
@@ -306,7 +313,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config.fragment_scoped_search.run(
+        action_result = await self._app_config.fragment_scoped_search.run(
             ScopedSearchAppConfigFragmentAction(
                 owner=self._scope_owner(input.scope), searcher=searcher
             )
@@ -346,6 +353,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     def _fragment_to_node(data: AppConfigFragmentData) -> AppConfigFragmentNode:
         return AppConfigFragmentNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             scope_type=AppConfigScopeType.of_owner(data.scope_id),
             scope_id=AppConfigScopeID(data.scope_id) if data.scope_id is not None else None,

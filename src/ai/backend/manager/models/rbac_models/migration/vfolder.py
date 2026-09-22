@@ -1,9 +1,15 @@
+"""Frozen vfolder-side inputs for the RBAC data migrations.
+
+Deprecated: read only by `models/alembic/versions/`. These do not track the live
+models; a migration keeps reading what it was written against.
+"""
+
 import enum
 import uuid
 from collections.abc import Mapping
 
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.models.vfolder import VFolderOwnershipType as OriginalVFolderOwnershipType
 from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFolderPermission
 
@@ -13,7 +19,7 @@ from .enums import (
     ScopeType,
 )
 
-VFOLDER_ENTITY = EntityType.VFOLDER
+VFOLDER_ENTITY = VFolderEntityType()
 
 
 class VFolderOwnershipType(enum.StrEnum):

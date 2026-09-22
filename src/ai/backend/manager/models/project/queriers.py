@@ -10,7 +10,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -34,4 +35,20 @@ class ProjectQuerier(DataQuerier[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
+
+
+class BulkProjectQuerier(BulkEntityQuerier[ProjectRow, ProjectData]):
+    """The projects the caller named, keyed by their id."""
+
+    @override
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return ProjectRow.id
+
+    @override
+    def to_data(self, row: ProjectRow) -> ProjectData:
+        return ProjectSearchableFields.own.to_data(row)

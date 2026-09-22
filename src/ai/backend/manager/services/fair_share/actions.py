@@ -13,16 +13,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.data.entity.fair_share import (
-    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
-    PROJECT_FAIR_SHARE_ENTITY_TYPE,
-    USER_FAIR_SHARE_ENTITY_TYPE,
-)
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -34,9 +28,9 @@ from ai.backend.manager.data.fair_share import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
 )
 from ai.backend.manager.models.specs.pagination import QueryPagination
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -60,11 +54,11 @@ class DomainFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_FAIR_SHARE_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.resource_group_id,)
 
 
 @dataclass(frozen=True)
@@ -100,7 +94,7 @@ class GlobalSearchDomainFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DOMAIN_FAIR_SHARE_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -123,7 +117,7 @@ class GlobalSearchDomainFairSharesActionResult:
 class SearchRGDomainFairSharesAction(DomainFairShareAction):
     """Page through the domain fair shares of a resource group, defaults filled in."""
 
-    scope: DomainFairShareOperationScope
+    scope: DomainFairShareTarget
     querier: BatchQuerier
 
     @override
@@ -207,11 +201,11 @@ class ProjectFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_FAIR_SHARE_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.resource_group_id,)
 
 
 @dataclass(frozen=True)
@@ -247,7 +241,7 @@ class GlobalSearchProjectFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_FAIR_SHARE_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -270,7 +264,7 @@ class GlobalSearchProjectFairSharesActionResult:
 class SearchRGProjectFairSharesAction(ProjectFairShareAction):
     """Page through the project fair shares of a resource group, defaults filled in."""
 
-    scope: ProjectFairShareOperationScope
+    scope: ProjectFairShareTarget
     querier: BatchQuerier
 
     @override
@@ -356,11 +350,11 @@ class UserFairShareAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_FAIR_SHARE_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.resource_group_id,)
 
 
 @dataclass(frozen=True)
@@ -397,7 +391,7 @@ class GlobalSearchUserFairSharesAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_FAIR_SHARE_ENTITY_TYPE
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -420,7 +414,7 @@ class GlobalSearchUserFairSharesActionResult:
 class SearchRGUserFairSharesAction(UserFairShareAction):
     """Page through the user fair shares of a resource group, defaults filled in."""
 
-    scope: UserFairShareOperationScope
+    scope: UserFairShareTarget
     querier: BatchQuerier
 
     @override

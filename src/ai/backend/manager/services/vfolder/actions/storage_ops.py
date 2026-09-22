@@ -5,9 +5,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 
@@ -20,8 +20,12 @@ from .base import (
 
 
 @dataclass
-class GlobalListAllowedTypesAction(VFolderGlobalAction):
-    """Query allowed vfolder types from etcd config."""
+class PublicListAllowedTypesAction(VFolderGlobalAction):
+    """Read the vfolder types the etcd config allows.
+
+    Open to any authenticated caller: the list is what a user needs before creating
+    a folder, and it names no entity.
+    """
 
     @override
     @classmethod
@@ -31,11 +35,11 @@ class GlobalListAllowedTypesAction(VFolderGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_list_allowed_types"
+        return "public_list_allowed_types"
 
 
 @dataclass
-class GlobalListAllowedTypesActionResult:
+class PublicListAllowedTypesActionResult:
     allowed_types: list[str]
 
 
@@ -148,11 +152,11 @@ class SearchHostsAction(VFolderScopeAction):
     resource_policy: Mapping[str, Any]
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         """A project folder is bounded by the project, a user folder by its owner."""
         if self.group_id is not None:
-            return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.group_id),)
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+            return (ProjectID(self.group_id),)
+        return (UserID(self.user_uuid),)
 
     @override
     @classmethod

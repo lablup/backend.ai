@@ -39,8 +39,7 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 
 - Use `Field()` constraints: `min_length`, `max_length`, `ge`, `le`, `pattern`.
 - Use `field_validator` for cross-field/format validation (e.g., stripping whitespace, verifying non-empty after strip).
-- nullable-clearable fields: SENTINEL pattern (sentinel value = "clear this field", None = "no change").
-- All optional update fields default to `None` to mean "no change".
+- Update fields follow the "Update" section of `src/ai/backend/common/dto/AGENTS.md`: `X | None | Unset = Field(default=UNSET)`.
 
 ## Conversion
 

@@ -4,6 +4,8 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.permission import PermissionFieldType
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -11,54 +13,34 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode, FieldNotFoundError
 
 __all__ = (
+    "GlobalEntityMissing",
+    "GlobalEntityNotLoaded",
     "InvalidFieldPermission",
+    "InvalidRoleSeed",
     "InvalidPermissionOperation",
     "NotEnoughPermission",
-    "ObjectPermissionNotFound",
     "PermissionAlreadyGranted",
     "PermissionNotFound",
     "ReplaceRolePermissionRoleIdMismatch",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
     "RoleNotFound",
-    "UserSystemRoleNotProvisioned",
     "VirtualEntityNotFound",
 )
 
 
-class RoleNotFound(BackendAIError, web.HTTPNotFound):
+class RoleNotFound(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/role-not-found"
     error_title = "The role does not exist."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ROLE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class UserSystemRoleNotProvisioned(BackendAIError, web.HTTPInternalServerError):
-    """Raised when a user is missing the SYSTEM role that should exist for every user.
-
-    This is a server-side data-integrity condition (e.g. legacy or externally
-    provisioned accounts) to be remediated via the superadmin ensure-system-role
-    API, not a client error.
-    """
-
-    error_type = "https://api.backend.ai/probs/user-system-role-not-provisioned"
-    error_title = "The user's SYSTEM role is not provisioned."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ROLE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(RoleEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
 class RoleAlreadyAssigned(BackendAIError, web.HTTPConflict):
@@ -87,16 +69,27 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class PermissionAlreadyGranted(BackendAIError, web.HTTPConflict):
+class PermissionNotFound(FieldNotFoundError):
+    error_type = "https://api.backend.ai/probs/permission-not-found"
+    error_title = "The permission entry does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, field_type=PermissionFieldType(), operation=operation)
+
+
+class PermissionAlreadyGranted(FieldError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/permission-already-granted"
     error_title = "The role already holds the permission."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            PermissionFieldType(), ActionOperationType.CREATE, ErrorDetail.ALREADY_EXISTS
         )
 
 
@@ -116,7 +109,7 @@ class InvalidFieldPermission(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidPermissionOperation(BackendAIError, web.HTTPBadRequest):
+class InvalidPermissionOperation(FieldError, web.HTTPBadRequest):
     """An operation with no permission bit — a grant operation — cannot be stored
     as a permission; sharing is judged from entity shares and scope CREATE."""
 
@@ -124,11 +117,9 @@ class InvalidPermissionOperation(BackendAIError, web.HTTPBadRequest):
     error_title = "The operation cannot be stored as a permission."
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            PermissionFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_PARAMETERS
         )
 
 
@@ -139,35 +130,9 @@ class NotEnoughPermission(BackendAIError, web.HTTPForbidden):
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.ROLE,
-            operation=ErrorOperation.CREATE,
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class PermissionNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/permission-not-found"
-    error_title = "The permission does not exist."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/object-permission-not-found"
-    error_title = "The object permission does not exist."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
@@ -191,14 +156,55 @@ class VirtualEntityNotFound(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ReplaceRolePermissionRoleIdMismatch(BackendAIError, web.HTTPBadRequest):
+class ReplaceRolePermissionRoleIdMismatch(FieldError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/replace-role-permission-role-id-mismatch"
     error_title = "Permission entry role_id does not match the request role_id."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            PermissionFieldType(), ActionOperationType.UPDATE, ErrorDetail.MISMATCH
+        )
+
+
+class InvalidRoleSeed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-role-seed"
+    error_title = "The seed role declaration is not valid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class GlobalEntityNotLoaded(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a global entity id is read before the ids are loaded."""
+
+    error_type = "https://api.backend.ai/probs/global-entity-not-loaded"
+    error_title = "The global entity ids are not loaded."
 
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.MISMATCH,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_READY,
+        )
+
+
+class GlobalEntityMissing(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a global entity row or its virtual entity does not exist."""
+
+    error_type = "https://api.backend.ai/probs/global-entity-missing"
+    error_title = "A global entity or its virtual entity does not exist."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

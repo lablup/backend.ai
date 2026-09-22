@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -13,8 +12,8 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData, DomainStatus
 from ai.backend.manager.errors.resource import DomainPurgeInProgress
-from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -48,14 +47,16 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=DomainConditions.not_being_purged(),
+                condition=DomainSearchableFields.own.status.filter.not_in(
+                    DomainStatus.purge_in_progress()
+                ),
                 error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
             ),
         )
@@ -81,7 +82,7 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -101,7 +102,7 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
@@ -115,7 +116,7 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -134,14 +135,16 @@ class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=DomainConditions.not_being_purged(),
+                condition=DomainSearchableFields.own.status.filter.not_in(
+                    DomainStatus.purge_in_progress()
+                ),
                 error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
             ),
         )
@@ -157,7 +160,7 @@ class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -177,14 +180,16 @@ class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return DomainRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DomainID:
         return self.domain_id
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=DomainConditions.not_being_purged(),
+                condition=DomainSearchableFields.own.status.filter.not_in(
+                    DomainStatus.purge_in_progress()
+                ),
                 error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
             ),
         )
@@ -200,4 +205,4 @@ class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)

@@ -35,6 +35,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -58,6 +59,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -71,8 +73,8 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -83,12 +85,14 @@ from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
-from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.creators import KernelCreator
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
-from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
+from ai.backend.manager.models.resource_group import ResourceGroupRow
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     KeyPairResourcePolicyRow,
@@ -111,6 +115,7 @@ from ai.backend.manager.models.session import (
     SessionRow,
 )
 from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
@@ -118,10 +123,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
-)
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
 )
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.write import BatchReconcileTransition
@@ -136,7 +137,6 @@ from ai.backend.manager.repositories.scheduler.types.session import (
     SessionHistoryToCreate,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedResourceGroup,
     ComputeScheduleFetch,
     SessionSpecFetch,
     UserEnqueueFetch,
@@ -2228,36 +2228,53 @@ class ScheduleDBSource:
     async def pick_default_resource_group(
         self,
         *,
-        access_key: AccessKey,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
+        user_id: UserID,
     ) -> ResourceGroupID:
-        """Return the first resource group from the owner's allowlist."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            allowed_rgs = await self._query_allowed_resource_groups(
-                db_sess, domain_name, project_id, access_key
-            )
-        if not allowed_rgs:
+        """Return the first resource group, by name, the owner may schedule on."""
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=[project_id], user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        if not result.items:
             raise InvalidAPIParameters("No accessible resource group available")
-        return allowed_rgs[0].id
+        return result.items[0].id
 
     async def query_accessible_resource_group_ids(
         self,
         *,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
-        access_key: AccessKey,
+        user_id: UserID,
     ) -> frozenset[ResourceGroupID]:
         """Return the resource-group ids accessible to the given single-project scope.
 
         A pure DB read: the caller decides the scope and performs the
         accessibility rejection, so this method neither validates nor raises.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            allowed_rgs = await self._query_allowed_resource_groups(
-                db_sess, domain_name, project_id, access_key
-            )
-        return frozenset(rg.id for rg in allowed_rgs)
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=[project_id], user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return frozenset(rg.id for rg in result.items)
+
+    async def query_allowed_resource_groups(
+        self,
+        *,
+        domain_id: DomainID,
+        project_ids: Sequence[ProjectID],
+        user_id: UserID,
+    ) -> list[ResourceGroupData]:
+        """Return the active resource groups the user may schedule on, in name order."""
+        search = AllowedResourceGroupsSearch(
+            domain_id=domain_id, project_ids=project_ids, user_id=user_id
+        )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+        return result.items
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -2376,44 +2393,6 @@ class ScheduleDBSource:
             main_gid=user_row.container_main_gid,
             supplementary_gids=user_row.container_gids or [],
         )
-
-    async def _query_allowed_resource_groups(
-        self,
-        db_sess: SASession,
-        domain_name: str,
-        group_id: ProjectID,
-        access_key: str,
-    ) -> list[AllowedResourceGroup]:
-        """
-        Query allowed resource groups for the given user/group.
-
-        Args:
-            db_sess: Database session
-            domain_name: Domain name
-            group_id: Project (group) ID
-            access_key: Access key
-
-        Returns:
-            List of AllowedScalingGroup objects
-        """
-        # query_allowed_sgroups expects AsyncConnection, get it from session
-        conn = await db_sess.connection()
-        allowed_sgroups = await query_allowed_sgroups(
-            conn,
-            domain_name,
-            group_id,
-            access_key,
-        )
-
-        return [
-            AllowedResourceGroup(
-                id=ResourceGroupID(sg.id),
-                name=ResourceGroupName(sg.name),
-                is_private=not sg.is_public,  # Convert is_public to is_private
-                scheduler_opts=sg.scheduler_opts,
-            )
-            for sg in allowed_sgroups
-        ]
 
     async def allocate_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
         """Reserve and assign sessions in the batch to their agents.
@@ -3892,7 +3871,7 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
             if row is None:
-                raise ObjectNotFound(object_name="network")
+                raise NetworkNotFound()
             return row.to_data()
 
     async def update_session_network_id(
@@ -4029,49 +4008,32 @@ class ScheduleDBSource:
 
     async def search_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: KernelSearcher,
     ) -> KernelListResult:
         """Search kernels for kernel handler execution.
 
-        This method is for KernelLifecycleHandler. It queries kernels
-        directly using BatchQuerier conditions.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use KernelConditions for filtering.
-
-        Returns:
-            KernelListResult containing KernelInfo objects.
+        This method is for KernelLifecycleHandler.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(KernelRow)
-            result = await execute_batch_querier(db_sess, stmt, querier)
-            return KernelListResult(
-                items=[row.KernelRow.to_kernel_info() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return KernelListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_sessions_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionInfo]:
         """Search sessions without kernel data for handlers.
 
-        This method uses EXISTS subqueries for optimized kernel condition checking
-        without loading kernel data.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            List of SessionInfo matching all conditions.
+        The kernel conditions stay EXISTS subqueries, so no kernel row is loaded.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(SessionRow)
-            result = await execute_batch_querier(db_sess, stmt, querier)
-            return [row.SessionRow.to_session_info() for row in result.rows]
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return list(result.items)
 
     async def update_with_history(
         self,
@@ -4344,7 +4306,7 @@ class ScheduleDBSource:
 
     async def search_sessions_with_kernels(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsSearchResult:
         """Search sessions with kernel data and image configs.
 
@@ -4354,53 +4316,37 @@ class ScheduleDBSource:
         Uses separate queries for sessions, kernels, and images to avoid
         data duplication from JOINs and improve memory efficiency.
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use NoPagination for scheduler batch operations.
-                     Conditions should target SessionRow columns.
-
-        Returns:
-            SessionWithKernelsSearchResult with sessions, image_configs, and pagination info
-
         Example:
-            querier = BatchQuerier(
+            searcher = SessionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_resource_group_id(resource_group_id),
-                    SessionConditions.by_statuses([SessionStatus.SCHEDULED]),
+                    fields.resource_group_id.filter.equals(resource_group_spec),
+                    fields.status.filter.in_([SessionStatus.SCHEDULED]),
                 ],
-                orders=[SessionOrders.created_at()],
+                orders=[fields.created_at.order.apply(ascending=True)],
             )
-            result = await db_source.search_sessions_with_kernels(querier)
+            result = await db_source.search_sessions_with_kernels(searcher)
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions
-            session_query = sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.status,
+        async with self._reconcile_ops.read_ops() as r:
+            session_result = await r.search_in_global(searcher)
+        if not session_result.items:
+            return SessionWithKernelsSearchResult(
+                sessions=[],
+                image_configs={},
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
             )
-            session_result = await execute_batch_querier(db_sess, session_query, querier)
-
-            if not session_result.rows:
-                return SessionWithKernelsSearchResult(
-                    sessions=[],
-                    image_configs={},
-                    total_count=0,
-                    has_next_page=False,
-                    has_previous_page=False,
-                )
-
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build session map
             session_ids: list[SessionId] = []
             sessions_map: dict[SessionId, SessionDataForPull] = {}
-            for row in session_result.rows:
-                session_ids.append(row.id)
-                sessions_map[row.id] = SessionDataForPull(
-                    session_id=row.id,
-                    creation_id=row.creation_id,
-                    access_key=row.access_key,
+            for session in session_result.items:
+                session_ids.append(SessionId(session.id))
+                sessions_map[SessionId(session.id)] = SessionDataForPull(
+                    session_id=SessionId(session.id),
+                    creation_id=session.creation_id or "",
+                    access_key=session.access_key or AccessKey(""),
                     kernels=[],
                 )
 
@@ -4489,7 +4435,7 @@ class ScheduleDBSource:
 
     async def search_sessions_with_kernels_and_user(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsAndUserSearchResult:
         """Search sessions with kernel data, user info, and image configs.
 
@@ -4499,72 +4445,50 @@ class ScheduleDBSource:
         Uses separate queries for sessions, kernels, users, and images to avoid
         data duplication from JOINs and improve memory efficiency.
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use NoPagination for scheduler batch operations.
-                     Conditions should target SessionRow columns.
-
-        Returns:
-            SessionWithKernelsAndUserSearchResult with sessions, image_configs, and pagination info
-
         Example:
-            querier = BatchQuerier(
+            searcher = SessionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_resource_group_id(resource_group_id),
-                    SessionConditions.by_statuses([SessionStatus.PREPARED]),
+                    fields.resource_group_id.filter.equals(resource_group_spec),
+                    fields.status.filter.in_([SessionStatus.PREPARED]),
                 ],
-                orders=[SessionOrders.created_at()],
+                orders=[fields.created_at.order.apply(ascending=True)],
             )
-            result = await db_source.search_sessions_with_kernels_and_user(querier)
+            result = await db_source.search_sessions_with_kernels_and_user(searcher)
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions
-            session_query = sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.session_type,
-                SessionRow.name,
-                SessionRow.environ,
-                SessionRow.cluster_mode,
-                SessionRow.user_uuid,
-                SessionRow.network_type,
-                SessionRow.network_id,
+        async with self._reconcile_ops.read_ops() as r:
+            session_result = await r.search_in_global(searcher)
+        if not session_result.items:
+            return SessionWithKernelsAndUserSearchResult(
+                sessions=[],
+                image_configs={},
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
             )
-            session_result = await execute_batch_querier(db_sess, session_query, querier)
-
-            if not session_result.rows:
-                return SessionWithKernelsAndUserSearchResult(
-                    sessions=[],
-                    image_configs={},
-                    total_count=0,
-                    has_next_page=False,
-                    has_previous_page=False,
-                )
-
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build session info map and collect user UUIDs
             session_ids: list[SessionId] = []
             session_info_map: dict[SessionId, dict[str, Any]] = {}
             user_uuids: set[UUID] = set()
 
-            for row in session_result.rows:
-                session_ids.append(row.id)
-                session_info_map[row.id] = {
-                    "id": row.id,
-                    "creation_id": row.creation_id,
-                    "access_key": row.access_key,
-                    "session_type": row.session_type,
-                    "name": row.name,
-                    "environ": row.environ,
-                    "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
-                    "network_type": row.network_type,
-                    "network_id": row.network_id,
+            for session in session_result.items:
+                session_id = SessionId(session.id)
+                session_ids.append(session_id)
+                session_info_map[session_id] = {
+                    "id": session_id,
+                    "creation_id": session.creation_id,
+                    "access_key": session.access_key,
+                    "session_type": session.session_type,
+                    "name": session.name,
+                    "environ": session.environ,
+                    "cluster_mode": session.cluster_mode,
+                    "user_uuid": session.user_uuid,
+                    "network_type": session.network_type,
+                    "network_id": session.network_id,
                     "kernels": [],
                 }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
+                user_uuids.add(session.user_uuid)
 
             # 2. Query kernels for these sessions
             kernel_query = (
@@ -4688,43 +4612,35 @@ class ScheduleDBSource:
 
     async def search_sessions_with_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionWithKernels]:
         """Search sessions with their kernels using SessionInfo/KernelInfo for handlers.
 
-        This method uses the unified SessionInfo and KernelInfo types,
-        loading full Row objects and converting via to_session_info()/to_kernel_info().
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Conditions should target SessionRow columns.
-
-        Returns:
-            List of SessionWithKernels containing SessionInfo and KernelInfo objects.
+        This method uses the unified SessionInfo and KernelInfo types.
         """
+        async with self._reconcile_ops.read_ops() as r:
+            session_result = await r.search_in_global(searcher)
+        if not session_result.items:
+            return []
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions (full rows for to_session_info conversion)
-            session_query = sa.select(SessionRow)
-            session_result = await execute_batch_querier(db_sess, session_query, querier)
-
-            if not session_result.rows:
-                return []
-
             # Build session map
             session_ids: list[SessionId] = []
             sessions_map: dict[SessionId, SessionWithKernels] = {}
-            for row in session_result.rows:
-                session_row: SessionRow = row.SessionRow
-                session_ids.append(session_row.id)
-                sessions_map[session_row.id] = SessionWithKernels(
-                    session_info=session_row.to_session_info(),
+            for session_info in session_result.items:
+                session_ids.append(SessionId(session_info.identity.id))
+                sessions_map[SessionId(session_info.identity.id)] = SessionWithKernels(
+                    session_info=session_info,
                     kernel_infos=[],
                 )
 
             # 2. Query kernels for these sessions (full rows for to_kernel_info conversion)
             kernel_query = (
                 sa.select(KernelRow)
-                .where(KernelConditions.by_session_ids(session_ids)())
+                .where(
+                    KernelSearchableFields.own.session_id.filter.in_(
+                        UUIDInMatchSpec(values=session_ids, negated=False)
+                    )()
+                )
                 .order_by(KernelRow.session_id, KernelRow.cluster_idx)
             )
             kernel_result = await db_sess.execute(kernel_query)

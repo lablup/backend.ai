@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -12,6 +14,8 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     SearchRuntimeVariantsInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant.types import (
     CreateRuntimeVariantInputGQL,
@@ -24,6 +28,7 @@ from ai.backend.manager.api.gql.runtime_variant.types import (
     RuntimeVariantFilterGQL,
     RuntimeVariantGQL,
     RuntimeVariantOrderByGQL,
+    RuntimeVariantUsageGQL,
     UpdateRuntimeVariantInputGQL,
     UpdateRuntimeVariantPayloadGQL,
 )
@@ -39,6 +44,15 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def runtime_variants(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        RuntimeVariantUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller."
+            )
+        ),
+    ] = None,
     filter: RuntimeVariantFilterGQL | None = None,
     order_by: list[RuntimeVariantOrderByGQL] | None = None,
     before: str | None = None,
@@ -60,6 +74,7 @@ async def runtime_variants(
         ]
 
     search_input = SearchRuntimeVariantsInput(
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,
@@ -74,7 +89,7 @@ async def runtime_variants(
     edges = [
         RuntimeVariantEdge(
             node=RuntimeVariantGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
@@ -161,14 +176,14 @@ async def admin_delete_runtime_variants(
     info: Info[StrawberryGQLContext],
     input: DeleteRuntimeVariantsInputGQL,
 ) -> DeleteRuntimeVariantsPayloadGQL | None:
-    """Delete multiple runtime variants.
+    """Delete multiple runtime variants, answering for each one.
 
     Args:
         info: Strawberry GraphQL context.
         input: Input containing list of runtime variant UUIDs to delete.
 
     Returns:
-        DeleteRuntimeVariantsPayloadGQL with count of deleted runtime variants.
+        DeleteRuntimeVariantsPayloadGQL with the deleted ids and the per-item failures.
     """
     check_admin_only()
     ctx = info.context

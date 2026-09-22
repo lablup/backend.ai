@@ -4,7 +4,7 @@ import enum
 import functools
 import logging
 import uuid
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -32,21 +32,14 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
-    AutoPullBehavior,
     BinarySize,
-    ImageAlias,
     ImageCanonical,
-    ImageConfig,
     ImageID,
-    ImageRegistry,
-    ResourceSlot,
     SlotName,
-    SlotTypes,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -55,10 +48,7 @@ from ai.backend.manager.data.image.types import (
     ImageData,
     ImageDataWithDetails,
     ImageIdentifier,
-    ImageLabelsData,
-    ImageResourcesData,
     ImageStatus,
-    ImageTagEntry,
     ImageType,
     KVPair,
     ResourceLimit,
@@ -66,7 +56,7 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.image import ImageNotFound, ImagePurgeInProgress
+from ai.backend.manager.errors.image import ImagePurgeInProgress
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -127,23 +117,6 @@ class ImageLoadFilter(enum.StrEnum):
     """Include customized images owned or accessible by API callee."""
     CUSTOMIZED_GLOBAL = "customized-global"
     """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
-
-
-class RelationLoadingOption(enum.StrEnum):
-    ALIASES = enum.auto()
-    REGISTRY = enum.auto()
-
-
-def _apply_loading_option(
-    query_stmt: sa.sql.Select[Any], options: Iterable[RelationLoadingOption]
-) -> sa.sql.Select[Any]:
-    for op in options:
-        match op:
-            case RelationLoadingOption.ALIASES:
-                query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
-            case RelationLoadingOption.REGISTRY:
-                query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
-    return query_stmt
 
 
 def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -307,106 +280,6 @@ class ImageRow(CreatedAtMixin, Base):
         )
 
     @classmethod
-    async def from_alias(
-        cls,
-        session: AsyncSession,
-        alias: str,
-        load_aliases: bool = False,
-        filter_by_statuses: list[ImageStatus] | None = None,
-        *,
-        loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
-        if filter_by_statuses is None:
-            filter_by_statuses = [ImageStatus.ALIVE]
-        query = (
-            sa.select(ImageRow)
-            .select_from(ImageRow)
-            .join(ImageAliasRow, ImageRow.aliases.and_(ImageAliasRow.alias == alias))
-        )
-        if load_aliases:
-            query = query.options(selectinload(ImageRow.aliases))
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-
-        query = _apply_loading_option(query, loading_options)
-        result = await session.scalar(query)
-        if result is not None:
-            return result
-        raise UnknownImageReference
-
-    @classmethod
-    async def from_image_identifier(
-        cls,
-        session: AsyncSession,
-        identifier: ImageIdentifier,
-        load_aliases: bool = True,
-        filter_by_statuses: list[ImageStatus] | None = None,
-        *,
-        loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
-        if filter_by_statuses is None:
-            filter_by_statuses = [ImageStatus.ALIVE]
-        query = sa.select(ImageRow).where(
-            (ImageRow.name == identifier.canonical)
-            & (ImageRow.architecture == identifier.architecture)
-        )
-
-        if load_aliases:
-            query = query.options(selectinload(ImageRow.aliases))
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-
-        query = _apply_loading_option(query, loading_options)
-
-        result = await session.execute(query)
-        candidates = list(result.scalars().all())
-
-        if len(candidates) <= 0:
-            raise UnknownImageReference(identifier.canonical)
-
-        return candidates[0]
-
-    @classmethod
-    async def from_image_ref(
-        cls,
-        session: AsyncSession,
-        ref: ImageRef,
-        *,
-        strict_arch: bool = False,
-        load_aliases: bool = False,
-        filter_by_statuses: list[ImageStatus] | None = None,
-        loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
-        """
-        Loads a image row that corresponds to the given ImageRef object.
-
-        When *strict_arch* is False and the image table has only one row
-        with respect to requested canonical, this function will
-        return that row regardless of the image architecture.
-        """
-        if filter_by_statuses is None:
-            filter_by_statuses = [ImageStatus.ALIVE]
-        query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
-        if load_aliases:
-            query = query.options(selectinload(ImageRow.aliases))
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-
-        query = _apply_loading_option(query, loading_options)
-
-        result = await session.execute(query)
-        candidates = list(result.scalars().all())
-
-        if len(candidates) == 0:
-            raise UnknownImageReference(ref)
-        if len(candidates) == 1 and not strict_arch:
-            return candidates[0]
-        for row in candidates:
-            if row.architecture == ref.architecture:
-                return row
-        raise UnknownImageReference(ref)
-
-    @classmethod
     def from_dataclass(cls, image_data: ImageData) -> Self:
         image_row = cls(
             name=image_data.name,
@@ -457,141 +330,6 @@ class ImageRow(CreatedAtMixin, Base):
         if image_data is None:
             return None
         return cls.from_dataclass(image_data)
-
-    @classmethod
-    async def resolve(
-        cls,
-        session: AsyncSession,
-        reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
-        *,
-        strict_arch: bool = False,
-        filter_by_statuses: list[ImageStatus] | None = None,
-        load_aliases: bool = True,
-        loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
-        """
-        Resolves a matching row in the image table from image references and/or aliases.
-        If candidate element is `ImageRef`, this method will try to resolve image with matching
-        `ImageRef` description. Otherwise, if element is `str`, this will try to follow the alias.
-        If multiple elements are supplied, this method will return the first matched `ImageRow`
-        among those elements.
-        Passing the canonical image reference as string directly to resolve image data
-        is no longer possible. You need to declare ImageRef object explicitly if you're using string
-        as an canonical image references. For example:
-        .. code-block::
-           await ImageRow.resolve(
-               conn,
-               [
-                   ImageRef(
-                       image_name,
-                       project,
-                       registry,
-                       tag,
-                       architecture,
-                       is_local,
-                   ),
-                   ImageIdentifier(canonical, architecture),
-                   ImageAlias(image_alias),
-               ],
-           )
-
-        When *strict_arch* is False and the image table has only one row
-        with respect to requested canonical, this function will
-        return that row regardless of the image architecture.
-
-        When *load_aliases* is True, it tries to resolve the alias chain.
-        Otherwise it finds only the direct image references.
-        """
-        if filter_by_statuses is None:
-            filter_by_statuses = [ImageStatus.ALIVE]
-        searched_refs = []
-        for reference in reference_candidates:
-            resolver_func: Any = None
-            if isinstance(reference, str):
-                resolver_func = cls.from_alias
-                searched_refs.append(f"alias:{reference!r}")
-            elif isinstance(reference, ImageRef):
-                resolver_func = functools.partial(cls.from_image_ref, strict_arch=strict_arch)
-                searched_refs.append(f"ref:{reference.canonical!r}")
-            elif isinstance(reference, ImageIdentifier):
-                resolver_func = cls.from_image_identifier
-                searched_refs.append(f"identifier:{reference!r}")
-            try:
-                if row := await resolver_func(
-                    session,
-                    reference,
-                    load_aliases=load_aliases,
-                    filter_by_statuses=filter_by_statuses,
-                    loading_options=loading_options,
-                ):
-                    result: ImageRow = row
-                    return result
-            except UnknownImageReference:
-                continue
-        raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
-
-    @classmethod
-    async def lookup(
-        cls,
-        session: AsyncSession,
-        image_identifier: ImageIdentifier,
-    ) -> ImageRow:
-        """
-        Lookup ImageRow by ImageIdentifier, also trying canonical as alias.
-
-        Args:
-            session: Database session
-            image_identifier: ImageIdentifier containing canonical name and architecture
-
-        Returns:
-            ImageRow instance
-
-        Raises:
-            ImageNotFound: If no matching image is found
-        """
-        identifiers: list[ImageAlias | ImageRef | ImageIdentifier] = [
-            image_identifier,
-            ImageAlias(image_identifier.canonical),
-        ]
-
-        return await cls.resolve(session, identifiers)
-
-    @classmethod
-    async def get(
-        cls,
-        session: AsyncSession,
-        image_id: UUID,
-        filter_by_statuses: list[ImageStatus] | None = None,
-        load_aliases: bool = False,
-    ) -> ImageRow | None:
-        if filter_by_statuses is None:
-            filter_by_statuses = [ImageStatus.ALIVE]
-        query = sa.select(ImageRow).where(ImageRow.id == image_id)
-        if load_aliases:
-            query = query.options(selectinload(ImageRow.aliases))
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-
-        result = await session.execute(query)
-        return result.scalar()
-
-    @classmethod
-    async def list(
-        cls,
-        session: AsyncSession,
-        filter_by_statuses: list[ImageStatus] | None = None,
-        load_aliases: bool = False,
-    ) -> list[ImageRow]:
-        if filter_by_statuses is None:
-            filter_by_statuses = [ImageStatus.ALIVE]
-        query = sa.select(ImageRow)
-        if load_aliases:
-            query = query.options(selectinload(ImageRow.aliases))
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-
-        result = await session.execute(query)
-        return list(result.scalars().all())
 
     @override
     def __str__(self) -> str:
@@ -656,32 +394,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
-
-    async def get_min_slot(self, slot_units: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
-        min_slot = ResourceSlot()
-
-        for slot_key, resource in self.resources.items():
-            slot_unit = slot_units.get(slot_key)
-            if slot_unit is None:
-                # ignore unknown slots
-                continue
-            min_value = resource.get("min")
-            if min_value is None:
-                min_value = Decimal(0)
-            if slot_unit == "bytes":
-                if not isinstance(min_value, Decimal):
-                    min_value = BinarySize.from_str(min_value)
-            else:
-                if not isinstance(min_value, Decimal):
-                    min_value = Decimal(min_value)
-            min_slot[slot_key] = min_value
-
-        # fill missing
-        for slot_key in slot_units.keys():
-            if slot_key not in min_slot:
-                min_slot[slot_key] = Decimal(0)
-
-        return min_slot
 
     def _parse_row(self) -> dict[str, Any]:
         res_limits = []
@@ -753,38 +465,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         self._resources = resources
 
-    def to_dataclass(self) -> ImageData:
-        _, ptag_set = self.image_ref.tag_set
-        return ImageData(
-            id=self.id,
-            name=ImageCanonical(self.name),
-            project=self.project,
-            image=self.image,
-            created_at=self.created_at,
-            tag=self.tag,
-            registry=self.registry,
-            registry_id=self.registry_id,
-            architecture=self.architecture,
-            config_digest=self.config_digest,
-            size_bytes=self.size_bytes,
-            is_local=self.is_local,
-            type=self.type,
-            accelerators=self.accelerators,
-            labels=ImageLabelsData(label_data=self.labels),
-            resources=ImageResourcesData(resources_data=self.resources),
-            resource_limits=[
-                ResourceLimit(
-                    key=str(k), min=v.get("min", Decimal(0)), max=v.get("max", Decimal("Infinity"))
-                )
-                for k, v in self.resources.items()
-            ],
-            tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
-            status=self.status,
-            customized=self.customized,
-            creator_id=self.creator_id,
-            last_used_at=self.last_used_at,
-        )
-
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
         version, ptag_set = self.image_ref.tag_set
         return ImageDataWithDetails(
@@ -821,57 +501,10 @@ class ImageRow(CreatedAtMixin, Base):
         )
 
 
-async def bulk_get_image_configs(
-    image_refs: Iterable[ImageRef],
-    auto_pull: AutoPullBehavior = AutoPullBehavior.DIGEST,
-    *,
-    db_session: AsyncSession,
-) -> list[ImageConfig]:
-    result: list[ImageConfig] = []
-
-    for ref in image_refs:
-        resolved_image_info = await ImageRow.resolve(db_session, [ref])
-
-        registry_info: ImageRegistry
-        if resolved_image_info.image_ref.is_local:
-            registry_info = {
-                "name": ref.registry,
-                "url": "http://127.0.0.1",  # "http://localhost",
-                "username": None,
-                "password": None,
-            }
-        else:
-            url, credential = await ContainerRegistryRow.get_container_registry_info(
-                db_session, resolved_image_info.registry_id
-            )
-            registry_info = {
-                "name": ref.registry,
-                "url": str(url),
-                "username": credential["username"],
-                "password": credential["password"],
-            }
-
-        image_conf: ImageConfig = {
-            "architecture": ref.architecture,
-            "project": resolved_image_info.project,
-            "canonical": ref.canonical,
-            "is_local": resolved_image_info.image_ref.is_local,
-            "digest": resolved_image_info.trimmed_digest,
-            "labels": resolved_image_info.labels,
-            "repo_digest": None,
-            "registry": registry_info,
-            "auto_pull": auto_pull,
-        }
-
-        result.append(image_conf)
-
-    return result
-
-
 class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
-    id: Mapped[ImageID] = mapped_column(
-        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[ImageAliasID] = mapped_column(
+        "id", GUID(ImageAliasID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
@@ -905,9 +538,6 @@ class ImageAliasRow(Base):
     @classmethod
     def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
-
-    def to_dataclass(self) -> ImageAliasData:
-        return ImageAliasData(id=ImageAliasID(self.id), alias=self.alias or "")
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
@@ -1214,7 +844,7 @@ class ImagePermissionContextBuilder(
         scope: UserScope,
     ) -> list[ProjectScope]:
         project_ids_stmt = sa.select(ProjectRow.id).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, scope.user_id)
+            user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, scope.user_id)
         )
         project_ids = await self.db_session.scalars(project_ids_stmt)
 

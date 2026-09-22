@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
+from typing import assert_never
 
-from ai.backend.common.api_handlers import Sentinel
-from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -21,6 +27,8 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrderByInputDTO,
     PurgeImageInput,
     RestoreImageInput,
+    ScopedSearchImagesInput,
+    SearchImageAliasesInput,
     UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -35,59 +43,76 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
     RestoreImagePayload,
+    ScopedSearchImagesPayload,
+    SearchImageAliasesPayload,
     UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
+    ImageAliasOrderField,
     ImageLabelInfo,
+    ImageOrderField,
     ImageResourceLimitGQLInfo,
     ImageResourceLimitInfo,
+    ImageScope,
     ImageStatusType,
     ImageTagInfo,
     ImageTypeEnum,
+    ImageUsage,
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.image import ImageType
-from ai.backend.manager.models.image.conditions import (
-    ImageAliasConditions,
-    ImageConditions,
-)
-from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.image.scopes import (
+    ContainerRegistryImageTarget,
+    DomainImageTarget,
+    ImageTarget,
+    ProjectImageTarget,
+    PublicImageTarget,
+    UserImageTarget,
+)
+from ai.backend.manager.models.image.searchable_fields import (
+    ImageAliasSearchableFields,
+    ImageSearchableFields,
+)
+from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
+from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
+from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.get_images_by_ids import (
-    PublicGetImageAliasesByIdsAction,
-    PublicGetImagesByIdsAction,
-)
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
+from ai.backend.manager.services.image.actions.scoped_search import (
+    ScopedSearchImagesAction,
+)
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
+from ai.backend.manager.services.image.actions.search_image_aliases import (
+    SearchImageAliasesAction,
+)
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
+from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.types import OptionalState, TriState
-
-DEFAULT_PAGINATION_LIMIT = 50
 
 
 @lru_cache(maxsize=1)
 def _get_image_pagination_spec() -> PaginationSpec:
     """Get pagination spec for Image queries."""
     return PaginationSpec(
-        forward_order=ImageOrders.created_at(ascending=False),
-        backward_order=ImageOrders.created_at(ascending=True),
-        forward_condition_factory=ImageConditions.by_cursor_forward,
-        backward_condition_factory=ImageConditions.by_cursor_backward,
-        tiebreaker_order=ImageRow.id.asc(),
+        forward_order=ImageSearchableFields.own.created_at.order.apply(ascending=False),
+        cursor_column=ImageRow.id,
     )
 
 
@@ -95,63 +120,143 @@ def _get_image_pagination_spec() -> PaginationSpec:
 def _get_alias_pagination_spec() -> PaginationSpec:
     """Get pagination spec for ImageAlias queries."""
     return PaginationSpec(
-        forward_order=ImageAliasOrders.alias(ascending=True),
-        backward_order=ImageAliasOrders.alias(ascending=False),
-        forward_condition_factory=ImageAliasConditions.by_cursor_forward,
-        backward_condition_factory=ImageAliasConditions.by_cursor_backward,
-        tiebreaker_order=ImageAliasRow.id.asc(),
+        forward_order=ImageAliasSearchableFields.own.alias.order.apply(ascending=True),
+        cursor_column=ImageAliasRow.id,
     )
 
 
 class ImageAdapter(BaseAdapter):
     """Adapter for image domain operations."""
 
+    _image: ImageProcessors
+
+    def __init__(self, image: ImageProcessors) -> None:
+        self._image = image
+
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, image_ids: Sequence[ImageID]) -> list[ImageNode | None]:
-        """Batch load images by ID for DataLoader use.
-
-        Returns ImageNode DTOs in the same order as the input image_ids list.
-        """
+    async def batch_load_by_ids(
+        self, image_ids: Sequence[ImageID]
+    ) -> list[ImageNode | Exception | None]:
+        """Batch load images by their IDs for DataLoader use, checked per image."""
         if not image_ids:
             return []
-        action_result = await self._processors.image.public_get_images_by_ids.run(
-            PublicGetImagesByIdsAction(image_ids=list(image_ids))
-        )
-        image_map: dict[ImageID, ImageNode] = {
-            ImageID(item.id): self._data_to_dto(item) for item in action_result.data
-        }
-        return [image_map.get(image_id) for image_id in image_ids]
+        result = await self._image.bulk_get.run(BulkGetImagesAction(ids=list(image_ids)))
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_aliases_by_ids(
-        self, alias_ids: Sequence[uuid.UUID]
-    ) -> list[ImageAliasNode | None]:
-        """Batch load image aliases by alias ID for DataLoader use.
-
-        Returns ImageAliasNode DTOs in the same order as the input alias_ids list.
-        """
+        self, alias_ids: Sequence[ImageAliasID]
+    ) -> list[ImageAliasNode | Exception | None]:
+        """Batch load image aliases for DataLoader use, checked per owning image."""
         if not alias_ids:
             return []
-        action_result = await self._processors.image.public_get_image_aliases_by_ids.run(
-            PublicGetImageAliasesByIdsAction(alias_ids=list(alias_ids))
+        ids = [ImageAliasID(alias_id) for alias_id in alias_ids]
+        return await self.batch_load_fields(
+            self._image.bulk_get_aliases,
+            BulkGetImageAliasesAction(ids=ids),
+            ids,
+            self._alias_data_to_dto,
         )
-        alias_map: dict[uuid.UUID, ImageAliasNode] = {
-            item.id: self._alias_data_to_dto(item) for item in action_result.data
-        }
-        return [alias_map.get(alias_id) for alias_id in alias_ids]
 
     # ------------------------------------------------------------------ search
 
     async def admin_search(self, input: AdminSearchImagesInput) -> AdminSearchImagesPayload:
-        """Search images with admin scope using offset pagination."""
-        querier = self._build_offset_querier(input)
-
-        action_result = await self._processors.image.search_images.run(
-            SearchImagesAction(querier=querier)
+        """Search images with admin scope, by cursor or by offset as the request names."""
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        limit = input.limit
+        if limit is None and not options.has_cursor:
+            limit = DEFAULT_PAGE_LIMIT
+        action_result = await self._image.search_images.run(
+            SearchImagesAction(
+                searcher=GlobalSearcher(
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_image_searcher(input, limit=limit),
+                )
+            )
         )
 
         return AdminSearchImagesPayload(
-            items=[self._data_to_dto(item) for item in action_result.data],
+            items=[self._data_to_dto(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_targets(self, scope: ImageScope) -> list[ImageTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[ImageTarget] = [
+            DomainImageTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        targets.extend(
+            ProjectImageTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
+        )
+        targets.extend(UserImageTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        targets.extend(
+            ContainerRegistryImageTarget(registry_id=ContainerRegistryID(entry.value))
+            for entry in scope.container_registry or ()
+        )
+        if scope.public:
+            targets.append(PublicImageTarget())
+        return targets
+
+    def _usage(self, usage: ImageUsage | None) -> list[UsedBy]:
+        """The uses the request named, sessions before deployments."""
+        if usage is None or usage.used_by is None:
+            return []
+        used_by = usage.used_by
+        linked = ImageSearchableFields.linked.usage
+        return [
+            *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
+            *(
+                linked.deployments.used_by(DeploymentID(entity_id))
+                for entity_id in used_by.deployment or ()
+            ),
+        ]
+
+    def _build_image_searcher(
+        self,
+        input: AdminSearchImagesInput | ScopedSearchImagesInput,
+        limit: int | None = None,
+    ) -> ImageSearcher:
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        return self._build_searcher(
+            ImageSearcher,
+            conditions=conditions,
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_get_image_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit if limit is None else limit,
+            offset=input.offset,
+        )
+
+    async def scoped_search(self, input: ScopedSearchImagesInput) -> ScopedSearchImagesPayload:
+        """Search the images the named scopes reach, combined with OR."""
+        action_result = await self._image.scoped_search.run(
+            ScopedSearchImagesAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope),
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_image_searcher(input),
+                )
+            )
+        )
+        return ScopedSearchImagesPayload(
+            items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -160,30 +265,19 @@ class ImageAdapter(BaseAdapter):
     async def admin_search_images_gql(
         self,
         input: AdminSearchImagesInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> AdminSearchImagesPayload:
         """Search images with cursor or offset pagination for GQL resolvers."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_get_image_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=list(base_conditions) if base_conditions else None,
-        )
-
-        action_result = await self._processors.image.search_images.run(
-            SearchImagesAction(querier=querier)
+        action_result = await self._image.search_images.run(
+            SearchImagesAction(
+                searcher=GlobalSearcher(
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_image_searcher(input),
+                )
+            )
         )
 
         return AdminSearchImagesPayload(
-            items=[self._data_to_dto(item) for item in action_result.data],
+            items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -192,7 +286,6 @@ class ImageAdapter(BaseAdapter):
     async def admin_search_image_aliases(
         self,
         input: AdminSearchImageAliasesInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> AdminSearchImageAliasesPayload:
         """Search image aliases with cursor or offset pagination for GQL resolvers."""
         conditions = self._convert_alias_filter(input.filter) if input.filter else []
@@ -207,15 +300,38 @@ class ImageAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=list(base_conditions) if base_conditions else None,
         )
 
-        action_result = await self._processors.image.search_aliases.run(
-            SearchAliasesAction(querier=querier)
-        )
+        action_result = await self._image.search_aliases.run(SearchAliasesAction(querier=querier))
 
         return AdminSearchImageAliasesPayload(
             items=[self._alias_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def scoped_search_aliases(
+        self, image_id: ImageID, input: SearchImageAliasesInput
+    ) -> SearchImageAliasesPayload:
+        """Search the aliases of one image, answered for by the caller's read on it."""
+        searcher = self._build_searcher(
+            ImageAliasSearcher,
+            conditions=self._convert_alias_filter(input.filter) if input.filter else [],
+            orders=self._convert_alias_orders(input.order) if input.order else [],
+            pagination_spec=_get_alias_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._image.search_image_aliases.run(
+            SearchImageAliasesAction(image_id=image_id, searcher=searcher)
+        )
+        return SearchImageAliasesPayload(
+            items=[self._alias_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -225,28 +341,28 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
         """Forget (soft-delete) an image by ID."""
-        result = await self._processors.image.forget_image_by_id.run(
+        result = await self._image.forget_image_by_id.run(
             ForgetImageByIdAction(image_id=ImageID(input.image_id))
         )
         return ForgetImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_restore(self, input: RestoreImageInput) -> RestoreImagePayload:
         """Restore a forgotten (soft-deleted) image by ID."""
-        result = await self._processors.image.restore_image_by_id.run(
+        result = await self._image.restore_image_by_id.run(
             RestoreImageByIdAction(image_id=ImageID(input.image_id))
         )
         return RestoreImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
         """Purge (hard-delete) an image by ID."""
-        result = await self._processors.image.purge_image_by_id.run(
+        result = await self._image.purge_image_by_id.run(
             PurgeImageByIdAction(image_id=ImageID(input.image_id))
         )
         return PurgeImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_alias(self, input: AliasImageInput) -> AliasImagePayload:
         """Create an alias for an image."""
-        result = await self._processors.image.alias_image_by_id.run(
+        result = await self._image.alias_image_by_id.run(
             AliasImageByIdAction(image_id=ImageID(input.image_id), alias=input.alias)
         )
         return AliasImagePayload(
@@ -257,9 +373,7 @@ class ImageAdapter(BaseAdapter):
 
     async def admin_dealias(self, input: DealiasImageInput) -> AliasImagePayload:
         """Remove an image alias."""
-        result = await self._processors.image.dealias_image.run(
-            DealiasImageAction(alias=input.alias)
-        )
+        result = await self._image.dealias_image.run(DealiasImageAction(alias=input.alias))
         return AliasImagePayload(
             alias_id=result.image_alias.id,
             alias=result.image_alias.alias,
@@ -269,166 +383,55 @@ class ImageAdapter(BaseAdapter):
     async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
         """Update an image by ID (superadmin only)."""
         update = ImageUpdate(
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            registry=(
-                OptionalState.update(input.registry)
-                if input.registry is not None
-                else OptionalState.nop()
-            ),
-            image=(
-                OptionalState.update(input.image)
-                if input.image is not None
-                else OptionalState.nop()
-            ),
-            tag=(OptionalState.update(input.tag) if input.tag is not None else OptionalState.nop()),
-            architecture=(
-                OptionalState.update(input.architecture)
-                if input.architecture is not None
-                else OptionalState.nop()
-            ),
-            is_local=(
-                OptionalState.update(input.is_local)
-                if input.is_local is not None
-                else OptionalState.nop()
-            ),
-            size_bytes=(
-                OptionalState.update(input.size_bytes)
-                if input.size_bytes is not None
-                else OptionalState.nop()
-            ),
-            image_type=(
-                OptionalState.update(ImageType(input.type))
-                if input.type is not None
-                else OptionalState.nop()
-            ),
-            config_digest=(
-                OptionalState.update(input.config_digest)
-                if input.config_digest is not None
-                else OptionalState.nop()
-            ),
-            labels=(
-                OptionalState.update(input.labels)
-                if input.labels is not None
-                else OptionalState.nop()
-            ),
-            accelerators=(
-                TriState.nop()
-                if isinstance(input.supported_accelerators, Sentinel)
-                else TriState.nullify()
-                if input.supported_accelerators is None
-                else TriState.update(input.supported_accelerators)
-            ),
-            resources=(
-                OptionalState.update(input.resource_limits)
-                if input.resource_limits is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            registry=OptionalState.from_unset(input.registry),
+            image=OptionalState.from_unset(input.image),
+            tag=OptionalState.from_unset(input.tag),
+            architecture=OptionalState.from_unset(input.architecture),
+            is_local=OptionalState.from_unset(input.is_local),
+            size_bytes=OptionalState.from_unset(input.size_bytes),
+            image_type=OptionalState.from_unset(input.type).map(ImageType),
+            config_digest=OptionalState.from_unset(input.config_digest),
+            labels=OptionalState.from_unset(input.labels),
+            accelerators=TriState.from_unset(input.supported_accelerators),
+            resources=OptionalState.from_unset(input.resource_limits),
         )
-        result = await self._processors.image.update_image_by_id.run(
+        result = await self._image.update_image_by_id.run(
             UpdateImageByIdAction(image_id=ImageID(input.image_id), update=update)
         )
         return UpdateImagePayload(item=self._data_to_dto(result.image))
 
     # ------------------------------------------------------------------ querier builders
 
-    def _build_offset_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier with offset pagination from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _convert_filter(
-        self,
-        filter: ImageFilterInputDTO,
-        base_conditions: list[QueryCondition] | None = None,
-    ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = list(base_conditions) if base_conditions else []
-
-        if filter.id is not None:
-            condition = self.convert_uuid_filter(
-                filter.id,
-                equals_factory=ImageConditions.by_id_equals,
-                in_factory=ImageConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=ImageConditions.by_name_contains,
-                equals_factory=ImageConditions.by_name_equals,
-                starts_with_factory=ImageConditions.by_name_starts_with,
-                ends_with_factory=ImageConditions.by_name_ends_with,
-                in_factory=ImageConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.architecture is not None:
-            condition = self.convert_string_filter(
-                filter.architecture,
-                contains_factory=ImageConditions.by_architecture_contains,
-                equals_factory=ImageConditions.by_architecture_equals,
-                starts_with_factory=ImageConditions.by_architecture_starts_with,
-                ends_with_factory=ImageConditions.by_architecture_ends_with,
-                in_factory=ImageConditions.by_architecture_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.status is not None:
-            st = filter.status
-            if st.equals is not None:
-                conditions.append(ImageConditions.by_status_equals(ImageStatus(st.equals.value)))
-            if st.in_ is not None:
-                conditions.append(
-                    ImageConditions.by_statuses([ImageStatus(s.value) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                conditions.append(
-                    ImageConditions.by_status_not_equals(ImageStatus(st.not_equals.value))
-                )
-            if st.not_in is not None:
-                conditions.append(
-                    ImageConditions.by_status_not_in([ImageStatus(s.value) for s in st.not_in])
-                )
-
-        if filter.registry_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.registry_id,
-                equals_factory=ImageConditions.by_registry_id_equals,
-                in_factory=ImageConditions.by_registry_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
+    def _convert_filter(self, filter: ImageFilterInputDTO) -> list[QueryCondition]:
+        fields = ImageSearchableFields.own
+        alias_fields = ImageAliasSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(filter.architecture, fields.architecture.filter),
+            *self.apply_uuid_filter(filter.registry_id, fields.registry_id.filter),
+            *self.apply_enum_filter(filter.status, fields.status.filter),
+            *self.apply_string_filter(filter.image, fields.image.filter),
+            *self.apply_string_filter(filter.registry, fields.registry.filter),
+            *self.apply_string_filter(filter.project, fields.project.filter),
+            *self.apply_string_filter(filter.tag, fields.tag.filter),
+            *self.apply_string_filter(filter.config_digest, fields.config_digest.filter),
+            *self.apply_string_filter(filter.accelerators, fields.accelerators.filter),
+            *self.apply_int_filter(filter.size_bytes, fields.size_bytes.filter),
+            *self.apply_bool_filter(filter.is_local, fields.is_local.filter),
+            *self.apply_enum_filter(filter.type, fields.type.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
+        ]
         if filter.alias is not None:
-            alias_f = filter.alias
-            if alias_f.alias is not None:
-                condition = self.convert_string_filter(
-                    alias_f.alias,
-                    contains_factory=ImageConditions.by_alias_contains,
-                    equals_factory=ImageConditions.by_alias_equals,
-                    starts_with_factory=ImageConditions.by_alias_starts_with,
-                    ends_with_factory=ImageConditions.by_alias_ends_with,
-                    in_factory=ImageConditions.by_alias_in,
+            alias_conditions = self.apply_string_filter(
+                filter.alias.alias, alias_fields.alias.filter
+            )
+            if alias_conditions:
+                conditions.append(
+                    ImageSearchableFields.nested.aliases.correlation.some(alias_conditions)
                 )
-                if condition is not None:
-                    conditions.append(condition)
-
-        if filter.last_used is not None:
-            lu = filter.last_used
-            if lu.before is not None:
-                conditions.append(ImageConditions.by_last_used_before(lu.before))
-            if lu.after is not None:
-                conditions.append(ImageConditions.by_last_used_after(lu.after))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -450,30 +453,13 @@ class ImageAdapter(BaseAdapter):
 
         return conditions
 
-    def _convert_alias_filter(
-        self,
-        filter: ImageAliasFilterInputDTO,
-    ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.alias is not None:
-            condition = self.convert_string_filter(
-                filter.alias,
-                contains_factory=ImageAliasConditions.by_alias_contains,
-                equals_factory=ImageAliasConditions.by_alias_equals,
-                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
-                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
-                in_factory=ImageAliasConditions.by_alias_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.image_id is not None:
-            iid = filter.image_id
-            if iid.equals is not None:
-                conditions.append(ImageAliasConditions.by_image_ids([ImageID(iid.equals)]))
-            elif iid.in_ is not None:
-                conditions.append(ImageAliasConditions.by_image_ids([ImageID(i) for i in iid.in_]))
+    def _convert_alias_filter(self, filter: ImageAliasFilterInputDTO) -> list[QueryCondition]:
+        fields = ImageAliasSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.alias, fields.alias.filter),
+            *self.apply_uuid_filter(filter.image_id, fields.image_id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -495,29 +481,61 @@ class ImageAdapter(BaseAdapter):
 
         return conditions
 
-    @staticmethod
-    def _convert_orders(orders: list[ImageOrderByInputDTO]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for order in orders:
-            ascending = order.direction == OrderDirection.ASC
-            match order.field.value:
-                case "name":
-                    result.append(ImageOrders.name(ascending))
-                case "created_at":
-                    result.append(ImageOrders.created_at(ascending))
-                case "last_used":
-                    result.append(ImageOrders.last_used(ascending))
-        return result
+    def _convert_orders(self, orders: list[ImageOrderByInputDTO]) -> list[QueryOrder]:
+        return [self._convert_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_alias_orders(orders: list[ImageAliasOrderByInputDTO]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for order in orders:
-            ascending = order.direction == OrderDirection.ASC
-            match order.field:
-                case "alias":
-                    result.append(ImageAliasOrders.alias(ascending))
-        return result
+    def _convert_order(self, order: ImageOrderByInputDTO) -> QueryOrder:
+        fields = ImageSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ImageOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case ImageOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case ImageOrderField.LAST_USED:
+                return fields.last_used_at.order.apply(ascending)
+            case ImageOrderField.ENTITY_ID:
+                return fields.id.order.apply(ascending)
+            case ImageOrderField.IMAGE:
+                return fields.image.order.apply(ascending)
+            case ImageOrderField.PROJECT:
+                return fields.project.order.apply(ascending)
+            case ImageOrderField.TAG:
+                return fields.tag.order.apply(ascending)
+            case ImageOrderField.REGISTRY:
+                return fields.registry.order.apply(ascending)
+            case ImageOrderField.REGISTRY_ID:
+                return fields.registry_id.order.apply(ascending)
+            case ImageOrderField.ARCHITECTURE:
+                return fields.architecture.order.apply(ascending)
+            case ImageOrderField.CONFIG_DIGEST:
+                return fields.config_digest.order.apply(ascending)
+            case ImageOrderField.SIZE_BYTES:
+                return fields.size_bytes.order.apply(ascending)
+            case ImageOrderField.IS_LOCAL:
+                return fields.is_local.order.apply(ascending)
+            case ImageOrderField.TYPE:
+                return fields.type.order.apply(ascending)
+            case ImageOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case ImageOrderField.ACCELERATORS:
+                return fields.accelerators.order.apply(ascending)
+            case _:
+                assert_never(order.field)
+
+    def _convert_alias_orders(self, orders: list[ImageAliasOrderByInputDTO]) -> list[QueryOrder]:
+        return [self._convert_alias_order(order) for order in orders]
+
+    def _convert_alias_order(self, order: ImageAliasOrderByInputDTO) -> QueryOrder:
+        fields = ImageAliasSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ImageAliasOrderField.ALIAS:
+                return fields.alias.order.apply(ascending)
+            case ImageAliasOrderField.FIELD_ID:
+                return fields.id.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     @staticmethod
     def _convert_max(value: Decimal | str | None) -> str | None:
@@ -554,10 +572,11 @@ class ImageAdapter(BaseAdapter):
         ]
         return ImageNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=str(data.name),
             image=data.image,
             registry=data.registry,
-            registry_id=ArtifactRegistryID(data.registry_id),
+            registry_id=ContainerRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,
@@ -597,18 +616,6 @@ class ImageAdapter(BaseAdapter):
         """Convert alias data layer type to Pydantic DTO."""
         return ImageAliasNode(
             id=data.id,
+            field_id=data.id,
             alias=data.alias,
         )
-
-    def build_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO (offset pagination)."""
-        return self._build_offset_querier(input)
-
-    def _build_pagination(self, input: AdminSearchImagesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    def _convert_orders_legacy(self, orders: list[ImageOrderByInputDTO]) -> list[QueryOrder]:
-        return self._convert_orders(orders)

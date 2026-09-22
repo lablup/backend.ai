@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, IdleCheckerID
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
@@ -25,9 +25,11 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericForbidden
 
 
 class TestIdleCheckerAdapter:
@@ -66,21 +68,38 @@ class TestIdleCheckerAdapter:
         return IdleCheckerID(uuid4())
 
     @pytest.fixture
-    def mock_processors(self, idle_checker_data: list[IdleCheckerData]) -> MagicMock:
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this idle checker")
+
+    @pytest.fixture
+    def mock_processors(
+        self,
+        idle_checker_data: list[IdleCheckerData],
+        missing_checker_id: IdleCheckerID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
         processors = MagicMock()
-        processors.idle_checker.admin_search.run = AsyncMock(
-            return_value=BatchOpsResult(
-                items=list(reversed(idle_checker_data)),
-                total_count=len(idle_checker_data),
-                has_next_page=False,
-                has_previous_page=False,
+        processors.idle_checker.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[IdleCheckerData].succeeded(
+                        idle_checker_data[0].id, idle_checker_data[0]
+                    ),
+                    PartialBulkEntityResult[IdleCheckerData].failed(
+                        missing_checker_id,
+                        EntityNotFoundError(entity_type=IdleCheckerEntityType()),
+                    ),
+                    PartialBulkEntityResult[IdleCheckerData].denied(
+                        idle_checker_data[1].id, denial
+                    ),
+                ]
             )
         )
         return processors
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> IdleCheckerAdapter:
-        return IdleCheckerAdapter(mock_processors)
+        return IdleCheckerAdapter(mock_processors.idle_checker)
 
     def test_builds_session_lifetime_spec(
         self,
@@ -164,22 +183,27 @@ class TestIdleCheckerAdapter:
         ]
         assert info.utilization.threshold.group_labels == ["session_id", "device"]
 
-    async def test_batch_load_preserves_input_order_and_missing_entries(
+    async def test_batch_load_answers_per_id(
         self,
         adapter: IdleCheckerAdapter,
         idle_checker_data: list[IdleCheckerData],
         missing_checker_id: IdleCheckerID,
+        denial: GenericForbidden,
     ) -> None:
-        requested_ids = [
+        nodes = await adapter.batch_load_by_ids([
             idle_checker_data[0].id,
             missing_checker_id,
             idle_checker_data[1].id,
-        ]
+        ])
 
-        nodes = await adapter.batch_load_by_ids(requested_ids)
+        node, missing, refused = nodes
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == idle_checker_data[0].id
+        assert missing is None
+        assert refused is denial
 
-        assert [node.id if node is not None else None for node in nodes] == [
-            idle_checker_data[0].id,
-            None,
-            idle_checker_data[1].id,
-        ]
+    async def test_no_ids_read_nothing(
+        self, adapter: IdleCheckerAdapter, mock_processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_load_by_ids([]) == []
+        mock_processors.idle_checker.bulk_get.run.assert_not_awaited()

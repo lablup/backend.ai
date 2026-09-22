@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize
@@ -32,19 +33,25 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture
 async def database_with_resource_slot_tables(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     """Set up tables required for resource slot normalization tests."""
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             # FK dependency order: parents before children
+            VirtualEntityRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
             DomainRow,
             ResourceGroupRow,
             UserResourcePolicyRow,
@@ -66,7 +73,7 @@ async def database_with_resource_slot_tables(
             ResourceAllocationRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -192,16 +199,29 @@ async def project_id(
 
 
 @pytest.fixture
+def agent_uuid() -> AgentUUID:
+    """The agent's surrogate key, fixed here rather than left to the column's server default.
+
+    ``agent_resources.agent_uuid`` is a NOT NULL copy of it, so every row a test writes has to name
+    it -- and reading it back from the inserted agent would make each of those tests depend on an
+    extra round trip for a value the fixture can simply decide.
+    """
+    return AgentUUID(uuid.uuid4())
+
+
+@pytest.fixture
 async def agent_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     resource_group: str,
     resource_group_id: ResourceGroupID,
+    agent_uuid: AgentUUID,
 ) -> AsyncGenerator[str, None]:
     aid = "i-test-agent-001"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
             AgentRow(
                 id=aid,
+                uuid=agent_uuid,
                 scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 region="local",

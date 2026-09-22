@@ -15,8 +15,14 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     MountItemInput,
@@ -26,9 +32,14 @@ from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNes
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
+    NetworkTypeFilter,
     OrderDirection,
     SessionOrderField,
+    SessionResultFilter,
+    SessionScope,
     SessionStatusFilter,
+    SessionTypeFilter,
+    SessionUsage,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -102,6 +113,60 @@ class SessionFilter(BaseRequestModel):
     labels: EntityLabelNestedFilter | None = Field(
         default=None, description="Filter by the labels on the entity"
     )
+    creation_id: StringFilter | None = Field(
+        default=None, description="Filter by the id the creating request carried"
+    )
+    session_type: SessionTypeFilter | None = Field(
+        default=None, description="Filter by session type"
+    )
+    tier: IntFilter | None = Field(
+        default=None, description="Filter by the scheduling tier of the pending queue"
+    )
+    priority: IntFilter | None = Field(
+        default=None,
+        deprecated=True,
+        description="Filter by the scheduling tier of the pending queue. Renamed to `tier`",
+    )
+    job_priority: IntFilter | None = Field(
+        default=None, description="Filter by the preemption priority among the owner's sessions"
+    )
+    is_preemptible: bool | None = Field(
+        default=None, description="Filter by whether the session may be preempted"
+    )
+    cluster_size: IntFilter | None = Field(
+        default=None, description="Filter by the number of kernels in the session"
+    )
+    resource_group_name: StringFilter | None = Field(
+        default=None, description="Filter by the resource group the session runs in"
+    )
+    access_key: StringFilter | None = Field(
+        default=None, description="Filter by the access key the session was created with"
+    )
+    tag: StringFilter | None = Field(default=None, description="Filter by the user-supplied tag")
+    use_host_network: bool | None = Field(
+        default=None, description="Filter by whether the session uses the host network"
+    )
+    batch_timeout: IntFilter | None = Field(
+        default=None, description="Filter by the batch execution timeout in seconds"
+    )
+    starts_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by when the session started running"
+    )
+    terminated_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by when the session terminated"
+    )
+    result: SessionResultFilter | None = Field(
+        default=None, description="Filter by the session result"
+    )
+    network_type: NetworkTypeFilter | None = Field(
+        default=None, description="Filter by the inter-container network type"
+    )
+    network_id: StringFilter | None = Field(
+        default=None, description="Filter by the network reference the session uses"
+    )
+    replica_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the deployment replica the session serves"
+    )
     AND: list[SessionFilter] | None = None
     OR: list[SessionFilter] | None = None
     NOT: list[SessionFilter] | None = None
@@ -126,9 +191,37 @@ class SearchSessionsInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0)
 
 
+class ScopedSearchSessionsInput(BaseRequestModel):
+    """Input for searching the sessions the named scopes reach."""
+
+    scope: SessionScope = Field(description="Scope (OR across all items).")
+    usage: SessionUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "sessions the caller cannot read are left out."
+        ),
+    )
+    filter: SessionFilter | None = Field(default=None, description="Filter criteria")
+    order: list[SessionOrder] | None = Field(default=None, description="Sort order")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
 class AdminSearchSessionsInput(BaseRequestModel):
     """Input for admin search of sessions with cursor and offset pagination."""
 
+    usage: SessionUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "sessions the caller cannot read are left out."
+        ),
+    )
     filter: SessionFilter | None = Field(default=None, description="Filter conditions.")
     order: list[SessionOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
@@ -328,7 +421,14 @@ class EnqueueSessionInput(BaseRequestModel):
     )
 
     # Scheduling
-    priority: int = Field(default=10, ge=0, le=100, description="Scheduling priority (0-100).")
+    tier: int | None = Field(default=None, ge=0, le=100, description="Scheduling tier (0-100).")
+    priority: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        deprecated=True,
+        description="Scheduling tier (0-100). Renamed to `tier`.",
+    )
     job_priority: int = Field(
         default=0,
         description=(
@@ -379,10 +479,17 @@ class EnqueueSessionInput(BaseRequestModel):
         ),
     )
 
+    # ---------------------------------------------------------------------------
+    # Terminate (batch)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Terminate (batch)
-# ---------------------------------------------------------------------------
+    def effective_tier(self) -> int:
+        """The tier the request asked for; ``tier`` answers when both names carry a value."""
+        if self.tier is not None:
+            return self.tier
+        if self.priority is not None:
+            return self.priority
+        return SESSION_PRIORITY_DEFAULT
 
 
 class TerminateSessionsInput(BaseRequestModel):

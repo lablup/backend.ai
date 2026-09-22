@@ -13,11 +13,10 @@ import pytest
 import yarl
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
     VFolderData,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderUsageData,
@@ -62,11 +61,7 @@ def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> VFolderData:
         domain_name="default",
         quota_scope_id=QuotaScopeID.parse(f"user:{sample_vfolder_uuid}"),
         usage_mode=VFolderUsageMode.GENERAL,
-        permission=VFolderMountPermission.READ_WRITE,
-        max_files=0,
-        max_size=None,
-        num_files=0,
-        cur_size=0,
+        default_mount_permission=VFolderMountPolicy.READ_WRITE,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
         updated_at=datetime(2025, 1, 1, tzinfo=UTC),
@@ -111,6 +106,7 @@ class TestVFolderServicePurge:
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -340,6 +336,7 @@ class TestVFolderServiceGetFolderUsage:
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
         )
 
     @pytest.fixture

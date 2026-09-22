@@ -417,5 +417,10 @@ def ops() -> None:
     """Command set for inspecting the wired domain operation catalog."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.permissions:cli")
+def permissions() -> None:
+    """Command set for the seed role declaration."""
+
+
 if __name__ == "__main__":
     main()

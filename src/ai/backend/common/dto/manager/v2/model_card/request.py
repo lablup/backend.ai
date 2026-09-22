@@ -4,16 +4,26 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    DecimalFilter,
+    NullableDateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
+    ModelCardScope,
+    ModelCardUsage,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class ResourceSlotEntryInput(BaseRequestModel):
@@ -56,32 +66,109 @@ class CreateModelCardInput(BaseRequestModel):
 
 class UpdateModelCardInput(BaseRequestModel):
     id: UUID = Field(description="Model card ID.")
-    name: str | None = Field(default=None, min_length=1, max_length=512)
-    author: str | Sentinel | None = Field(default=SENTINEL)
-    title: str | Sentinel | None = Field(default=SENTINEL)
-    model_version: str | Sentinel | None = Field(default=SENTINEL)
-    description: str | Sentinel | None = Field(default=SENTINEL)
-    task: str | Sentinel | None = Field(default=SENTINEL)
-    category: str | Sentinel | None = Field(default=SENTINEL)
-    architecture: str | Sentinel | None = Field(default=SENTINEL)
-    framework: list[str] | None = Field(default=None)
-    label: list[str] | None = Field(default=None)
-    license: str | Sentinel | None = Field(default=SENTINEL)
-    min_resource: list[ResourceSlotEntryInput] | Sentinel | None = Field(default=SENTINEL)
-    readme: str | Sentinel | None = Field(default=SENTINEL)
-    access_level: ModelCardAccessLevel | Sentinel | None = Field(default=SENTINEL)
+    name: str | None | Unset = Field(
+        default=UNSET,
+        min_length=1,
+        max_length=512,
+        description="Model card name. Omit to leave unchanged.",
+    )
+    author: str | None | Unset = Field(
+        default=UNSET, description="Model card author. Omit to leave unchanged; null clears."
+    )
+    title: str | None | Unset = Field(
+        default=UNSET, description="Model card title. Omit to leave unchanged; null clears."
+    )
+    model_version: str | None | Unset = Field(
+        default=UNSET, description="Model version. Omit to leave unchanged; null clears."
+    )
+    description: str | None | Unset = Field(
+        default=UNSET, description="Model card description. Omit to leave unchanged; null clears."
+    )
+    task: str | None | Unset = Field(
+        default=UNSET, description="Task type. Omit to leave unchanged; null clears."
+    )
+    category: str | None | Unset = Field(
+        default=UNSET, description="Model category. Omit to leave unchanged; null clears."
+    )
+    architecture: str | None | Unset = Field(
+        default=UNSET, description="Model architecture. Omit to leave unchanged; null clears."
+    )
+    framework: list[str] | None | Unset = Field(
+        default=UNSET, description="Frameworks. Omit to leave unchanged."
+    )
+    label: list[str] | None | Unset = Field(
+        default=UNSET, description="Labels. Omit to leave unchanged."
+    )
+    license: str | None | Unset = Field(
+        default=UNSET, description="Model license. Omit to leave unchanged; null clears."
+    )
+    min_resource: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Minimum resource requirements. Omit to leave unchanged; null clears.",
+    )
+    readme: str | None | Unset = Field(
+        default=UNSET, description="Model readme. Omit to leave unchanged; null clears."
+    )
+    access_level: ModelCardAccessLevel | None | Unset = Field(
+        default=UNSET, description="Access level. Omit to leave unchanged."
+    )
+
+
+class ModelCardResourceRequirementFilter(BaseRequestModel):
+    """Filter for one minimum resource requirement row."""
+
+    slot_name: StringFilter | None = Field(default=None, description="Resource slot name filter")
+    min_quantity: DecimalFilter | None = Field(default=None, description="Minimum quantity filter")
+
+
+class ModelCardResourceRequirementNestedFilter(ToManyFilter[ModelCardResourceRequirementFilter]):
+    """The `min_resource` field of a model card filter.
+
+    Each quantifier matches one requirement at a time. To require two different slots,
+    combine two of these with the model card filter's own `AND`.
+    """
 
 
 class ModelCardFilter(BaseRequestModel):
-    name: StringFilter | None = Field(default=None)
-    domain_name: StringFilter | None = Field(default=None)
-    project_id: UUIDFilter | None = Field(default=None)
+    entity_id: UUIDFilter | None = Field(default=None, description="Filter by model card ID")
+    name: StringFilter | None = Field(default=None, description="Name filter")
+    vfolder_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the VFolder holding the model"
+    )
+    domain_name: StringFilter | None = Field(default=None, description="Domain name filter")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
+    creator_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the user who created the model card"
+    )
+    author: StringFilter | None = Field(default=None, description="Author filter")
+    title: StringFilter | None = Field(default=None, description="Title filter")
+    model_version: StringFilter | None = Field(default=None, description="Model version filter")
+    task: StringFilter | None = Field(default=None, description="Task filter")
+    category: StringFilter | None = Field(default=None, description="Category filter")
+    architecture: StringFilter | None = Field(default=None, description="Architecture filter")
+    license: StringFilter | None = Field(default=None, description="License filter")
+    access_level: StringFilter | None = Field(
+        default=None,
+        description=(
+            "Access level filter. The column stores the level as text, so this is a string "
+            "match rather than an enum comparison."
+        ),
+    )
     storage_host: StringFilter | None = Field(
         default=None,
         description=(
             "Filter by the storage host backing the model card's VFolder. "
-            "Evaluated as an EXISTS subquery joining the model VFolder's host column."
+            "Deprecated: search vfolders by host first, then pass their ids as "
+            "`usage.uses.vfolder`."
         ),
+        deprecated=True,
+    )
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    updated_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Update datetime filter (supports is_null)"
+    )
+    min_resource: ModelCardResourceRequirementNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the minimum resource requirements"
     )
     AND: list[ModelCardFilter] | None = Field(default=None)
     OR: list[ModelCardFilter] | None = Field(default=None)
@@ -96,7 +183,35 @@ class ModelCardOrder(BaseRequestModel):
     direction: OrderDirection = OrderDirection.ASC
 
 
+class ScopedSearchModelCardsInput(BaseRequestModel):
+    """Input for searching the model cards the named scopes reach."""
+
+    scope: ModelCardScope = Field(description="Scope (OR across all items).")
+    usage: ModelCardUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "model cards the caller cannot read are left out."
+        ),
+    )
+    filter: ModelCardFilter | None = Field(default=None)
+    order: list[ModelCardOrder] | None = Field(default=None)
+    first: int | None = Field(default=None, ge=1)
+    after: str | None = Field(default=None)
+    last: int | None = Field(default=None, ge=1)
+    before: str | None = Field(default=None)
+    limit: int | None = Field(default=None, ge=1)
+    offset: int | None = Field(default=None, ge=0)
+
+
 class SearchModelCardsInput(BaseRequestModel):
+    usage: ModelCardUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "model cards the caller cannot read are left out."
+        ),
+    )
     filter: ModelCardFilter | None = Field(default=None)
     order: list[ModelCardOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)

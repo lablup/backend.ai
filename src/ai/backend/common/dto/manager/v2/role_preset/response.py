@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkDeleteRolePresetsPayload",
@@ -30,8 +32,11 @@ class RolePresetNode(BaseResponseModel):
     """
 
     id: RolePresetID = Field(description="Role preset UUID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the role preset. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Role preset name.")
-    scope_type: RBACElementTypeDTO = Field(description="Scope type this preset targets.")
+    scope_type: EntityType = Field(description="Scope type this preset targets.")
     auto_assign: bool = Field(
         description=(
             "Default value for the `auto_assign` flag copied onto roles instantiated "

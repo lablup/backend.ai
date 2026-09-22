@@ -3,13 +3,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -51,7 +53,7 @@ class ModelCardUpdater(DataUpdater[ModelCardRow, ModelCardData]):
         return ModelCardRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ModelCardID:
         return self.card_id
 
     @property
@@ -79,4 +81,4 @@ class ModelCardUpdater(DataUpdater[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return row.to_data()
+        return ModelCardSearchableFields.own.to_data(row)

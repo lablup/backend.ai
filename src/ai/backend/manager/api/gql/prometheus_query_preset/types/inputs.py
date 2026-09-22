@@ -79,10 +79,10 @@ class ModifyQueryDefinitionOptionsInputGQL(
     PydanticInputMixin[ModifyQueryDefinitionOptionsInputDTO]
 ):
     filter_labels: list[str] | None = gql_field(
-        description="Allowed filter label keys.", default=None
+        description="Allowed filter label keys.", default=UNSET
     )
     group_labels: list[str] | None = gql_field(
-        description="Allowed group-by label keys.", default=None
+        description="Allowed group-by label keys.", default=UNSET
     )
 
 

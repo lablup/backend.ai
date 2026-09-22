@@ -12,7 +12,14 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.route_history import RouteHistoryID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_scheduling_history import (
+    SessionSchedulingHistoryID,
+)
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     DeploymentHistoryFilter as DeploymentHistoryFilterDTO,
 )
@@ -61,11 +68,13 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
+    UUIDScopeGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -81,7 +90,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -250,6 +258,12 @@ class SubStepResultGQL(PydanticOutputMixin[SubStepResultInfo]):
 )
 class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the session scheduling history record.",
+        ),
+    )
     session_id: ID
     phase: str
     from_status: str | None
@@ -278,10 +292,8 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
         ]
         | None
     ):
-        from ai.backend.common.types import SessionId
-
         return await info.context.data_loaders.session_loader.load(
-            SessionId(UUID(str(self.session_id)))
+            SessionID(UUID(str(self.session_id)))
         )
 
     @classmethod
@@ -295,7 +307,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     ) -> Iterable[Self | None]:
         # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.session_history_loader.load_many([
-            UUID(nid) for nid in node_ids
+            SessionSchedulingHistoryID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -306,6 +318,12 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
 )
 class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the kernel scheduling history record.",
+        ),
+    )
     kernel_id: ID
     session_id: ID
     phase: str
@@ -337,6 +355,12 @@ class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
 class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment history record.",
+        ),
+    )
     deployment_id: ID
     phase: str
     from_status: str | None
@@ -375,7 +399,9 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+        return await info.context.data_loaders.deployment_loader.load(
+            DeploymentID(UUID(str(self.deployment_id)))
+        )
 
     @classmethod
     @override
@@ -388,7 +414,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     ) -> Iterable[Self | None]:
         # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.deployment_history_loader.load_many([
-            UUID(nid) for nid in node_ids
+            DeploymentHistoryID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -403,6 +429,12 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
     # No resolve_nodes: these rows are reached through the owning deployment.
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the replica group history record.",
+        ),
+    )
     deployment_id: ID
     category: ReplicaGroupHistoryCategoryGQL
     phase: str
@@ -429,12 +461,20 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+        return await info.context.data_loaders.deployment_loader.load(
+            DeploymentID(UUID(str(self.deployment_id)))
+        )
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
 class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the route history record.",
+        ),
+    )
     route_id: ID
     deployment_id: ID
     category: str
@@ -483,7 +523,9 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+        return await info.context.data_loaders.deployment_loader.load(
+            DeploymentID(UUID(str(self.deployment_id)))
+        )
 
     @classmethod
     @override
@@ -496,7 +538,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     ) -> Iterable[Self | None]:
         # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.route_history_loader.load_many([
-            UUID(nid) for nid in node_ids
+            RouteHistoryID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

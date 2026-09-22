@@ -28,6 +28,11 @@ def register_v2_image_routes(
     )
     registry.add(
         "POST",
+        "/scoped/search",
+        handler.scoped_search_images,
+    )
+    registry.add(
+        "POST",
         "/aliases/search",
         handler.admin_search_image_aliases,
         middlewares=[superadmin_required],

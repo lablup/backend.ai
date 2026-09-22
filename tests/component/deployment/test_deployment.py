@@ -69,7 +69,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 from ai.backend.manager.services.processors import Processors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -361,7 +360,7 @@ class TestDeploymentAdapterFilter:
     ) -> DeploymentAdapter:
         processors_mock = MagicMock(spec=Processors)
         processors_mock.deployment = deployment_processors
-        return DeploymentAdapter(processors_mock, deployment_coordinator=MagicMock())
+        return DeploymentAdapter(processors_mock.deployment, deployment_coordinator=MagicMock())
 
     @staticmethod
     def _admin_user_data(user_uuid: uuid.UUID, domain: str) -> UserData:
@@ -530,7 +529,7 @@ class TestDeploymentAdapterFilter:
             replica_filter_deployments[name] for name in expected_names
         }
 
-    async def test_replica_some_and_every_require_nonempty_all_match(
+    async def test_replica_exists_and_every_require_nonempty_all_match(
         self,
         deployment_adapter: DeploymentAdapter,
         admin_user_fixture: UserFixtureData,
@@ -544,7 +543,7 @@ class TestDeploymentAdapterFilter:
                 AdminSearchDeploymentsInput(
                     filter=DeploymentFilterV2(
                         replicas=ReplicaNestedFilter(
-                            some=ReplicaFilter(),
+                            exists=True,
                             every=ReplicaFilter(
                                 health_status=ReplicaHealthStatusFilter(
                                     equals=CommonRouteHealthStatus.HEALTHY
@@ -807,7 +806,7 @@ class TestStatusMapping:
         }
 
         for lifecycle, expected_status in mapping.items():
-            actual_status = _map_lifecycle_to_status(lifecycle)
+            actual_status = ModelDeploymentStatus.from_lifecycle(lifecycle)
             assert actual_status == expected_status, (
                 f"EndpointLifecycle.{lifecycle.name} should map to "
                 f"ModelDeploymentStatus.{expected_status.name}, got {actual_status.name}"

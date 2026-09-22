@@ -4,31 +4,26 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.deployment.types import ModelReplicaData
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.routing.scopes import DeploymentReplicaOperationScope
+from ai.backend.manager.models.routing.scopes import DeploymentReplicaTarget
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchReplicasAction(OperationScopeOpsAction[RoutingRow, ModelReplicaData]):
-    """Page through the replicas of one deployment.
+class SearchReplicasAction(BulkScopedSearchOpsAction[RoutingRow, ModelReplicaData]):
+    """Page through the replicas of the deployments named, combined with OR.
 
-    The deployment is the scope, so ops applies that condition. Reading every
-    deployment's replicas is the global variant, which says so in its shape.
+    Every deployment is authorized before the read runs. Reading every deployment's
+    replicas is the global variant, which says so in its shape.
     """
 
-    deployment_id: DeploymentID
+    deployment_ids: Sequence[DeploymentID]
     searcher: ModelReplicaSearcher
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
 
     @override
     @classmethod
@@ -36,14 +31,15 @@ class SearchReplicasAction(OperationScopeOpsAction[RoutingRow, ModelReplicaData]
         return "search_replicas"
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (
-            ScopeRef(scope_type=ScopeType(DEPLOYMENT_ENTITY_TYPE), scope_id=self.deployment_id),
-        )
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.deployment_ids)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (DeploymentReplicaOperationScope(deployment_id=self.deployment_id),)
+        return [
+            DeploymentReplicaTarget(deployment_id=deployment_id)
+            for deployment_id in self.deployment_ids
+        ]
 
     @override
     def to_searcher(self) -> ModelReplicaSearcher:

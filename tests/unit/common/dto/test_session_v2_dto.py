@@ -46,7 +46,7 @@ class TestEnqueueSessionInput:
         assert result.session_type == CreateSessionTypeEnum.INTERACTIVE
         assert result.cluster_size == 1
         assert result.cluster_mode == ClusterModeEnum.SINGLE_NODE
-        assert result.priority == 10
+        assert result.effective_tier() == 10
         assert result.job_priority == 0
         assert result.is_preemptible is True
         assert result.batch is None
@@ -149,7 +149,16 @@ class TestEnqueueSessionInput:
             )
 
     def test_priority_out_of_range(self) -> None:
-        """Priority > 100 should fail."""
+        """A tier above 100 fails under either name."""
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            EnqueueSessionInput(
+                session_name="test",
+                session_type=CreateSessionTypeEnum.INTERACTIVE,
+                image_id=uuid4(),
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                project_id=uuid4(),
+                tier=101,
+            )
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput(
                 session_name="test",
@@ -159,6 +168,27 @@ class TestEnqueueSessionInput:
                 project_id=uuid4(),
                 priority=101,
             )
+
+    def test_tier_reads_either_name(self) -> None:
+        """``tier`` answers when both names carry a value, and 0 is kept."""
+
+        def _make(tier: int | None, priority: int | None) -> EnqueueSessionInput:
+            return EnqueueSessionInput(
+                session_name="test",
+                session_type=CreateSessionTypeEnum.INTERACTIVE,
+                image_id=uuid4(),
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                project_id=uuid4(),
+                tier=tier,
+                priority=priority,
+            )
+
+        assert _make(tier=3, priority=None).effective_tier() == 3
+        assert _make(tier=None, priority=7).effective_tier() == 7
+        assert _make(tier=3, priority=7).effective_tier() == 3
+        assert _make(tier=0, priority=None).effective_tier() == 0
+        assert _make(tier=None, priority=0).effective_tier() == 0
+        assert _make(tier=None, priority=None).effective_tier() == 10
 
     def test_with_mounts(self) -> None:
         """Session with virtual folder mounts."""

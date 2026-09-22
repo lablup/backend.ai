@@ -25,16 +25,15 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
-from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -207,7 +206,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[UserID]:
         return cls.uuid
 
     @classmethod
@@ -275,7 +274,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
         Returns:
             The UserRow instance that matches the UUID.
         Raises:
-            ObjectNotFound: If user not found.
+            UserNotFound: If user not found.
         """
         rows = await cls.query_by_condition(
             [by_user_uuid(user_uuid)],
@@ -286,43 +285,13 @@ class UserRow(LifecycleTimestampsMixin, Base):
             db=db,
         )
         if not rows:
-            raise ObjectNotFound(f"User with id {user_uuid} not found")
+            raise UserNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
     def to_model_serving_user_data(self) -> ModelServingUserData:
         return ModelServingUserData(
             uuid=self.uuid,
             email=self.email,
-        )
-
-    def to_data(self) -> UserData:
-        return UserData(
-            id=self.uuid,
-            uuid=self.uuid,
-            username=self.username,
-            email=self.email,
-            need_password_change=self.need_password_change,
-            full_name=self.full_name,
-            description=self.description,
-            is_active=self.status == UserStatus.ACTIVE,
-            status=self.status.value,
-            status_info=self.status_info,
-            created_at=self.created_at,
-            modified_at=self.updated_at,
-            domain_name=self.domain_name,
-            domain_id=self.domain_id,
-            role=self.role,
-            resource_policy=self.resource_policy,
-            allowed_client_ip=[str(ip) for ip in self.allowed_client_ip]
-            if self.allowed_client_ip
-            else None,
-            totp_activated=self.totp_activated,
-            totp_activated_at=self.totp_activated_at,
-            sudo_session_enabled=self.sudo_session_enabled,
-            container_uid=self.container_uid,
-            container_main_gid=self.container_main_gid,
-            container_gids=self.container_gids,
-            integration_name=self.integration_id,  # DB column is integration_id
         )
 
 

@@ -9,8 +9,9 @@ import pytest
 
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
@@ -28,10 +29,14 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.app_config_definition.searchers import (
     AppConfigDefinitionSearcher,
 )
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -49,10 +54,10 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def repository(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[OpsRepository[AppConfigDefinitionData], None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -63,16 +68,28 @@ async def repository(
             RoleRow,
             PermissionRow,
             AppConfigDefinitionRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
-        yield OpsRepository(V2DBOpsProvider(database_connection))
+        yield OpsRepository(V2DBOpsProvider(global_entity_ids))
 
 
 @pytest.fixture
 async def existing_definition(
     repository: OpsRepository[AppConfigDefinitionData],
 ) -> AppConfigDefinitionData:
-    return await repository.create_global_entity(AppConfigDefinitionCreator(config_name="menu"))
+    return await repository.create_entity(AppConfigDefinitionCreator(config_name="menu"))
+
+
+@pytest.fixture
+def pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
+        cursor_column=AppConfigDefinitionRow.id,
+    )
 
 
 @pytest.fixture
@@ -81,7 +98,7 @@ async def seeded_definitions(
 ) -> list[AppConfigDefinitionData]:
     definitions: list[AppConfigDefinitionData] = []
     for config_name in ("theme", "menu", "preferences"):
-        definition = await repository.create_global_entity(
+        definition = await repository.create_entity(
             AppConfigDefinitionCreator(config_name=config_name)
         )
         definitions.append(definition)
@@ -96,9 +113,7 @@ class TestCreateAndGet:
     async def test_create_then_get_by_id(
         self, repository: OpsRepository[AppConfigDefinitionData]
     ) -> None:
-        created = await repository.create_global_entity(
-            AppConfigDefinitionCreator(config_name="theme")
-        )
+        created = await repository.create_entity(AppConfigDefinitionCreator(config_name="theme"))
         fetched = await repository.get(AppConfigDefinitionQuerier(definition_id=created.id))
         assert fetched.id == created.id
         assert fetched.config_name == "theme"
@@ -229,6 +244,7 @@ class TestAdminSearch:
         self,
         repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
+        pagination_spec: PaginationSpec,
     ) -> None:
         by_created_desc = sorted(seeded_definitions, key=lambda d: d.created_at, reverse=True)
         cursor = by_created_desc[0].id
@@ -237,7 +253,7 @@ class TestAdminSearch:
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
-                    cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
+                    cursor_condition=pagination_spec.forward_condition(str(cursor)),
                 )
             )
         )

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -16,6 +18,8 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -26,6 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetFilterGQL,
     DeploymentRevisionPresetGQL,
     DeploymentRevisionPresetOrderByGQL,
+    DeploymentRevisionPresetUsageGQL,
     UpdateDeploymentRevisionPresetInputGQL,
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
@@ -41,6 +46,15 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def deployment_revision_presets(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        DeploymentRevisionPresetUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller."
+            )
+        ),
+    ] = None,
     filter: DeploymentRevisionPresetFilterGQL | None = None,
     order_by: list[DeploymentRevisionPresetOrderByGQL] | None = None,
     before: str | None = None,
@@ -61,6 +75,7 @@ async def deployment_revision_presets(
             for o in order_by
         ]
     search_input = SearchDeploymentRevisionPresetsInput(
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,
@@ -74,7 +89,7 @@ async def deployment_revision_presets(
     edges = [
         DeploymentRevisionPresetEdge(
             node=DeploymentRevisionPresetGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]

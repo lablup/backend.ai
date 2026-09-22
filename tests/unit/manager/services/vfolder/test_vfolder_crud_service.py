@@ -12,30 +12,26 @@ import aiohttp
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
-    VFolderAccessInfo,
     VFolderData,
-    VFolderListResult,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import Forbidden
 from ai.backend.manager.errors.storage import (
-    TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderCreationFailure,
     VFolderGone,
@@ -44,10 +40,13 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
+)
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -61,8 +60,6 @@ from ai.backend.manager.services.vfolder.actions.base import (
     ForceDeleteVFolderActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
-    ListVFolderAction,
-    ListVFolderActionResult,
     LookupAccessibleVFolderAction,
     LookupAccessibleVFolderActionResult,
     MoveToTrashVFolderAction,
@@ -143,6 +140,7 @@ def vfolder_service(
         vfolder_repository=mock_vfolder_repository,
         user_repository=mock_user_repository,
         valkey_stat_client=MagicMock(),
+        own_check=MagicMock(),
     )
 
 
@@ -166,11 +164,7 @@ def _make_vfolder_data(
         domain_name="default",
         quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_id),
         usage_mode=usage_mode,
-        permission=VFolderMountPermission.READ_WRITE,
-        max_files=0,
-        max_size=None,
-        num_files=0,
-        cur_size=0,
+        default_mount_permission=VFolderMountPolicy.READ_WRITE,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
         updated_at=datetime(2025, 1, 1, tzinfo=UTC),
@@ -240,7 +234,7 @@ class TestCreateVFolderAction:
                 creator_id=user_uuid,
                 user=UserID(user_uuid),
                 usage_mode=usage_mode,
-                permission=VFolderPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 cloneable=False,
             ),
         )
@@ -262,7 +256,7 @@ class TestCreateVFolderAction:
                 creator_id=user_uuid,
                 project=ProjectID(project_id),
                 usage_mode=usage_mode,
-                permission=VFolderPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 cloneable=False,
             ),
         )
@@ -350,7 +344,7 @@ class TestCreateVFolderAction:
 
 
 class TestGetVFolderAction:
-    async def test_owned_vfolder_returns_full_details(
+    async def test_returns_the_vfolder_with_its_usage(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
@@ -358,19 +352,7 @@ class TestGetVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid)
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=vfolder_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
-
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         action = GetVFolderAction(
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -379,21 +361,18 @@ class TestGetVFolderAction:
         result = await vfolder_service.get(action)
 
         assert isinstance(result, GetVFolderActionResult)
-        assert result.base_info.id == vfolder_uuid
-        assert result.ownership_info.is_owner is True
+        assert result.vfolder == vfolder_data
+        assert result.usage_info.used_bytes == 1024
+        assert result.usage_info.num_files == 10
 
-    async def test_inaccessible_vfolder_raises_not_found(
+    async def test_missing_vfolder_raises_not_found(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(vfolders=[])
-        )
-
+        mock_vfolder_repository.get_by_id = AsyncMock(side_effect=VFolderNotFound())
         action = GetVFolderAction(
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -402,122 +381,28 @@ class TestGetVFolderAction:
         with pytest.raises(VFolderNotFound):
             await vfolder_service.get(action)
 
-    async def test_admin_non_owner_returns_effective_permission(
+
+class TestUpdateVFolderAttributeAction:
+    async def test_update_without_rename_skips_name_check(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        vfolder_data = _make_vfolder_data(vfolder_uuid, uuid.uuid4())
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.ADMIN, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=vfolder_data,
-                        is_owner=False,
-                        effective_permission=VFolderMountPermission.READ_ONLY,
-                    )
-                ]
-            )
-        )
-
-        action = GetVFolderAction(
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=True)
+        mock_vfolder_repository.update_vfolder_attribute = AsyncMock()
+        action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            updater=VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid)),
         )
 
-        result = await vfolder_service.get(action)
+        result = await vfolder_service.update_attribute(action)
 
-        assert result.ownership_info.is_owner is False
-        assert result.base_info.mount_permission == VFolderMountPermission.READ_ONLY
+        assert result.vfolder_uuid == vfolder_uuid
+        mock_vfolder_repository.check_vfolder_name_exists.assert_not_awaited()
 
-
-class TestListVFolderAction:
-    async def test_no_vfolders_returns_empty_list(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(vfolders=[])
-        )
-
-        action = ListVFolderAction(
-            user_uuid=user_uuid,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-        )
-
-        result = await vfolder_service.list(action)
-
-        assert isinstance(result, ListVFolderActionResult)
-        assert result.vfolders == []
-
-    async def test_returns_owned_and_shared_vfolders(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        owned_data = _make_vfolder_data(uuid.uuid4(), user_uuid, name="owned")
-        shared_data = _make_vfolder_data(uuid.uuid4(), uuid.uuid4(), name="shared")
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=owned_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    ),
-                    VFolderAccessInfo(
-                        vfolder_data=shared_data,
-                        is_owner=False,
-                        effective_permission=VFolderMountPermission.READ_ONLY,
-                    ),
-                ]
-            )
-        )
-
-        action = ListVFolderAction(
-            user_uuid=user_uuid,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-        )
-
-        result = await vfolder_service.list(action)
-
-        assert len(result.vfolders) == 2
-
-    async def test_admin_filtered_by_allowed_types(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        mock_config_provider: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
-            return_value=["user"]
-        )
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.ADMIN, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(vfolders=[])
-        )
-
-        action = ListVFolderAction(
-            user_uuid=user_uuid,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-        )
-
-        await vfolder_service.list(action)
-
-        call_kwargs = mock_vfolder_repository.list_accessible_vfolders.call_args.kwargs
-        assert call_kwargs["allowed_vfolder_types"] == ["user"]
-
-
-class TestUpdateVFolderAttributeAction:
     async def test_unique_name_change_succeeds(
         self,
         vfolder_service: VFolderService,
@@ -525,27 +410,18 @@ class TestUpdateVFolderAttributeAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid, name="old-name")
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=vfolder_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
+        mock_vfolder_repository.get_by_id = AsyncMock(
+            return_value=_make_vfolder_data(vfolder_uuid, user_uuid, name="old-name")
         )
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
         mock_vfolder_repository.update_vfolder_attribute = AsyncMock()
-
-        updater = VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid))
-
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            updater=updater,
+            updater=VFolderAttributeUpdater(
+                vfolder_id=VFolderUUID(vfolder_uuid),
+                name=OptionalState[str].update("new-name"),
+            ),
         )
 
         result = await vfolder_service.update_attribute(action)
@@ -553,63 +429,30 @@ class TestUpdateVFolderAttributeAction:
         assert isinstance(result, UpdateVFolderAttributeActionResult)
         assert result.vfolder_uuid == vfolder_uuid
 
-    async def test_duplicate_name_raises_invalid_parameter(
+    async def test_duplicate_name_in_owning_scope_raises_invalid_parameter(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid, name="existing-name")
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=vfolder_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
+        mock_vfolder_repository.get_by_id = AsyncMock(
+            return_value=_make_vfolder_data(vfolder_uuid, user_uuid, name="old-name")
         )
-
-        updater = VFolderAttributeUpdater(
-            vfolder_id=VFolderUUID(vfolder_uuid),
-            name=OptionalState[str].update("existing-name"),
-        )
-
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=True)
+        mock_vfolder_repository.update_vfolder_attribute = AsyncMock()
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
-            updater=updater,
+            updater=VFolderAttributeUpdater(
+                vfolder_id=VFolderUUID(vfolder_uuid),
+                name=OptionalState[str].update("existing-name"),
+            ),
         )
 
         with pytest.raises(VFolderInvalidParameter, match="already has the name"):
             await vfolder_service.update_attribute(action)
-
-    async def test_no_accessible_vfolders_raises_not_found(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-        vfolder_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(vfolders=[])
-        )
-
-        updater = VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid))
-
-        action = UpdateVFolderAttributeAction(
-            user_uuid=user_uuid,
-            vfolder_uuid=VFolderUUID(vfolder_uuid),
-            updater=updater,
-        )
-
-        with pytest.raises(VFolderNotFound):
-            await vfolder_service.update_attribute(action)
+        mock_vfolder_repository.update_vfolder_attribute.assert_not_awaited()
 
 
 class TestMoveToTrashVFolderAction:
@@ -621,7 +464,7 @@ class TestMoveToTrashVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid)
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repository.move_vfolders_to_trash = AsyncMock()
 
         action = MoveToTrashVFolderAction(
@@ -643,7 +486,7 @@ class TestMoveToTrashVFolderAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
+        mock_vfolder_repository.get_by_id = AsyncMock(side_effect=VFolderNotFound())
 
         action = MoveToTrashVFolderAction(
             user_uuid=user_uuid,
@@ -666,7 +509,7 @@ class TestRestoreVFolderFromTrashAction:
         vfolder_data = _make_vfolder_data(
             vfolder_uuid, user_uuid, status=VFolderOperationStatus.DELETE_PENDING
         )
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repository.restore_vfolders_from_trash = AsyncMock()
 
         action = RestoreVFolderFromTrashAction(
@@ -687,7 +530,7 @@ class TestRestoreVFolderFromTrashAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
+        mock_vfolder_repository.get_by_id = AsyncMock(side_effect=VFolderNotFound())
 
         action = RestoreVFolderFromTrashAction(
             user_uuid=user_uuid,
@@ -710,7 +553,7 @@ class TestDeleteForeverVFolderAction:
         vfolder_data = _make_vfolder_data(
             vfolder_uuid, user_uuid, status=VFolderOperationStatus.DELETE_PENDING
         )
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
             return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
         )
@@ -738,7 +581,7 @@ class TestDeleteForeverVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid)
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
             return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
         )
@@ -764,7 +607,7 @@ class TestDeleteForeverVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         vfolder_data = _make_vfolder_data(vfolder_uuid, user_uuid)
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
             return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
         )
@@ -794,7 +637,7 @@ class TestForceDeleteVFolderAction:
         vfolder_data = _make_vfolder_data(
             vfolder_uuid, user_uuid, status=VFolderOperationStatus.READY
         )
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
         mock_vfolder_repository.delete_vfolders_forever = AsyncMock(
             return_value=BulkVFolderPurgeResult(succeeded=[vfolder_data], failures=[])
         )
@@ -829,17 +672,7 @@ class TestCloneVFolderAction:
         target_id = uuid.uuid4()
 
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
         mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
         mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
             return_value={"local:volume1": set()}
@@ -860,7 +693,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         result = await vfolder_service.clone(action)
@@ -878,17 +711,7 @@ class TestCloneVFolderAction:
     ) -> None:
         source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=False)
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
 
         action = CloneVFolderAction(
             vfolder_uuid=VFolderUUID(vfolder_uuid),
@@ -899,7 +722,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(Forbidden, match="not permitted to be cloned"):
@@ -914,17 +737,7 @@ class TestCloneVFolderAction:
     ) -> None:
         source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=True)
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
         mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=True)
         mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
             return_value={"local:volume1": set()}
@@ -940,7 +753,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(VFolderAlreadyExists):
@@ -955,17 +768,7 @@ class TestCloneVFolderAction:
     ) -> None:
         source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=True)
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
         mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
         mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
             return_value={"local:volume1": set()}
@@ -983,7 +786,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(VFolderInvalidParameter, match="cannot create more"):
@@ -1000,17 +803,7 @@ class TestCloneVFolderAction:
         source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=True)
 
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
         mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
         mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
             return_value={"local:volume1": set()}
@@ -1054,7 +847,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=target_quota_scope_id,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         result = await vfolder_service.clone(action)
@@ -1089,7 +882,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         result = await vfolder_service.clone(action)
@@ -1124,7 +917,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=unauthorized_scope,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -1151,17 +944,7 @@ class TestCloneVFolderAction:
         target_id = uuid.uuid4()
 
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
         mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
         mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
             return_value={"local:volume1": set()}
@@ -1182,7 +965,7 @@ class TestCloneVFolderAction:
             target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
-            mount_permission=VFolderPermission.READ_WRITE,
+            mount_permission=VFolderMountPolicy.READ_WRITE,
         )
 
         await vfolder_service.clone(action)
@@ -1213,17 +996,7 @@ class TestCloneVFolderV2Action:
         target_id = uuid.uuid4()
 
         mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_data,
-                        is_owner=True,
-                        effective_permission=None,
-                    )
-                ]
-            )
-        )
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=source_data)
         mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
         mock_vfolder_repository.ensure_host_permission_allowed_by_user = AsyncMock()
         mock_vfolder_repository.get_max_vfolder_count = AsyncMock(return_value=0)
@@ -1249,23 +1022,19 @@ class TestCloneVFolderV2Action:
 
 
 class TestGetAccessibleVFolderAction:
-    async def test_lookup_by_uuid_succeeds(
+    async def test_lookup_by_uuid_reads_the_row(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_accessible_rows = AsyncMock(
-            return_value=[{"id": vfolder_uuid, "name": "test-vfolder", "status": "ready"}]
+        mock_vfolder_repository.resolve_vfolder_id_by_name = AsyncMock()
+        mock_vfolder_repository.get_row_by_id = AsyncMock(
+            return_value={"id": vfolder_uuid, "name": "test-vfolder", "status": "ready"}
         )
-
         action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            domain_name="default",
-            is_admin=False,
-            perm=VFolderPermission.READ_ONLY,
             folder_id_or_name=vfolder_uuid,
         )
 
@@ -1273,72 +1042,53 @@ class TestGetAccessibleVFolderAction:
 
         assert isinstance(result, LookupAccessibleVFolderActionResult)
         assert result.row["id"] == vfolder_uuid
+        mock_vfolder_repository.resolve_vfolder_id_by_name.assert_not_awaited()
 
-    async def test_lookup_by_name_succeeds(
+    async def test_lookup_by_name_resolves_within_personal_and_joined_projects(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
+        group_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_accessible_rows = AsyncMock(
-            return_value=[{"id": vfolder_uuid, "name": "my-folder", "status": "ready"}]
+        mock_vfolder_repository.get_joined_project_ids = AsyncMock(
+            return_value=[ProjectID(group_uuid)]
         )
-
+        mock_vfolder_repository.resolve_vfolder_id_by_name = AsyncMock(return_value=vfolder_uuid)
+        mock_vfolder_repository.get_row_by_id = AsyncMock(
+            return_value={"id": vfolder_uuid, "name": "my-folder", "status": "ready"}
+        )
         action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            domain_name="default",
-            is_admin=False,
-            perm=VFolderPermission.READ_ONLY,
             folder_id_or_name="my-folder",
         )
 
         result = await vfolder_service.get_accessible_vfolder(action)
 
         assert result.row["name"] == "my-folder"
+        mock_vfolder_repository.resolve_vfolder_id_by_name.assert_awaited_once_with(
+            [
+                UserVFolderTarget(user_id=UserID(user_uuid)),
+                ProjectVFolderTarget(project_id=ProjectID(group_uuid)),
+            ],
+            "my-folder",
+        )
 
-    async def test_inaccessible_raises_not_found(
+    async def test_unresolved_name_raises_not_found(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_accessible_rows = AsyncMock(return_value=[])
-
+        mock_vfolder_repository.get_joined_project_ids = AsyncMock(return_value=[])
+        mock_vfolder_repository.resolve_vfolder_id_by_name = AsyncMock(
+            side_effect=VFolderNotFound()
+        )
         action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            domain_name="default",
-            is_admin=False,
-            perm=VFolderPermission.READ_ONLY,
             folder_id_or_name="nonexistent",
         )
 
         with pytest.raises(VFolderNotFound):
-            await vfolder_service.get_accessible_vfolder(action)
-
-    async def test_multiple_matches_raises_too_many(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.get_accessible_rows = AsyncMock(
-            return_value=[
-                {"id": uuid.uuid4(), "name": "dup", "status": "ready"},
-                {"id": uuid.uuid4(), "name": "dup", "status": "ready"},
-            ]
-        )
-
-        action = LookupAccessibleVFolderAction(
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            domain_name="default",
-            is_admin=False,
-            perm=VFolderPermission.READ_ONLY,
-            folder_id_or_name="dup",
-        )
-
-        with pytest.raises(TooManyVFoldersFound):
             await vfolder_service.get_accessible_vfolder(action)

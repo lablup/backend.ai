@@ -10,13 +10,13 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryID,
-)
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
     PrometheusQueryPresetRow,
+)
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -37,9 +37,7 @@ class PrometheusQueryPresetUpdater(
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    category_id: TriState[PrometheusQueryPresetCategoryID] = field(
-        default_factory=TriState[PrometheusQueryPresetCategoryID].nop
-    )
+    category_id: TriState[UUID] = field(default_factory=TriState[UUID].nop)
     metric_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     query_template: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     time_window: TriState[str] = field(default_factory=TriState[str].nop)
@@ -56,7 +54,7 @@ class PrometheusQueryPresetUpdater(
         return PrometheusQueryPresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> PrometheusQueryPresetID:
         return self.preset_id
 
     @property
@@ -81,7 +79,7 @@ class PrometheusQueryPresetUpdater(
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
-        return row.to_data()
+        return PrometheusQueryPresetSearchableFields.own.to_data(row)
 
     def _build_options(self) -> Any:
         filter_value = self.filter_labels.optional_value()

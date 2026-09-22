@@ -21,6 +21,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
     gql_enum,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -77,11 +78,33 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
     is_active: bool | None = None
     created_at: DateTimeFilter | None = None
     modified_at: DateTimeFilter | None = None
-    project: DomainProjectNestedFilter | None = None
-    user: DomainUserNestedFilter | None = None
+    project: DomainProjectNestedFilter | None = gql_field(
+        default=None,
+        description="Filter by the projects the domain holds.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            " cannot check whether the caller may read that row. Search projects first, then"
+            " narrow by their domain."
+        ),
+    )
+    user: DomainUserNestedFilter | None = gql_field(
+        default=None,
+        description="Filter by the users the domain holds.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            " cannot check whether the caller may read that row. Search users first, then"
+            " narrow by their domain."
+        ),
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+_HELD_ORDER_DEPRECATION_TEMPLATE = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A domain holds many {{holds}}, so this order"
+    " folds them into a single {subject}. Narrow the results with the matching filter instead."
+)
 
 
 @gql_enum(
@@ -93,12 +116,21 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
             "MODIFIED_AT: Order by last modification timestamp. "
             "NAME: Order by domain name alphabetically. "
             "IS_ACTIVE: Order by active status. "
-            "PROJECT_NAME: Order by project name (MIN aggregation). "
-            "USER_USERNAME: Order by username (MIN aggregation). "
-            "USER_EMAIL: Order by user email (MIN aggregation)."
+            "PROJECT_NAME: Order by project name. "
+            "USER_USERNAME: Order by username. "
+            "USER_EMAIL: Order by user email."
         ),
     ),
     name="DomainV2OrderField",
+    deprecated_values={
+        "PROJECT_NAME": _HELD_ORDER_DEPRECATION_TEMPLATE.format(
+            holds="projects", subject="project name"
+        ),
+        "USER_USERNAME": _HELD_ORDER_DEPRECATION_TEMPLATE.format(holds="users", subject="username"),
+        "USER_EMAIL": _HELD_ORDER_DEPRECATION_TEMPLATE.format(
+            holds="users", subject="email address"
+        ),
+    },
 )
 class DomainV2OrderField(StrEnum):
     CREATED_AT = "created_at"

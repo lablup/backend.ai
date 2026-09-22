@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from typing import Any, Self
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     DomainUsageBucketFilter as DomainUsageBucketFilterDTO,
 )
@@ -16,6 +18,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     DomainUsageBucketNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -32,8 +35,8 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.repositories.resource_usage_history.options import (
-    ProjectUsageBucketConditions,
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    ProjectUsageBucketSearchableFields,
 )
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
@@ -65,6 +68,12 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
     """Domain-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the usage bucket.",
+        ),
+    )
     domain_name: str = gql_field(description="Name of the domain this usage bucket belongs to.")
     resource_group_name: str = gql_field(
         description="Name of the scaling group this usage was recorded in."
@@ -128,9 +137,15 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
 
         payload = await info.context.adapters.resource_usage.gql_search_project_unscoped(
             base_conditions=[
-                ProjectUsageBucketConditions.by_domain_name(self.domain_name),
-                ProjectUsageBucketConditions.by_resource_group(self.resource_group_name),
-                ProjectUsageBucketConditions.by_period_start(self.metadata.period_start),
+                ProjectUsageBucketSearchableFields.own.domain_name.filter.equals(
+                    StringMatchSpec(self.domain_name, case_insensitive=False, negated=False)
+                ),
+                ProjectUsageBucketSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(self.resource_group_name, case_insensitive=False, negated=False)
+                ),
+                ProjectUsageBucketSearchableFields.own.period_start.filter.equals(
+                    self.metadata.period_start
+                ),
             ],
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
@@ -46,9 +47,14 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
+)
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
 )
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupRow
@@ -62,20 +68,14 @@ from ai.backend.manager.models.resource_usage_history import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkUpserter,
-    BulkUpserterResult,
-    Creator,
-    Upserter,
     execute_batch_querier,
-    execute_bulk_upserter,
-    execute_creator,
-    execute_upserter,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -86,52 +86,38 @@ if TYPE_CHECKING:
 __all__ = ("FairShareDBSource",)
 
 
+# `association_groups_users` is no longer written; project membership lives in the
+# entity graph. Moving the reads below changes which users answer, so they are left
+# to a follow-up.
+
+
 class FairShareDBSource:
     """Database source for Fair Share operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     # ==================== Domain Fair Share ====================
 
-    async def create_domain_fair_share(
-        self,
-        creator: Creator[DomainFairShareRow],
-    ) -> DomainFairShareData:
-        """Create a new domain fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            sg_row = await self._fetch_resource_group_row_by_id(
-                db_sess, result.row.resource_group_id
-            )
-            fair_share_spec = sg_row.fair_share_spec or FairShareResourceGroupSpec()
-            available_slots = await self._fetch_available_slots(
-                db_sess, result.row.resource_group_id
-            )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
-            )
-
     async def upsert_domain_fair_share(
-        self,
-        upserter: Upserter[DomainFairShareRow],
+        self, upserter: DomainFairShareUpserter
     ) -> DomainFairShareData:
         """Upsert a domain fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["resource_group_id", "domain_name"],
-            )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             fair_share_spec, available_slots = await self._try_fetch_resource_group_context(
-                db_sess, result.row.resource_group_id
+                db_sess, upserter.resource_group_id
             )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
+        async with self._v2_ops.write_ops() as w:
+            return await w.upsert_dangling_field(
+                replace(
+                    upserter,
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
             )
 
     async def get_domain_fair_share(
@@ -224,7 +210,7 @@ class FairShareDBSource:
 
     async def search_rg_domain_fair_shares(
         self,
-        scope: DomainFairShareOperationScope,
+        scope: DomainFairShareTarget,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
         """Search domain fair shares within a resource group.
@@ -313,42 +299,21 @@ class FairShareDBSource:
 
     # ==================== Project Fair Share ====================
 
-    async def create_project_fair_share(
-        self,
-        creator: Creator[ProjectFairShareRow],
-    ) -> ProjectFairShareData:
-        """Create a new project fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            sg_row = await self._fetch_resource_group_row_by_id(
-                db_sess, result.row.resource_group_id
-            )
-            fair_share_spec = sg_row.fair_share_spec or FairShareResourceGroupSpec()
-            available_slots = await self._fetch_available_slots(
-                db_sess, result.row.resource_group_id
-            )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
-            )
-
     async def upsert_project_fair_share(
-        self,
-        upserter: Upserter[ProjectFairShareRow],
+        self, upserter: ProjectFairShareUpserter
     ) -> ProjectFairShareData:
         """Upsert a project fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["resource_group_id", "project_id"],
-            )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             fair_share_spec, available_slots = await self._try_fetch_resource_group_context(
-                db_sess, result.row.resource_group_id
+                db_sess, upserter.resource_group_id
             )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
+        async with self._v2_ops.write_ops() as w:
+            return await w.upsert_dangling_field(
+                replace(
+                    upserter,
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
             )
 
     async def get_project_fair_share(
@@ -444,7 +409,7 @@ class FairShareDBSource:
 
     async def search_rg_project_fair_shares(
         self,
-        scope: ProjectFairShareOperationScope,
+        scope: ProjectFairShareTarget,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
         """Search project fair shares within a resource group.
@@ -541,102 +506,82 @@ class FairShareDBSource:
 
     # ==================== User Fair Share ====================
 
-    async def create_user_fair_share(
-        self,
-        creator: Creator[UserFairShareRow],
-    ) -> UserFairShareData:
-        """Create a new user fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            sg_row = await self._fetch_resource_group_row_by_id(
-                db_sess, result.row.resource_group_id
-            )
-            fair_share_spec = sg_row.fair_share_spec or FairShareResourceGroupSpec()
-            available_slots = await self._fetch_available_slots(
-                db_sess, result.row.resource_group_id
-            )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
-            )
-
-    async def upsert_user_fair_share(
-        self,
-        upserter: Upserter[UserFairShareRow],
-    ) -> UserFairShareData:
+    async def upsert_user_fair_share(self, upserter: UserFairShareUpserter) -> UserFairShareData:
         """Upsert a user fair share record."""
-        async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["resource_group_id", "user_uuid", "project_id"],
-            )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             fair_share_spec, available_slots = await self._try_fetch_resource_group_context(
-                db_sess, result.row.resource_group_id
+                db_sess, upserter.resource_group_id
             )
-            return result.row.to_data(
-                default_weight=fair_share_spec.default_weight,
-                available_slots=available_slots,
+        async with self._v2_ops.write_ops() as w:
+            return await w.upsert_dangling_field(
+                replace(
+                    upserter,
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
             )
 
     # ==================== Bulk Upsert Operations ====================
 
     async def bulk_upsert_domain_fair_share(
-        self,
-        bulk_upserter: BulkUpserter[DomainFairShareRow],
-    ) -> BulkUpserterResult:
-        """Bulk upsert domain fair share records.
-
-        Args:
-            bulk_upserter: BulkUpserter containing specs for rows to insert/update
-
-        Returns:
-            BulkUpserterResult containing count of affected rows
-        """
-        async with self._db.begin_session_read_committed() as db_sess:
-            return await execute_bulk_upserter(
-                db_sess,
-                bulk_upserter,
-                index_elements=["resource_group_id", "domain_name"],
+        self, upserters: Sequence[DomainFairShareUpserter]
+    ) -> list[DomainFairShareData]:
+        """Bulk upsert domain fair share records, answering what was written."""
+        if not upserters:
+            return []
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            fair_share_spec, available_slots = await self._try_fetch_resource_group_context(
+                db_sess, upserters[0].resource_group_id
             )
+        async with self._v2_ops.write_ops() as w:
+            return await w.atomic_upsert_dangling_fields([
+                replace(
+                    upserter,
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
+                for upserter in upserters
+            ])
 
     async def bulk_upsert_project_fair_share(
-        self,
-        bulk_upserter: BulkUpserter[ProjectFairShareRow],
-    ) -> BulkUpserterResult:
-        """Bulk upsert project fair share records.
-
-        Args:
-            bulk_upserter: BulkUpserter containing specs for rows to insert/update
-
-        Returns:
-            BulkUpserterResult containing count of affected rows
-        """
-        async with self._db.begin_session_read_committed() as db_sess:
-            return await execute_bulk_upserter(
-                db_sess,
-                bulk_upserter,
-                index_elements=["resource_group_id", "project_id"],
+        self, upserters: Sequence[ProjectFairShareUpserter]
+    ) -> list[ProjectFairShareData]:
+        """Bulk upsert project fair share records, answering what was written."""
+        if not upserters:
+            return []
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            fair_share_spec, available_slots = await self._try_fetch_resource_group_context(
+                db_sess, upserters[0].resource_group_id
             )
+        async with self._v2_ops.write_ops() as w:
+            return await w.atomic_upsert_dangling_fields([
+                replace(
+                    upserter,
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
+                for upserter in upserters
+            ])
 
     async def bulk_upsert_user_fair_share(
-        self,
-        bulk_upserter: BulkUpserter[UserFairShareRow],
-    ) -> BulkUpserterResult:
-        """Bulk upsert user fair share records.
-
-        Args:
-            bulk_upserter: BulkUpserter containing specs for rows to insert/update
-
-        Returns:
-            BulkUpserterResult containing count of affected rows
-        """
-        async with self._db.begin_session_read_committed() as db_sess:
-            return await execute_bulk_upserter(
-                db_sess,
-                bulk_upserter,
-                index_elements=["resource_group_id", "user_uuid", "project_id"],
+        self, upserters: Sequence[UserFairShareUpserter]
+    ) -> list[UserFairShareData]:
+        """Bulk upsert user fair share records, answering what was written."""
+        if not upserters:
+            return []
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            fair_share_spec, available_slots = await self._try_fetch_resource_group_context(
+                db_sess, upserters[0].resource_group_id
             )
+        async with self._v2_ops.write_ops() as w:
+            return await w.atomic_upsert_dangling_fields([
+                replace(
+                    upserter,
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
+                for upserter in upserters
+            ])
 
     async def get_user_fair_share(
         self,
@@ -810,7 +755,7 @@ class FairShareDBSource:
 
     async def search_rg_user_fair_shares(
         self,
-        scope: UserFairShareOperationScope,
+        scope: UserFairShareTarget,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
         """Search user fair shares within a resource group.

@@ -1,8 +1,8 @@
 from abc import ABC
 
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import ScopeActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 __all__ = ("ScopeActionMonitor",)
 
@@ -15,7 +15,7 @@ class ScopeActionMonitor(ABC):
     the outcome carried in :class:`ScopeActionProcessResult`.
     """
 
-    async def prepare(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         raise NotImplementedError("Subclasses must implement the prepare method")
 
     async def done(self, action: BaseScopeAction, result: ScopeActionProcessResult) -> None:

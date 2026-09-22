@@ -98,6 +98,7 @@ class TestServiceCatalogGQL:
 
         node = ServiceCatalogNode(
             id=row_id,
+            entity_id=row_id,
             service_group="manager",
             instance_id="mgr-001",
             display_name="Manager Instance 1",
@@ -133,6 +134,7 @@ class TestServiceCatalogGQL:
 
         node = ServiceCatalogNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             service_group="agent",
             instance_id="agent-001",
             display_name="Agent 1",

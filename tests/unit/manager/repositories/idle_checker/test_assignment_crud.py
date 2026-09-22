@@ -10,16 +10,16 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.data.permission.types import Permission, ScopeType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
@@ -32,14 +32,17 @@ from ai.backend.manager.errors.idle_checker import (
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerAssignmentCreator,
     IdleCheckerCreator,
 )
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
-from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentTarget
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerAssignmentSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -66,7 +69,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -99,10 +101,10 @@ class TestIdleCheckerAssignmentRepository:
     @pytest.fixture
     async def database(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -120,13 +122,18 @@ class TestIdleCheckerAssignmentRepository:
                 PermissionRow,
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
+                EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
+        return IdleCheckerRepository(
+            database,
+            RelationOpsProvider(database),
+            V2DBOpsProvider(database),
+        )
 
     @pytest.fixture
     def relations(self, database: ExtendedAsyncSAEngine) -> RbacRelationRepository:
@@ -253,7 +260,7 @@ class TestIdleCheckerAssignmentRepository:
         """The target every binding names, created the way the catalog creates it so
         it has the node a relation needs."""
         ops: OpsRepository[IdleCheckerData] = OpsRepository(V2DBOpsProvider(database))
-        return await ops.create_global_entity(
+        return await ops.create_entity(
             IdleCheckerCreator(
                 name="session lifetime",
                 description=None,
@@ -313,7 +320,7 @@ class TestIdleCheckerAssignmentRepository:
                 )
             )
 
-        assert assignment.scope_type is ScopeType.RESOURCE_GROUP
+        assert assignment.scope_type == ResourceGroupEntityType()
         assert assignment.scope_id == resource_group_id
         assert assignment.enabled is False
         # A relation makes no node of its own.
@@ -394,7 +401,7 @@ class TestIdleCheckerAssignmentRepository:
             relations, repository, IdleCheckerAssignmentCreator(enabled=True), user_id, checker.id
         )
 
-        assert assignment.scope_type is ScopeType.USER
+        assert assignment.scope_type == UserEntityType()
         assert assignment.scope_id == user_id
 
     async def test_create_assignment_on_project_scope(
@@ -412,7 +419,7 @@ class TestIdleCheckerAssignmentRepository:
             checker.id,
         )
 
-        assert assignment.scope_type is ScopeType.PROJECT
+        assert assignment.scope_type == ProjectEntityType()
         assert assignment.scope_id == project_id
 
     async def test_disable_and_enable_switch_the_row_alone(
@@ -520,7 +527,7 @@ class TestIdleCheckerAssignmentRepository:
 
         result = await repository.admin_search_assignments(
             IdleCheckerAssignmentSearcher(
-                conditions=[IdleCheckerAssignmentConditions.by_enabled_equals(False)],
+                conditions=[IdleCheckerAssignmentSearchableFields.own.enabled.filter.equals(False)],
                 pagination=NoPagination(),
             )
         )
@@ -551,14 +558,14 @@ class TestIdleCheckerAssignmentRepository:
         )
 
         single_scope_result = await repository.scoped_search_assignments(
-            [IdleCheckerAssignmentOperationScope(scope=domain_id)],
+            [IdleCheckerAssignmentTarget(scope=domain_id)],
             IdleCheckerAssignmentSearcher(pagination=NoPagination()),
         )
         mixed_union_result = await repository.scoped_search_assignments(
             [
-                IdleCheckerAssignmentOperationScope(scope=domain_id),
-                IdleCheckerAssignmentOperationScope(scope=resource_group_id),
-                IdleCheckerAssignmentOperationScope(scope=project_id),
+                IdleCheckerAssignmentTarget(scope=domain_id),
+                IdleCheckerAssignmentTarget(scope=resource_group_id),
+                IdleCheckerAssignmentTarget(scope=project_id),
             ],
             IdleCheckerAssignmentSearcher(pagination=NoPagination()),
         )

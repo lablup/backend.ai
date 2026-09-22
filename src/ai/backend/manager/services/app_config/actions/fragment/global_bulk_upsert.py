@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config import APP_CONFIG_FRAGMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import AtomicUpsertGlobalEntityOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
@@ -20,7 +20,7 @@ class GlobalBulkUpsertAppConfigFragmentsAction(
 ):
     """Write the ``public`` fragments, all of them or none.
 
-    A public value applies to everyone and belongs to no one, so no scope can answer for
+    A public value applies to everyone and has no owner, so no owner's scope can answer for
     it — the SUPERADMIN gate does, which is what separates this from the owned write.
     """
 
@@ -29,7 +29,7 @@ class GlobalBulkUpsertAppConfigFragmentsAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return APP_CONFIG_FRAGMENT_ENTITY_TYPE
+        return AppConfigFragmentEntityType()
 
     @override
     @classmethod

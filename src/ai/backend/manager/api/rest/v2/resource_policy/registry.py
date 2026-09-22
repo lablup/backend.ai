@@ -127,5 +127,11 @@ def register_v2_resource_policy_routes(
         handler.admin_delete_project_resource_policy,
         middlewares=[superadmin_required],
     )
+    reg.add(
+        "GET",
+        "/project/projects/{project_id}",
+        handler.scoped_project_resource_policy,
+        middlewares=[auth_required],
+    )
 
     return reg

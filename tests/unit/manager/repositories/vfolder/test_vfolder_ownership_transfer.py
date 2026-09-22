@@ -17,37 +17,35 @@ import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.types import (
     RoleSource,
 )
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import (
@@ -61,7 +59,10 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder import (
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+)
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -116,9 +117,9 @@ async def _membership_cap(
                 )
                 .join(member, member.id == EntityMembershipRow.member_entity_id)
                 .where(
-                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
                     VirtualEntityRow.entity_id == personal_project_id,
-                    member.entity_type == VFOLDER_ENTITY_TYPE,
+                    member.entity_type == VFolderEntityType(),
                     member.entity_id == vfolder_id,
                 )
             )
@@ -153,10 +154,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 ProjectRow,
                 AssocGroupUserRow,
                 VFolderRow,
-                VFolderInvitationRow,
-                VFolderPermissionRow,
-                AssociationScopesEntitiesRow,
-                ObjectPermissionRow,
+                VFolderUserMountPolicyRow,
                 PermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
@@ -164,6 +162,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -366,6 +365,8 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 id=role_id,
                 name=f"user-role-{user_uuid.hex[:8]}",
                 source=RoleSource.SYSTEM,
+                scope_type=UserEntityType(),
+                scope_id=user_uuid,
             )
             db_sess.add(role_row)
             await db_sess.flush()
@@ -393,7 +394,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(
                 VirtualEntityRow(
                     id=uuid.uuid4(),
-                    entity_type=USER_SCOPE_TYPE,
+                    entity_type=UserEntityType(),
                     entity_id=UserID(user_uuid),
                 )
             )
@@ -417,13 +418,35 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(
                 VirtualEntityRow(
                     id=uuid.uuid4(),
-                    entity_type=PROJECT_SCOPE_TYPE,
+                    entity_type=ProjectEntityType(),
                     entity_id=ProjectID(personal_project_id),
                 )
             )
             await db_sess.flush()
 
         return UserWithKeypair(user_id=user_uuid, email=email)
+
+    async def _share(
+        self,
+        repo: VfolderRepository,
+        vfolder_id: uuid.UUID,
+        inviter: UserWithKeypair,
+        invitee: UserWithKeypair,
+        permission: VFolderMountPolicy,
+    ) -> None:
+        """Invite ``invitee`` to the folder and accept the invitation as them."""
+        await repo.create_vfolder_invitation(
+            vfolder_id,
+            UserID(inviter.user_id),
+            invitee.email,
+            permission,
+            invitee_id=UserID(invitee.user_id),
+        )
+        pending = await repo.get_pending_invitations_for_user(
+            UserID(invitee.user_id), invitee.email
+        )
+        invitation = next(inv for inv, _ in pending if inv.vfolder == vfolder_id)
+        await repo.accept_invitation(invitation.id, UserID(invitee.user_id))
 
     async def test_ownership_transfer_cleans_up_old_owner_rbac(
         self,
@@ -451,7 +474,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.OWNER_PERM,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 host=VFOLDER_HOST,
                 creator=user_a_email,
                 ownership_type=VFolderOwnershipType.USER,
@@ -463,13 +486,11 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
-            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
+            db_sess.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await db_sess.flush()
 
         # Grant A owner permission (creates scope-entity mapping + permissions)
-        await repo.create_vfolder_permission(
-            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
-        )
+        await self._share(repo, vfolder_id, old_owner, old_owner, VFolderMountPolicy.READ_WRITE)
 
         # Verify A holds the vfolder before transfer
         granted, _ = await _membership_cap(db_with_cleanup, vfolder_id, user_a_id)
@@ -514,7 +535,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.OWNER_PERM,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 host=VFOLDER_HOST,
                 creator=user_a_email,
                 ownership_type=VFolderOwnershipType.USER,
@@ -526,12 +547,10 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
-            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
+            db_sess.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await db_sess.flush()
 
-        await repo.create_vfolder_permission(
-            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
-        )
+        await self._share(repo, vfolder_id, old_owner, old_owner, VFolderMountPolicy.READ_WRITE)
 
         # Transfer A -> B
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
@@ -580,7 +599,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.OWNER_PERM,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 host=VFOLDER_HOST,
                 creator=user_a_email,
                 ownership_type=VFolderOwnershipType.USER,
@@ -592,18 +611,14 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
-            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
+            db_sess.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await db_sess.flush()
 
         # A gets owner permission
-        await repo.create_vfolder_permission(
-            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
-        )
+        await self._share(repo, vfolder_id, old_owner, old_owner, VFolderMountPolicy.READ_WRITE)
 
         # B gets invitee permission (simulates accepting an invitation)
-        await repo.create_vfolder_permission(
-            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
-        )
+        await self._share(repo, vfolder_id, old_owner, new_owner, VFolderMountPolicy.READ_ONLY)
 
         # Verify B holds the vfolder under a cap before transfer
         granted_b, cap_b = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
@@ -622,9 +637,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         await repo.change_vfolder_ownership(vfolder_id, user_a_email)
 
         # B accepts invitation again (must not raise unique constraint violation)
-        await repo.create_vfolder_permission(
-            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
-        )
+        await self._share(repo, vfolder_id, old_owner, new_owner, VFolderMountPolicy.READ_ONLY)
 
         # Verify B holds it again, capped, after re-accepting
         granted_b_final, cap_b_final = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
@@ -657,7 +670,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.OWNER_PERM,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 host=VFOLDER_HOST,
                 creator=user_a_email,
                 ownership_type=VFolderOwnershipType.USER,
@@ -669,18 +682,14 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
-            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
+            db_sess.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await db_sess.flush()
 
         # Grant A owner permission
-        await repo.create_vfolder_permission(
-            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
-        )
+        await self._share(repo, vfolder_id, old_owner, old_owner, VFolderMountPolicy.READ_WRITE)
 
         # Grant B invitee permission (creates REF scope-entity mapping)
-        await repo.create_vfolder_permission(
-            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
-        )
+        await self._share(repo, vfolder_id, old_owner, new_owner, VFolderMountPolicy.READ_ONLY)
 
         # Verify B's hold is capped before transfer
         granted_b, cap_b = await _membership_cap(db_with_cleanup, vfolder_id, user_b_id)
@@ -695,7 +704,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         assert granted_b_after, "New owner should hold the vfolder after transfer"
         assert cap_b_after is None, "An owner's hold carries no cap"
 
-    async def test_ownership_transfer_preserves_invitee_legacy_permission(
+    async def test_ownership_transfer_revokes_new_owners_share(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
@@ -705,8 +714,8 @@ class TestVFolderOwnershipTransferRBACCleanup:
         new_owner: UserWithKeypair,
     ) -> None:
         """
-        Verify that after ownership transfer, the new owner's legacy
-        vfolder_permissions record is preserved (not deleted).
+        Verify that after ownership transfer, the share the new owner held as an
+        invitee is settled as revoked.
         """
         repo = vfolder_repository
         user_a_id, user_a_email = old_owner.user_id, old_owner.email
@@ -721,7 +730,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 name=f"test-vfolder-{vfolder_id.hex[:8]}",
                 domain_name=test_domain.domain_name,
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.OWNER_PERM,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 host=VFOLDER_HOST,
                 creator=user_a_email,
                 ownership_type=VFolderOwnershipType.USER,
@@ -733,43 +742,23 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
-            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
+            db_sess.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await db_sess.flush()
 
-        # Grant B invitee permission (legacy vfolder_permissions record)
-        await repo.create_vfolder_permission(
-            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
-        )
-
-        # Verify B has legacy permission before transfer
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            perm_count_before = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderPermissionRow)
-                .where(
-                    sa.and_(
-                        VFolderPermissionRow.vfolder == vfolder_id,
-                        VFolderPermissionRow.user == user_b_id,
-                    )
-                )
-            )
-            assert perm_count_before == 1, "Invitee should have legacy permission before transfer"
+        # B accepts an invitation to the folder
+        await self._share(repo, vfolder_id, old_owner, new_owner, VFolderMountPolicy.READ_ONLY)
 
         # Transfer ownership to B
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
 
-        # Verify B's legacy permission is preserved
+        # B's share is settled as revoked
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            perm_count_after = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderPermissionRow)
-                .where(
-                    sa.and_(
-                        VFolderPermissionRow.vfolder == vfolder_id,
-                        VFolderPermissionRow.user == user_b_id,
+            statuses = (
+                await db_sess.scalars(
+                    sa.select(EntityShareRow.status).where(
+                        EntityShareRow.target_entity_id == vfolder_id,
+                        EntityShareRow.recipient_entity_id == user_b_id,
                     )
                 )
-            )
-            assert perm_count_after == 1, (
-                "New owner's legacy vfolder_permissions should be preserved after transfer"
-            )
+            ).all()
+        assert statuses == [EntityShareStatus.REVOKED]

@@ -3,40 +3,45 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
 
 @dataclass
-class ContainerRegistryCreator(
-    GlobalEntityCreator[ContainerRegistryRow, ContainerRegistryData],
-):
+class ContainerRegistryCreator(EntityCreator[ContainerRegistryRow, ContainerRegistryData]):
     """Creator for a container registry.
 
-    A registry goes under no other scope, and the entities it owns (images) resolve
-    through its own virtual entity; the projects allowed to reach them are bound to
-    that scope separately.
+    A registry is created in the `global` scope, and a global one in `public` as well,
+    so every user reads it and the images it owns. The projects allowed to reach a
+    registry that is not global are bound to it separately.
     """
 
     url: str
     type: ContainerRegistryType
     registry_name: str
     is_global: bool | None = None
+    """Left out by the caller, the registry is global. The column itself is not nullable."""
     project: str | None = None
     username: str | None = None
     password: str | None = None
@@ -46,6 +51,15 @@ class ContainerRegistryCreator(
     @override
     def entity_id(self, row: ContainerRegistryRow) -> ContainerRegistryID:
         return ContainerRegistryID(row.id)
+
+    @override
+    def created_in(self, row: ContainerRegistryRow) -> Collection[EntityIdentifier]:
+        if not row.is_global:
+            return (global_entity_id(GlobalEntityName.GLOBAL),)
+        return (
+            global_entity_id(GlobalEntityName.GLOBAL),
+            global_entity_id(GlobalEntityName.PUBLIC),
+        )
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -58,7 +72,7 @@ class ContainerRegistryCreator(
             url=self.url,
             type=self.type,
             registry_name=self.registry_name,
-            is_global=self.is_global,
+            is_global=self._resolved_is_global(),
             project=self.project,
             username=self.username,
             password=self.password,
@@ -66,9 +80,13 @@ class ContainerRegistryCreator(
             extra=self.extra,
         )
 
+    def _resolved_is_global(self) -> bool:
+        """What the omitted input means, stated here so the row and `created_in` agree."""
+        return True if self.is_global is None else self.is_global
+
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return row.to_dataclass()
+        return ContainerRegistrySearchableFields.own.to_data(row)
 
 
 @dataclass

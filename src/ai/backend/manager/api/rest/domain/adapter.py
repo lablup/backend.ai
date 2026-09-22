@@ -19,8 +19,7 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.domain.orders import DomainOrders
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.domain.updaters import DomainUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -93,35 +92,23 @@ class DomainAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter_req: DomainFilter) -> list[QueryCondition]:
         """Convert domain filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter_req.name is not None:
-            condition = self.convert_string_filter(
-                filter_req.name,
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.is_active is not None:
-            conditions.append(DomainConditions.by_is_active(filter_req.is_active))
-
-        return conditions
+        fields = DomainSearchableFields.own
+        return [
+            *self.apply_string_filter(filter_req.name, fields.name.filter),
+            *self.apply_bool_filter(filter_req.is_active, fields.is_active.filter),
+        ]
 
     def _convert_order(self, order: DomainOrder) -> QueryOrder:
         """Convert domain order specification to query order."""
+        fields = DomainSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == DomainOrderField.NAME:
-            return DomainOrders.name(ascending=ascending)
+            return fields.name.order.apply(ascending)
         if order.field == DomainOrderField.CREATED_AT:
-            return DomainOrders.created_at(ascending=ascending)
+            return fields.created_at.order.apply(ascending)
         if order.field == DomainOrderField.MODIFIED_AT:
-            return DomainOrders.updated_at(ascending=ascending)
+            return fields.updated_at.order.apply(ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

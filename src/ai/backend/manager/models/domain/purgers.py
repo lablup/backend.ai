@@ -19,6 +19,7 @@ from ai.backend.manager.errors.resource import (
     DomainHasUsers,
 )
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
@@ -63,7 +64,7 @@ class DomainPurger(EntityPurger[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass

@@ -3,36 +3,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
-@dataclass
-class GetEntityTypesAction(RoleAction):
-    """Action to get available entity types.
-
-    This action is only available to superadmins.
-    Permission check is performed at the API handler level.
-    """
+@dataclass(frozen=True)
+class PublicGetEntityTypesAction(BaseGlobalAction):
+    """The entity types a role may permit."""
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return RoleEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-
-@dataclass
-class GetEntityTypesActionResult(BaseActionResult):
-    """Result of getting entity types."""
-
-    element_types: list[RBACElementType]
-
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "public_get_entity_types"
+
+
+@dataclass(frozen=True)
+class PublicGetEntityTypesActionResult:
+    entity_types: list[EntityType]

@@ -12,8 +12,11 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.endpoint.types import ScalingState
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
@@ -34,6 +37,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentOrder as DeploymentOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentScalingStateFilter as DeploymentScalingStateFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStatusFilter as DeploymentStatusFilterDTO,
@@ -106,6 +112,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntFilter,
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
@@ -307,7 +314,9 @@ class ModelDeploymentMetadata:
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(UUID(str(self.project_id)))
+        return await info.context.data_loaders.project_loader.load(
+            ProjectID(UUID(str(self.project_id)))
+        )
 
     @gql_field(
         description="The domain of this entity.",
@@ -358,6 +367,12 @@ class ModelDeploymentNetworkAccess:
 )
 class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment.",
+        ),
+    )
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     current_revision_id: ID | None = None
@@ -389,7 +404,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         if self.current_revision_id is None:
             return None
         return await info.context.data_loaders.revision_loader.load(
-            UUID(str(self.current_revision_id))
+            DeploymentRevisionID(UUID(str(self.current_revision_id)))
         )
 
     @gql_added_field(
@@ -402,7 +417,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         if self.deploying_revision_id is None:
             return None
         return await info.context.data_loaders.revision_loader.load(
-            UUID(str(self.deploying_revision_id))
+            DeploymentRevisionID(UUID(str(self.deploying_revision_id)))
         )
 
     @gql_added_field(
@@ -420,7 +435,9 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(UUID(str(self.created_user_id)))
+        return await info.context.data_loaders.user_loader.load(
+            UserID(UUID(str(self.created_user_id)))
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")
@@ -430,7 +447,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     ) -> DeploymentPolicyGQL | None:
         """Get the deployment policy for this deployment."""
         policy_data = await info.context.data_loaders.deployment_policy_by_endpoint_loader.load(
-            UUID(str(self.id))
+            DeploymentID(UUID(str(self.id)))
         )
         if policy_data is None:
             return None
@@ -506,7 +523,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
         nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
-        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+        edges = [ModelReplicaEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ModelReplicaConnection(
             count=payload.total_count,
             edges=edges,
@@ -701,7 +718,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     ) -> EntityLabelConnection | None:
         return await resolve_entity_labels(
             info,
-            RuntimeEntityID(DEPLOYMENT_ENTITY_TYPE, UUID(str(self.id))),
+            RuntimeEntityID(DeploymentEntityType(), UUID(str(self.id))),
             filter=filter,
             order_by=order_by,
             before=before,
@@ -722,7 +739,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.deployment_loader.load_many([
-            UUID(nid) for nid in node_ids
+            DeploymentID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -763,6 +780,16 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
     name="ReplicaNestedFilter",
 )
 class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    exists: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Matches parents that have at least one replica when true, and parents "
+                "with none when false. Says nothing about what the replicas hold."
+            ),
+        ),
+        default=None,
+    )
     some: ReplicaFilter | None = gql_field(
         description="Matches parents with at least one replica satisfying all conditions.",
         default=None,
@@ -777,6 +804,28 @@ class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
     none: ReplicaFilter | None = gql_field(
         description="Matches parents with no replica satisfying all conditions.",
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the deployment scaling state.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ScalingStateFilter",
+)
+class ScalingStateFilterGQL(PydanticInputMixin[DeploymentScalingStateFilterDTO]):
+    in_: list[ScalingStateGQL] | None = gql_field(
+        description="Scaling states to match.", name="in", default=None
+    )
+    equals: ScalingStateGQL | None = gql_field(
+        description="Exact scaling state match.", default=None
+    )
+    not_in: list[ScalingStateGQL] | None = gql_field(
+        description="Excludes scaling states in the list.", name="notIn", default=None
+    )
+    not_equals: ScalingStateGQL | None = gql_field(
+        description="Excludes exact scaling state match.", name="notEquals", default=None
     )
 
 
@@ -835,6 +884,25 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by deployment ID."
+        ),
+        default=None,
+    )
+    desired_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the requested replica count.",
+        ),
+        default=None,
+    )
+    scaling_state: ScalingStateFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by scaling state."
         ),
         default=None,
     )

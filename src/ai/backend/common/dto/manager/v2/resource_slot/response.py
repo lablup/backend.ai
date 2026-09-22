@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import NumberFormatInfo
 
@@ -34,7 +35,16 @@ class ResourceSlotTypeNode(BaseResponseModel):
     """Node model representing a resource slot type entity."""
 
     id: str | None = Field(default=None, description="Node ID (same as slot_name).")
-    uuid: UUID = Field(description="Stable UUID identity of the resource slot type.")
+    entity_id: UUID = Field(
+        description=f"UUID of the resource slot type. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    uuid: UUID = Field(
+        description=(
+            "Stable UUID identity of the resource slot type. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use entity_id."
+        ),
+        deprecated=True,
+    )
     slot_name: str = Field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
     )
@@ -94,6 +104,9 @@ class AgentResourceNode(BaseResponseModel):
     """Node model representing a per-agent, per-slot resource capacity and usage entry."""
 
     id: str = Field(description="Node ID (format: '{agent_id}:{slot_name}').")
+    field_id: UUID = Field(
+        description=f"UUID of the agent resource. Added in {NEXT_RELEASE_VERSION}.",
+    )
     agent_id: str = Field(description="Agent identifier.")
     slot_name: str = Field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
@@ -119,6 +132,9 @@ class ResourceAllocationNode(BaseResponseModel):
     """Node model representing a per-kernel, per-slot resource allocation entry."""
 
     id: str = Field(description="Node ID (format: '{kernel_id}:{slot_name}').")
+    field_id: UUID = Field(
+        description=f"UUID of the resource allocation. Added in {NEXT_RELEASE_VERSION}.",
+    )
     kernel_id: str = Field(description="Kernel identifier (UUID).")
     slot_name: str = Field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."

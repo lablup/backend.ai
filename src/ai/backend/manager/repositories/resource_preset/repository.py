@@ -9,6 +9,7 @@ from uuid import UUID
 import trafaret as t
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -19,13 +20,14 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
-    ResourcePresetSearchResult,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+    ResourcePresetUpdater,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
@@ -64,15 +66,14 @@ class ResourcePresetRepository:
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
+        v2_ops_provider: ShareOpsProvider,
     ) -> None:
-        self._db_source = ResourcePresetDBSource(db)
+        self._db_source = ResourcePresetDBSource(db, v2_ops_provider)
         self._cache_source = ResourcePresetCacheSource(valkey_stat)
         self._config_provider = config_provider
 
     @resource_preset_repository_resilience.apply()
-    async def create_preset_validated(
-        self, creator: Creator[ResourcePresetRow]
-    ) -> ResourcePresetData:
+    async def create_preset_validated(self, creator: ResourcePresetCreator) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
@@ -132,9 +133,7 @@ class ResourcePresetRepository:
         return await self._db_source.get_preset_by_id_or_name(preset_id, name)
 
     @resource_preset_repository_resilience.apply()
-    async def modify_preset_validated(
-        self, updater: Updater[ResourcePresetRow]
-    ) -> ResourcePresetData:
+    async def modify_preset_validated(self, updater: ResourcePresetUpdater) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
@@ -143,26 +142,36 @@ class ResourcePresetRepository:
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset modification"
         ):
-            await self._cache_source.invalidate_preset(
-                updater.pk_value if isinstance(updater.pk_value, UUID) else None,
-                None,
-            )
+            await self._cache_source.invalidate_preset(updater.preset_id, None)
         return preset
 
     @resource_preset_repository_resilience.apply()
-    async def delete_preset_validated(
-        self, preset_id: UUID | None, name: str | None
+    async def set_preset_resource_group(
+        self, updater: ResourcePresetResourceGroupUpdater
     ) -> ResourcePresetData:
+        """Bind the preset to a resource group or to none, moving it into the `public`
+        scope or out of it.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
+        """
+        preset = await self._db_source.set_preset_resource_group(updater)
+        with suppress_with_log(
+            [Exception], message="Failed to invalidate cache after preset modification"
+        ):
+            await self._cache_source.invalidate_preset(updater.preset_id, None)
+        return preset
+
+    @resource_preset_repository_resilience.apply()
+    async def delete_preset_validated(self, preset_id: ResourcePresetID) -> ResourcePresetData:
         """
         Deletes a resource preset.
         Returns the deleted preset data.
-        Raises ObjectNotFound if the preset doesn't exist.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.delete_preset(preset_id, name)
+        preset = await self._db_source.delete_preset(preset_id)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset deletion"
         ):
-            await self._cache_source.invalidate_preset(preset_id, name)
+            await self._cache_source.invalidate_preset(preset_id, None)
         return preset
 
     @resource_preset_repository_resilience.apply()
@@ -196,13 +205,6 @@ class ResourcePresetRepository:
         return await self._db_source.known_slot_types()
 
     @resource_preset_repository_resilience.apply()
-    async def search_presets(
-        self,
-        querier: BatchQuerier,
-    ) -> ResourcePresetSearchResult:
-        """Search resource presets with filtering, ordering, and pagination."""
-        return await self._db_source.search_presets(querier)
-
     @resource_preset_repository_resilience.apply()
     async def check_presets(
         self,

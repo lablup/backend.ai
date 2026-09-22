@@ -6,18 +6,22 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupDeploymentRevisionOwnerAction,
+)
 
 
 @dataclass
-class SearchRevisionResourceSlotsAction(DeploymentGlobalAction):
-    """Action to search resource slots allocated to a deployment revision."""
+class SearchRevisionResourceSlotsAction(BaseSingleFieldAction[DeploymentRevisionID, DeploymentID]):
+    """Search the resource slots of one revision, authorized against its deployment."""
 
     revision_id: DeploymentRevisionID
-    querier: BatchQuerier
+    searcher: RevisionResourceSlotSearcher
 
     @override
     @classmethod
@@ -28,6 +32,10 @@ class SearchRevisionResourceSlotsAction(DeploymentGlobalAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
+
+    @override
+    def to_owner_lookup_action(self) -> LookupDeploymentRevisionOwnerAction:
+        return LookupDeploymentRevisionOwnerAction(revision_id=self.revision_id)
 
 
 @dataclass

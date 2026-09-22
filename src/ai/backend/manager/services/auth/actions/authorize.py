@@ -4,14 +4,15 @@ from uuid import UUID
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.data.auth.types import AuthorizationResult
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
 
 
 @dataclass(frozen=True)
-class AuthorizeAction(AuthGlobalAction):
+class AuthorizeAction(BaseGlobalAction):
     request: web.Request
     type: AuthTokenType
     domain_name: str
@@ -21,6 +22,11 @@ class AuthorizeAction(AuthGlobalAction):
     otp: str | None
     client_type_id: UUID | None
     force: bool = False
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
     @classmethod

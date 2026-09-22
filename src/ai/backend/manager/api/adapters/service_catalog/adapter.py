@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+from typing import assert_never
+
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
@@ -14,31 +17,44 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
 )
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     EndpointInfo,
+    OrderDirection,
+    ServiceCatalogOrderField,
     ServiceCatalogStatusFilter,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
-from ai.backend.manager.models.service_catalog.orders import (
-    DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
-    resolve_order,
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.service_catalog.searchable_fields import (
+    ServiceCatalogSearchableFields,
 )
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
+from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+@lru_cache(maxsize=1)
+def _get_service_catalog_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ServiceCatalogSearchableFields.own.registered_at.order.apply(ascending=False),
+        cursor_column=ServiceCatalogRow.id,
+    )
 
 
 class ServiceCatalogAdapter(BaseAdapter):
     """Adapter for service catalog domain operations."""
+
+    _service_catalog: ServiceCatalogProcessors
+
+    def __init__(self, service_catalog: ServiceCatalogProcessors) -> None:
+        self._service_catalog = service_catalog
 
     async def admin_search(
         self,
@@ -54,8 +70,8 @@ class ServiceCatalogAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.service_catalog.global_search_service_catalogs.run(
-            SearchServiceCatalogsAction(searcher=searcher)
+        action_result = await self._service_catalog.global_search_service_catalogs.run(
+            SearchServiceCatalogsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchServiceCatalogsPayload(
@@ -68,11 +84,19 @@ class ServiceCatalogAdapter(BaseAdapter):
     def build_searcher(self, input: AdminSearchServiceCatalogsInput) -> ServiceCatalogSearcher:
         """Build the search spec from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
-        orders.append(TIEBREAKER_ORDER)
-        pagination = self._build_pagination(input)
-
-        return ServiceCatalogSearcher(pagination=pagination, conditions=conditions, orders=orders)
+        orders = self._convert_orders(input.order) if input.order else []
+        return self._build_searcher(
+            ServiceCatalogSearcher,
+            pagination_spec=_get_service_catalog_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _convert_filter(self, filter: ServiceCatalogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -100,44 +124,57 @@ class ServiceCatalogAdapter(BaseAdapter):
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
+        conditions = ServiceCatalogSearchableFields.own.service_group.filter
         return self.convert_string_filter(
             sf,
-            contains_factory=ServiceCatalogConditions.by_service_group_contains,
-            equals_factory=ServiceCatalogConditions.by_service_group_equals,
-            starts_with_factory=ServiceCatalogConditions.by_service_group_starts_with,
-            ends_with_factory=ServiceCatalogConditions.by_service_group_ends_with,
-            in_factory=ServiceCatalogConditions.by_service_group_in,
+            contains_factory=conditions.contains,
+            equals_factory=conditions.equals,
+            starts_with_factory=conditions.starts_with,
+            ends_with_factory=conditions.ends_with,
+            in_factory=conditions.in_,
         )
 
     @staticmethod
     def _convert_status_filter(sf: ServiceCatalogStatusFilter) -> list[QueryCondition]:
+        conditions_of = ServiceCatalogSearchableFields.own.status.filter
         conditions: list[QueryCondition] = []
         if sf.equals is not None:
-            conditions.append(ServiceCatalogConditions.by_status_equals(sf.equals))
+            conditions.append(conditions_of.equals(sf.equals))
         if sf.in_ is not None:
-            conditions.append(ServiceCatalogConditions.by_status_in(sf.in_))
+            conditions.append(conditions_of.in_(sf.in_))
         if sf.not_equals is not None:
-            conditions.append(ServiceCatalogConditions.by_status_not_equals(sf.not_equals))
+            conditions.append(conditions_of.not_equals(sf.not_equals))
         if sf.not_in is not None:
-            conditions.append(ServiceCatalogConditions.by_status_not_in(sf.not_in))
+            conditions.append(conditions_of.not_in(sf.not_in))
         return conditions
 
     @staticmethod
     def _convert_orders(order: list[ServiceCatalogOrder]) -> list[QueryOrder]:
-        return [resolve_order(o.field, o.direction) for o in order]
-
-    @staticmethod
-    def _build_pagination(input: AdminSearchServiceCatalogsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
+        fields = ServiceCatalogSearchableFields.own
+        result: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction != OrderDirection.DESC
+            match o.field:
+                case ServiceCatalogOrderField.SERVICE_GROUP:
+                    result.append(fields.service_group.order.apply(ascending))
+                case ServiceCatalogOrderField.DISPLAY_NAME:
+                    result.append(fields.display_name.order.apply(ascending))
+                case ServiceCatalogOrderField.REGISTERED_AT:
+                    result.append(fields.registered_at.order.apply(ascending))
+                case ServiceCatalogOrderField.LAST_HEARTBEAT:
+                    result.append(fields.last_heartbeat.order.apply(ascending))
+                case ServiceCatalogOrderField.STATUS:
+                    result.append(fields.status.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return result
 
     @staticmethod
     def _data_to_dto(data: ServiceCatalogData) -> ServiceCatalogNode:
         """Convert data layer type to Pydantic DTO."""
         return ServiceCatalogNode(
             id=data.id,
+            entity_id=data.entity_id(),
             service_group=data.service_group,
             instance_id=data.instance_id,
             display_name=data.display_name,

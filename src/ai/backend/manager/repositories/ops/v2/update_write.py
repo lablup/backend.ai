@@ -9,7 +9,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -62,7 +63,9 @@ class V2UpdateWriteOps(V2WriteOpsBase):
                     )
                     if row is None:
                         raise EntityNotFoundError(
-                            f"{updater.row_class.__name__} {updater.target_id_value()} not found"
+                            entity_type=entity_id.entity_type(),
+                            operation=ActionOperationType.UPDATE,
+                            extra_msg=f"{updater.row_class.__name__} {entity_id} not found",
                         )
                     successes[entity_id] = updater.to_data(row)
             except Exception as e:

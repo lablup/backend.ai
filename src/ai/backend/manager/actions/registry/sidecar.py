@@ -21,8 +21,8 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 )
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
+    GlobalSearcherOpsAction,
     OperationScopeOpsAction,
-    SearchGlobalOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -32,7 +32,7 @@ from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
 from ai.backend.manager.services.ops.service import (
-    GlobalSearchService,
+    GlobalSearcherService,
     SearchFieldsService,
 )
 
@@ -100,19 +100,19 @@ class SidecarProcessorGroup[TSidecarData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TSidecarData]]:
-        """A read across every row of this sidecar type, behind the SUPERADMIN gate.
+        """A read across every row of this sidecar type, behind the global gate.
 
         For the rows of named scopes use :meth:`search_ops`; this one names none."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
+            GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

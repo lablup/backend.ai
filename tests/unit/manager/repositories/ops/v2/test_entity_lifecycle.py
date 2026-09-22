@@ -31,41 +31,35 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute, Mapped, aliased, mapped_column
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     FieldData,
     FieldIdentifier,
     FieldType,
-    ScopeType,
+    GlobalEntityType,
 )
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType as LegacyEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-    RoleSource,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission, RoleSource
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
-from ai.backend.manager.errors.repository import (
-    EntityNotFoundError,
-    RepositoryIntegrityError,
-)
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     EntityCreator,
@@ -75,6 +69,7 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -116,11 +111,24 @@ class _EntityData:
     note: str | None
 
 
-_SCOPE_TYPE = PROJECT_SCOPE_TYPE
-_PARENT_SCOPE_TYPE = DOMAIN_SCOPE_TYPE
+_SCOPE_TYPE = ProjectEntityType()
+_PARENT_SCOPE_TYPE = DomainEntityType()
+
 
 # A scope type outside every permission-layer enum — the chain accepts it as-is.
-_OPEN_SCOPE_TYPE = ScopeType(EntityType("not_an_rbac_element_type"))
+class _OpenEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "not_an_rbac_element_type"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A kind outside every permission-layer enum."
+
+
+_OPEN_SCOPE_TYPE = _OpenEntityType()
 
 
 class _EntityID(EntityIdentifier):
@@ -328,10 +336,10 @@ class _Upserter(EntityUpserter[EntityLifecycleTestRow, _EntityData]):
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -344,9 +352,13 @@ async def database(
             RoleRow,
             PermissionRow,
             EntityLifecycleTestRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -373,7 +385,7 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
     async with database.begin_session() as sess:
         preset_row = RolePresetRow(
             name=_PRESET_NAME,
-            scope_type=LegacyScopeType.PROJECT,
+            scope_type=ProjectEntityType(),
             auto_assign=True,
             deleted=False,
         )
@@ -382,15 +394,15 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
         sess.add(
             RolePermissionPresetRow(
                 role_preset_id=preset_row.id,
-                entity_type=LegacyEntityType.VFOLDER,
-                operation=OperationType.READ,
+                entity_type=VFolderEntityType(),
+                permission=Permission.READ,
             )
         )
         sess.add(
             RolePresetRow(
                 name="preset-templated",
                 role_name_template="{{ scope.name }}-member",
-                scope_type=LegacyScopeType.PROJECT,
+                scope_type=ProjectEntityType(),
                 auto_assign=False,
                 deleted=False,
             )
@@ -415,7 +427,7 @@ async def _preset_id(database: ExtendedAsyncSAEngine, name: str) -> UUID:
 
 
 async def _virtual_entity_id(
-    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
+    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: EntityType = _SCOPE_TYPE
 ) -> UUID | None:
     async with database.begin_readonly_session() as sess:
         result = await sess.execute(
@@ -427,7 +439,7 @@ async def _virtual_entity_id(
         return result.scalar_one_or_none()
 
 
-def _node_id(scope_type: ScopeType, scope_id: UUID) -> sa.ScalarSelect[Any]:
+def _node_id(scope_type: EntityType, scope_id: UUID) -> sa.ScalarSelect[Any]:
     return (
         sa.select(VirtualEntityRow.id)
         .where(
@@ -439,7 +451,7 @@ def _node_id(scope_type: ScopeType, scope_id: UUID) -> sa.ScalarSelect[Any]:
 
 
 async def _self_membership_exists(
-    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
+    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: EntityType = _SCOPE_TYPE
 ) -> bool:
     async with database.begin_readonly_session() as sess:
         node = _node_id(scope_type, scope_id)
@@ -453,7 +465,7 @@ async def _self_membership_exists(
 
 
 async def _self_binding_exists(
-    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
+    database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: EntityType = _SCOPE_TYPE
 ) -> bool:
     async with database.begin_readonly_session() as sess:
         node = _node_id(scope_type, scope_id)
@@ -535,7 +547,7 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
                 .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
                 .where(
                     EntityMembershipRow.virtual_entity_id == _node_id(_SCOPE_TYPE, scope_id),
-                    role_node.entity_type == EntityType("role"),
+                    role_node.entity_type == RoleEntityType(),
                 )
             )
         ).all()
@@ -558,20 +570,19 @@ async def _scope_governs_role(
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
             sa.select(ScopeBindingRow.scope_entity_id).where(
-                ScopeBindingRow.virtual_entity_id
-                == _node_id(ScopeType(EntityType("role")), role_id),
+                ScopeBindingRow.virtual_entity_id == _node_id(RoleEntityType(), role_id),
                 ScopeBindingRow.scope_entity_id == _node_id(_SCOPE_TYPE, scope_id),
             )
         )
         return row is not None
 
 
-async def _role_permissions(database: ExtendedAsyncSAEngine, role_id: UUID) -> set[OperationType]:
+async def _role_permissions(database: ExtendedAsyncSAEngine, role_id: UUID) -> set[Permission]:
     async with database.begin_readonly_session() as sess:
         rows = await sess.scalars(
             sa.select(PermissionRow.permission).where(PermissionRow.role_id == role_id)
         )
-        return {permission.to_operation() for permission in rows.all()}
+        return set(rows.all())
 
 
 async def _row_count(database: ExtendedAsyncSAEngine) -> int:
@@ -615,7 +626,11 @@ class TestEntityCreate:
         assert await _row_count(database) == 0
         async with database.begin_readonly_session() as sess:
             assert (
-                await sess.scalar(sa.select(sa.func.count()).select_from(VirtualEntityRow))
+                await sess.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(VirtualEntityRow)
+                    .where(VirtualEntityRow.entity_type != GlobalEntityType())
+                )
             ) == 0
 
     async def test_create_never_consults_presets(
@@ -673,7 +688,7 @@ class TestEntityCreate:
 
 
 class TestRoleManagedGlobalEntityCreate:
-    async def test_create_is_owned_and_governed_by_nothing(
+    async def test_create_is_governed_by_itself_and_the_global_scope(
         self,
         database: ExtendedAsyncSAEngine,
         repository: OpsRepository[_EntityData],
@@ -683,7 +698,7 @@ class TestRoleManagedGlobalEntityCreate:
         )
 
         assert await _self_binding_exists(database, data.id)
-        assert await _govern_count(database, data.id) == 1
+        assert await _govern_count(database, data.id) == 2
 
     async def test_create_provisions_preset_roles_with_generated_names(
         self,
@@ -700,7 +715,7 @@ class TestRoleManagedGlobalEntityCreate:
         assert role.source == RoleSource.SYSTEM
         assert role.status == RoleStatus.ACTIVE
         assert role.auto_assign is True
-        assert await _role_permissions(database, role.id) == {OperationType.READ}
+        assert await _role_permissions(database, role.id) == {Permission.READ}
 
     async def test_a_preset_role_is_governed_by_the_scope_that_provisioned_it(
         self,
@@ -868,6 +883,8 @@ class TestEntityPurge:
         assert await _self_binding_exists(database, data.id) is False
         assert await _scope_roles(database, data.id) == {}
         assert await _role_permissions(database, role.id) == set()
+        # The role goes with the scope by FK; its own node goes with it too.
+        assert await _virtual_entity_id(database, role.id, RoleEntityType()) is None
 
     async def test_purge_removes_edges_in_joined_scopes(
         self,
@@ -921,16 +938,33 @@ class TestEntityPurge:
 # =============================================================================
 
 
-_SIDECAR_FIELD_TYPE = FieldType("test_sidecar")
+class _SidecarFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_sidecar"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A row that rides beside the graph."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType] | None:
+        return None
+
+
+_SIDECAR_FIELD_TYPE = _SidecarFieldType()
 
 
 class _SidecarID(FieldIdentifier):
+    """The id of a row that rides beside the graph."""
+
     @override
     @classmethod
     def field_type(cls) -> FieldType:
         return _SIDECAR_FIELD_TYPE
-
-    """The id of a row that rides beside the graph."""
 
 
 @dataclass(frozen=True)

@@ -21,7 +21,10 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import (
+    RolePresetEntityType,
     RolePresetID,
 )
 from ai.backend.common.data.entity.types import (
@@ -31,44 +34,46 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
     FieldType,
-    ScopeRef,
-    ScopeType,
 )
-from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.base import SearchOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.errors.repository import (
-    AmbiguousEntityKeyError,
-    EmptyOperationScopeError,
-    EntityNotFoundError,
-)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.repository import AmbiguousEntityKeyError, EmptyOperationScopeError
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
     RolePresetSoftDeleteUpdater,
     RolePresetUpdater,
 )
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
     DataQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import ScopedSearcher, Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -95,7 +100,7 @@ from ai.backend.testutils.db import with_tables
 @dataclass
 class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
     name: str
-    scope_type: RBACScopeType
+    scope_type: EntityType
 
     @override
     def entity_id(self, row: RolePresetRow) -> RolePresetID:
@@ -111,7 +116,7 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -140,7 +145,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
         return {
             "id": self.target,
             "name": self.name,
-            "scope_type": RBACScopeType.DOMAIN,
+            "scope_type": DomainEntityType(),
             "auto_assign": False,
             "deleted": False,
         }
@@ -151,7 +156,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -172,7 +177,7 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
@@ -188,14 +193,31 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
+
+
+class _PresetFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "test_preset_field"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "A field row of the test preset."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return RolePresetEntityType
 
 
 class _PresetFieldID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return FieldType("test_preset_field")
+        return _PresetFieldType()
 
 
 @dataclass(frozen=True)
@@ -237,7 +259,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
     """Marks every preset of one scope type deleted, in one statement."""
 
     deleted: bool = True
-    scope: RBACScopeType = RBACScopeType.DOMAIN
+    scope: EntityType = DomainEntityType()
 
     @property
     @override
@@ -259,7 +281,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -282,7 +304,7 @@ class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -313,6 +335,10 @@ class _PresetByName(DataLookup[RolePresetRow, RolePresetID]):
         return RolePresetRow
 
     @override
+    def entity_type(self) -> EntityType:
+        return RolePresetEntityType()
+
+    @override
     def conditions(self) -> Sequence[QueryCondition]:
         return [lambda: RolePresetRow.name == self.name]
 
@@ -339,10 +365,10 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetView]):
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -353,9 +379,13 @@ async def database(
             RoleRow,
             PermissionRow,
             RolePresetRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -373,7 +403,7 @@ def view_repository(database: ExtendedAsyncSAEngine) -> OpsRepository[_PresetVie
 @pytest.fixture
 async def preset(repository: OpsRepository[RolePresetData]) -> RolePresetData:
     return await repository.create_global_entity(
-        _PresetCreator(name="default", scope_type=RBACScopeType.DOMAIN)
+        _PresetCreator(name="default", scope_type=DomainEntityType())
     )
 
 
@@ -382,7 +412,7 @@ class TestCreate:
         self, repository: OpsRepository[RolePresetData]
     ) -> None:
         created = await repository.create_global_entity(
-            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="analysts", scope_type=ProjectEntityType())
         )
 
         assert isinstance(created, RolePresetData)
@@ -409,7 +439,7 @@ class TestBulkGet:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         other = await repository.create_global_entity(
-            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="analysts", scope_type=ProjectEntityType())
         )
 
         found = await repository.bulk_get(_PresetBulkQuerier(), [preset.id, other.id])
@@ -439,7 +469,7 @@ class TestBulkGetFields:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         other = await repository.create_global_entity(
-            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="analysts", scope_type=ProjectEntityType())
         )
         first, second = _PresetFieldID(preset.id), _PresetFieldID(other.id)
 
@@ -484,7 +514,7 @@ class TestLookup:
     ) -> None:
         # `name` carries no unique constraint, so the same name can land twice.
         await repository.create_global_entity(
-            _PresetCreator(name="default", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="default", scope_type=ProjectEntityType())
         )
 
         with pytest.raises(AmbiguousEntityKeyError):
@@ -496,7 +526,7 @@ class TestBulkLookup:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         other = await repository.create_global_entity(
-            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="analysts", scope_type=ProjectEntityType())
         )
 
         found = await repository.bulk_lookup(_PresetsByName(), ["default", "analysts"])
@@ -553,7 +583,7 @@ class TestBulkUpdate:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         other = await repository.create_global_entity(
-            _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
+            _PresetCreator(name="other", scope_type=DomainEntityType())
         )
 
         result = await repository.partial_bulk_update({
@@ -586,14 +616,14 @@ class TestBatchUpdate:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         await repository.create_global_entity(
-            _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
+            _PresetCreator(name="other", scope_type=DomainEntityType())
         )
         await repository.create_global_entity(
-            _PresetCreator(name="elsewhere", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="elsewhere", scope_type=ProjectEntityType())
         )
 
         updated = await repository.batch_update_in_global(
-            _PresetBatchUpdater(deleted=True, scope=RBACScopeType.DOMAIN)
+            _PresetBatchUpdater(deleted=True, scope=DomainEntityType())
         )
 
         # The two domain-scoped rows, not the project-scoped one.
@@ -605,7 +635,7 @@ class TestBatchUpdate:
     ) -> None:
         assert (
             await repository.batch_update_in_global(
-                _PresetBatchUpdater(deleted=True, scope=RBACScopeType.PROJECT)
+                _PresetBatchUpdater(deleted=True, scope=ProjectEntityType())
             )
             == []
         )
@@ -616,7 +646,7 @@ class TestBatchPurge:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         await repository.create_global_entity(
-            _PresetCreator(name="default", scope_type=RBACScopeType.PROJECT)
+            _PresetCreator(name="default", scope_type=ProjectEntityType())
         )
 
         removed = await repository.batch_purge_entities_in_global(
@@ -696,11 +726,30 @@ class _NamedScope(OperationScope):
         return ()
 
 
+@dataclass(frozen=True)
+class _NamedScopeTarget(ScopeTarget):
+    name: str
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        return lambda: RolePresetRow.name == self.name
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
 @dataclass
 class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetView]):
     """The only file a pass-through domain still writes: the action."""
 
-    scope: ScopeRef
+    scope: EntityIdentifier
     scopes: tuple[OperationScope, ...] = ()
 
     @override
@@ -712,13 +761,13 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
         return self.scopes
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         return (self.scope,)
 
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
-        return EntityType("role_preset")
+        return RolePresetEntityType()
 
     @classmethod
     @override
@@ -759,7 +808,7 @@ class TestSearch:
         preset: RolePresetData,
     ) -> None:
         await repository.create_global_entity(
-            _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
+            _PresetCreator(name="other", scope_type=DomainEntityType())
         )
 
         result = await view_repository.search_in_scopes(
@@ -768,6 +817,87 @@ class TestSearch:
         )
 
         assert [item.id for item in result.items] == [preset.id]
+
+    async def test_scoped_searcher_ands_used_by_onto_the_scopes(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.scoped_search(
+            ScopedSearcher(
+                scopes=[
+                    _NamedScopeTarget(name="default", domain_id=DomainID(uuid.uuid4())),
+                    _NamedScopeTarget(name="other", domain_id=DomainID(uuid.uuid4())),
+                ],
+                used_by=[
+                    UsedBy(
+                        target=DomainID(uuid.uuid4()),
+                        condition=lambda: RolePresetRow.name == "other",
+                    )
+                ],
+                searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id]
+        assert result.total_count == 1
+
+    async def test_scoped_searcher_with_no_scope_is_rejected(
+        self, view_repository: OpsRepository[_PresetView], preset: RolePresetData
+    ) -> None:
+        with pytest.raises(EmptyOperationScopeError):
+            await view_repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[],
+                    used_by=[],
+                    searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+                )
+            )
+
+    async def test_offset_priority_orders_lead(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.search_in_global(
+            _PresetSearcher(
+                pagination=OffsetPagination(
+                    limit=20, priority_orders=[(RolePresetRow.name == "other").desc()]
+                ),
+                orders=[RolePresetRow.name.asc()],
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id, preset.id]
+
+    async def test_unpaginated_priority_orders_lead(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.search_in_global(
+            _PresetSearcher(
+                pagination=NoPagination(priority_orders=[(RolePresetRow.name == "other").desc()]),
+                orders=[RolePresetRow.name.asc()],
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id, preset.id]
 
 
 class TestFullStack:
@@ -781,7 +911,7 @@ class TestFullStack:
             service.execute
         )
         action = _SearchPresetsAction(
-            scope=ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=uuid.uuid4()),
+            scope=DomainID(uuid.uuid4()),
             scopes=(_NamedScope(name="default"),),
         )
 

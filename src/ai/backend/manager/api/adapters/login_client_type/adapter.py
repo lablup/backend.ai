@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
@@ -24,16 +24,26 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
-from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
+from ai.backend.manager.models.login_client_type.deprecated_search import (
+    DeprecatedLoginClientTypeDescriptionConditions,
+)
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.login_client_type.scopes import PublicLoginClientTypeTarget
+from ai.backend.manager.models.login_client_type.searchable_fields import (
+    LoginClientTypeSearchableFields,
+)
 from ai.backend.manager.models.login_client_type.searchers import LoginClientTypeSearcher
 from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
@@ -43,19 +53,30 @@ from ai.backend.manager.services.login_client_type.actions.get import (
 from ai.backend.manager.services.login_client_type.actions.purge import (
     PurgeLoginClientTypeAction,
 )
-from ai.backend.manager.services.login_client_type.actions.search import (
-    SearchLoginClientTypesAction,
+from ai.backend.manager.services.login_client_type.actions.scoped_search import (
+    ScopedSearchLoginClientTypesAction,
 )
 from ai.backend.manager.services.login_client_type.actions.update import (
     UpdateLoginClientTypeAction,
 )
+from ai.backend.manager.services.login_client_type.processors import LoginClientTypeProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
-DEFAULT_PAGINATION_LIMIT = 50
+
+def _pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=LoginClientTypeSearchableFields.own.created_at.order.apply(ascending=False),
+        cursor_column=LoginClientTypeRow.id,
+    )
 
 
 class LoginClientTypeAdapter(BaseAdapter):
     """Adapter for login client type domain operations."""
+
+    _login_client_type: LoginClientTypeProcessors
+
+    def __init__(self, login_client_type: LoginClientTypeProcessors) -> None:
+        self._login_client_type = login_client_type
 
     # --- Static helpers (grouped at top) ---
 
@@ -63,40 +84,69 @@ class LoginClientTypeAdapter(BaseAdapter):
     def _data_to_node(data: LoginClientTypeData) -> LoginClientTypeNode:
         return LoginClientTypeNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             created_at=data.created_at,
             modified_at=data.updated_at,
         )
 
-    @staticmethod
-    def _convert_orders(orders: list[LoginClientTypeOrder]) -> list[QueryOrder]:
+    def _convert_orders(self, orders: list[LoginClientTypeOrder]) -> list[QueryOrder]:
+        fields = LoginClientTypeSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field:
                 case LoginClientTypeOrderField.NAME:
-                    result.append(LoginClientTypeOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case LoginClientTypeOrderField.CREATED_AT:
-                    result.append(LoginClientTypeOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case LoginClientTypeOrderField.MODIFIED_AT:
-                    result.append(LoginClientTypeOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
         return result
 
     # --- Non-admin methods ---
 
     async def get(self, type_id: UUID) -> LoginClientTypeNode:
-        action_result = await self._processors.login_client_type.public_get.run(
+        action_result = await self._login_client_type.get.run(
             GetLoginClientTypeAction(id=LoginClientTypeID(type_id))
         )
         return self._data_to_node(action_result.data)
 
     async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
-        """Search login client types with filter/order/pagination."""
-        searcher = self._build_search_searcher(input)
+        """Search login client types, by cursor or by offset as the request names."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        options = PaginationOptions(
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        limit = input.limit
+        if limit is None and not options.has_cursor:
+            limit = DEFAULT_PAGE_LIMIT
+        searcher = self._build_searcher(
+            LoginClientTypeSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=limit,
+            offset=input.offset,
+        )
 
-        action_result = await self._processors.login_client_type.public_search.run(
-            SearchLoginClientTypesAction(searcher=searcher)
+        action_result = await self._login_client_type.scoped_search.run(
+            ScopedSearchLoginClientTypesAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicLoginClientTypeTarget()], used_by=(), searcher=searcher
+                )
+            )
         )
 
         return SearchLoginClientTypesPayload(
@@ -113,7 +163,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             name=input.name,
             description=input.description,
         )
-        action_result = await self._processors.login_client_type.global_create.run(
+        action_result = await self._login_client_type.global_create.run(
             CreateLoginClientTypeAction(creator=creator)
         )
         return CreateLoginClientTypePayload(
@@ -125,18 +175,10 @@ class LoginClientTypeAdapter(BaseAdapter):
     ) -> UpdateLoginClientTypePayload:
         updater = LoginClientTypeUpdater(
             login_client_type_id=LoginClientTypeID(type_id),
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
         )
-        action_result = await self._processors.login_client_type.update.run(
+        action_result = await self._login_client_type.update.run(
             UpdateLoginClientTypeAction(updater=updater)
         )
         return UpdateLoginClientTypePayload(
@@ -144,66 +186,23 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type.purge.run(
+        action_result = await self._login_client_type.purge.run(
             PurgeLoginClientTypeAction(id=type_id)
         )
         return DeleteLoginClientTypePayload(id=action_result.data.id)
 
     # --- Private helpers ---
 
-    def _build_search_searcher(self, input: SearchLoginClientTypesInput) -> LoginClientTypeSearcher:
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-        return LoginClientTypeSearcher(pagination=pagination, conditions=conditions, orders=orders)
-
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=LoginClientTypeConditions.by_name_contains,
-                equals_factory=LoginClientTypeConditions.by_name_equals,
-                starts_with_factory=LoginClientTypeConditions.by_name_starts_with,
-                ends_with_factory=LoginClientTypeConditions.by_name_ends_with,
-                in_factory=LoginClientTypeConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.description is not None:
-            condition = self.convert_string_filter(
-                filter.description,
-                contains_factory=LoginClientTypeConditions.by_description_contains,
-                equals_factory=LoginClientTypeConditions.by_description_equals,
-                starts_with_factory=LoginClientTypeConditions.by_description_starts_with,
-                ends_with_factory=LoginClientTypeConditions.by_description_ends_with,
-                in_factory=LoginClientTypeConditions.by_description_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=LoginClientTypeConditions.by_created_at_before,
-                after_factory=LoginClientTypeConditions.by_created_at_after,
-                equals_factory=LoginClientTypeConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.modified_at is not None:
-            condition = filter.modified_at.build_query_condition(
-                before_factory=LoginClientTypeConditions.by_updated_at_before,
-                after_factory=LoginClientTypeConditions.by_updated_at_after,
-                equals_factory=LoginClientTypeConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = LoginClientTypeSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(
+                filter.description, DeprecatedLoginClientTypeDescriptionConditions()
+            ),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.modified_at, fields.updated_at.filter),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:

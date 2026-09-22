@@ -1,20 +1,26 @@
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
-    "USER_ENTITY_TYPE",
-    "USER_SCOPE_TYPE",
+    "UserEntityType",
     "UserID",
 )
 
 
-# Raw strings mirroring the RBAC-managed RBACElementType.USER value.
-USER_ENTITY_TYPE = EntityType("user")
-USER_SCOPE_TYPE = ScopeType(USER_ENTITY_TYPE)
+class UserEntityType(EntityType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "user"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "An account inside a domain."
 
 
 class UserID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()

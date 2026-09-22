@@ -17,14 +17,16 @@ from ai.backend.manager.bgtask.tasks.rescan_images import RescanImagesHandler
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.image.service import ImageService
 
 
 @dataclass
 class BgtaskRegistryInput:
     """Input required for BackgroundTaskHandlerRegistry setup."""
 
-    processors: Processors
+    container_registry_service: ContainerRegistryService
+    image_service: ImageService
     background_task_manager: BackgroundTaskManager
     repositories: Repositories
     agent_client_pool: AgentClientPool
@@ -53,8 +55,8 @@ class BgtaskRegistryDependency(
         self, setup_input: BgtaskRegistryInput
     ) -> AsyncIterator[BackgroundTaskHandlerRegistry]:
         registry = BackgroundTaskHandlerRegistry()
-        registry.register(RescanImagesHandler(setup_input.processors))
-        registry.register(PurgeImagesHandler(setup_input.processors))
+        registry.register(RescanImagesHandler(setup_input.container_registry_service))
+        registry.register(PurgeImagesHandler(setup_input.image_service))
         registry.register(
             RescanGPUAllocMapsHandler(
                 agent_repository=setup_input.repositories.agent.repository,

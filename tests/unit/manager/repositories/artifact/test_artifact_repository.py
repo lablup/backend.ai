@@ -55,7 +55,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -318,12 +318,14 @@ class TestArtifactRepository:
         """Test updating artifact"""
         updater = ArtifactUpdater(
             artifact_id=ArtifactID(sample_artifact_id),
+            readonly=OptionalState.update(False),
             description=TriState.update("Updated description"),
         )
 
         updated_artifact = await artifact_repository.update_artifact(updater)
 
         assert updated_artifact is not None
+        assert updated_artifact.readonly is False
         assert updated_artifact.description == "Updated description"
 
     # =========================================================================

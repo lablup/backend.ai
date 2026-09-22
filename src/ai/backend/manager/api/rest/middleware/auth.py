@@ -63,6 +63,10 @@ from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
 from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -705,7 +709,7 @@ async def _query_auth_context_by_access_key(
                 sudo_session_enabled=user_row.sudo_session_enabled,
                 allowed_client_ip=user_row.allowed_client_ip,
                 rate_limit=default_rate_limit,
-                resource_policy=user_policy_row.to_dataclass(),
+                resource_policy=UserResourcePolicySearchableFields.own.to_data(user_policy_row),
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),
@@ -715,7 +719,9 @@ async def _query_auth_context_by_access_key(
                     )
                 ),
                 is_admin=bool(keypair_row.is_admin),
-                resource_policy=keypair_policy_row.to_dataclass(),
+                resource_policy=KeyPairResourcePolicySearchableFields.own.to_data(
+                    keypair_policy_row
+                ),
             ),
         )
 

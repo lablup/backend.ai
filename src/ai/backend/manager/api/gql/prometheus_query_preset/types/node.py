@@ -9,6 +9,9 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
 )
@@ -18,6 +21,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -42,6 +46,12 @@ from .payloads import QueryDefinitionOptionsGQL
 )
 class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     id: NodeID[str] = gql_field(description="Query definition UUID (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the query preset.",
+        ),
+    )
     name: str = gql_field(description="Human-readable query definition identifier.")
     description: str | None = gql_field(description="Human-readable description.")
     rank: int = gql_field(description="Sort rank (lower = higher priority).")
@@ -63,7 +73,9 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     async def category(self, info: Info[StrawberryGQLContext]) -> CategoryGQL | None:
         if self.category_id is None:
             return None
-        return await info.context.data_loaders.category_loader.load(self.category_id)
+        return await info.context.data_loaders.category_loader.load(
+            PrometheusQueryPresetCategoryID(self.category_id)
+        )
 
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]

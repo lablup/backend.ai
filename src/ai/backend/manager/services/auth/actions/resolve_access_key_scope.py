@@ -3,11 +3,11 @@ from typing import override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
 @dataclass(frozen=True)
-class PublicResolveAccessKeyScopeAction(AuthGlobalAction):
+class PublicResolveAccessKeyScopeAction(UserGlobalAction):
     owner_access_key: str | None  # None = self
 
     @override

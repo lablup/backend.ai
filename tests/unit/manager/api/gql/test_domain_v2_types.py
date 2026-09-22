@@ -29,8 +29,10 @@ def _make_domain_node(
     modified_at: datetime | None = None,
 ) -> DomainNode:
     now = datetime.now(tz=UTC)
+    domain_id = DomainID(uuid.uuid4())
     return DomainNode(
-        id=DomainID(uuid.uuid4()),
+        id=domain_id,
+        entity_id=domain_id,
         basic_info=DomainBasicInfo(
             name=name,
             description=description,
@@ -88,7 +90,7 @@ class TestDomainV2GQL:
         domain_gql = DomainV2GQL.from_pydantic(dto)
 
         assert str(domain_gql.id) == str(dto.id)
-        assert domain_gql.entity_id() == dto.id
+        assert domain_gql.entity_id == dto.entity_id
         assert domain_gql.basic_info.name == "my-domain"
 
     def test_from_pydantic_empty_registries(self) -> None:

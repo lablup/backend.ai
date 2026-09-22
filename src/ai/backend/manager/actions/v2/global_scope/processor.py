@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -16,8 +15,8 @@ from ai.backend.manager.actions.v2.global_scope.result import (
 from ai.backend.manager.actions.v2.global_scope.validator import (
     AuthenticatedActionValidator,
     GlobalActionValidator,
-    SuperAdminActionValidator,
 )
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 
 __all__ = (
@@ -32,8 +31,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
     """Validate, run monitors around, then execute a global action.
 
-    The SUPERADMIN gate always runs first — it is the invariant of this layer — then
-    any extra validators, then the action within the monitor lifecycle.
+    Each registered validator runs first, then the action within the monitor lifecycle.
+    The gate is the one the wiring supplies, as it is for a scope action: the `global`
+    singleton answers for the action's entity type.
+
+    The constructor refuses an empty validator list, so a wiring that states no gate
+    fails where it is made rather than running ungated at request time. A tool that only
+    reads the wiring states :class:`RefusingGlobalActionValidator`.
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
@@ -46,11 +50,15 @@ class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
         monitors: Sequence[GlobalActionMonitor] | None = None,
         validators: Sequence[GlobalActionValidator] | None = None,
     ) -> None:
+        if not validators:
+            raise ServerMisconfiguredError(
+                "A global processor states at least one validator; this one states none."
+            )
         self._func = func
         self._monitors = monitors or []
-        self._validators = [SuperAdminActionValidator(), *(validators or [])]
+        self._validators = validators
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -68,7 +76,7 @@ class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
 
@@ -108,7 +116,7 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
     """Validate authentication only, run monitors around, then execute a global read.
 
     The counterpart of :class:`GlobalActionProcessor` for global state everyone may
-    read — the SUPERADMIN gate is replaced by an authentication check, and nothing
+    read — the global gate is replaced by an authentication check, and nothing
     else. The action shape stays ``BaseGlobalAction``, so the global monitor set
     (audit, reporter, prometheus) applies unchanged.
 
@@ -142,7 +150,7 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
         self._monitors = monitors or []
         self._validators = [AuthenticatedActionValidator(), *(validators or [])]
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -160,7 +168,7 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
 
@@ -220,7 +228,7 @@ class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
         self._func = func
         self._monitors = monitors or []
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -238,7 +246,7 @@ class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
 

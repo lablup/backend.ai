@@ -9,26 +9,27 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import override
+from typing import final, override
 
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.ops.base import BulkGetOwnedFieldOpsAction
-from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
-from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.actions.v2.ops.base import (
+    BulkGetOwnedFieldOpsAction,
+    GlobalSearcherOpsAction,
+    OperationScopeOpsAction,
+)
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.scopes import UserKeypairTarget
+from ai.backend.manager.models.keypair.searchers import KeyPairSearcher
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
-from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import LookupKeypairOwnerAction
 from ai.backend.manager.types import OptionalState
 
@@ -172,42 +173,35 @@ class SwitchDefaultAccessKeyActionResult:
 
 
 @dataclass(frozen=True)
-class SearchMyKeypairsAction(BaseScopeAction):
+class SearchMyKeypairsAction(OperationScopeOpsAction[KeyPairRow, KeyPairData]):
     """Page through the keypairs a user owns."""
 
     user_id: UserID
-    querier: BatchQuerier
+    searcher: KeyPairSearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()
+
+    @final
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.user_id,)
+
+    @final
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (UserKeypairTarget(user_uuid=self.user_id),)
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def to_searcher(self) -> KeyPairSearcher:
+        return self.searcher
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "search_keypairs"
-
-    def scope(self) -> UserKeypairOperationScope:
-        return UserKeypairOperationScope(user_uuid=self.user_id)
-
-
-@dataclass(frozen=True)
-class SearchMyKeypairsActionResult(BaseScopeActionResult):
-    result: SearchResult[KeyPairData]
-
-    @override
-    def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return ()
 
 
 @dataclass(frozen=True)
@@ -257,30 +251,18 @@ class AdminCreateKeypairActionResult:
 
 
 @dataclass(frozen=True)
-class AdminSearchKeypairsAction(BaseGlobalAction):
+class AdminSearchKeypairsAction(GlobalSearcherOpsAction[KeyPairRow, KeyPairData]):
     """Read keypairs across every user."""
-
-    querier: BatchQuerier
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+        return UserEntityType()
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "global_search_keypairs"
-
-
-@dataclass(frozen=True)
-class AdminSearchKeypairsActionResult:
-    result: SearchResult[KeyPairData]
 
 
 @dataclass(frozen=True)

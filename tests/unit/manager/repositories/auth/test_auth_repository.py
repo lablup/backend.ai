@@ -14,12 +14,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
@@ -37,10 +35,8 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -106,10 +102,10 @@ class TestAuthRepository:
 
     @pytest.fixture
     async def db_with_cleanup(
-        self, database_connection: ExtendedAsyncSAEngine
+        self, global_entity_ids: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
                 # FK dependency order: parents before children
                 DomainRow,
@@ -126,7 +122,6 @@ class TestAuthRepository:
                 KeyPairRow,
                 ProjectRow,
                 AssocGroupUserRow,
-                AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -150,7 +145,7 @@ class TestAuthRepository:
                 EntityMembershipFieldRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     async def auth_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthRepository:
@@ -376,17 +371,6 @@ class TestAuthRepository:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group via RBAC scope-entity association
-            await db_sess.execute(
-                sa.insert(AssociationScopesEntitiesRow).values(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(sample_user_data.uuid),
-                    relation_type=RelationType.AUTO,
-                )
-            )
-            await db_sess.flush()
             await VirtualEntitySeeder().enroll_user_in_project(
                 db_sess, group_id, sample_user_data.uuid
             )
@@ -406,7 +390,7 @@ class TestAuthRepository:
                 dotfiles=group.dotfiles,
                 resource_policy=group.resource_policy,
                 type=group.type,
-                container_registry=group.container_registry,
+                container_registry=ProjectSearchableFields.own.to_data(group).container_registry,
             )
         yield group_data
 

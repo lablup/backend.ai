@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
@@ -16,16 +15,11 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -39,7 +33,7 @@ from ai.backend.manager.models.specs.purger import (
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import VFolderPermissionRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 
 @dataclass
@@ -77,28 +71,6 @@ class UserKeyPairPurger(FieldBatchPurger[UserID, KeyPairRow, KeyPairID]):
 
 
 @dataclass
-class UserVFolderPermissionPurger(FieldBatchPurger[UserID, VFolderPermissionRow, VFolderUUID]):
-    """Clears the vfolder permissions granted to a user.
-
-    Answers with the folders taken back rather than the rows removed: what the caller
-    does next is take the share caps off those folders, and the row ids name nothing
-    it can act on.
-    """
-
-    @override
-    def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
-        return sa.select(VFolderPermissionRow).where(VFolderPermissionRow.user == owner_id)
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
-        return VFolderUUID(row.vfolder)
-
-
-@dataclass
 class UserGroupAssociationPurger(FieldBatchPurger[UserID, AssocGroupUserRow, ProjectID]):
     """Clears the legacy project association rows a user holds."""
 
@@ -113,36 +85,6 @@ class UserGroupAssociationPurger(FieldBatchPurger[UserID, AssocGroupUserRow, Pro
     @override
     def to_data(self, row: AssocGroupUserRow) -> ProjectID:
         return row.group_id
-
-
-@dataclass
-class UserScopeAssociationPurger(FieldBatchPurger[UserID, AssociationScopesEntitiesRow, UUID]):
-    """Clears the legacy scope associations a user leaves behind, on both sides: the
-    rows enrolling the user under other scopes, and the rows enrolled under the scope
-    the user is."""
-
-    @override
-    def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
-        return sa.select(AssociationScopesEntitiesRow).where(
-            sa.or_(
-                sa.and_(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(owner_id),
-                ),
-                sa.and_(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
-                    AssociationScopesEntitiesRow.scope_id == str(owner_id),
-                ),
-            )
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: AssociationScopesEntitiesRow) -> UUID:
-        return row.id
 
 
 @dataclass
@@ -221,4 +163,4 @@ class UserPurger(EntityPurger[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+        return UserSearchableFields.own.to_data(row)

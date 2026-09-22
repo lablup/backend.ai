@@ -42,7 +42,6 @@ from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,
     ProjectKernelPurger,
     ProjectPurger,
-    ProjectScopeAssociationPurger,
     ProjectSessionPurger,
     SessionsByIdsPurger,
 )
@@ -50,9 +49,11 @@ from ai.backend.manager.models.project.row import (
     ProjectRow,
 )
 from ai.backend.manager.models.project.scopes import (
-    DomainProjectOperationScope,
-    UserProjectOperationScope,
+    DomainProjectTarget,
+    UserProjectTarget,
 )
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
@@ -64,7 +65,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     vfolder_status_map,
 )
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -310,6 +310,7 @@ class ProjectDBSource:
 
         async with self._v2_ops.write_ops() as w:
             # Deployments go first (their routings cascade), then the sessions they routed.
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(ProjectEndpointPurger(project_id=project_id))
             if routed_session_ids:
                 await w.batch_purge_entities_in_global(
@@ -319,7 +320,6 @@ class ProjectDBSource:
                 project_id, ProjectKernelPurger(project_id=project_id)
             )
             await w.batch_purge_entities_in_global(ProjectSessionPurger(project_id=project_id))
-            await w.batch_purge_field_entities(project_id, ProjectScopeAssociationPurger())
             if await w.purge_entity(ProjectPurger(project_id=project_id)) is None:
                 raise ProjectNotFound("project not found")
 
@@ -407,7 +407,6 @@ class ProjectDBSource:
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
-            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,
@@ -430,7 +429,7 @@ class ProjectDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ProjectNotFound(f"Project {project_id} not found")
-            return row.to_data()
+            return ProjectSearchableFields.own.to_data(row)
 
     async def project_id_by_name_in_domain(
         self, domain_name: str, project_name: str
@@ -460,82 +459,48 @@ class ProjectDBSource:
 
     async def search_projects(
         self,
-        querier: BatchQuerier,
+        searcher: ProjectSearcher,
     ) -> ProjectSearchResult:
-        """Search all projects (admin only).
-
-        Args:
-            querier: Contains conditions, orders, and pagination.
-
-        Returns:
-            ProjectSearchResult with items, total_count, and pagination flags.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-
-            items = [row.ProjectRow.to_data() for row in result.rows]
-
-            return ProjectSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search all projects (admin only)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return ProjectSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_projects_by_domain(
         self,
-        scope: DomainProjectOperationScope,
-        querier: BatchQuerier,
+        scope: DomainProjectTarget,
+        searcher: ProjectSearcher,
     ) -> ProjectSearchResult:
-        """Search projects within a domain.
-
-        Args:
-            scope: DomainProjectOperationScope defining the domain to search within.
-            querier: Contains conditions, orders, and pagination.
-
-        Returns:
-            ProjectSearchResult with items, total_count, and pagination flags.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow)
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.ProjectRow.to_data() for row in result.rows]
-
-            return ProjectSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search projects within a domain."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return ProjectSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_projects_by_user(
         self,
-        scope: UserProjectOperationScope,
-        querier: BatchQuerier,
+        scope: UserProjectTarget,
+        searcher: ProjectSearcher,
     ) -> ProjectSearchResult:
         """Search projects a user is member of.
 
         Membership comes from the projects' virtual entities; the scope supplies
         the membership predicate.
-
-        Args:
-            scope: UserProjectOperationScope defining the user to search for.
-            querier: Contains conditions, orders, and pagination.
-
-        Returns:
-            ProjectSearchResult with items, total_count, and pagination flags.
         """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow).select_from(ProjectRow)
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.ProjectRow.to_data() for row in result.rows]
-
-            return ProjectSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return ProjectSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

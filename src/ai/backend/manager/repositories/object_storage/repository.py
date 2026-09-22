@@ -8,12 +8,10 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 object_storage_repository_resilience = Resilience(
     policies=[
@@ -37,8 +35,8 @@ class ObjectStorageRepository:
 
     _db_source: ObjectStorageDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = ObjectStorageDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+        self._db_source = ObjectStorageDBSource(db, v2_ops_provider)
 
     @object_storage_repository_resilience.apply()
     async def get_by_name(self, storage_name: str) -> ObjectStorageData:
@@ -53,24 +51,12 @@ class ObjectStorageRepository:
         return await self._db_source.get_by_namespace_id(storage_namespace_id)
 
     @object_storage_repository_resilience.apply()
-    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
-        return await self._db_source.create(creator)
-
-    @object_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
-        return await self._db_source.update(updater)
-
-    @object_storage_repository_resilience.apply()
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        return await self._db_source.delete(storage_id)
-
-    @object_storage_repository_resilience.apply()
     async def list_object_storages(self) -> list[ObjectStorageData]:
         return await self._db_source.list_object_storages()
 
     @object_storage_repository_resilience.apply()
     async def search(
         self,
-        querier: BatchQuerier,
+        searcher: ObjectStorageSearcher,
     ) -> ObjectStorageListResult:
-        return await self._db_source.search(querier)
+        return await self._db_source.search(searcher)

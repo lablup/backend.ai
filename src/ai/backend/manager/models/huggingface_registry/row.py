@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -53,10 +51,3 @@ class HuggingFaceRegistryRow(Base):
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> HuggingFaceRegistryData:
-        if self.meta is None:
-            raise RelationNotLoadedError()
-        return HuggingFaceRegistryData(
-            id=self.id, name=self.meta.name, url=self.url, token=self.token
-        )

@@ -3,12 +3,11 @@ from typing import override
 
 import strawberry
 from graphql import GraphQLError
-from graphql.pyutils.undefined import Undefined as GraphQLUndefined
+from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
-from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
@@ -118,6 +117,7 @@ from .deployment import (
     # Route
     route,
     routes,
+    scoped_deployments,
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
@@ -134,6 +134,7 @@ from .domain_v2 import (
     admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
+    scoped_domains_v2,
 )
 from .entity.resolver import entity_types
 from .entity_label.resolver import (
@@ -211,6 +212,7 @@ from .image import (
     image_alias,
     image_scoped_aliases,
     image_v2,
+    scoped_images_v2,
 )
 from .image_federation import Image as _ImageStub
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
@@ -267,6 +269,7 @@ from .model_card import (
     model_card_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
+    scoped_model_cards_v2,
 )
 from .node_field import node
 from .notification import (
@@ -317,6 +320,7 @@ from .project_v2 import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    scoped_projects_v2,
     unassign_users_from_project_v2,
 )
 from .prometheus_query_preset import (
@@ -342,7 +346,6 @@ from .rbac import (
     admin_create_role,
     admin_delete_permission,
     admin_delete_role,
-    admin_entities,
     admin_permissions,
     admin_purge_role,
     admin_replace_role_permissions,
@@ -352,11 +355,25 @@ from .rbac import (
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    my_atomic_bulk_scope_permissions,
     my_roles,
+    my_roles_v2,
+    my_scope_permissions,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+)
+from .rbac.resolver.entity import admin_entities
+from .rbac.resolver.role_invitation import (
+    accept_role_invitation,
+    admin_cancel_role_invitation,
+    admin_role_invitations,
+    create_role_invitation,
+    my_role_invitations,
+    my_sent_role_invitations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -392,6 +409,7 @@ from .resource_group import (
     replace_resource_group_default_deployment_options,
     replace_resource_group_default_session_options,
     resource_groups,
+    scoped_resource_groups,
     update_resource_group_fair_share_spec,
 )
 from .resource_group.federation import ResourceGroup as _ResourceGroupStub
@@ -413,6 +431,7 @@ from .resource_policy_v2 import (
     admin_user_resource_policy_v2,
     my_keypair_resource_policy_v2,
     my_user_resource_policy_v2,
+    scoped_project_resource_policy_v2,
 )
 from .resource_preset import (
     admin_create_resource_preset_v2,
@@ -498,6 +517,7 @@ from .session.resolver import (
     exclude_session_idle_checks,
     include_session_idle_checks,
     project_sessions_v2,
+    scoped_sessions_v2,
     session_v2,
     terminate_sessions_v2,
 )
@@ -526,6 +546,7 @@ from .user import (
     my_client_ip,
     my_user_v2,
     project_users_v2,
+    scoped_users_v2,
     update_my_allowed_client_ip,
     update_user_v2,
 )
@@ -544,11 +565,15 @@ from .vfolder_v2 import (
     project_vfolders,
     purge_vfolder_v2,
     restore_vfolder_v2,
+    scoped_vfolders_v2,
+    set_vfolder_mount_policy,
+    unset_vfolder_mount_policy,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
     vfolder_list_files_v2,
     vfolder_mkdir_v2,
+    vfolder_mount_policies,
     vfolder_move_file_v2,
     vfolder_v2,
 )
@@ -601,6 +626,7 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
     compute_schedule = compute_schedule
@@ -629,6 +655,7 @@ class Query:
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
+    scoped_images_v2 = scoped_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
@@ -641,8 +668,10 @@ class Query:
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    scoped_sessions_v2 = scoped_sessions_v2
     session_v2 = session_v2
     project_deployments = project_deployments
+    scoped_deployments = scoped_deployments
     my_deployments = my_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
@@ -664,6 +693,10 @@ class Query:
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    admin_role_invitations = admin_role_invitations
+    my_role_invitations = my_role_invitations
+    my_sent_role_invitations = my_sent_role_invitations
+    role_scoped_role_invitations = role_scoped_role_invitations
     # Keypair self-service queries
     my_keypairs = my_keypairs
     # Keypair admin queries
@@ -676,11 +709,14 @@ class Query:
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    my_roles_v2 = my_roles_v2
     # RBAC Scoped APIs
     project_roles = project_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
+    my_scope_permissions = my_scope_permissions
+    my_atomic_bulk_scope_permissions = my_atomic_bulk_scope_permissions
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -730,14 +766,17 @@ class Query:
     my_client_ip = my_client_ip
     my_user_v2 = my_user_v2
     project_users_v2 = project_users_v2
+    scoped_users_v2 = scoped_users_v2
     # Domain V2 APIs
     domain_v2 = domain_v2
     admin_domains_v2 = admin_domains_v2
     rg_domains_v2 = rg_domains_v2
+    scoped_domains_v2 = scoped_domains_v2
     # Project V2 APIs
     project_v2 = project_v2
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
+    scoped_projects_v2 = scoped_projects_v2
     project_domain_v2 = project_domain_v2
     # Resource Policy V2 APIs
     admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
@@ -748,6 +787,7 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    scoped_project_resource_policy_v2 = scoped_project_resource_policy_v2
     # Storage Host APIs
     my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs
@@ -778,6 +818,7 @@ class Query:
     # Model Card APIs
     admin_model_cards_v2 = admin_model_cards_v2
     project_model_cards_v2 = project_model_cards_v2
+    scoped_model_cards_v2 = scoped_model_cards_v2
     model_card_v2 = model_card_v2
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
@@ -792,6 +833,8 @@ class Query:
     admin_vfolders_v2 = admin_vfolders_v2
     vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
+    scoped_vfolders_v2 = scoped_vfolders_v2
+    vfolder_mount_policies = vfolder_mount_policies
     my_vfolders = my_vfolders
 
 
@@ -986,6 +1029,10 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
+    create_role_invitation = create_role_invitation
+    accept_role_invitation = accept_role_invitation
+    reject_role_invitation = reject_role_invitation
+    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
@@ -1047,6 +1094,8 @@ class Mutation:
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2
+    set_vfolder_mount_policy = set_vfolder_mount_policy
+    unset_vfolder_mount_policy = unset_vfolder_mount_policy
     deploy_vfolder_v2 = deploy_vfolder_v2
     bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
     bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2
@@ -1077,6 +1126,11 @@ class Subscription:
     background_task_events = background_task_events
 
 
+# Per-request cost ceilings applied to every schema below.
+MAX_QUERY_DEPTH = 20
+MAX_ALIAS_COUNT = 20
+
+
 class CustomizedSchema(Schema):
     @override
     def process_errors(
@@ -1090,15 +1144,6 @@ class CustomizedSchema(Schema):
 
     @override
     def as_str(self) -> str:
-        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
-        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
-        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
-        for type_def in self._schema.type_map.values():
-            if not hasattr(type_def, "fields"):
-                continue
-            for field in type_def.fields.values():
-                if isinstance(getattr(field, "default_value", None), BackendSentinel):
-                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable")
         # PageInfo is force-marked @shareable above, so the directive must be imported from the
@@ -1141,6 +1186,8 @@ schema = CustomizedSchema(
         GQLLoggingExtension,
         GQLMetricExtension,
         GQLValidationExtension,
+        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
@@ -1176,6 +1223,8 @@ public_schema = Schema(
         GQLLoggingExtension,
         GQLMetricExtension,
         GQLValidationExtension,
+        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )

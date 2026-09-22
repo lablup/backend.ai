@@ -1,5 +1,5 @@
 """
-Tests for PermissionControllerRepository permission search functionality.
+Tests for the global permission search through ``OpsRepository.global_search``.
 Tests the repository layer with real database operations.
 """
 
@@ -11,13 +11,13 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.data.permission.permission import PermissionData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -28,14 +28,11 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.permission.conditions import (
-    ScopedPermissionConditions,
-)
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.orders import (
-    ScopedPermissionOrders,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
@@ -43,12 +40,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
@@ -83,7 +79,6 @@ class TestSearchPermissions:
                 UserRow,
                 KeyPairRow,
                 PermissionRow,
-                ObjectPermissionRow,
             ],
         ):
             yield database_connection
@@ -92,8 +87,8 @@ class TestSearchPermissions:
     def repository(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionControllerRepository:
-        return PermissionControllerRepository(db_with_rbac_tables)
+    ) -> OpsRepository[PermissionData]:
+        return OpsRepository[PermissionData](V2DBOpsProvider(db_with_rbac_tables))
 
     @pytest.fixture
     async def role_with_permissions(
@@ -106,6 +101,8 @@ class TestSearchPermissions:
 
         async with db_with_rbac_tables.begin_session() as db_sess:
             role = RoleRow(
+                scope_type=EntityType("project"),
+                scope_id=uuid.uuid4(),
                 id=role_id,
                 name="test-role-perms",
                 description="Test role for permissions",
@@ -114,17 +111,15 @@ class TestSearchPermissions:
             await db_sess.flush()
 
             for entity_type, operation in [
-                (EntityType.VFOLDER, OperationType.READ),
-                (EntityType.VFOLDER, OperationType.UPDATE),
-                (EntityType.SESSION, OperationType.CREATE),
-                (EntityType.IMAGE, OperationType.READ),
+                (VFolderEntityType(), Permission.READ),
+                (VFolderEntityType(), Permission.UPDATE),
+                (SessionEntityType(), Permission.CREATE),
+                (ImageEntityType(), Permission.READ),
             ]:
                 perm = PermissionRow(
                     role_id=role_id,
-                    scope_type=ScopeType.DOMAIN,
-                    scope_id="test-domain",
                     entity_type=entity_type,
-                    permission=Permission.from_operation(operation),
+                    permission=operation,
                 )
                 db_sess.add(perm)
                 await db_sess.flush()
@@ -134,35 +129,39 @@ class TestSearchPermissions:
 
     async def test_search_permissions_with_entity_type_filter(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[PermissionData],
         role_with_permissions: RoleWithPermissions,
     ) -> None:
-        querier = BatchQuerier(
+        searcher = RolePermissionSearcher(
             conditions=[
-                ScopedPermissionConditions.by_entity_type(VFOLDER_ENTITY_TYPE),
+                PermissionSearchableFields.own.entity_type.filter.equals(
+                    StringMatchSpec(
+                        value=str(VFolderEntityType()), case_insensitive=False, negated=False
+                    )
+                ),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_permissions(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert result.total_count == 2
         for item in result.items:
-            assert item.entity_type == EntityType.VFOLDER.value
+            assert item.entity_type == VFolderEntityType()
 
     async def test_search_permissions_ordered_by_entity_type(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[PermissionData],
         role_with_permissions: RoleWithPermissions,
     ) -> None:
-        querier = BatchQuerier(
+        searcher = RolePermissionSearcher(
             conditions=[],
-            orders=[ScopedPermissionOrders.entity_type(ascending=True)],
+            orders=[PermissionSearchableFields.own.entity_type.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_permissions(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         entity_types = [item.entity_type for item in result.items]
         assert entity_types == sorted(entity_types)

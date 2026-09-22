@@ -20,9 +20,6 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
 )
-from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    PublicResolveUserScopeAction,
-)
 from ai.backend.manager.services.auth.service import AuthService
 
 
@@ -57,7 +54,6 @@ def auth_service(
 REQUESTER_AK = "AKIAIOSFODNN7EXAMPLE"
 OWNER_AK = "AKIAI44QH8DHBEXAMPLE"
 REQUESTER_UUID = uuid.UUID("11111111-1111-1111-1111-111111111111")
-OWNER_UUID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 DOMAIN_ID = DomainID(uuid.UUID("33333333-3333-3333-3333-333333333333"))
 
 
@@ -159,53 +155,3 @@ class TestResolveAccessKeyScope:
         with with_user(acting_user(UserRole.USER)):
             with pytest.raises(GenericForbidden):
                 await auth_service.resolve_access_key_scope(action)
-
-
-class TestResolveUserScope:
-    async def test_owner_email_none_returns_acting_user(
-        self,
-        auth_service: AuthService,
-    ) -> None:
-        action = PublicResolveUserScopeAction(owner_user_email=None)
-        with with_user(acting_user(UserRole.USER)):
-            result = await auth_service.resolve_user_scope(action)
-        assert result.owner_uuid == REQUESTER_UUID
-        assert result.owner_role == UserRole.USER
-
-    async def test_non_superadmin_specifying_email_raises_invalid_params(
-        self,
-        auth_service: AuthService,
-    ) -> None:
-        action = PublicResolveUserScopeAction(owner_user_email="other@example.com")
-        with with_user(acting_user(UserRole.ADMIN)):
-            with pytest.raises(InvalidAPIParameters):
-                await auth_service.resolve_user_scope(action)
-
-    async def test_superadmin_delegation_succeeds(
-        self,
-        auth_service: AuthService,
-        mock_auth_repository: AsyncMock,
-    ) -> None:
-        mock_auth_repository.get_delegation_target_by_email.return_value = (
-            OWNER_UUID,
-            UserRole.USER,
-            "default",
-        )
-        action = PublicResolveUserScopeAction(owner_user_email="owner@example.com")
-        with with_user(acting_user(UserRole.SUPERADMIN)):
-            result = await auth_service.resolve_user_scope(action)
-        assert result.owner_uuid == OWNER_UUID
-        assert result.owner_role == UserRole.USER
-
-    async def test_nonexistent_email_raises_invalid_params(
-        self,
-        auth_service: AuthService,
-        mock_auth_repository: AsyncMock,
-    ) -> None:
-        mock_auth_repository.get_delegation_target_by_email.side_effect = ValueError(
-            "Unknown user email"
-        )
-        action = PublicResolveUserScopeAction(owner_user_email="nonexistent@example.com")
-        with with_user(acting_user(UserRole.SUPERADMIN)):
-            with pytest.raises(InvalidAPIParameters):
-                await auth_service.resolve_user_scope(action)

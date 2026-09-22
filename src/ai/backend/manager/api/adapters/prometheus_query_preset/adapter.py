@@ -5,17 +5,18 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    ModifyQueryDefinitionOptionsInput,
     PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
@@ -50,13 +51,15 @@ from ai.backend.manager.data.prometheus_query_preset import (
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.models.prometheus_query_preset.conditions import (
-    PrometheusQueryPresetConditions,
-)
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
-from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
+from ai.backend.manager.models.prometheus_query_preset.scopes import (
+    PublicPrometheusQueryPresetTarget,
+)
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
@@ -64,14 +67,22 @@ from ai.backend.manager.models.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdater,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
-    GetPresetAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.get import GetPresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
     PreviewPresetAction,
-    PurgePresetAction,
-    SearchPresetsAction,
-    UpdatePresetAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.purge import PurgePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.scoped_search import (
+    ScopedSearchPresetsAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.update import UpdatePresetAction
+from ai.backend.manager.services.prometheus_query_preset.processors import (
+    PrometheusQueryPresetProcessors,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -79,15 +90,26 @@ from ai.backend.manager.types import OptionalState, TriState
 class PrometheusQueryPresetAdapter(BaseAdapter):
     """Adapter for prometheus query preset domain operations."""
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[QueryDefinitionNode | None]:
+    _prometheus_query_preset: PrometheusQueryPresetProcessors
+
+    def __init__(self, prometheus_query_preset: PrometheusQueryPresetProcessors) -> None:
+        self._prometheus_query_preset = prometheus_query_preset
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[PrometheusQueryPresetID]
+    ) -> list[QueryDefinitionNode | None]:
         if not ids:
             return []
         searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=len(ids)),
-            conditions=[PrometheusQueryPresetConditions.by_ids(ids)],
+            conditions=[
+                PrometheusQueryPresetSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=list(ids), negated=False)
+                )
+            ],
         )
-        action_result = await self._processors.prometheus_query_preset.public_search_presets.run(
-            SearchPresetsAction(searcher=searcher)
+        action_result = await self._prometheus_query_preset.scoped_search_presets.run(
+            self._scoped_search(searcher)
         )
         preset_map = {item.id: self._data_to_dto(item) for item in action_result.items}
         return [preset_map.get(PrometheusQueryPresetID(preset_id)) for preset_id in ids]
@@ -110,7 +132,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             group_labels=input.options.group_labels,
         )
 
-        action_result = await self._processors.prometheus_query_preset.global_create_preset.run(
+        action_result = await self._prometheus_query_preset.global_create_preset.run(
             CreatePresetAction(creator=creator)
         )
 
@@ -124,8 +146,8 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.prometheus_query_preset.public_search_presets.run(
-            SearchPresetsAction(searcher=searcher)
+        action_result = await self._prometheus_query_preset.scoped_search_presets.run(
+            self._scoped_search(searcher)
         )
 
         return SearchQueryDefinitionsPayload(
@@ -137,7 +159,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> GetQueryDefinitionPayload:
         """Get a single query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.public_get_preset.run(
+        action_result = await self._prometheus_query_preset.get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(preset_id))
         )
 
@@ -147,7 +169,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         self, preset_id: UUID, input: ModifyQueryDefinitionInput
     ) -> ModifyQueryDefinitionPayload:
         """Update an existing query definition."""
-        action_result = await self._processors.prometheus_query_preset.update_preset.run(
+        action_result = await self._prometheus_query_preset.update_preset.run(
             UpdatePresetAction(
                 updater=self._build_updater(PrometheusQueryPresetID(preset_id), input)
             )
@@ -157,7 +179,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def admin_preview(self, input: PreviewQueryDefinitionInput) -> QueryDefinitionResultInfo:
         """Preview a prometheus query template (admin only)."""
-        action_result = await self._processors.prometheus_query_preset.global_preview_preset.run(
+        action_result = await self._prometheus_query_preset.global_preview_preset.run(
             PreviewPresetAction(query_template=input.query_template)
         )
         return self._prometheus_response_to_result_info(action_result.response)
@@ -185,7 +207,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             if time_range is not None
             else None
         )
-        action_result = await self._processors.prometheus_query_preset.execute_preset.run(
+        action_result = await self._prometheus_query_preset.execute_preset.run(
             ExecutePresetAction(
                 preset_id=PrometheusQueryPresetID(preset_id),
                 options=execute_options,
@@ -217,18 +239,17 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
         """Delete a query definition by ID."""
-        action_result = await self._processors.prometheus_query_preset.purge_preset.run(
+        action_result = await self._prometheus_query_preset.purge_preset.run(
             PurgePresetAction(preset_id=PrometheusQueryPresetID(input.id))
         )
 
         return DeleteQueryDefinitionPayload(id=action_result.data.id)
 
     _PAGINATION_SPEC = PaginationSpec(
-        forward_order=PrometheusQueryPresetOrders.created_at(ascending=False),
-        backward_order=PrometheusQueryPresetOrders.created_at(ascending=True),
-        forward_condition_factory=PrometheusQueryPresetConditions.by_cursor_forward,
-        backward_condition_factory=PrometheusQueryPresetConditions.by_cursor_backward,
-        tiebreaker_order=PrometheusQueryPresetRow.id.asc(),
+        forward_order=PrometheusQueryPresetSearchableFields.own.created_at.order.apply(
+            ascending=False
+        ),
+        cursor_column=PrometheusQueryPresetRow.id,
     )
 
     def build_searcher(self, input: SearchQueryDefinitionsInput) -> PrometheusQueryPresetSearcher:
@@ -248,29 +269,19 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             offset=input.offset,
         )
 
+    def _scoped_search(self, searcher: PrometheusQueryPresetSearcher) -> ScopedSearchPresetsAction:
+        return ScopedSearchPresetsAction(
+            searcher=ScopedSearcher(
+                scopes=[PublicPrometheusQueryPresetTarget()], used_by=(), searcher=searcher
+            )
+        )
+
     def _convert_filter(self, filter: QueryDefinitionFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=PrometheusQueryPresetConditions.by_name_contains,
-                equals_factory=PrometheusQueryPresetConditions.by_name_equals,
-                starts_with_factory=PrometheusQueryPresetConditions.by_name_starts_with,
-                ends_with_factory=PrometheusQueryPresetConditions.by_name_ends_with,
-                in_factory=PrometheusQueryPresetConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.category_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.category_id,
-                equals_factory=PrometheusQueryPresetConditions.by_category_id_equals,
-                in_factory=PrometheusQueryPresetConditions.by_category_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = PrometheusQueryPresetSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_uuid_filter(filter.category_id, fields.category_id.filter),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -292,69 +303,38 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
         return conditions
 
-    @staticmethod
-    def _convert_orders(orders: list[QueryDefinitionOrder]) -> list[QueryOrder]:
+    def _convert_orders(self, orders: list[QueryDefinitionOrder]) -> list[QueryOrder]:
+        fields = PrometheusQueryPresetSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field.value:
                 case "name":
-                    result.append(PrometheusQueryPresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case "rank":
-                    result.append(PrometheusQueryPresetOrders.rank(ascending))
+                    result.append(fields.rank.order.apply(ascending))
                 case "created_at":
-                    result.append(PrometheusQueryPresetOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case "updated_at":
-                    result.append(PrometheusQueryPresetOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
         return result
 
     @staticmethod
     def _build_updater(
         preset_id: PrometheusQueryPresetID, input: ModifyQueryDefinitionInput
     ) -> PrometheusQueryPresetUpdater:
+        options = OptionalState[ModifyQueryDefinitionOptionsInput].from_unset(input.options)
         return PrometheusQueryPresetUpdater(
             preset_id=preset_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            description=TriState.nop()
-            if isinstance(input.description, Sentinel)
-            else TriState.nullify()
-            if input.description is None
-            else TriState.update(input.description),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-            category_id=TriState.nop()
-            if isinstance(input.category_id, Sentinel)
-            else TriState.nullify()
-            if input.category_id is None
-            else TriState.update(PrometheusQueryPresetCategoryID(input.category_id)),
-            metric_name=(
-                OptionalState.update(input.metric_name)
-                if input.metric_name is not None
-                else OptionalState.nop()
-            ),
-            query_template=(
-                OptionalState.update(input.query_template)
-                if input.query_template is not None
-                else OptionalState.nop()
-            ),
-            time_window=TriState.nop()
-            if isinstance(input.time_window, Sentinel)
-            else TriState.nullify()
-            if input.time_window is None
-            else TriState.update(input.time_window),
-            filter_labels=(
-                OptionalState.update(input.options.filter_labels)
-                if input.options is not None and input.options.filter_labels is not None
-                else OptionalState.nop()
-            ),
-            group_labels=(
-                OptionalState.update(input.options.group_labels)
-                if input.options is not None and input.options.group_labels is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+            rank=OptionalState.from_unset(input.rank),
+            category_id=TriState.from_unset(input.category_id),
+            metric_name=OptionalState.from_unset(input.metric_name),
+            query_template=OptionalState.from_unset(input.query_template),
+            time_window=TriState.from_unset(input.time_window),
+            filter_labels=options.and_optional(lambda o: o.filter_labels),
+            group_labels=options.and_optional(lambda o: o.group_labels),
         )
 
     @staticmethod
@@ -362,6 +342,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return QueryDefinitionNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             rank=data.rank,

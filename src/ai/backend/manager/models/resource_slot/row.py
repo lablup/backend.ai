@@ -14,6 +14,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -28,12 +29,6 @@ from ai.backend.common.data.entity.model_card_resource_requirement import (
 from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
 from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
-from ai.backend.manager.data.model_card.types import ModelCardResourceRequirementData
-from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceData,
-    NumberFormatData,
-    ResourceSlotTypeData,
-)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -122,24 +117,6 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
 
-    def to_data(self) -> ResourceSlotTypeData:
-        return ResourceSlotTypeData(
-            uuid=self.uuid,
-            slot_name=self.slot_name,
-            slot_type=self.slot_type,
-            required=self.required,
-            enabled=self.enabled,
-            display_name=self.display_name,
-            description=self.description,
-            display_unit=self.display_unit,
-            display_icon=self.display_icon,
-            number_format=NumberFormatData(
-                binary=self.number_format.binary,
-                round_length=self.number_format.round_length,
-            ),
-            rank=self.rank,
-        )
-
 
 class AgentResourceRow(LifecycleTimestampsMixin, Base):
     """Per-agent, per-slot resource capacity and usage.
@@ -157,6 +134,9 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
         server_default=sa.text("uuid_generate_v7()"),
     )
     agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
+    # The agent this row is written under. ``agent_id`` names the same agent by its
+    # name column, which the key and every existing query still use.
+    agent_uuid: Mapped[AgentUUID] = mapped_column("agent_uuid", GUID(AgentUUID), nullable=False)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
@@ -177,16 +157,6 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
     slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
         "ResourceSlotTypeRow", foreign_keys=[slot_name], lazy="raise"
     )
-
-    def to_data(self) -> AgentResourceData:
-        return AgentResourceData(
-            id=self.id,
-            agent_id=self.agent_id,
-            slot_name=self.slot_name,
-            capacity=self.capacity,
-            reserved=self.reserved,
-            used=self.used,
-        )
 
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -328,25 +298,6 @@ class ModelCardResourceRequirementRow(Base):
         ),
         sa.Index("ix_mc_resource_req_slot_name", "slot_name"),
     )
-
-    def to_data(self) -> ModelCardResourceRequirementData:
-        return ModelCardResourceRequirementData(
-            model_card_id=self.model_card_id,
-            slot_name=self.slot_name,
-            min_quantity=self._formatted_min_quantity(),
-        )
-
-    def _formatted_min_quantity(self) -> str:
-        """The quantity as the caller wrote it, not as ``Numeric(24, 6)`` stores it.
-
-        A read of ``"2"`` comes back ``Decimal("2.000000")``; before a flush the
-        attribute may still be the raw string, so normalize before trimming.
-        """
-        value = self.min_quantity
-        quantity = value if isinstance(value, Decimal) else Decimal(value)
-        if quantity == quantity.to_integral_value():
-            return str(int(quantity))
-        return format(quantity.normalize(), "f")
 
 
 class PresetResourceSlotRow(Base):

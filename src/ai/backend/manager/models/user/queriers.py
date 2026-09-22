@@ -9,10 +9,12 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.auth.types import AuthorizingUser
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
-__all__ = ("AuthorizingUserQuerier",)
+__all__ = ("AuthorizingUserQuerier", "BulkUserQuerier")
 
 
 @dataclass
@@ -46,3 +48,19 @@ class AuthorizingUserQuerier(DataQuerier[UserRow, AuthorizingUser]):
             totp_activated=row.totp_activated,
             totp_key=row.totp_key,
         )
+
+
+class BulkUserQuerier(BulkEntityQuerier[UserRow, UserData]):
+    """The users the caller named, keyed by the uuid column."""
+
+    @override
+    def row_class(self) -> type[UserRow]:
+        return UserRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return UserRow.uuid
+
+    @override
+    def to_data(self, row: UserRow) -> UserData:
+        return UserSearchableFields.own.to_data(row)

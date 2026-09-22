@@ -20,6 +20,19 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 | `single_field` / `bulk_field` | field rows |
 | `relation` | two entities, linked or unlinked |
 
+## Searching within scopes
+
+- A `scope`-shaped search takes `targets: Sequence[<Entity>Target]` and nothing else
+  standing for a scope. One action per entity, never one per scope kind.
+- A `ScopeTarget` (`models/scopes.py`) answers both axes: `scope_id()` names the scope the
+  read is authorized against, `to_condition()` the rows it is restricted to. Declaring them
+  on one class is what keeps a read from being authorized against one thing and served
+  another.
+- The action derives both from that one list and marks them `@final`: `scope_targets()` is
+  every target's `scope_id()`, `operation_scopes()` the targets themselves. Ops ORs the
+  conditions; the gate authorizes each scope, so a caller naming one they cannot see is
+  refused the whole read.
+
 ## Linking two entities
 
 - The shape splits on **whether one side is contained in the other**.
@@ -34,7 +47,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   named scope itself and every one of them has to permit the run.
 - Its audit row names no entity and no kind; the scopes go to `audit_log_scopes`, which
   is why `audit_logs.entity_type` is nullable. The catalog records the wiring with no
-  entity type at all, which `GLOBAL_ENTITY_TYPE` does not stand for — that names an
+  entity type at all, which `GlobalEntityType` does not stand for — that names an
   operation over every entity, and a relation targets none.
 - It is wired through `ConcernGroups.relation_group()`, not through an entity group:
   a group is answered for by an entity type and a relation is answered for by none.
@@ -174,9 +187,17 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Gates
 
-- `global` extends `scope` to the whole system and runs behind the SUPERADMIN
-  gate. Global reads open to all authenticated users are wired via the `public_*`
-  factories — read operations only; the constructor rejects writes.
+- `global` extends `scope` to the whole system. The gate is what the `global`
+  singleton grants on the action's entity type, and the check is by type, so it puts no
+  row condition on the query. A super admin passes everything and a monitor passes the
+  reads — both are read off the user role, so neither needs a role row. With RBAC
+  enforcement off those two bypasses are the whole gate. Global reads open to all
+  authenticated users are wired via the `public_*` factories — read operations only;
+  the constructor rejects writes.
+- The global gate is a validator the wiring supplies, as it is for every other shape.
+  `GlobalActionProcessor` refuses an empty validator list, so a wiring that states no
+  gate fails where it is made rather than at request time. A tool that only reads the
+  wiring states `RefusingGlobalActionValidator`, which lets no one through.
 - `anonymous_global` takes no gate at all and accepts writes. Wire through any other
   factory that fits. It is available only when both hold — the caller is an external
   system that can never hold a principal, and the service checks that caller itself
@@ -198,12 +219,13 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - A lookup with post-validators answers a key naming nothing and a key the caller may
   not reach with one exception, so no status code says whether the key exists. The
   processor merges them; adapters must not split them apart again. The audit record
-  keeps the two causes apart.
+  keeps the two causes apart. A superadmin passes every check, so the miss reaches
+  them unmerged.
 - The owner lookup a field operation runs first is checked the same way. It is a
   different permission from the write that follows — the lookup asks for read, the
   write for write.
 - `BaseGlobalAction` declares no `entity_id()`.
-- `GLOBAL_ENTITY_TYPE` is what a global operation records when it names no other
+- `GlobalEntityType` is what a global operation records when it names no other
   entity. Wiring only — service and domain code never reference it.
 
 ## Monitors

@@ -3,11 +3,11 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
-    PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
     BulkLookupOpsResult,
     LookupOpsResult,
     ScopedBatchOpsResult,
@@ -51,7 +51,6 @@ from ai.backend.manager.services.resource_group.actions.get_wsproxy_version impo
 )
 from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
     SearchResourceGroupsAction,
-    SearchResourceGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
@@ -101,12 +100,12 @@ class ResourceGroupProcessors:
         UpdateResourceGroupAction, UpdateResourceGroupActionResult
     ]
     search_resource_groups: GlobalActionProcessor[
-        SearchResourceGroupsAction, SearchResourceGroupsActionResult
+        SearchResourceGroupsAction, BatchOpsResult[ResourceGroupData]
     ]
     scoped_search_resource_groups: ScopeActionProcessor[
         ScopedSearchResourceGroupsAction, ScopedBatchOpsResult[ResourceGroupData]
     ]
-    get_wsproxy_version: PublicActionProcessor[
+    get_wsproxy_version: ScopeActionProcessor[
         GetWsproxyVersionAction, GetWsproxyVersionActionResult
     ]
     get_resource_info: SingleEntityActionProcessor[
@@ -159,15 +158,11 @@ class ResourceGroupProcessors:
         self.update_resource_group = group.single_entity(
             UpdateResourceGroupAction, service.update_resource_group
         )
-        self.search_resource_groups = group.global_scope(
-            SearchResourceGroupsAction, service.search_resource_groups
-        )
-        self.scoped_search_resource_groups = group.scope_search_ops(
+        self.search_resource_groups = group.global_searcher_ops(SearchResourceGroupsAction)
+        self.scoped_search_resource_groups = group.scoped_search_ops(
             ScopedSearchResourceGroupsAction
         )
-        self.get_wsproxy_version = group.public(
-            GetWsproxyVersionAction, service.get_wsproxy_version
-        )
+        self.get_wsproxy_version = group.scope(GetWsproxyVersionAction, service.get_wsproxy_version)
         self.get_resource_info = group.single_entity(
             GetResourceInfoAction, service.get_resource_info
         )

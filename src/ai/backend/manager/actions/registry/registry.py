@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityData, FieldData
+from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
 from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
@@ -61,35 +61,7 @@ class ConcernGroups[TData: EntityData]:
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
     ) -> FieldGroup[TFieldData]:
-        return FieldGroup(self._deps, self._records, self._concern, meta, GLOBAL_ENTITY_TYPE)
-
-
-class ProcessorRegistry[TData: EntityData]:
-    _deps: ProcessorDependencies[TData]
-    _records: list[WiredProcessor]
-
-    def __init__(self, deps: ProcessorDependencies[TData]) -> None:
-        self._deps = deps
-        self._records = []
-
-    def concern(self, meta: ConcernMeta) -> ConcernGroups[TData]:
-        """The groups of one area, so every wiring made through them names it."""
-        return ConcernGroups(self._deps, self._records, meta.name)
-
-    def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
-        """A group for a domain that is its own area, which its entity type names."""
-        return ProcessorGroup(self._deps, self._records, meta.entity_type, meta)
-
-    def dangling_field_group[TFieldData: FieldData](
-        self, meta: FieldGroupMeta, data_cls: type[TFieldData]
-    ) -> FieldGroup[TFieldData]:
-        """The operations over a field kind whose owner is not fixed.
-
-        Reached from the registry rather than an entity group, unlike
-        :meth:`ProcessorGroup.field_group`: the owner's type is a value on the row, and
-        some rows have no owner at all.
-        """
-        return FieldGroup(self._deps, self._records, meta.field_type, meta, GLOBAL_ENTITY_TYPE)
+        return FieldGroup(self._deps, self._records, self._concern, meta, GlobalEntityType())
 
     def dangling_lookup_field_group[TFieldData: FieldData](
         self,
@@ -125,9 +97,9 @@ class ProcessorRegistry[TData: EntityData]:
         return LookupFieldGroup(
             self._deps,
             self._records,
-            meta.field_type,
+            self._concern,
             meta,
-            GLOBAL_ENTITY_TYPE,
+            GlobalEntityType(),
             owner_lookup,
             bulk_owner_lookup,
             partial_bulk_owner_lookup,
@@ -137,14 +109,57 @@ class ProcessorRegistry[TData: EntityData]:
     def _record_lookup(self, meta: FieldGroupMeta, action_cls: type[Any]) -> None:
         self._records.append(
             WiredProcessor(
-                concern=meta.field_type,
-                entity_type=GLOBAL_ENTITY_TYPE,
+                concern=self._concern,
+                entity_type=GlobalEntityType(),
                 field_type=meta.field_type,
                 action_cls=action_cls,
                 kind=ActionKind.LOOKUP,
                 gate=ActionGate.PERMISSION,
                 backing=ActionBacking.GENERIC,
             )
+        )
+
+
+class ProcessorRegistry[TData: EntityData]:
+    _deps: ProcessorDependencies[TData]
+    _records: list[WiredProcessor]
+
+    def __init__(self, deps: ProcessorDependencies[TData]) -> None:
+        self._deps = deps
+        self._records = []
+
+    def concern(self, meta: ConcernMeta) -> ConcernGroups[TData]:
+        """The groups of one area, so every wiring made through them names it."""
+        return ConcernGroups(self._deps, self._records, meta.name)
+
+    def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
+        """A group for a domain that is its own area, which its entity type names."""
+        return ProcessorGroup(self._deps, self._records, meta.entity_type, meta)
+
+    def dangling_field_group[TFieldData: FieldData](
+        self, meta: FieldGroupMeta, data_cls: type[TFieldData]
+    ) -> FieldGroup[TFieldData]:
+        """The operations over a field kind whose owner is not fixed.
+
+        Reached from the registry rather than an entity group, unlike
+        :meth:`ProcessorGroup.field_group`: the owner's type is a value on the row, and
+        some rows have no owner at all.
+        """
+        return FieldGroup(self._deps, self._records, meta.field_type, meta, GlobalEntityType())
+
+    def dangling_lookup_field_group[TFieldData: FieldData](
+        self,
+        meta: FieldGroupMeta,
+        data_cls: type[TFieldData],
+        owner_lookup_action_cls: type[LookupRuntimeFieldOwnerOpsAction[Any]],
+        bulk_owner_lookup_action_cls: type[LookupBulkRuntimeFieldOwnerOpsAction[Any]],
+    ) -> LookupFieldGroup[TFieldData]:
+        """:meth:`ConcernGroups.dangling_lookup_field_group` for a field kind that is its
+        own area, which its field type names."""
+        return ConcernGroups(
+            self._deps, self._records, meta.field_type
+        ).dangling_lookup_field_group(
+            meta, data_cls, owner_lookup_action_cls, bulk_owner_lookup_action_cls
         )
 
     def wired_processors(self) -> Sequence[WiredProcessor]:
@@ -154,3 +169,19 @@ class ProcessorRegistry[TData: EntityData]:
     def wired_actions(self) -> Sequence[type[Any]]:
         """Every action class wired through this registry's groups, in wiring order."""
         return tuple(r.action_cls for r in self._records)
+
+    def role_grantable_wirings(self) -> Sequence[WiredProcessor]:
+        """Every wiring a role may permit — the ones asking the caller for a permission
+        on an entity a permission row can name.
+
+        Leaves out the global ones, whose scope the role matrix does not offer, and the
+        relations, which name no entity to hold a permission on.
+        """
+        return tuple(
+            record
+            for record in self._records
+            if record.gate is ActionGate.PERMISSION
+            and record.kind is not ActionKind.GLOBAL
+            and record.entity_type is not None
+            and record.entity_type != GlobalEntityType()
+        )

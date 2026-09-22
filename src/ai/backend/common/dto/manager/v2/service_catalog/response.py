@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
     EndpointInfo,
     ServiceCatalogStatus,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchServiceCatalogsPayload",
@@ -30,6 +31,9 @@ class ServiceCatalogNode(BaseResponseModel):
     """Node model representing a service catalog entry."""
 
     id: UUID = Field(description="Service catalog entry ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the service catalog. Added in {NEXT_RELEASE_VERSION}.",
+    )
     service_group: str = Field(description="Service group name")
     instance_id: str = Field(description="Unique instance identifier")
     display_name: str = Field(description="Human-readable display name")

@@ -77,7 +77,9 @@ async def resource_slot_types(
     payload = await info.context.adapters.resource_slot.search_slot_types(search_input)
 
     nodes = [ResourceSlotTypeGQL.from_pydantic(item) for item in payload.items]
-    edges = [ResourceSlotTypeEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    edges = [
+        ResourceSlotTypeEdgeGQL(node=node, cursor=encode_cursor(node.entity_id)) for node in nodes
+    ]
 
     return ResourceSlotTypeConnectionGQL(
         edges=edges,

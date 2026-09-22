@@ -12,6 +12,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskResult,
 )
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
@@ -29,8 +30,6 @@ from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 
 if TYPE_CHECKING:
@@ -63,8 +62,13 @@ class CommitSessionManifest(BaseBackgroundTaskManifest):
     """
 
     session_id: SessionId = Field(description="Session ID to commit")
+    registry_id: ContainerRegistryID | None = Field(
+        default=None, description="Selected container registry ID"
+    )
     registry_hostname: str = Field(description="Registry hostname to push the image")
-    registry_project: str = Field(description="Registry project name")
+    registry_project: str | None = Field(
+        default=None, description="Registry project name, absent for a registry without one"
+    )
     image_name: str = Field(description="Name for the customized image")
     image_visibility: CustomizedImageVisibilityScope = Field(
         description="Visibility scope of the customized image"
@@ -117,12 +121,13 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 raise SessionNotFound(f"Session {manifest.session_id} not found")
 
             # Get registry configuration
-            registry_conf = await self._session_repository.get_container_registry(
-                manifest.registry_hostname, manifest.registry_project
-            )
-            if not registry_conf:
-                raise ContainerRegistryNotFound(
-                    f"Project {manifest.registry_project} not found in registry {manifest.registry_hostname}"
+            if manifest.registry_id is not None:
+                registry_conf = await self._session_repository.get_container_registry_by_id(
+                    manifest.registry_id
+                )
+            else:
+                registry_conf = await self._session_repository.get_container_registry(
+                    manifest.registry_hostname, manifest.registry_project
                 )
 
             # Resolve base image
@@ -132,11 +137,10 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 )
             # The base image may have been deleted while the session is still
             # running, so include non-alive images when resolving it.
-            image_row = await self._session_repository.resolve_image(
-                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
-                alive_only=False,
+            image_data = await self._session_repository.resolve_image_by_canonical(
+                session.main_kernel.image, session.main_kernel.architecture, alive_only=False
             )
-            base_image_ref = image_row.image_ref
+            base_image_ref = image_data.image_ref
 
             # Build new image canonical name
             filtered_tag_set = [
@@ -148,7 +152,8 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
             else:
                 new_name = base_image_ref.name
 
-            new_canonical = f"{manifest.registry_hostname}/{manifest.registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            project_prefix = f"{manifest.registry_project}/" if manifest.registry_project else ""
+            new_canonical = f"{manifest.registry_hostname}/{project_prefix}{new_name}:{'-'.join(filtered_tag_set)}"
 
             # Check for existing customized image
             existing_row = await self._session_repository.get_existing_customized_image(

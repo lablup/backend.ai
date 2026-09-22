@@ -9,10 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -68,24 +65,3 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         server_default="{}",
     )
-
-    def to_data(self) -> DeploymentPolicyData:
-        """Convert to DeploymentPolicyData dataclass."""
-        return DeploymentPolicyData(
-            id=self.id,
-            endpoint=self.endpoint,
-            strategy=self.strategy,
-            strategy_spec=self.get_strategy_spec(),
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
-
-    def get_strategy_spec(self) -> RollingUpdateSpec | BlueGreenSpec:
-        """Parse strategy spec to the appropriate Pydantic model based on strategy type."""
-        match self.strategy:
-            case DeploymentStrategy.ROLLING:
-                return RollingUpdateSpec.model_validate(self.strategy_spec or {})
-            case DeploymentStrategy.BLUE_GREEN:
-                return BlueGreenSpec.model_validate(self.strategy_spec or {})
-            case _:
-                raise InvalidDeploymentStrategy(f"Unknown deployment strategy: {self.strategy}")

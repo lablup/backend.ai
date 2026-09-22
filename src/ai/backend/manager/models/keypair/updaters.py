@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -14,8 +13,8 @@ from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.user import KeyPairForbidden
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
@@ -38,7 +37,7 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override
@@ -52,7 +51,7 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -72,7 +71,7 @@ class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override
@@ -86,7 +85,7 @@ class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -115,7 +114,7 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override
@@ -124,7 +123,7 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
             return ()
         return (
             GuardCheck(
-                condition=KeypairConditions.by_is_default(False),
+                condition=KeyPairSearchableFields.own.is_default.filter.equals(False),
                 error=KeyPairForbidden(
                     "Cannot deactivate the default access key. Switch the default access key first."
                 ),
@@ -156,4 +155,4 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)

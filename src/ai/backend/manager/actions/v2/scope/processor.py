@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
@@ -15,6 +14,7 @@ from ai.backend.manager.actions.v2.scope.result import (
     ScopeActionResultMeta,
 )
 from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 __all__ = ("ScopeActionProcessor",)
 
@@ -33,19 +33,19 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult: BaseScopeActionRes
 
     _func: Callable[[TAction], Awaitable[TResult]]
     _monitors: Sequence[ScopeActionMonitor]
-    _validators: Sequence[ScopeActionValidator]
+    _validators: Sequence[ScopeActionValidator[TAction]]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         monitors: Sequence[ScopeActionMonitor] | None = None,
-        validators: Sequence[ScopeActionValidator] | None = None,
+        validators: Sequence[ScopeActionValidator[TAction]] | None = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
         self._validators = validators or []
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -63,7 +63,7 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult: BaseScopeActionRes
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
         entity_ids: Sequence[EntityIdentifier] = []

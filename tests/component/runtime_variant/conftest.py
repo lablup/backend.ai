@@ -16,7 +16,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -25,18 +25,28 @@ from ai.backend.manager.api.rest.v2.runtime_variant.handler import V2RuntimeVari
 from ai.backend.manager.api.rest.v2.runtime_variant.registry import (
     register_v2_runtime_variant_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
 def runtime_variant_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> RuntimeVariantProcessors:
     return RuntimeVariantProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE))
+        group=ops_processor_group(
+            database_engine, GroupMeta(RuntimeVariantEntityType()), config_provider
+        ),
+        service=RuntimeVariantService(
+            RuntimeVariantRepository(database_engine, V2DBOpsProvider(database_engine))
+        ),
     )
 
 
@@ -49,7 +59,7 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.runtime_variant = runtime_variant_processors
 
-    adapter = RuntimeVariantAdapter(processors)
+    adapter = RuntimeVariantAdapter(processors.runtime_variant)
 
     handler = V2RuntimeVariantHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

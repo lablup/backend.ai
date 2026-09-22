@@ -9,38 +9,31 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     AssignedUserOrderField,
-    EntityType,
-    OperationType,
     OrderDirection,
-    PermissionStatus,
     RoleOrderField,
     RoleSource,
     RoleStatus,
-    ScopeOrderField,
 )
 
 __all__ = (
     "AssignRoleRequest",
     "AssignedUserFilter",
     "AssignedUserOrder",
-    "CreateObjectPermissionRequest",
     "CreatePermissionRequest",
     "CreateRoleRequest",
     "RevokeRoleRequest",
     "RoleFilter",
     "RoleOrder",
-    "ScopeFilter",
-    "ScopeOrder",
-    "SearchEntitiesRequest",
     "SearchRolesRequest",
-    "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
     "StringFilter",
     "UpdateRoleRequest",
@@ -51,8 +44,9 @@ class CreateRoleRequest(BaseRequestModel):
     """Request to create a role."""
 
     name: str = Field(description="Role name")
-    source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
-    status: RoleStatus = Field(default=RoleStatus.ACTIVE, description="Role status")
+    scope_type: DeclaredEntityType = Field(description="Type of the scope the role belongs to")
+    scope_id: UUID = Field(description="ID of the scope the role belongs to")
+    status: RoleStatus | None = Field(default=None, description="Role status; active if omitted")
     description: str | None = Field(default=None, description="Role description")
 
 
@@ -62,8 +56,8 @@ class UpdateRoleRequest(BaseRequestModel):
     name: str | None = Field(default=None, description="Updated role name")
     source: RoleSource | None = Field(default=None, description="Updated role source")
     status: RoleStatus | None = Field(default=None, description="Updated role status")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated role description"
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
 
 
@@ -152,52 +146,5 @@ class CreatePermissionRequest(BaseRequestModel):
     """Request to create a permission."""
 
     role_id: UUID = Field(description="Role ID for the permission")
-    scope_type: ScopeType = Field(description="Scope type for the permission")
-    scope_id: str = Field(description="Scope ID for the permission")
-    entity_type: EntityType = Field(description="Entity type for the permission")
-    operation: OperationType = Field(description="Operation type for the permission")
-
-
-class CreateObjectPermissionRequest(BaseRequestModel):
-    """Request to create an object permission for a role."""
-
-    role_id: UUID = Field(description="Role ID to add the object permission to")
-    entity_type: EntityType = Field(description="Entity type for the object permission")
-    entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
-    operation: OperationType = Field(description="Operation type for the object permission")
-    status: PermissionStatus = Field(
-        default=PermissionStatus.ACTIVE, description="Permission status"
-    )
-
-
-class ScopeFilter(BaseRequestModel):
-    """Filter for scopes."""
-
-    name: StringFilter | None = Field(default=None, description="Filter by name")
-
-
-class ScopeOrder(BaseRequestModel):
-    """Order specification for scopes."""
-
-    field: ScopeOrderField = Field(description="Field to order by")
-    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
-
-
-class SearchScopesRequest(BaseRequestModel):
-    """Request body for searching scopes with filters and pagination."""
-
-    filter: ScopeFilter | None = Field(default=None, description="Filter conditions")
-    order: list[ScopeOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(
-        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
-
-
-class SearchEntitiesRequest(BaseRequestModel):
-    """Request body for searching entities within a scope."""
-
-    limit: int = Field(
-        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    entity_type: DeclaredEntityType = Field(description="Entity type for the permission")
+    permission: PermissionBitDTO = Field(description="The operation bit the row holds")

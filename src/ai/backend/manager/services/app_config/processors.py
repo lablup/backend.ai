@@ -184,8 +184,10 @@ class AppConfigProcessors:
         self.definition_bulk_get = definition_group.partial_bulk_get_ops(
             BulkGetAppConfigDefinitionsAction
         )
-        self.definition_purge = definition_group.entity_purge_ops(PurgeAppConfigDefinitionAction)
-        self.definition_global_search = definition_group.global_search_ops(
+        self.definition_purge = definition_group.single_entity(
+            PurgeAppConfigDefinitionAction, service.purge_definition
+        )
+        self.definition_global_search = definition_group.global_searcher_ops(
             AdminSearchAppConfigDefinitionsAction
         )
 
@@ -197,8 +199,10 @@ class AppConfigProcessors:
             BulkGetAppConfigAllowListsAction
         )
         self.allow_list_update = allow_list_group.single_update_ops(UpdateAppConfigAllowListAction)
-        self.allow_list_purge = allow_list_group.entity_purge_ops(PurgeAppConfigAllowListAction)
-        self.allow_list_global_search = allow_list_group.global_search_ops(
+        self.allow_list_purge = allow_list_group.single_entity(
+            PurgeAppConfigAllowListAction, service.purge_allow_list
+        )
+        self.allow_list_global_search = allow_list_group.global_searcher_ops(
             AdminSearchAppConfigAllowListAction
         )
 
@@ -212,7 +216,7 @@ class AppConfigProcessors:
         self.fragment_bulk_get = fragment_group.partial_bulk_get_ops(
             BulkGetAppConfigFragmentsAction
         )
-        self.fragment_admin_search = fragment_group.global_search_ops(
+        self.fragment_admin_search = fragment_group.global_searcher_ops(
             AdminSearchAppConfigFragmentAction
         )
         self.fragment_scoped_search = fragment_group.scope_search_ops(

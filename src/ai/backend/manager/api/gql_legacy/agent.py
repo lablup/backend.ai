@@ -17,8 +17,10 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -35,11 +37,12 @@ from ai.backend.manager.models.agent import (
     AgentStatus,
     agents,
 )
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project import AssocGroupUserRow
+from ai.backend.manager.models.project import AssocGroupUserRow, groups
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
@@ -654,33 +657,24 @@ async def _query_domain_groups_by_ak(
     db_conn: SAConnection,
     access_key: str,
     domain_name: str | None,
-) -> tuple[str, list[ProjectID]]:
-    kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-    group_join: sa.FromClause
-    if domain_name is None:
-        domain_query = (
-            sa.select(users.c.uuid, users.c.domain_name)
-            .select_from(kp_user_join)
-            .where(keypairs.c.access_key == access_key)
-        )
-        row = (await db_conn.execute(domain_query)).first()
-        if row is None:
-            raise ValueError(f"No user found for access_key: {access_key}")
-        user_domain = row.domain_name
-        user_id = row.uuid
-        group_join = AssocGroupUserRow.__table__
-        group_cond = AssocGroupUserRow.user_id == user_id
-    else:
-        user_domain = domain_name
-        group_join = kp_user_join.join(
-            AssocGroupUserRow,
-            AssocGroupUserRow.user_id == users.c.uuid,
-        )
-        group_cond = keypairs.c.access_key == access_key
-    query = sa.select(AssocGroupUserRow.group_id).select_from(group_join).where(group_cond)
+) -> tuple[str, UserID, list[ProjectID]]:
+    user_query = (
+        sa.select(users.c.uuid, users.c.domain_name)
+        .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
+        .where(keypairs.c.access_key == access_key)
+    )
+    row = (await db_conn.execute(user_query)).first()
+    if row is None:
+        raise ValueError(f"No user found for access_key: {access_key}")
+    user_domain = domain_name if domain_name is not None else row.domain_name
+    query = (
+        sa.select(AssocGroupUserRow.group_id)
+        .select_from(sa.join(AssocGroupUserRow, groups, AssocGroupUserRow.group_id == groups.c.id))
+        .where((AssocGroupUserRow.user_id == row.uuid) & (groups.c.domain_name == user_domain))
+    )
     rows = (await db_conn.execute(query)).fetchall()
-    group_ids = [ProjectID(row.group_id) for row in rows]
-    return user_domain, group_ids
+    group_ids = [ProjectID(group_row.group_id) for group_row in rows]
+    return user_domain, UserID(row.uuid), group_ids
 
 
 async def _append_sgroup_from_clause(
@@ -690,16 +684,20 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select[Any]:
-    from ai.backend.manager.models.resource_group import query_allowed_sgroups
-
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)
     else:
         async with graph_ctx.db.begin_readonly() as conn:
-            domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key, domain_name)
-            sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
-            names = [sgroup.name for sgroup in sgroups]
-        query = query.where(AgentRow.scaling_group.in_(names))
+            domain_name, user_id, group_ids = await _query_domain_groups_by_ak(
+                conn, access_key, domain_name
+            )
+        domain_id = await graph_ctx.scheduler_repository.get_domain_id_by_name(
+            DomainName(domain_name)
+        )
+        allowed = await graph_ctx.scheduler_repository.query_allowed_resource_groups(
+            domain_id=domain_id, project_ids=group_ids, user_id=user_id
+        )
+        query = query.where(AgentRow.scaling_group.in_([rg.name for rg in allowed]))
     return query
 
 
@@ -786,7 +784,7 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
             return [
                 cls.from_data(
                     AgentDetailData(
-                        agent=agent.to_data(),
+                        agent=AgentSearchableFields.own.to_data(agent),
                         resources=agent.resources_by_rank(),
                         permissions=[],
                     )

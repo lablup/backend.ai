@@ -18,4 +18,4 @@ class ServiceCatalogProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[ServiceCatalogData]) -> None:
-        self.global_search_service_catalogs = group.global_search_ops(SearchServiceCatalogsAction)
+        self.global_search_service_catalogs = group.global_searcher_ops(SearchServiceCatalogsAction)

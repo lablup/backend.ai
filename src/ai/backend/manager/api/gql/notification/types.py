@@ -12,6 +12,8 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.data.entity.notification import NotificationChannelID, NotificationRuleID
+
 # NOTE: NotificationChannelSpecGQL uses @gql_pydantic_interface so Strawberry
 # dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
 # EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
@@ -104,6 +106,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -209,6 +212,12 @@ class EmailSpecGQL(NotificationChannelSpecGQL):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification channel."))
 class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the notification channel.",
+        ),
+    )
     name: str
     description: str | None
     channel_type: NotificationChannelTypeGQL
@@ -226,13 +235,19 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
         required: bool = False,
     ) -> Iterable[NotificationChannel | None]:
         return await info.context.data_loaders.notification_channel_loader.load_many([
-            UUID(nid) for nid in node_ids
+            NotificationChannelID(UUID(nid)) for nid in node_ids
         ])
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification rule."))
 class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the notification rule.",
+        ),
+    )
     name: str
     description: str | None
     rule_type: NotificationRuleTypeGQL
@@ -253,7 +268,9 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         The rule names its channel by id, so a client that skips the channel skips the
         read. Non-null because ``notification_rules.channel_id`` is.
         """
-        channel = await info.context.data_loaders.notification_channel_loader.load(self.channel_id)
+        channel = await info.context.data_loaders.notification_channel_loader.load(
+            NotificationChannelID(self.channel_id)
+        )
         if channel is None:
             raise NotificationChannelNotFound(f"Notification channel {self.channel_id} not found")
         return channel
@@ -268,7 +285,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         required: bool = False,
     ) -> Iterable[NotificationRule | None]:
         return await info.context.data_loaders.notification_rule_loader.load_many([
-            UUID(nid) for nid in node_ids
+            NotificationRuleID(UUID(nid)) for nid in node_ids
         ])
 
 

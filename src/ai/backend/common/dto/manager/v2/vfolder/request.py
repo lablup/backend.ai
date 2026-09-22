@@ -9,11 +9,13 @@ from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -142,19 +144,23 @@ class CreateVFolderInScopeInput(BaseRequestModel):
 class UpdateVFolderInput(BaseRequestModel):
     """Input for updating a virtual folder."""
 
-    name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated vfolder name. Use SENTINEL (default) for no change.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated vfolder name. Omit to leave unchanged.",
     )
-    cloneable: bool | None = Field(default=None, description="Updated cloneable setting")
-    permission: VFolderPermissionField | None = Field(
-        default=None, description="Updated permission level"
+    cloneable: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated cloneable setting. Omit to leave unchanged.",
+    )
+    permission: VFolderPermissionField | None | Unset = Field(
+        default=UNSET,
+        description="Updated permission level. Omit to leave unchanged.",
     )
 
     @field_validator("name")
     @classmethod
-    def strip_and_validate_name(cls, v: str | Sentinel | None) -> str | Sentinel | None:
-        if v is None or isinstance(v, Sentinel):
+    def strip_and_validate_name(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -344,6 +350,21 @@ class UnshareVFolderInput(BaseRequestModel):
     emails: list[str] = Field(description="Email addresses of users to unshare from")
 
 
+class SetVFolderMountPolicyInput(BaseRequestModel):
+    """Input for setting the mount level one user gets on a virtual folder."""
+
+    user_id: UUID = Field(description="User the mount level is set for")
+    permission: VFolderPermissionField = Field(
+        description="Mount level: none, ro or rw. wd is stored as rw."
+    )
+
+
+class UnsetVFolderMountPolicyInput(BaseRequestModel):
+    """Input for taking back the mount level one user was given on a virtual folder."""
+
+    user_id: UUID = Field(description="User whose mount level is taken back")
+
+
 class AcceptInvitationInput(BaseRequestModel):
     """Input for accepting a virtual folder invitation."""
 
@@ -395,6 +416,13 @@ class VFolderOrder(BaseRequestModel):
 class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
+    usage: VFolderUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "vfolders the caller cannot read are left out."
+        ),
+    )
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
@@ -403,6 +431,12 @@ class SearchVFoldersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchVFoldersInput(SearchVFoldersInput):
+    """Input for searching the vfolders the named scopes reach."""
+
+    scope: VFolderScope = Field(description="Scope (OR across all items).")
 
 
 # ============================================================

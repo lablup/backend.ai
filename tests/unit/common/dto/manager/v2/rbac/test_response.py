@@ -5,17 +5,25 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+import pytest
+
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
     DeleteRolePayload,
+    PermissionNode,
     PurgeRolePayload,
     RoleNode,
     UpdateRolePayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    PermissionBitDTO,
     RoleSourceDTO,
     RoleStatusDTO,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
+
+_SCOPE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 class TestRoleNodeCreation:
@@ -26,12 +34,15 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             description="Administrator role",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=None,
         )
         assert node.id == role_id
@@ -48,11 +59,14 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.id == role_id
         assert node.description is None
@@ -63,11 +77,14 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="TestRole",
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.description is None
 
@@ -76,12 +93,15 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="TestRole",
             description=None,
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.description is None
 
@@ -90,11 +110,14 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="DeletedRole",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=now,
         )
         assert node.deleted_at == now
@@ -105,11 +128,14 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="SystemRole",
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.source == RoleSourceDTO.SYSTEM
 
@@ -118,11 +144,14 @@ class TestRoleNodeCreation:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="InactiveRole",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         assert node.status == RoleStatusDTO.INACTIVE
 
@@ -135,11 +164,14 @@ class TestCreateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = CreateRolePayload(role=role_node)
         assert payload.role.name == "Admin"
@@ -150,12 +182,15 @@ class TestCreateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             description="Admin role",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = CreateRolePayload(role=role_node)
         assert payload.role.name == "Admin"
@@ -166,11 +201,14 @@ class TestCreateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = CreateRolePayload(role=role_node)
         json_str = payload.model_dump_json()
@@ -188,11 +226,14 @@ class TestUpdateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="UpdatedAdmin",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = UpdateRolePayload(role=role_node)
         assert payload.role.name == "UpdatedAdmin"
@@ -203,12 +244,15 @@ class TestUpdateRolePayload:
         now = datetime.now(tz=UTC)
         role_node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="UpdatedAdmin",
             description="Updated description",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         payload = UpdateRolePayload(role=role_node)
         json_str = payload.model_dump_json()
@@ -284,12 +328,15 @@ class TestRoleNodeRoundTrip:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="Admin",
             description="Admin role",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=None,
         )
         json_str = node.model_dump_json()
@@ -306,11 +353,14 @@ class TestRoleNodeRoundTrip:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="DeletedRole",
             source=RoleSourceDTO.CUSTOM,
             status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
             deleted_at=now,
         )
         json_str = node.model_dump_json()
@@ -324,13 +374,80 @@ class TestRoleNodeRoundTrip:
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
+            entity_id=role_id,
             name="BasicRole",
             source=RoleSourceDTO.SYSTEM,
             status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
         )
         json_str = node.model_dump_json()
         restored = RoleNode.model_validate_json(json_str)
         assert restored.id == role_id
         assert restored.name == "BasicRole"
+
+
+class TestRoleNodeScope:
+    """The role names the one scope it belongs to."""
+
+    def test_the_scope_is_required(self) -> None:
+        now = datetime.now(tz=UTC).isoformat()
+        with pytest.raises(BackendAISchemaValidationFailed):
+            RoleNode.model_validate({
+                "id": str(uuid.uuid4()),
+                "name": "Scopeless",
+                "source": RoleSourceDTO.CUSTOM.value,
+                "status": RoleStatusDTO.ACTIVE.value,
+                "created_at": now,
+                "updated_at": now,
+            })
+
+    def test_the_scope_survives_a_round_trip(self) -> None:
+        now = datetime.now(tz=UTC)
+        node = RoleNode(
+            id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
+            name="Scoped",
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
+            created_at=now,
+            updated_at=now,
+            scope_type=EntityType("domain"),
+            scope_id=_SCOPE_ID,
+        )
+
+        restored = RoleNode.model_validate_json(node.model_dump_json())
+
+        assert restored.scope_type == "domain"
+        assert restored.scope_id == _SCOPE_ID
+
+
+class TestPermissionNodeBit:
+    """A permission row names the bit it holds."""
+
+    def _node(self, permission: PermissionBitDTO) -> PermissionNode:
+        return PermissionNode(
+            id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
+            role_id=uuid.uuid4(),
+            entity_type=EntityType("vfolder"),
+            permission=permission,
+            created_at=datetime.now(tz=UTC),
+        )
+
+    def test_the_bit_is_carried(self) -> None:
+        node = self._node(PermissionBitDTO.SOFT_DELETE)
+
+        assert node.permission == PermissionBitDTO.SOFT_DELETE
+        assert node.permission.value == "soft_delete"
+
+    def test_the_bit_is_required(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            PermissionNode.model_validate({
+                "id": str(uuid.uuid4()),
+                "role_id": str(uuid.uuid4()),
+                "entity_type": "vfolder",
+                "created_at": datetime.now(tz=UTC).isoformat(),
+            })

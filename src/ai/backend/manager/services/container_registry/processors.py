@@ -1,9 +1,15 @@
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
 )
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -50,7 +56,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
-    SearchContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+    SetContainerRegistryGlobalActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
@@ -81,12 +90,17 @@ class ContainerRegistryProcessors:
     update_container_registry: GlobalActionProcessor[
         UpdateContainerRegistryAction, UpdateContainerRegistryActionResult
     ]
+    set_container_registry_global: MembershipActionProcessor[
+        SetContainerRegistryGlobalAction, SetContainerRegistryGlobalActionResult
+    ]
     delete_container_registry: GlobalActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
     ]
     search_container_registries: GlobalActionProcessor[
-        SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
+        SearchContainerRegistriesAction, BatchOpsResult[ContainerRegistryData]
     ]
+    # What the DataLoader reads: checked per registry.
+    bulk_get: PartialBulkActionProcessor[BulkGetContainerRegistriesAction, ContainerRegistryData]
     handle_harbor_webhook: AnonymousGlobalActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
     ]
@@ -123,12 +137,16 @@ class ContainerRegistryProcessors:
         self.update_container_registry = group.global_scope(
             UpdateContainerRegistryAction, service.update_container_registry
         )
+        self.set_container_registry_global = group.membership(
+            SetContainerRegistryGlobalAction, service.set_container_registry_global
+        )
         self.delete_container_registry = group.global_scope(
             DeleteContainerRegistryAction, service.delete_container_registry
         )
-        self.search_container_registries = group.global_scope(
-            SearchContainerRegistriesAction, service.search_container_registries
+        self.search_container_registries = group.global_searcher_ops(
+            SearchContainerRegistriesAction
         )
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetContainerRegistriesAction)
         # Harbor holds no keypair; the service checks its webhook secret instead.
         self.handle_harbor_webhook = group.anonymous_global(
             HandleHarborWebhookAction, service.handle_harbor_webhook

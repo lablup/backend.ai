@@ -39,6 +39,7 @@ def _make_metadata(
         session_type=session_type,
         cluster_mode=cluster_mode,
         cluster_size=cluster_size,
+        tier=priority,
         priority=priority,
         job_priority=job_priority,
         is_preemptible=is_preemptible,
@@ -57,6 +58,7 @@ def _make_metadata_gql_dto(
         session_type=session_type,
         cluster_mode=cluster_mode,
         cluster_size=cluster_size,
+        tier=priority,
         priority=priority,
         job_priority=job_priority,
         is_preemptible=is_preemptible,
@@ -96,6 +98,7 @@ def _make_network(use_host_network: bool = False) -> SessionNetworkInfo:
 def _make_session_node() -> SessionNode:
     return SessionNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         domain_name="default",
         user_id=uuid.uuid4(),
         project_id=uuid.uuid4(),
@@ -115,6 +118,7 @@ class TestSessionMetadataInfo:
             session_type="interactive",
             cluster_mode="single-node",
             cluster_size=1,
+            tier=0,
             priority=0,
             job_priority=0,
             is_preemptible=False,
@@ -141,6 +145,7 @@ class TestSessionMetadataInfo:
             access_key="AKIAIOSFODNN7EXAMPLE",
             cluster_mode="multi-node",
             cluster_size=4,
+            tier=5,
             priority=5,
             job_priority=-3,
             is_preemptible=True,
@@ -311,6 +316,7 @@ class TestSessionNode:
         session_id = uuid.uuid4()
         node = SessionNode(
             id=session_id,
+            entity_id=session_id,
             domain_name="default",
             user_id=uuid.uuid4(),
             project_id=uuid.uuid4(),
@@ -369,6 +375,7 @@ class TestSessionNode:
         replica_id = uuid.uuid4()
         node = SessionNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             domain_name="default",
             user_id=uuid.uuid4(),
             project_id=uuid.uuid4(),

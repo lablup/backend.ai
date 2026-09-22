@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.types import ResourceSlot, SlotQuantity
@@ -43,7 +44,7 @@ class ResourceSlotTypeData(EntityData):
     """One registered resource slot type.
 
     ``slot_name`` is the primary key and the five referencing tables' FK target;
-    ``uuid`` is the unique alternate key that gives the entity its ``EntityID``.
+    ``uuid`` is the unique alternate key that gives the entity its ``EntityIdentifier``.
     """
 
     uuid: ResourceSlotTypeUUID
@@ -76,27 +77,12 @@ class AgentResourceData(FieldData):
 
 
 @dataclass(frozen=True)
-class AgentResourceSearchResult:
-    items: list[AgentResourceData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass(frozen=True)
 class ResourceAllocationData(FieldData):
+    id: ResourceAllocationID
     kernel_id: uuid.UUID
     slot_name: str
     requested: Decimal
     used: Decimal | None
-
-
-@dataclass(frozen=True)
-class ResourceAllocationSearchResult:
-    items: list[ResourceAllocationData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
 
 
 @dataclass(frozen=True)

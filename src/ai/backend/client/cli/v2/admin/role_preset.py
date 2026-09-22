@@ -41,7 +41,7 @@ def role_preset() -> None:
 @click.option(
     "--permissions",
     default=None,
-    help='Permission entries as JSON or @file: [{"entity_type": "...", "operation": "..."}].',
+    help='Permission entries as JSON or @file: [{"entity_type": "...", "permission": "..."}].',
 )
 def create(
     name: str,
@@ -50,7 +50,7 @@ def create(
     permissions: str | None,
 ) -> None:
     """Create a new role preset."""
-    from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
+    from ai.backend.common.data.entity.types import EntityType
     from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
         RolePermissionPresetEntry,
     )
@@ -66,7 +66,7 @@ def create(
             result = await registry.role_preset.create(
                 CreateRolePresetInput(
                     name=name,
-                    scope_type=RBACElementTypeDTO(scope_type),
+                    scope_type=EntityType(scope_type),
                     auto_assign=auto_assign,
                     permissions=entries,
                 ),
@@ -155,7 +155,6 @@ def search(
 ) -> None:
     """Search role presets across the system."""
     from ai.backend.common.dto.manager.query import StringFilter
-    from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
     from ai.backend.common.dto.manager.v2.role_preset.request import (
         RolePresetFilter,
         RolePresetOrder,
@@ -167,7 +166,7 @@ def search(
     if any(v is not None for v in (name_contains, scope_type, auto_assign, deleted)):
         filter_dto = RolePresetFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
-            scope_type=RBACElementTypeDTO(scope_type) if scope_type is not None else None,
+            scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             auto_assign=auto_assign,
             deleted=deleted,
         )
@@ -296,7 +295,7 @@ def purge(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option("--entity-type", default=None, help="Filter by entity type.")
-@click.option("--operation", default=None, help="Filter by granted operation.")
+@click.option("--permission", default=None, help="Filter by the operation bit granted.")
 @click.option(
     "--order-by",
     multiple=True,
@@ -307,16 +306,15 @@ def permission_search(
     limit: int | None,
     offset: int | None,
     entity_type: str | None,
-    operation: str | None,
+    permission: str | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search the permission entries belonging to a single role preset."""
     from ai.backend.common.data.entity.role_preset import RolePresetID
+    from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.rbac.types import (
-        OperationTypeDTO,
-        OperationTypeFilter,
-        RBACElementTypeDTO,
-        RBACElementTypeFilter,
+        PermissionBitDTO,
+        PermissionBitFilter,
     )
     from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
         RolePermissionPresetFilter,
@@ -328,16 +326,12 @@ def permission_search(
     )
 
     filter_dto: RolePermissionPresetFilter | None = None
-    if entity_type is not None or operation is not None:
+    if entity_type is not None or permission is not None:
         filter_dto = RolePermissionPresetFilter(
-            entity_type=(
-                RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type))
-                if entity_type is not None
-                else None
-            ),
-            operation=(
-                OperationTypeFilter(equals=OperationTypeDTO(operation))
-                if operation is not None
+            entity_type=(StringFilter(equals=entity_type) if entity_type is not None else None),
+            permission=(
+                PermissionBitFilter(equals=PermissionBitDTO(permission))
+                if permission is not None
                 else None
             ),
         )
@@ -372,7 +366,7 @@ def permission_search(
 @click.option(
     "--permissions",
     required=True,
-    help='Permission entries as JSON or @file: [{"entity_type": "...", "operation": "..."}].',
+    help='Permission entries as JSON or @file: [{"entity_type": "...", "permission": "..."}].',
 )
 def permission_add(role_preset_id: uuid.UUID, permissions: str) -> None:
     """Bulk-add permission entries to an existing role preset."""

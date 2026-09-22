@@ -211,9 +211,13 @@ The Hive Gateway serves the federated GraphQL schema. Regenerate when:
 cp docs/manager/graphql-reference/supergraph.graphql ./supergraph.graphql
 cp configs/graphql/gateway.config.ts ./gateway.config.ts
 
-# 3. Restart the gateway
-docker compose -f docker-compose.halfstack.current.yml restart backendai-half-apollo-router
+# 3. Recreate the gateway (docker configs are baked in at container creation,
+#    so `restart` would keep serving the old schema)
+docker compose -f docker-compose.halfstack.current.yml up -d --force-recreate --wait backendai-half-apollo-router
 ```
+
+Steps 1-3 in one command: `./scripts/refresh-graphql-gateway.sh --recreate`
+(without `--recreate` it only restarts the container, which keeps the old schema).
 
 If manager code is broken and `generate-graphql-schema.sh` fails,
 copy the last known-good supergraph from git:

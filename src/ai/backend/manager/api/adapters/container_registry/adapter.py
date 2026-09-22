@@ -8,7 +8,6 @@ from collections.abc import Sequence
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
     ContainerRegistryFilter,
@@ -24,29 +23,36 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     DeleteContainerRegistryPayload,
     UpdateContainerRegistryPayload,
 )
-from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
+from ai.backend.common.dto.manager.v2.container_registry.types import (
+    ContainerRegistryOrderField,
+    ContainerRegistryTypeFilter,
+    OrderDirection,
+)
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
-)
-from ai.backend.manager.models.container_registry.orders import (
-    DEFAULT_FORWARD_ORDER,
-    TIEBREAKER_ORDER,
-    resolve_order,
 )
 from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
+from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.services.container_registry.actions.bulk_get import (
+    BulkGetContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
@@ -56,19 +62,41 @@ from ai.backend.manager.services.container_registry.actions.delete_container_reg
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
 )
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+)
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+def _pagination_spec() -> PaginationSpec:
+    """How a page of registries is cut, in either mode. The order runs by id."""
+    return PaginationSpec(
+        forward_order=ContainerRegistrySearchableFields.own.id.order.apply(ascending=False),
+        cursor_column=ContainerRegistryRow.id,
+    )
 
 
 class ContainerRegistryAdapter(BaseAdapter):
     """Adapter for container registry domain operations."""
+
+    _container_registry: ContainerRegistryProcessors
+    _rbac: RbacProcessors
+
+    def __init__(
+        self,
+        container_registry: ContainerRegistryProcessors,
+        rbac: RbacProcessors,
+    ) -> None:
+        self._container_registry = container_registry
+        self._rbac = rbac
 
     async def admin_search(
         self,
@@ -84,12 +112,21 @@ class ContainerRegistryAdapter(BaseAdapter):
         """
         querier = self.build_querier(input)
 
-        action_result = await self._processors.container_registry.search_container_registries.run(
-            SearchContainerRegistriesAction(querier=querier)
+        action_result = await self._container_registry.search_container_registries.run(
+            SearchContainerRegistriesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ContainerRegistrySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         return AdminSearchContainerRegistriesPayload(
-            items=[self._data_to_dto(item) for item in action_result.data],
+            items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -111,7 +148,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             ssl_verify=input.ssl_verify,
             extra=input.extra,
         )
-        result = await self._processors.container_registry.create_container_registry.run(
+        result = await self._container_registry.create_container_registry.run(
             CreateContainerRegistryAction(creator=creator)
         )
         if input.allowed_groups is not None:
@@ -148,9 +185,6 @@ class ContainerRegistryAdapter(BaseAdapter):
                 if input.registry_name is not None
                 else OptionalState.nop()
             ),
-            is_global=(
-                TriState.update(input.is_global) if input.is_global is not None else TriState.nop()
-            ),
             project=(
                 TriState.update(input.project) if input.project is not None else TriState.nop()
             ),
@@ -167,10 +201,28 @@ class ContainerRegistryAdapter(BaseAdapter):
             ),
             extra=(TriState.update(input.extra) if input.extra is not None else TriState.nop()),
         )
-        result = await self._processors.container_registry.update_container_registry.run(
+        result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
-        return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
+        data = result.data
+        if input.is_global is not None:
+            data = await self.apply_global(ContainerRegistryID(input.id), input.is_global)
+        return UpdateContainerRegistryPayload(registry=self._data_to_dto(data))
+
+    async def apply_global(
+        self, registry_id: ContainerRegistryID, is_global: bool | None
+    ) -> ContainerRegistryData:
+        """Put the registry in the `public` scope or take it out, as its own run: that
+        changes who reads it, which a settings update does not.
+
+        ``None`` is the caller naming no value, which means global, as it does on create.
+        """
+        result = await self._container_registry.set_container_registry_global.run(
+            SetContainerRegistryGlobalAction(
+                registry_id=registry_id, is_global=True if is_global is None else is_global
+            )
+        )
+        return result.data
 
     async def apply_allowed_groups(
         self,
@@ -186,7 +238,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         repository wrote these rows beside the update.
         """
         if allowed_groups.add:
-            await self._processors.rbac.create_relation.run(
+            await self._rbac.create_relation.run(
                 CreateRelationAction(
                     pairs=[
                         RelationPair(scope=ProjectID(uuid.UUID(raw)), target=registry_id)
@@ -197,7 +249,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             )
         if not allowed_groups.remove:
             return
-        result = await self._processors.rbac.purge_relation.run(
+        result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[
                     RelationPair(scope=ProjectID(uuid.UUID(raw)), target=registry_id)
@@ -218,30 +270,41 @@ class ContainerRegistryAdapter(BaseAdapter):
     ) -> DeleteContainerRegistryPayload:
         """Delete a container registry (superadmin only). This is a hard delete."""
         purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(input.id))
-        await self._processors.container_registry.delete_container_registry.run(
+        await self._container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(purger=purger)
         )
         return DeleteContainerRegistryPayload(id=input.id)
 
     def build_querier(self, input: AdminSearchContainerRegistriesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
-        orders.append(TIEBREAKER_ORDER)
-        pagination = self._build_pagination(input)
+        """Build a BatchQuerier from the search input DTO.
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        Both pagination modes the request type carries are read here. Reading only
+        the offset pair dropped a caller's cursor without saying so.
+        """
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _convert_filter(self, filter: ContainerRegistryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.registry_name is not None:
-            condition = self._convert_string_filter(filter.registry_name)
-            if condition is not None:
-                conditions.append(condition)
+        fields = ContainerRegistrySearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter.registry_name, fields.registry_name.filter),
+        ]
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.is_global is not None:
-            conditions.append(ContainerRegistryConditions.by_is_global(filter.is_global))
+            conditions.append(fields.is_global.filter.equals(filter.is_global))
         if filter.AND:
             for sub_filter in filter.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -259,64 +322,53 @@ class ContainerRegistryAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ContainerRegistryConditions.by_registry_name_contains,
-            equals_factory=ContainerRegistryConditions.by_registry_name_equals,
-            starts_with_factory=ContainerRegistryConditions.by_registry_name_starts_with,
-            ends_with_factory=ContainerRegistryConditions.by_registry_name_ends_with,
-            in_factory=ContainerRegistryConditions.by_registry_name_in,
-        )
-
     @staticmethod
     def _convert_type_filter(tf: ContainerRegistryTypeFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+        conditions = ContainerRegistrySearchableFields.own.type.filter
+        result: list[QueryCondition] = []
         if tf.equals is not None:
-            conditions.append(ContainerRegistryConditions.by_type_equals(tf.equals))
+            result.append(conditions.equals(tf.equals))
         if tf.in_ is not None:
-            conditions.append(ContainerRegistryConditions.by_type_in(tf.in_))
+            result.append(conditions.in_(tf.in_))
         if tf.not_equals is not None:
-            conditions.append(ContainerRegistryConditions.by_type_not_equals(tf.not_equals))
+            result.append(conditions.not_equals(tf.not_equals))
         if tf.not_in is not None:
-            conditions.append(ContainerRegistryConditions.by_type_not_in(tf.not_in))
-        return conditions
+            result.append(conditions.not_in(tf.not_in))
+        return result
 
     @staticmethod
     def _convert_orders(order: list[ContainerRegistryOrder]) -> list[QueryOrder]:
-        return [resolve_order(o.field, o.direction) for o in order]
-
-    @staticmethod
-    def _build_pagination(input: AdminSearchContainerRegistriesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
+        fields = ContainerRegistrySearchableFields.own
+        columns = {
+            ContainerRegistryOrderField.REGISTRY_NAME: fields.registry_name.order,
+            ContainerRegistryOrderField.URL: fields.url.order,
+            ContainerRegistryOrderField.TYPE: fields.type.order,
+            ContainerRegistryOrderField.IS_GLOBAL: fields.is_global.order,
+        }
+        return [columns[o.field].apply(ascending=o.direction != OrderDirection.DESC) for o in order]
 
     async def batch_load_by_ids(
-        self, ids: Sequence[uuid.UUID]
-    ) -> list[ContainerRegistryNode | None]:
-        """Batch load container registries by IDs for DataLoader use.
-
-        Returns ContainerRegistryNode DTOs in the same order as the input ids list.
-        """
+        self, ids: Sequence[ContainerRegistryID]
+    ) -> list[ContainerRegistryNode | Exception | None]:
+        """Batch load container registries by IDs for DataLoader use, checked per registry."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[ContainerRegistryConditions.by_ids(ids)],
+        result = await self._container_registry.bulk_get.run(
+            BulkGetContainerRegistriesAction(ids=list(ids))
         )
-        action_result = await self._processors.container_registry.search_container_registries.run(
-            SearchContainerRegistriesAction(querier=querier)
-        )
-        registry_map = {item.id: self._data_to_dto(item) for item in action_result.data}
-        return [registry_map.get(ContainerRegistryID(registry_id)) for registry_id in ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     @staticmethod
     def _data_to_dto(data: ContainerRegistryData) -> ContainerRegistryNode:
         """Convert data layer type to Pydantic DTO."""
         return ContainerRegistryNode(
             id=data.id,
+            entity_id=data.entity_id(),
             url=data.url,
             registry_name=data.registry_name,
             type=data.type,

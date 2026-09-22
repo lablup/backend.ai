@@ -4,10 +4,14 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
+from ai.backend.common.dto.manager.v2.common import OrderDirection, String128
+from ai.backend.common.dto.manager.v2.runtime_variant.types import (
+    RuntimeVariantOrderField,
+    RuntimeVariantUsage,
+)
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class CreateRuntimeVariantInput(BaseRequestModel):
@@ -19,8 +23,13 @@ class CreateRuntimeVariantInput(BaseRequestModel):
 
 class UpdateRuntimeVariantInput(BaseRequestModel):
     id: UUID = Field(description="ID of the runtime variant to update.")
-    name: str | None = Field(default=None, min_length=1, max_length=128, description="New name.")
-    description: str | Sentinel | None = Field(default=SENTINEL, description="New description.")
+    name: String128 | None | Unset = Field(
+        default=UNSET,
+        description="New name. Omit to leave unchanged.",
+    )
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated description. Omit to leave unchanged; null clears."
+    )
 
 
 class DeleteRuntimeVariantsInput(BaseRequestModel):
@@ -45,6 +54,12 @@ class RuntimeVariantOrder(BaseRequestModel):
 
 
 class SearchRuntimeVariantsInput(BaseRequestModel):
+    usage: RuntimeVariantUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
+        ),
+    )
     filter: RuntimeVariantFilter | None = Field(default=None)
     order: list[RuntimeVariantOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)

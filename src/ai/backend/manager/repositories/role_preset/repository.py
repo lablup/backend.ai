@@ -6,17 +6,18 @@ commits ahead of the roles that stand for it.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import FieldIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetData,
 )
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
     RolePermissionPresetCreator,
 )
@@ -42,7 +43,11 @@ class RolePresetRepository:
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
-                raise EntityNotFoundError(f"RolePresetRow {updater.preset_id} not found")
+                raise EntityNotFoundError(
+                    entity_type=updater.preset_id.entity_type(),
+                    operation=ActionOperationType.UPDATE,
+                    extra_msg=f"RolePresetRow {updater.preset_id} not found",
+                )
             await w.sync_preset_roles(updater.preset_id)
             return data
 
@@ -68,3 +73,14 @@ class RolePresetRepository:
             for preset_id in {entry.role_preset_id for entry in result.successes.values()}:
                 await w.sync_preset_roles(preset_id)
             return result
+
+    async def provision_roles(
+        self,
+        creator_preset_ids: Collection[RolePresetID],
+        preset_scopes: Mapping[RolePresetID, EntityIdentifier],
+    ) -> None:
+        """Point the presets at their scopes, instantiate the active presets in every scope
+        lacking their role and grant what the scopes assign on their own, in one
+        transaction."""
+        async with self._ops.write_ops() as w:
+            await w.provision_preset_roles(creator_preset_ids, preset_scopes)

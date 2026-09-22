@@ -11,7 +11,13 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -23,9 +29,9 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
-    ResourcePresetSearchResult,
 )
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
@@ -36,10 +42,23 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.resource_group import query_allowed_sgroups
+from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
+from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
+from ai.backend.manager.models.resource_preset.queriers import ResourcePresetQuerier
+from ai.backend.manager.models.resource_preset.searchable_fields import (
+    ResourcePresetSearchableFields,
+)
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+    ResourcePresetUpdater,
+)
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -48,9 +67,8 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.resource_slot.types import (
     add_quantities,
     min_quantities,
@@ -78,21 +96,23 @@ class ResourcePresetDBSource:
     """Database source for resource preset operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: ShareOpsProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        v2_ops: ShareOpsProvider,
     ) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
-    async def create_preset(self, creator: Creator[ResourcePresetRow]) -> ResourcePresetData:
+    async def create_preset(self, creator: ResourcePresetCreator) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
-        async with self._db.begin_session() as session:
-            result = await execute_creator(session, creator)
-            return result.row.to_dataclass()
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_entity(creator)
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """
@@ -103,7 +123,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_id(session, preset_id)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            return preset_row.to_dataclass()
+            return ResourcePresetSearchableFields.own.to_data(preset_row)
 
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
@@ -114,7 +134,7 @@ class ResourcePresetDBSource:
             preset_row = await self._get_preset_by_name(session, name)
             if preset_row is None:
                 raise ResourcePresetNotFound()
-            return preset_row.to_dataclass()
+            return ResourcePresetSearchableFields.own.to_data(preset_row)
 
     async def get_preset_by_id_or_name(
         self, preset_id: UUID | None, name: str | None
@@ -126,7 +146,7 @@ class ResourcePresetDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            return preset_row.to_dataclass()
+            return ResourcePresetSearchableFields.own.to_data(preset_row)
 
     async def _get_preset_by_id_or_name(
         self, db_sess: SASession, preset_id: UUID | None, name: str | None
@@ -142,29 +162,65 @@ class ResourcePresetDBSource:
             raise ResourcePresetNotFound()
         return preset_row
 
-    async def update_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
+    async def update_preset(self, updater: ResourcePresetUpdater) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
-            if result is None:
-                raise ResourcePresetNotFound(
-                    f"Resource preset with ID {updater.pk_value} not found."
-                )
-            return result.row.to_dataclass()
+        async with self._v2_ops.write_ops() as w:
+            preset = await w.update_data(updater)
+        if preset is None:
+            raise ResourcePresetNotFound(f"Resource preset with ID {updater.preset_id} not found.")
+        return preset
 
-    async def delete_preset(self, preset_id: UUID | None, name: str | None) -> ResourcePresetData:
+    async def set_preset_resource_group(
+        self, updater: ResourcePresetResourceGroupUpdater
+    ) -> ResourcePresetData:
+        """Write the preset's resource group and move it to the scope that group stands
+        for, in one transaction. Membership of `global` is left as it is.
+        """
+        async with self._v2_ops.write_ops() as w:
+            before = await w.query_data(ResourcePresetQuerier(preset_id=updater.preset_id))
+            if before is None:
+                raise ResourcePresetNotFound(
+                    f"Resource preset with ID {updater.preset_id} not found."
+                )
+            preset = await w.update_data(updater)
+            if preset is None:
+                raise ResourcePresetNotFound(
+                    f"Resource preset with ID {updater.preset_id} not found."
+                )
+            leaving = await self._preset_scope(w, before.resource_group_name)
+            landing = await self._preset_scope(w, preset.resource_group_name)
+            if leaving != landing:
+                await w.remove_membership([leaving], [updater.preset_id])
+                await w.add_membership([landing], [updater.preset_id])
+            return preset
+
+    async def _preset_scope(
+        self, w: V2ShareWriteOps, resource_group_name: str | None
+    ) -> EntityIdentifier:
+        """The scope a preset belongs to: `public` while it is bound to no resource
+        group, that resource group once it is."""
+        if resource_group_name is None:
+            return global_entity_id(GlobalEntityName.PUBLIC)
+        resource_group_id = await w.lookup_entity_id(
+            ResourceGroupNameLookup(name=ResourceGroupName(resource_group_name))
+        )
+        if resource_group_id is None:
+            raise ResourceGroupNotFound(resource_group_name)
+        return resource_group_id
+
+    async def delete_preset(self, preset_id: ResourcePresetID) -> ResourcePresetData:
         """
         Deletes a resource preset.
         Returns the deleted preset data.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        async with self._db.begin_session() as session:
-            preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
-            data = preset_row.to_dataclass()
-            await session.delete(preset_row)
+        async with self._v2_ops.write_ops() as w:
+            data = await w.purge_entity(ResourcePresetPurger(preset_id=preset_id))
+        if data is None:
+            raise ResourcePresetNotFound(f"Resource preset with ID {preset_id} not found.")
         return data
 
     async def list_presets(
@@ -188,7 +244,7 @@ class ResourcePresetDBSource:
 
             presets = []
             async for row in await session.stream_scalars(query):
-                presets.append(row.to_dataclass())
+                presets.append(ResourcePresetSearchableFields.own.to_data(row))
 
         return presets
 
@@ -202,22 +258,6 @@ class ResourcePresetDBSource:
             )
             rows = (await session.execute(stmt)).all()
         return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
-
-    async def search_presets(
-        self,
-        querier: BatchQuerier,
-    ) -> ResourcePresetSearchResult:
-        """Search resource presets with filtering, ordering, and pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ResourcePresetRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ResourcePresetRow.to_dataclass() for row in result.rows]
-            return ResourcePresetSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def check_presets_data(
         self,
@@ -233,10 +273,26 @@ class ResourcePresetDBSource:
         Fetch all data needed for checking presets from database.
         This includes resource limits, occupancy, and preset allocatability.
         """
+        async with self._v2_ops.read_ops() as r:
+            domain_id = await r.lookup_entity_id(DomainNameLookup(name=DomainName(domain_name)))
+            if domain_id is None:
+                raise DomainNotFound(f"Domain not found (name: {domain_name})")
+            project_id = await r.lookup_entity_id(
+                ProjectNameInDomainLookup(
+                    domain_name=DomainName(domain_name), project_name=group_name
+                )
+            )
+            if project_id is None:
+                raise ProjectNotFound(f"Project not found (name: {group_name})")
+            search = AllowedResourceGroupsSearch(
+                domain_id=domain_id, project_ids=[project_id], user_id=UserID(user_id)
+            )
+            allowed = await r.search_with_scopes(search.operation_scopes(), search.searcher())
         async with self._db.begin_readonly_session() as conn:
             # Fetch all database data at once
             return await self._fetch_all_check_presets_data(
                 conn,
+                [rg.name for rg in allowed.items],
                 access_key,
                 user_id,
                 group_name,
@@ -264,7 +320,7 @@ class ResourcePresetDBSource:
         :raises ProjectNotFound: If the group does not exist or the user is not a member
         """
         query = sa.select(groups.c.id, groups.c.total_resource_slots).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
+            user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_id)
             & (groups.c.name == group_name)
             & (groups.c.domain_name == domain_name),
         )
@@ -428,9 +484,6 @@ class ResourcePresetDBSource:
         result = await db_sess.execute(query)
         rows = result.all()
 
-        if not rows:
-            return ({sg: [] for sg in sgroup_names}, [])
-
         # Build remaining list[SlotQuantity] per agent, track scaling group
         agent_data: dict[str, tuple[str, list[SlotQuantity]]] = {}
         for row in rows:
@@ -449,6 +502,17 @@ class ResourcePresetDBSource:
                 per_sgroup_remaining[resource_group] = add_quantities(
                     per_sgroup_remaining[resource_group], remaining
                 )
+
+        # Zero-fill missing slot types per scaling group. Without this, slots no
+        # alive schedulable agent provides fall through the caller's
+        # min_quantities clamp (missing slots default to the OTHER list's value),
+        # so an agent-less group reported the policy remaining — often Infinity —
+        # as its free capacity instead of zero.
+        for sg in sgroup_names:
+            existing_slots = {sq.slot_name for sq in per_sgroup_remaining[sg]}
+            for slot_name in known_slot_types.keys():
+                if str(slot_name) not in existing_slots:
+                    per_sgroup_remaining[sg].append(SlotQuantity(str(slot_name), Decimal(0)))
 
         return per_sgroup_remaining, agent_slots
 
@@ -563,6 +627,7 @@ class ResourcePresetDBSource:
     async def _fetch_all_check_presets_data(
         self,
         conn: SASession,
+        allowed_resource_group_names: list[str],
         access_key: AccessKey,
         user_id: UUID,
         group_name: str,
@@ -596,13 +661,7 @@ class ResourcePresetDBSource:
             domain_usage.remaining,
         )
 
-        # Get scaling groups
-        # query_allowed_sgroups expects AsyncConnection, get it from session
-        db_conn = await conn.connection()
-        sgroups = await query_allowed_sgroups(
-            db_conn, domain_name, ProjectID(group_id), str(access_key)
-        )
-        sgroup_names = [sg.name for sg in sgroups]
+        sgroup_names = allowed_resource_group_names
         if resource_group is not None:
             if resource_group not in sgroup_names:
                 raise ResourceGroupNotFound(

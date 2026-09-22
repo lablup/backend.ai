@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ImageLabelInfo,
@@ -27,6 +28,7 @@ __all__ = (
     "AliasImagePayload",
     "ForgetImagePayload",
     "RestoreImagePayload",
+    "ScopedSearchImagesPayload",
     "GetImagePayload",
     "ImageAliasNode",
     "ImageIdentityInfoDTO",
@@ -36,6 +38,7 @@ __all__ = (
     "ImageRequirementsInfoDTO",
     "PurgeImagePayload",
     "RescanImagesPayload",
+    "SearchImageAliasesPayload",
     "SearchImagesPayload",
     "UpdateImagePayload",
 )
@@ -45,6 +48,9 @@ class ImageNode(BaseResponseModel):
     """Node model representing an image entity with full details."""
 
     id: UUID = Field(description="Image ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the image. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Image canonical name")
     image: str = Field(
         description="Image namespace/path within the registry (e.g. 'stable/python')"
@@ -142,15 +148,36 @@ class AdminSearchImagesPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
+class ScopedSearchImagesPayload(BaseResponseModel):
+    """Payload for a scoped paginated image search."""
+
+    items: list[ImageNode] = Field(description="List of image nodes.")
+    total_count: int = Field(description="Total number of images matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
 class ImageAliasNode(BaseResponseModel):
     """Node representing a single image alias."""
 
     id: UUID = Field(description="Alias ID.")
+    field_id: UUID = Field(
+        description=f"UUID of the image alias. Added in {NEXT_RELEASE_VERSION}.",
+    )
     alias: str = Field(description="Alias string.")
 
 
 class AdminSearchImageAliasesPayload(BaseResponseModel):
     """Payload for admin-scoped paginated image alias search results."""
+
+    items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
+    total_count: int = Field(description="Total number of aliases matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class SearchImageAliasesPayload(BaseResponseModel):
+    """Payload for the paginated aliases of one image."""
 
     items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
     total_count: int = Field(description="Total number of aliases matching the filter.")

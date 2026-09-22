@@ -12,13 +12,12 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_SCOPE_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SESSION_SCOPE_TYPE, SessionID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -41,44 +40,35 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.models.replica_group_history.searchers import (
+    ReplicaGroupHistorySearcher,
+)
 from ai.backend.manager.models.scheduling_history.scopes import (
-    DeploymentHistoryOperationScope,
-    DeploymentReplicaGroupHistoryOperationScope,
-    RouteHistoryOperationScope,
-    SessionKernelHistoryOperationScope,
-    SessionSchedulingHistoryOperationScope,
+    DeploymentHistoryTarget,
+    DeploymentReplicaGroupHistoryTarget,
+    RouteHistoryTarget,
+    SessionKernelHistoryTarget,
+    SessionSchedulingHistoryTarget,
+)
+from ai.backend.manager.models.scheduling_history.searchers import (
+    DeploymentHistorySearcher,
+    KernelSchedulingHistorySearcher,
+    RouteHistorySearcher,
+    SessionSchedulingHistorySearcher,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
-from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
-    GlobalSearchReplicaGroupHistoryAction,
-)
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
-    DeploymentReplicaGroupHistoryTarget,
     ScopedSearchReplicaGroupHistoryAction,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
-    SearchDeploymentHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
 )
-from ai.backend.manager.services.scheduling_history.actions.search_kernel_history import (
-    SearchKernelHistoryAction,
-)
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
-    SessionKernelHistoryTarget,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
-    SearchRouteHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_scoped_history import (
     SearchRouteScopedHistoryAction,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
-    SearchSessionHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_session_scoped_history import (
     SearchSessionScopedHistoryAction,
@@ -102,8 +92,28 @@ def service(mock_repository: MagicMock) -> SchedulingHistoryService:
 
 
 @pytest.fixture
-def querier() -> BatchQuerier:
-    return BatchQuerier(pagination=NoPagination())
+def session_searcher() -> SessionSchedulingHistorySearcher:
+    return SessionSchedulingHistorySearcher(pagination=NoPagination())
+
+
+@pytest.fixture
+def kernel_searcher() -> KernelSchedulingHistorySearcher:
+    return KernelSchedulingHistorySearcher(pagination=NoPagination())
+
+
+@pytest.fixture
+def deployment_searcher() -> DeploymentHistorySearcher:
+    return DeploymentHistorySearcher(pagination=NoPagination())
+
+
+@pytest.fixture
+def route_searcher() -> RouteHistorySearcher:
+    return RouteHistorySearcher(pagination=NoPagination())
+
+
+@pytest.fixture
+def replica_group_searcher() -> ReplicaGroupHistorySearcher:
+    return ReplicaGroupHistorySearcher(pagination=NoPagination())
 
 
 def _make_kernel_history() -> KernelSchedulingHistoryData:
@@ -199,80 +209,12 @@ def _make_route_history() -> RouteHistoryData:
     )
 
 
-class TestSearchSessionHistoryAction:
-    async def test_returns_histories_with_pagination(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_session_history()
-        mock_repository.search_session_history.return_value = SessionSchedulingHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
-        action = SearchSessionHistoryAction(querier=querier)
-        result = await service.search_session_history(action)
-
-        assert result.histories == [history_item]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_repository.search_session_history.assert_awaited_once_with(querier=querier)
-
-    async def test_empty_result(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        mock_repository.search_session_history.return_value = SessionSchedulingHistoryListResult(
-            items=[],
-            total_count=0,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
-        action = SearchSessionHistoryAction(querier=querier)
-        result = await service.search_session_history(action)
-
-        assert result.histories == []
-        assert result.total_count == 0
-
-
-class TestSearchDeploymentHistoryAction:
-    async def test_returns_deployment_histories(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_deployment_history()
-        mock_repository.search_deployment_history.return_value = DeploymentHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-
-        action = SearchDeploymentHistoryAction(querier=querier)
-        result = await service.search_deployment_history(action)
-
-        assert result.histories == [history_item]
-        assert result.total_count == 1
-        assert result.has_next_page is True
-        mock_repository.search_deployment_history.assert_awaited_once_with(querier=querier)
-
-
 class TestSearchDeploymentScopedHistoryAction:
     async def test_scope_filters_by_deployment_id(
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
-        querier: BatchQuerier,
+        deployment_searcher: DeploymentHistorySearcher,
     ) -> None:
         deployment_id = uuid4()
         history_item = _make_deployment_history()
@@ -282,16 +224,16 @@ class TestSearchDeploymentScopedHistoryAction:
             has_next_page=False,
             has_previous_page=False,
         )
-        scope = DeploymentHistoryOperationScope(deployment_id=deployment_id)
+        scope = DeploymentHistoryTarget(deployment_id=deployment_id)
 
         action = SearchDeploymentScopedHistoryAction(
-            deployment_id=DeploymentID(deployment_id), scope=scope, querier=querier
+            deployment_id=DeploymentID(deployment_id), scope=scope, searcher=deployment_searcher
         )
         result = await service.search_deployment_scoped_history(action)
 
         assert result.histories == [history_item]
         mock_repository.search_deployment_scoped_history.assert_awaited_once_with(
-            querier=querier, scope=scope
+            searcher=deployment_searcher, scope=scope
         )
 
 
@@ -300,7 +242,7 @@ class TestSearchSessionScopedHistoryAction:
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
-        querier: BatchQuerier,
+        session_searcher: SessionSchedulingHistorySearcher,
     ) -> None:
         session_id = uuid4()
         history_item = _make_session_history()
@@ -312,41 +254,17 @@ class TestSearchSessionScopedHistoryAction:
                 has_previous_page=False,
             )
         )
-        scope = SessionSchedulingHistoryOperationScope(session_id=session_id)
+        scope = SessionSchedulingHistoryTarget(session_id=session_id)
 
         action = SearchSessionScopedHistoryAction(
-            session_id=SessionID(session_id), scope=scope, querier=querier
+            session_id=SessionID(session_id), scope=scope, searcher=session_searcher
         )
         result = await service.search_session_scoped_history(action)
 
         assert result.histories == [history_item]
         mock_repository.search_session_scoped_history.assert_awaited_once_with(
-            querier=querier, scope=scope
+            searcher=session_searcher, scope=scope
         )
-
-
-class TestSearchRouteHistoryAction:
-    async def test_returns_route_histories(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_route_history()
-        mock_repository.search_route_history.return_value = RouteHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=True,
-        )
-
-        action = SearchRouteHistoryAction(querier=querier)
-        result = await service.search_route_history(action)
-
-        assert result.histories == [history_item]
-        assert result.total_count == 1
-        assert result.has_previous_page is True
-        mock_repository.search_route_history.assert_awaited_once_with(querier=querier)
 
 
 class TestSearchRouteScopedHistoryAction:
@@ -354,7 +272,7 @@ class TestSearchRouteScopedHistoryAction:
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
-        querier: BatchQuerier,
+        route_searcher: RouteHistorySearcher,
     ) -> None:
         route_id = ReplicaID(uuid4())
         history_item = _make_route_history()
@@ -364,40 +282,16 @@ class TestSearchRouteScopedHistoryAction:
             has_next_page=False,
             has_previous_page=False,
         )
-        scope = RouteHistoryOperationScope(route_id=route_id)
+        scope = RouteHistoryTarget(deployment_id=_DEPLOYMENT_ID, route_id=route_id)
 
-        action = SearchRouteScopedHistoryAction(scope=scope, querier=querier)
+        action = SearchRouteScopedHistoryAction(scope=scope, searcher=route_searcher)
         result = await service.search_route_scoped_history(action)
 
         assert result.histories == [history_item]
+        assert action.scope_targets() == (_DEPLOYMENT_ID,)
         mock_repository.search_route_scoped_history.assert_awaited_once_with(
-            querier=querier, scope=scope
+            searcher=route_searcher, scope=scope
         )
-
-
-class TestSearchKernelHistoryAction:
-    async def test_returns_kernel_histories_with_pagination(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-    ) -> None:
-        history_item = _make_kernel_history()
-        mock_repository.search_kernel_history.return_value = KernelSchedulingHistoryListResult(
-            items=[history_item],
-            total_count=1,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-
-        action = SearchKernelHistoryAction(querier=querier)
-        result = await service.search_kernel_history(action)
-
-        assert result.items == [history_item]
-        assert result.total_count == 1
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
-        mock_repository.search_kernel_history.assert_awaited_once_with(querier=querier)
 
 
 class TestSearchKernelScopedHistoryAction:
@@ -405,7 +299,7 @@ class TestSearchKernelScopedHistoryAction:
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
-        querier: BatchQuerier,
+        kernel_searcher: KernelSchedulingHistorySearcher,
     ) -> None:
         history_item = _make_kernel_history()
         mock_repository.search_kernel_scoped_history.return_value = (
@@ -418,46 +312,19 @@ class TestSearchKernelScopedHistoryAction:
         )
 
         action = SearchKernelScopedHistoryAction(
-            target=SessionKernelHistoryTarget(session_id=_SESSION_ID), querier=querier
+            target=SessionKernelHistoryTarget(session_id=_SESSION_ID), searcher=kernel_searcher
         )
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
         # empty, so the session is the scope the search is bounded by.
-        assert action.scope_targets() == (
-            ScopeRef(scope_type=SESSION_SCOPE_TYPE, scope_id=_SESSION_ID),
-        )
-        assert action.entity_type() == SESSION_ENTITY_TYPE
+        assert action.scope_targets() == (SessionID(_SESSION_ID),)
+        assert action.entity_type() == SessionEntityType()
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
-            querier=querier,
-            scopes=[SessionKernelHistoryOperationScope(session_id=_SESSION_ID)],
+            searcher=kernel_searcher,
+            scopes=[SessionKernelHistoryTarget(session_id=_SESSION_ID)],
         )
-
-
-class TestGlobalSearchReplicaGroupHistoryAction:
-    async def test_returns_histories(
-        self,
-        service: SchedulingHistoryService,
-        mock_repository: MagicMock,
-        querier: BatchQuerier,
-        replica_group_history: ReplicaGroupHistoryData,
-    ) -> None:
-        mock_repository.admin_search_replica_group_history.return_value = (
-            ReplicaGroupHistoryListResult(
-                items=[replica_group_history],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = GlobalSearchReplicaGroupHistoryAction(querier=querier)
-        result = await service.global_search_replica_group_history(action)
-
-        assert result.items == [replica_group_history]
-        assert result.total_count == 1
-        mock_repository.admin_search_replica_group_history.assert_awaited_once_with(querier=querier)
 
 
 class TestScopedSearchReplicaGroupHistoryAction:
@@ -465,7 +332,7 @@ class TestScopedSearchReplicaGroupHistoryAction:
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
-        querier: BatchQuerier,
+        replica_group_searcher: ReplicaGroupHistorySearcher,
         replica_group_history: ReplicaGroupHistoryData,
     ) -> None:
         mock_repository.scoped_search_replica_group_history.return_value = (
@@ -479,16 +346,14 @@ class TestScopedSearchReplicaGroupHistoryAction:
 
         action = ScopedSearchReplicaGroupHistoryAction(
             target=DeploymentReplicaGroupHistoryTarget(deployment_id=_DEPLOYMENT_ID),
-            querier=querier,
+            searcher=replica_group_searcher,
         )
         result = await service.scoped_search_replica_group_history(action)
 
         assert result.items == [replica_group_history]
         # A replica group is no scope of its own, so the deployment bounds the search.
-        assert action.scope_targets() == (
-            ScopeRef(scope_type=DEPLOYMENT_SCOPE_TYPE, scope_id=_DEPLOYMENT_ID),
-        )
+        assert action.scope_targets() == (_DEPLOYMENT_ID,)
         mock_repository.scoped_search_replica_group_history.assert_awaited_once_with(
-            querier=querier,
-            scopes=[DeploymentReplicaGroupHistoryOperationScope(deployment_id=_DEPLOYMENT_ID)],
+            searcher=replica_group_searcher,
+            scopes=[DeploymentReplicaGroupHistoryTarget(deployment_id=_DEPLOYMENT_ID)],
         )

@@ -4,7 +4,6 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.relation.monitor.base import RelationActionMonitor
 from ai.backend.manager.actions.v2.relation.result import RelationActionProcessResult
@@ -40,8 +39,8 @@ class RelationActionReporterMonitor(RelationActionMonitor):
                 StartedActionMessage(
                     action_id=meta.action_id,
                     action_type=meta.action_name,
-                    entity_id=scope.scope_id,
-                    entity_type=EntityType(scope.scope_type),
+                    entity_id=scope,
+                    entity_type=scope.entity_type(),
                     request_id=request_id,
                     triggered_by=str(trigger.user_id) if trigger else None,
                     acted_as=acting.user_id if acting else None,
@@ -62,11 +61,11 @@ class RelationActionReporterMonitor(RelationActionMonitor):
                 FinishedActionMessage(
                     action_id=meta.action_id,
                     action_type=meta.action_name,
-                    entity_id=scope.scope_id,
+                    entity_id=scope,
                     request_id=request_id,
                     triggered_by=str(trigger.user_id) if trigger else None,
                     acted_as=acting.user_id if acting else None,
-                    entity_type=EntityType(scope.scope_type),
+                    entity_type=scope.entity_type(),
                     operation_type=meta.operation_type,
                     status=result.meta.status,
                     description=result.meta.description,

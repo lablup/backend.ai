@@ -9,6 +9,8 @@ import sqlalchemy as sa
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     DeleteInvitationReq,
@@ -29,8 +31,8 @@ from ai.backend.common.dto.manager.vfolder import (
     VFolderListResponse,
 )
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.manager.data.vfolder.types import VFolderInvitationState, VFolderMountPermission
-from ai.backend.manager.models.vfolder import vfolder_invitations
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -266,6 +268,15 @@ class TestVFolderHosts:
         assert isinstance(result, ListAllowedTypesResponse)
         assert isinstance(result.root, list)
 
+    async def test_regular_user_lists_allowed_types(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """A regular user reads the allowed vfolder types; the route is not superadmin-only."""
+        result = await user_registry.vfolder.list_allowed_types()
+        assert isinstance(result, ListAllowedTypesResponse)
+        assert result.root == ["user"]
+
 
 class TestVFolderInvitation:
     async def test_invite_user_to_vfolder(
@@ -312,13 +323,14 @@ class TestVFolderInvitation:
         inv_id = uuid.uuid4()
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.insert(vfolder_invitations).values(
+                sa.insert(EntityShareRow.__table__).values(
                     id=inv_id,
-                    permission=VFolderMountPermission.READ_ONLY,
-                    inviter=admin_user_fixture.email,
-                    invitee=admin_user_fixture.email,
-                    state=VFolderInvitationState.PENDING,
-                    vfolder=target_vfolder["id"],
+                    permission_cap=Permission.READ,
+                    sharer_user_id=admin_user_fixture.user_uuid,
+                    recipient_email=admin_user_fixture.email,
+                    status=EntityShareStatus.PENDING,
+                    target_entity_type=VFolderEntityType(),
+                    target_entity_id=target_vfolder["id"],
                 )
             )
         result = await admin_registry.vfolder.delete_invitation(

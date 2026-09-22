@@ -3,17 +3,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -24,7 +24,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.image.handler import V2ImageHandler
 from ai.backend.manager.api.rest.v2.image.registry import register_v2_image_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.image.types import ImageAliasData, ImageStatus, ImageType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
@@ -32,6 +32,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.services.image.actions.lookup_alias_owner import (
+    LookupBulkImageAliasOwnerAction,
+    LookupImageAliasOwnerAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 
@@ -51,21 +55,21 @@ def image_processors(
         config_provider,
     )
     service = ImageService(agent_registry, repo, config_provider)
-    mock_scope = MagicMock(spec=ScopeActionRBACValidator)
-    mock_scope.validate = AsyncMock()
-    return ImageProcessors(processor_registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), service)
+    return ImageProcessors(
+        processor_registry.group(GroupMeta(ImageEntityType())),
+        processor_registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        service,
+    )
 
 
 @pytest.fixture()
 def image_adapter(image_processors: ImageProcessors) -> ImageAdapter:
-    """Build an ImageAdapter wired only with image processors.
-
-    Other adapter call sites in ImageAdapter use ``self._processors.image`` exclusively,
-    so a MagicMock backing object with ``.image`` set to the real ImageProcessors is sufficient.
-    """
-    processors = MagicMock()
-    processors.image = image_processors
-    return ImageAdapter(processors)
+    return ImageAdapter(image_processors)
 
 
 @pytest.fixture()

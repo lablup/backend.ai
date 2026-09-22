@@ -4,7 +4,6 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -15,6 +14,9 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
@@ -54,11 +56,11 @@ class DeploymentPresetUpdater(
     open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
     replica_count: TriState[int] = field(default_factory=TriState[int].nop)
     revision_history_limit: TriState[int] = field(default_factory=TriState[int].nop)
-    deployment_strategy: TriState[DeploymentStrategy] = field(
-        default_factory=TriState[DeploymentStrategy].nop
+    deployment_strategy: OptionalState[DeploymentStrategy] = field(
+        default_factory=OptionalState[DeploymentStrategy].nop
     )
-    deployment_strategy_spec: TriState[dict[str, Any]] = field(
-        default_factory=TriState[dict[str, Any]].nop
+    deployment_strategy_spec: OptionalState[dict[str, Any]] = field(
+        default_factory=OptionalState[dict[str, Any]].nop
     )
 
     @property
@@ -71,7 +73,7 @@ class DeploymentPresetUpdater(
         return DeploymentRevisionPresetRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> DeploymentPresetID:
         return self.preset_id
 
     @property
@@ -81,7 +83,7 @@ class DeploymentPresetUpdater(
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return row.to_data()
+        return DeploymentPresetSearchableFields.own.to_data(row)
 
     @override
     def build_values(self) -> dict[str, Any]:

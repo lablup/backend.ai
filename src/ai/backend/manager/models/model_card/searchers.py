@@ -12,6 +12,10 @@ from ai.backend.manager.data.model_card.types import (
     ModelCardResourceRequirementData,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardResourceRequirementSearchableFields,
+    ModelCardSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
@@ -27,7 +31,7 @@ class ModelCardSearcher(Searcher[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return row.to_data()
+        return ModelCardSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -54,4 +58,4 @@ class ModelCardResourceRequirementSearcher(
 
     @override
     def to_data(self, row: ModelCardResourceRequirementRow) -> ModelCardResourceRequirementData:
-        return row.to_data()
+        return ModelCardResourceRequirementSearchableFields.own.to_data(row)

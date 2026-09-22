@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import (
@@ -34,12 +34,13 @@ from ai.backend.manager.models.model_card.creators import (
     ModelCardResourceRequirementCreator,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.scopes import UserModelCardTarget
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardResourceRequirementSearchableFields,
+)
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -61,7 +62,6 @@ from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -117,7 +117,6 @@ class TestModelCardCreatorResourceRequirements:
                 ResourceSlotTypeRow,
                 ModelCardRow,
                 ModelCardResourceRequirementRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             async with database_connection.begin_session() as sess:
@@ -213,6 +212,7 @@ class TestModelCardCreatorResourceRequirements:
                 resource_policy=test_user_resource_policy.name,
             )
             db_sess.add(user)
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user.uuid))
             await db_sess.flush()
         return user
 
@@ -235,7 +235,7 @@ class TestModelCardCreatorResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.flush()
         return group
 
@@ -376,6 +376,64 @@ class TestModelCardCreatorResourceRequirements:
         ).data
         assert await self._requirements(db_with_cleanup, data.id) == []
 
+    async def _owners(self, db: ExtendedAsyncSAEngine, card_id: UUID) -> set[tuple[str, UUID]]:
+        """The (entity type, entity id) of every other entity holding an own edge to the card."""
+        scope = VirtualEntityRow.__table__.alias("scope")
+        node = VirtualEntityRow.__table__.alias("node")
+        async with db.begin_readonly_session() as sess:
+            rows = (
+                await sess.execute(
+                    sa.select(scope.c.entity_type, scope.c.entity_id)
+                    .select_from(EntityMembershipRow)
+                    .join(scope, scope.c.id == EntityMembershipRow.virtual_entity_id)
+                    .join(node, node.c.id == EntityMembershipRow.member_entity_id)
+                    .where(
+                        node.c.entity_id == card_id,
+                        scope.c.id != node.c.id,
+                        EntityMembershipRow.capped.is_(False),
+                    )
+                )
+            ).all()
+        return {(str(entity_type), entity_id) for entity_type, entity_id in rows}
+
+    async def test_create_joins_the_project_and_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        ops: OpsRepository[ModelCardData],
+        creator_without_min_resource: _CardCreators,
+        test_user: UserRow,
+        test_group: ProjectRow,
+    ) -> None:
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_without_min_resource.card, creator_without_min_resource.requirements
+            )
+        ).data
+
+        assert await self._owners(db_with_cleanup, data.id) == {
+            ("project", test_group.id),
+            ("user", test_user.uuid),
+        }
+
+    async def test_user_scope_reaches_a_creator_outside_the_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        ops: OpsRepository[ModelCardData],
+        creator_without_min_resource: _CardCreators,
+        test_user: UserRow,
+    ) -> None:
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_without_min_resource.card, creator_without_min_resource.requirements
+            )
+        ).data
+
+        condition = UserModelCardTarget(user_id=UserID(test_user.uuid)).to_condition()
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            found = (await sess.scalars(sa.select(ModelCardRow.id).where(condition()))).all()
+
+        assert found == [data.id]
+
     async def _requirements(
         self, db: ExtendedAsyncSAEngine, card_id: UUID
     ) -> list[ModelCardResourceRequirementData]:
@@ -392,7 +450,7 @@ class TestModelCardCreatorResourceRequirements:
                 .scalars()
                 .all()
             )
-        return [row.to_data() for row in rows]
+        return [ModelCardResourceRequirementSearchableFields.own.to_data(row) for row in rows]
 
     async def test_resource_requirements_persisted_in_db(
         self,

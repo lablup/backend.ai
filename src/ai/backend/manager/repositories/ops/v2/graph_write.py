@@ -18,13 +18,16 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.id import EntityMembershipID, FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import InvalidFieldPermission, VirtualEntityNotFound
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -74,34 +77,77 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
             .on_conflict_do_nothing()
         )
 
-    async def _teardown(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left: permissions granted on it, its virtual entity
-        (every relation naming it goes with it by FK), and the labels put on it."""
-        await self._sess.execute(
-            sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
-        )
+    async def _teardown(self, entities: Sequence[EntityIdentifier]) -> None:
+        """Remove what each entity left: its virtual entity (every relation naming it
+        goes with it by FK), and the labels put on it.
+
+        The roles a torn-down node scopes and the shares naming it go with it by FK, so
+        their own nodes are torn down in the same pass."""
+        if not entities:
+            return
+        keys = [self._node_key(entity) for entity in entities]
+        keys.extend(await self._cascaded_node_keys(keys))
         await self._sess.execute(
             sa.delete(VirtualEntityRow).where(
-                VirtualEntityRow.entity_type == entity.entity_type(),
-                VirtualEntityRow.entity_id == entity,
+                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_(keys)
             )
         )
         await self._sess.execute(
             sa.delete(EntityLabelRow).where(
-                EntityLabelRow.entity_type == entity.entity_type(),
-                EntityLabelRow.entity_id == entity,
+                sa.tuple_(EntityLabelRow.entity_type, EntityLabelRow.entity_id).in_(keys)
             )
         )
+
+    async def _cascaded_node_keys(self, keys: Sequence[_NodeKey]) -> list[_NodeKey]:
+        """The nodes of the roles and shares deleting ``keys`` takes by FK, transitively."""
+        seen = {(str(entity_type), entity_id) for entity_type, entity_id in keys}
+        found: list[_NodeKey] = []
+        frontier = list(keys)
+        while frontier:
+            role_ids = (
+                await self._sess.scalars(
+                    sa.select(RoleRow.id).where(
+                        sa.tuple_(RoleRow.scope_type, RoleRow.scope_id).in_(frontier)
+                    )
+                )
+            ).all()
+            share_ids = (
+                await self._sess.scalars(
+                    sa.select(EntityShareRow.id).where(
+                        sa.or_(
+                            sa.tuple_(
+                                EntityShareRow.target_entity_type, EntityShareRow.target_entity_id
+                            ).in_(frontier),
+                            sa.tuple_(
+                                EntityShareRow.recipient_entity_type,
+                                EntityShareRow.recipient_entity_id,
+                            ).in_(frontier),
+                        )
+                    )
+                )
+            ).all()
+            candidates: list[_NodeKey] = [(RoleEntityType(), role_id) for role_id in role_ids]
+            candidates.extend((EntityShareEntityType(), share_id) for share_id in share_ids)
+            frontier = [key for key in candidates if (str(key[0]), key[1]) not in seen]
+            seen.update((str(entity_type), entity_id) for entity_type, entity_id in frontier)
+            found.extend(frontier)
+        return found
 
     async def _disown(self, owners: Collection[EntityIdentifier], entity: EntityIdentifier) -> None:
         """Each owner's virtual entity stops owning the entity. Silent where it never
         did, or where either side has no virtual entity."""
-        if not owners:
+        await self._disown_all(owners, [entity])
+
+    async def _disown_all(
+        self, owners: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each owner's virtual entity stops owning every entity named."""
+        if not owners or not entities:
             return
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.virtual_entity_id.in_(self._node_ids_query(list(owners))),
-                EntityMembershipRow.member_entity_id == self._node_id_query(entity),
+                EntityMembershipRow.member_entity_id.in_(self._node_ids_query(list(entities))),
             )
         )
 
@@ -135,11 +181,17 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
     ) -> None:
         """Each scope stops governing the entity's virtual entity. Silent where it
         never did, or where either side has no virtual entity."""
-        if not scopes:
+        await self._ungovern_all(scopes, [entity])
+
+    async def _ungovern_all(
+        self, scopes: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each scope stops governing the virtual entity of every entity named."""
+        if not scopes or not entities:
             return
         await self._sess.execute(
             sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.virtual_entity_id == self._node_id_query(entity),
+                ScopeBindingRow.virtual_entity_id.in_(self._node_ids_query(list(entities))),
                 ScopeBindingRow.scope_entity_id.in_(self._node_ids_query(list(scopes))),
             )
         )
@@ -148,17 +200,25 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
         self, scopes: Collection[EntityIdentifier], entity: EntityIdentifier
     ) -> None:
         """Each scope owns and governs the entity — one node lookup for both."""
-        if not scopes:
+        await self._created_in_all(scopes, [entity])
+
+    async def _created_in_all(
+        self, scopes: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each scope owns and governs every entity named. Idempotent, so a run that
+        stopped part way can be repeated."""
+        if not scopes or not entities:
             return
-        node_ids = await self._node_ids([entity, *scopes])
-        entity_node = node_ids[self._node_key(entity)]
+        node_ids = await self._node_ids([*entities, *scopes])
+        entity_nodes = [node_ids[self._node_key(entity)] for entity in entities]
         scope_nodes = [node_ids[self._node_key(scope)] for scope in scopes]
         membership_ids = (
             await self._sess.scalars(
                 pg_insert(EntityMembershipRow)
                 .values([
-                    {"virtual_entity_id": scope, "member_entity_id": entity_node, "capped": False}
+                    {"virtual_entity_id": scope, "member_entity_id": node, "capped": False}
                     for scope in scope_nodes
+                    for node in entity_nodes
                 ])
                 .on_conflict_do_update(
                     index_elements=["virtual_entity_id", "member_entity_id"],
@@ -175,8 +235,9 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
         await self._sess.execute(
             pg_insert(ScopeBindingRow)
             .values([
-                {"virtual_entity_id": entity_node, "scope_entity_id": scope, "permission_cap": None}
+                {"virtual_entity_id": node, "scope_entity_id": scope, "permission_cap": None}
                 for scope in scope_nodes
+                for node in entity_nodes
             ])
             .on_conflict_do_nothing()
         )
@@ -186,8 +247,15 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
     ) -> None:
         """Each scope stops owning and governing the entity — the reverse of
         :meth:`_created_in`. Silent where it never did."""
-        await self._disown(scopes, entity)
-        await self._ungovern(scopes, entity)
+        await self._removed_from_all(scopes, [entity])
+
+    async def _removed_from_all(
+        self, scopes: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each scope stops owning and governing every entity named — the reverse of
+        :meth:`_created_in_all`. Silent where it never did."""
+        await self._disown_all(scopes, entities)
+        await self._ungovern_all(scopes, entities)
 
     async def _reset_share(
         self, scope: EntityIdentifier, entity: EntityIdentifier

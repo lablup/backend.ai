@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
 
 from .types import EntityLabelOrderField, OrderDirection
@@ -45,23 +45,12 @@ class EntityLabelFilter(BaseRequestModel):
 EntityLabelFilter.model_rebuild()
 
 
-class EntityLabelNestedFilter(BaseRequestModel):
+class EntityLabelNestedFilter(ToManyFilter[EntityLabelFilter]):
     """The `labels` field of a labelable entity's filter.
 
     Each relation matches one label at a time. To require two different labels, combine
     two of these with the entity filter's own `AND`.
     """
-
-    some: EntityLabelFilter | None = Field(
-        default=None, description="At least one of the entity's labels matches"
-    )
-    every: EntityLabelFilter | None = Field(
-        default=None,
-        description="All of the entity's labels match; true for an unlabeled entity",
-    )
-    none: EntityLabelFilter | None = Field(
-        default=None, description="None of the entity's labels matches"
-    )
 
 
 class EntityLabelOrder(BaseRequestModel):

@@ -164,7 +164,7 @@ class StorageMappingResolver:
             for step, target in storage_step_mappings.storage_step_target_mappings.items():
                 if isinstance(target, VFolderStorageTarget):
                     adapter_name = f"volume_storage_{current_request_id()}"
-                    volume = self._volume_pool.get_volume_by_name_direct(target.volume_name)
+                    volume = self._volume_pool.get_volume_by_name(target.volume_name)
                     adapter = VFolderStorage(
                         name=adapter_name,
                         volume=volume,

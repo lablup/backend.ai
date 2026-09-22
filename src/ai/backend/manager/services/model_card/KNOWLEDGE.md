@@ -3,7 +3,7 @@ name: model-card-service-shapes
 type: decision-table
 description: which model card operations keep a service method and what each one checks
 scope: src/ai/backend/manager/services/model_card
-keywords: [ModelCardCreator, ModelCardResourceRequirementCreator, bulk_scoped_search_ops, entity_create_with_fields_ops, ScanProjectModelCardsAction, AvailablePresetsAction]
+keywords: [ModelCardCreator, ModelCardResourceRequirementCreator, bulk_scoped_search_ops, entity_create_with_fields_ops, ScanProjectModelCardsAction]
 sources:
   - src/ai/backend/manager/services/model_card
   - src/ai/backend/manager/models/model_card

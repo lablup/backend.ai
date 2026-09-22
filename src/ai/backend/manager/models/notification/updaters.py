@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -20,6 +19,10 @@ from ai.backend.manager.data.notification.types import (
 from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
+)
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
@@ -48,7 +51,7 @@ class NotificationChannelUpdater(DataUpdater[NotificationChannelRow, Notificatio
         return NotificationChannelRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> NotificationChannelID:
         return self.channel_id
 
     @property
@@ -58,7 +61,7 @@ class NotificationChannelUpdater(DataUpdater[NotificationChannelRow, Notificatio
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return row.to_data()
+        return NotificationChannelSearchableFields.own.to_data(row)
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -92,7 +95,7 @@ class NotificationRuleUpdater(DataUpdater[NotificationRuleRow, NotificationRuleD
         return NotificationRuleRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> NotificationRuleID:
         return self.rule_id
 
     @property
@@ -102,7 +105,7 @@ class NotificationRuleUpdater(DataUpdater[NotificationRuleRow, NotificationRuleD
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return row.to_data()
+        return NotificationRuleSearchableFields.own.to_data(row)
 
     @override
     def build_values(self) -> dict[str, Any]:

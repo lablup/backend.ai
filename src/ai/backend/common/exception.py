@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Self, override
@@ -158,7 +158,6 @@ class ErrorDomain(enum.StrEnum):
     GROUP = "group"
     DOMAIN = "domain"
     IMAGE = "image"
-    IMAGE_ALIAS = "image-alias"
     TEMPLATE = "template"
     CONTAINER_REGISTRY = "container-registry"
     SCALING_GROUP = "scaling-group"
@@ -209,13 +208,15 @@ class ErrorOperation(enum.StrEnum):
 
     GENERIC = "generic"  # Whenever possible, use specific operation names instead of this one.
     CREATE = "create"
+    UPSERT = "upsert"
     ACCESS = "access"
     READ = "read"
+    SEARCH = "search"
     UPDATE = "update"
     START = "start"
     SOFT_DELETE = "soft-delete"
+    RESTORE = "restore"
     HARD_DELETE = "purge"
-    LIST = "list-query"
     AUTH = "auth"
     HOOK = "hook"
     REQUEST = "request"
@@ -300,9 +301,13 @@ class ErrorCode:
 
     The error_detail field describes the specific error that occurred during the operation.
     If it consists of two or more words, they should be connected with a hyphen (-).
+
+    The domain is an open string: an ``ErrorDomain`` value for a system error, the
+    entity or field type for an entity error. No part carries an underscore, so a
+    compound word is hyphenated.
     """
 
-    domain: ErrorDomain
+    domain: str
     operation: ErrorOperation
     error_detail: ErrorDetail
 
@@ -337,15 +342,30 @@ class ErrorCode:
             raise InvalidErrorCode(f"Invalid error code format: {code_str}")
         domain_str, operation_str, error_detail_str = parts
         try:
-            domain = ErrorDomain(domain_str)
             operation = ErrorOperation(operation_str)
             error_detail = ErrorDetail(error_detail_str)
         except ValueError as e:
             raise InvalidErrorCode(f"Invalid error code value. Err: {e}") from e
-        return cls(domain=domain, operation=operation, error_detail=error_detail)
+        return cls(domain=domain_str, operation=operation, error_detail=error_detail)
 
 
-class BackendAIError(web.HTTPError, ABC):
+class ErrorMeta(ABCMeta):
+    """Refuses to construct an error that still owes an abstract method.
+
+    ``object.__new__`` makes that refusal for an ordinary abstract class by reading
+    what ``ABCMeta`` recorded, but an exception is constructed through
+    ``Exception.__new__``, which does not read it. This hook runs before either.
+    """
+
+    @override
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        if cls.__abstractmethods__:
+            owed = ", ".join(sorted(cls.__abstractmethods__))
+            raise TypeError(f"{cls.__name__} is an abstract error; it still owes {owed}")
+        return super().__call__(*args, **kwargs)
+
+
+class BackendAIError(web.HTTPError, metaclass=ErrorMeta):
     """
     An RFC-7807 error class as a drop-in replacement of the original
     aiohttp.web.HTTPError subclasses.
@@ -425,6 +445,19 @@ class BackendAIError(web.HTTPError, ABC):
 class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-error-code"
     error_title = "Invalid error code in the raised exception."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DuplicateEntityTypeName(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/internal-server-error"
+    error_title = "Entity type names collide once lowercased."
 
     @override
     def error_code(self) -> ErrorCode:
@@ -797,19 +830,6 @@ class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class AgentNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/agent-not-found"
-    error_title = "Agent Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/scaling-group-not-found"
     error_title = "Scaling Group Not Found"
@@ -1058,32 +1078,6 @@ class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
             domain=ErrorDomain.HEALTH_CHECK,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
-        )
-
-
-class UserResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
-    error_title = "User Resource Policy Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER_RESOURCE_POLICY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/keypair-resource-policy-not-found"
-    error_title = "Keypair Resource Policy Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KEYPAIR_RESOURCE_POLICY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 

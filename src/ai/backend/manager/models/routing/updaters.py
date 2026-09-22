@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -18,8 +19,8 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -52,7 +53,7 @@ class ReplicaUpdater(DataUpdater[RoutingRow, RoutingData]):
         return RoutingRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ReplicaID:
         return self.replica_id
 
     @property
@@ -97,7 +98,11 @@ class ReplicaBatchUpdater(DataBatchUpdater[RoutingRow, RoutingData]):
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        return [RouteConditions.by_ids(list(self.replica_ids))]
+        return [
+            ReplicaSearchableFields.own.field_id.filter.in_(
+                UUIDInMatchSpec(values=list(self.replica_ids), negated=False)
+            )
+        ]
 
     @property
     @override

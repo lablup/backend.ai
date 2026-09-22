@@ -9,9 +9,7 @@ from ai.backend.common.dto.manager.rbac.request import (
     DeleteRoleRequest,
     PurgeRoleRequest,
     RevokeRoleRequest,
-    SearchEntitiesRequest,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -23,9 +21,7 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetRoleResponse,
     GetScopeTypesResponse,
     RevokeRoleResponse,
-    SearchEntitiesResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -118,16 +114,6 @@ class RBACClient(BaseDomainClient):
             response_model=GetScopeTypesResponse,
         )
 
-    async def search_scopes(
-        self, scope_type: str, request: SearchScopesRequest
-    ) -> SearchScopesResponse:
-        return await self._client.typed_request(
-            "POST",
-            f"/admin/rbac/scopes/{scope_type}/search",
-            request=request,
-            response_model=SearchScopesResponse,
-        )
-
     # ---- Entity Management ----
 
     async def get_entity_types(self) -> GetEntityTypesResponse:
@@ -135,18 +121,4 @@ class RBACClient(BaseDomainClient):
             "GET",
             "/admin/rbac/entity-types",
             response_model=GetEntityTypesResponse,
-        )
-
-    async def search_entities(
-        self,
-        scope_type: str,
-        scope_id: str,
-        entity_type: str,
-        request: SearchEntitiesRequest,
-    ) -> SearchEntitiesResponse:
-        return await self._client.typed_request(
-            "POST",
-            f"/admin/rbac/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search",
-            request=request,
-            response_model=SearchEntitiesResponse,
         )

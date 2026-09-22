@@ -10,6 +10,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
 from ai.backend.manager.models.specs.querier import OwnedFieldQuerier
 
 
@@ -28,4 +31,4 @@ class DeploymentPolicyByDeploymentQuerier(
 
     @override
     def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:
-        return row.to_data()
+        return DeploymentPolicySearchableFields.own.to_data(row)

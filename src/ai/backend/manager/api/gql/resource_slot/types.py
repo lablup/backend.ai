@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self, override
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
@@ -154,8 +155,14 @@ class NumberFormatGQL:
     ),
     name="ResourceSlotType",
 )
-class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
+class ResourceSlotTypeGQL(PydanticNodeMixin[ResourceSlotTypeNodeDTO]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the resource slot type.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
     )
@@ -201,13 +208,13 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        from ai.backend.manager.errors.repository import EntityNotFoundError
+        from ai.backend.manager.errors.base.not_found import NotFoundError
 
         results: list[Self | None] = []
         for slot_name in node_ids:
             try:
                 node = await load_resource_slot_type_node(info, slot_name)
-            except EntityNotFoundError:
+            except NotFoundError:
                 if required:
                     raise
                 results.append(None)
@@ -425,6 +432,12 @@ class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the agent resource.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )
@@ -538,6 +551,12 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the resource allocation.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )

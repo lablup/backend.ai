@@ -4,12 +4,11 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -21,9 +20,9 @@ from ai.backend.common.types import (
     QuotaScopeID,
     VFolderHostPermissionMap,
     VFolderID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
@@ -73,23 +72,6 @@ class VFolderMountPermission(enum.StrEnum):
                 return cls.OWNER_PERM
         return None
 
-    def to_rbac_operation(self) -> set[OperationType]:
-        """What a mount permission lets its holder do inside a session.
-
-        Two answers: reading, and reading with writing. ``wd`` answers as ``rw``
-        (BEP-1077 5.7) — it stays a value the legacy read paths gate on, but it buys
-        nothing the graph does not already give ``rw``.
-        """
-        match self:
-            case VFolderMountPermission.READ_ONLY:
-                return {OperationType.READ}
-            case (
-                VFolderMountPermission.READ_WRITE
-                | VFolderMountPermission.RW_DELETE
-                | VFolderMountPermission.OWNER_PERM
-            ):
-                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
-
 
 class VFolderInvitationState(enum.StrEnum):
     """
@@ -100,16 +82,6 @@ class VFolderInvitationState(enum.StrEnum):
     CANCELED = "canceled"  # canceled by inviter
     ACCEPTED = "accepted"
     REJECTED = "rejected"  # rejected by invitee
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def declined_states(cls) -> frozenset[VFolderInvitationState]:
-        """Terminal states that did not grant access (rejected / canceled).
-
-        ACCEPTED is excluded: acceptance writes a durable ``vfolder_permissions``
-        row, but the invitation record is kept rather than purged as history.
-        """
-        return frozenset((cls.REJECTED, cls.CANCELED))
 
 
 class VFolderOperationStatus(enum.StrEnum):
@@ -208,11 +180,7 @@ class VFolderData(EntityData):
     domain_name: str
     quota_scope_id: QuotaScopeID | None
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission | None
-    max_files: int
-    max_size: int | None
-    num_files: int
-    cur_size: int
+    default_mount_permission: VFolderMountPolicy
     created_at: datetime
     last_used: datetime | None
     updated_at: datetime
@@ -241,15 +209,15 @@ class VFolderUsageData:
 
 
 @dataclass
-class VFolderPermissionData(FieldData):
-    """
-    VFolder permission data representing user-specific permissions on a VFolder.
-    """
+class VFolderMountPolicyData(FieldData):
+    """The mount level one user gets on a vfolder."""
 
-    id: VFolderPermissionID
-    vfolder: uuid.UUID
-    user: uuid.UUID
-    permission: VFolderMountPermission
+    id: VFolderMountPolicyID
+    vfolder_id: VFolderUUID
+    user_id: uuid.UUID
+    permission: VFolderMountPolicy
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass
@@ -263,7 +231,7 @@ class VFolderInvitationData:
     inviter: str  # email
     inviter_username: str | None
     invitee: str  # email
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
     created_at: datetime
     modified_at: datetime | None
 
@@ -280,37 +248,6 @@ class VFolderCreation:
     vfolder: VFolderData
     max_quota_scope_size: int
     container_uid: int | None
-
-
-@dataclass
-class VFolderAccessInfo:
-    """
-    Information about VFolder access for query results.
-    """
-
-    vfolder_data: VFolderData
-    is_owner: bool
-    effective_permission: VFolderMountPermission | None
-
-
-@dataclass
-class VFolderListResult:
-    """
-    Result of VFolder list operations with pagination support.
-    """
-
-    vfolders: list[VFolderAccessInfo]
-    total_count: int | None = None
-
-
-@dataclass
-class VFolderSearchResult:
-    """Search result with total count and pagination info for vfolders."""
-
-    items: list[VFolderData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
 
 
 @dataclass

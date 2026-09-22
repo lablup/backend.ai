@@ -5,13 +5,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.login_client_type.searchable_fields import (
+    LoginClientTypeSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -33,7 +35,7 @@ class LoginClientTypeUpdater(DataUpdater[LoginClientTypeRow, LoginClientTypeData
         return LoginClientTypeRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> LoginClientTypeID:
         return self.login_client_type_id
 
     @property
@@ -50,4 +52,4 @@ class LoginClientTypeUpdater(DataUpdater[LoginClientTypeRow, LoginClientTypeData
 
     @override
     def to_data(self, row: LoginClientTypeRow) -> LoginClientTypeData:
-        return row.to_dataclass()
+        return LoginClientTypeSearchableFields.own.to_data(row)

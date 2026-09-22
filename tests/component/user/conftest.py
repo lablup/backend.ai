@@ -15,8 +15,8 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -27,8 +27,6 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     GroupMeta,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -48,6 +46,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -64,14 +66,6 @@ if TYPE_CHECKING:
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
 
-def _create_mock_validators() -> MagicMock:
-    mock_rbac = MagicMock(spec=RBACValidators)
-    mock_rbac.scope = AsyncMock()
-    mock_validators = MagicMock(spec=ActionValidators)
-    mock_validators.rbac = mock_rbac
-    return mock_validators
-
-
 @pytest.fixture()
 def user_processors(
     database_engine: ExtendedAsyncSAEngine,
@@ -84,6 +78,7 @@ def user_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = UserService(
@@ -94,7 +89,7 @@ def user_processors(
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(
-        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(UserEntityType())),
         service,
     )
 
@@ -105,9 +100,9 @@ def domain_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> DomainProcessors:
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
@@ -141,7 +136,8 @@ def server_module_registries(
     processors.user = user_processors
     v2_handler = V2UserHandler(
         adapter=UserAdapter(
-            processors,
+            processors.user,
+            MagicMock(),
             auth_config=MagicMock(),
             key_provider_pool=KeyProviderPool(
                 providers=[], write_provider_type=KeyProviderType.PLAIN

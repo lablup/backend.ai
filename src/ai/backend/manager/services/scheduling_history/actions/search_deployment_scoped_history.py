@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
-from ai.backend.manager.models.scheduling_history.scopes import DeploymentHistoryOperationScope
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.scheduling_history.scopes import DeploymentHistoryTarget
+from ai.backend.manager.models.scheduling_history.searchers import DeploymentHistorySearcher
 
 from .base import DeploymentSchedulingHistoryAction, SchedulingHistoryScopeActionResult
 
@@ -21,13 +21,13 @@ class SearchDeploymentScopedHistoryAction(DeploymentSchedulingHistoryAction):
     Scope is required and specifies which deployment to query history for.
     """
 
-    scope: DeploymentHistoryOperationScope
-    querier: BatchQuerier
+    scope: DeploymentHistoryTarget
+    searcher: DeploymentHistorySearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod

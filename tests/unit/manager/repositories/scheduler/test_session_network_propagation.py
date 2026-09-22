@@ -11,6 +11,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import (
     AccessKey,
@@ -46,11 +47,11 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
@@ -309,11 +310,15 @@ class TestPersistentNetworkNotRecreated:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
-        querier = BatchQuerier(
+        searcher = SessionSearcher(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([session_id])],
+            conditions=[
+                SessionSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=[session_id], negated=False)
+                )
+            ],
         )
-        result = await db_source.search_sessions_with_kernels_and_user(querier)
+        result = await db_source.search_sessions_with_kernels_and_user(searcher)
 
         assert len(result.sessions) == 1
         session = result.sessions[0]

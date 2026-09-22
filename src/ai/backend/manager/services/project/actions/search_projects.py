@@ -5,37 +5,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.v2.ops.base import (
     GetSingleEntityOpsAction,
-    SearchGlobalOpsAction,
+    GlobalSearcherOpsAction,
 )
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.queriers import ProjectQuerier
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchers import ProjectSearcher
 
 
 @dataclass(frozen=True)
-class GlobalSearchProjectsAction(SearchGlobalOpsAction[ProjectRow, ProjectData]):
+class GlobalSearchProjectsAction(GlobalSearcherOpsAction[ProjectRow, ProjectData]):
     """Page through every project in the installation."""
-
-    searcher: ProjectSearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return PROJECT_ENTITY_TYPE
+        return ProjectEntityType()
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "global_search_projects"
-
-    @override
-    def to_searcher(self) -> ProjectSearcher:
-        return self.searcher
 
 
 @dataclass(frozen=True)

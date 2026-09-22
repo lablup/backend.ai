@@ -1,42 +1,41 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.action.rbac import RBACActionName, RBACRequiredPermission
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.data.permission.types import GrantableOperation
 
 
-@dataclass
-class GetPermissionMatrixAction(RoleAction):
-    """Action to get the complete RBAC permission matrix.
+@dataclass(frozen=True)
+class PublicGetPermissionMatrixAction(BaseGlobalAction):
+    """The scope, entity and operation combinations a role may be given.
 
-    Returns scope -> entity -> action_name -> permission mapping.
-    This action is only available to superadmins.
-    Permission check is performed at the API handler level.
+    Read off the wired catalog, so it carries no row any caller owns.
     """
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return RoleEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-
-@dataclass
-class GetPermissionMatrixActionResult(BaseActionResult):
-    """Result of getting the RBAC permission matrix."""
-
-    matrix: dict[
-        RBACElementType, dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]
-    ] = field(default_factory=dict)
-
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "public_get_permission_matrix"
+
+
+@dataclass(frozen=True)
+class PublicGetPermissionMatrixActionResult:
+    matrix: Mapping[EntityType, Mapping[EntityType, Sequence[GrantableOperation]]] = field(
+        default_factory=dict
+    )

@@ -5,13 +5,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.searchable_fields import (
+    RuntimeVariantSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -33,7 +35,7 @@ class RuntimeVariantUpdater(DataUpdater[RuntimeVariantRow, RuntimeVariantData]):
         return RuntimeVariantRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> RuntimeVariantID:
         return self.variant_id
 
     @property
@@ -50,4 +52,4 @@ class RuntimeVariantUpdater(DataUpdater[RuntimeVariantRow, RuntimeVariantData]):
 
     @override
     def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
-        return row.to_data()
+        return RuntimeVariantSearchableFields.own.to_data(row)

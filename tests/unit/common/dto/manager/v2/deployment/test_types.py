@@ -92,7 +92,7 @@ class TestDeploymentOrderField:
 
     def test_enum_members_count(self) -> None:
         members = list(DeploymentOrderField)
-        assert len(members) == 7
+        assert len(members) == 13
 
     def test_all_values_are_strings(self) -> None:
         for member in DeploymentOrderField:
@@ -128,7 +128,7 @@ class TestRevisionOrderField:
 
     def test_enum_members_count(self) -> None:
         members = list(RevisionOrderField)
-        assert len(members) == 5
+        assert len(members) == 14
 
     def test_all_values_are_strings(self) -> None:
         for member in RevisionOrderField:

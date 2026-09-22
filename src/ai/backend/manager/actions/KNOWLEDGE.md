@@ -1,9 +1,9 @@
 ---
 name: action-framework-design
 type: design-rationale
-description: v2 action shapes and derived permissions, why a link between two entities names both scopes and no entity kind, why a field row's operations are answered for by its owning entity, why a bulk field answers per row but records per entity, audit recording principles (writes always, reads on subscription, failures always, DENIED), lookup existence-leak handling, public read gate, ops-backed backing axis
+description: v2 action shapes and derived permissions, why a link between two entities names both scopes and no entity kind, why a field row's operations are answered for by its owning entity, why a bulk field answers per row but records per entity, audit recording principles (writes always, reads on subscription, failures always, DENIED), lookup existence-leak handling, public read gate, global gate answered by the global singleton, ops-backed backing axis
 scope: src/ai/backend/manager/actions
-keywords: [BaseRelationAction, RelationActionProcessor, audit_log_scopes, BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, AnonymousGlobalActionProcessor, anonymous_scope, anonymous_global, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
+keywords: [BaseRelationAction, RelationActionProcessor, audit_log_scopes, BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, VirtualEntityGlobalActionRBACValidator, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, AnonymousGlobalActionProcessor, anonymous_scope, anonymous_global, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
 sources:
   - src/ai/backend/manager/actions/v2
   - src/ai/backend/manager/actions/registry
@@ -142,10 +142,27 @@ which is why handlers call processors, not services.
 
 ## Public means all authenticated users, not anonymous
 
-- `PublicActionProcessor` replaces the SUPERADMIN gate with an authentication check and does nothing else.
+- `PublicActionProcessor` replaces the global gate with an authentication check and does nothing else.
 - It is the only processor constructed together with the action class, so it rejects write operations at wiring time, not at request time.
 - A read that runs before anyone has signed in therefore has no processor of its own: `ScopeActionProcessor` pins no gate, so `ProcessorGroup.anonymous_scope` wires one without adding a class. It takes read operations only, checked at wiring time.
 - A write that no principal can ever reach — an external system posting to a webhook, authenticated by a secret the entity stores — has nowhere else to go, so `AnonymousGlobalActionProcessor` runs it with no validator at all. Recording the wiring as an anonymous gate is what keeps that set countable.
+
+## A global action is answered by the global singleton
+
+- A global action names no scope, which is not the same as belonging to none. The `global`
+  singleton is that scope, and the bits it grants on the action's entity type are the gate.
+- The check is by type. It puts no scope condition on the query, so a user delegated a
+  global permission reads every row of that type. A global search over a resource that
+  belongs to a project or a user is no different.
+- A super admin, and a monitor on a read, pass straight off the user role. What worked
+  without a role row keeps working, and neither costs a permission read.
+- With the enforcement switch (`manager.rbac.enforcement_enabled`) off, those two bypasses
+  are all that remain and everything else is refused. Nothing guarantees the permission rows
+  are maintained while it is off, so the fall-back is the earlier behavior — super admin
+  only — rather than letting callers through.
+- The list a role editor offers (`role_grantable_wirings`) leaves the global wirings out,
+  because `role_scope_types` does not name `global` and the matrix has no axis for it. The
+  gate works, but a role to delegate through cannot yet be made from that list.
 
 ## The registry is the catalog
 

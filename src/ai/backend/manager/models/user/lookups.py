@@ -6,7 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.user.row import UserRow
@@ -21,6 +22,10 @@ class UserEmailLookup(DataLookup[UserRow, UserID]):
     @override
     def row_class(self) -> type[UserRow]:
         return UserRow
+
+    @override
+    def entity_type(self) -> EntityType:
+        return UserEntityType()
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:

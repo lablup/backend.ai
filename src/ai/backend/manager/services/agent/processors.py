@@ -1,7 +1,6 @@
 from ai.backend.common.data.entity.agent import AgentUUID
-from ai.backend.common.data.entity.agent_resource import AGENT_RESOURCE_FIELD_TYPE
+from ai.backend.common.data.entity.agent_resource import AgentResourceFieldType
 from ai.backend.common.types import AgentId
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -11,6 +10,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionPro
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
     BulkLookupOpsResult,
     LookupOpsResult,
     ScopedFieldsOpsResult,
@@ -50,10 +50,7 @@ from ai.backend.manager.services.agent.actions.recalculate_usage import (
 from ai.backend.manager.services.agent.actions.scoped_search_resources import (
     ScopedSearchAgentResourcesAction,
 )
-from ai.backend.manager.services.agent.actions.search_agents import (
-    SearchAgentsAction,
-    SearchAgentsActionResult,
-)
+from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -108,7 +105,7 @@ class AgentProcessors:
     get_total_resources: GlobalActionProcessor[
         GetTotalResourcesAction, GetTotalResourcesActionResult
     ]
-    search_agents: GlobalActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
+    search_agents: GlobalActionProcessor[SearchAgentsAction, BatchOpsResult[AgentData]]
     load_container_counts: GlobalActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
@@ -117,7 +114,6 @@ class AgentProcessors:
         self,
         group: ProcessorGroup[AgentData],
         service: AgentService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupAgentAction)
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupAgentsAction)
@@ -129,7 +125,7 @@ class AgentProcessors:
             BulkLoadAgentPermissionsAction, service.bulk_load_permissions
         )
         resources: LookupFieldGroup[AgentResourceData] = group.field_group(
-            FieldGroupMeta(AGENT_RESOURCE_FIELD_TYPE),
+            FieldGroupMeta(AgentResourceFieldType()),
             AgentResourceData,
             LookupAgentResourceOwnerAction,
             LookupBulkAgentResourceOwnerAction,
@@ -161,7 +157,7 @@ class AgentProcessors:
         self.get_total_resources = group.global_scope(
             GetTotalResourcesAction, service.get_total_resources
         )
-        self.search_agents = group.global_scope(SearchAgentsAction, service.search_agents)
+        self.search_agents = group.global_searcher_ops(SearchAgentsAction)
         self.load_container_counts = group.global_scope(
             LoadContainerCountsAction, service.load_container_counts
         )

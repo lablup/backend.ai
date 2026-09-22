@@ -6,13 +6,16 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
+from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
+    RolePermissionPresetFilter,
+)
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
-from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
 
 __all__ = (
     "BulkDeleteRolePresetsInput",
@@ -21,6 +24,7 @@ __all__ = (
     "CreateRolePresetInput",
     "RolePresetFilter",
     "RolePresetOrder",
+    "RolePresetPermissionNestedFilter",
     "SearchRolePresetsInput",
     "UpdateRolePresetBody",
     "UpdateRolePresetInput",
@@ -31,7 +35,7 @@ class CreateRolePresetInput(BaseRequestModel):
     """Input for creating a new role preset."""
 
     name: str = Field(min_length=1, max_length=64, description="Role preset name.")
-    scope_type: RBACElementTypeDTO = Field(
+    scope_type: DeclaredEntityType = Field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
     auto_assign: bool = Field(
@@ -99,11 +103,19 @@ class BulkPurgeRolePresetsInput(BaseRequestModel):
     )
 
 
+class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter]):
+    """The `permissions` field of a role preset filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the preset filter's own `AND`.
+    """
+
+
 class RolePresetFilter(BaseRequestModel):
     """Filter criteria for searching role presets."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name.")
-    scope_type: RBACElementTypeDTO | None = Field(default=None, description="Filter by scope type.")
+    scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     deleted: bool | None = Field(
         default=None,
@@ -111,6 +123,10 @@ class RolePresetFilter(BaseRequestModel):
             "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
             "set this explicitly to ``true`` to inspect archived presets."
         ),
+    )
+    permissions: RolePresetPermissionNestedFilter | None = Field(
+        default=None,
+        description="Filter by conditions on the permission entries the preset carries.",
     )
     AND: list[RolePresetFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[RolePresetFilter] | None = Field(default=None, description="OR conjunction.")
@@ -130,6 +146,12 @@ class RolePresetOrder(BaseRequestModel):
 class SearchRolePresetsInput(BaseRequestModel):
     """Input for paginated search of role presets."""
 
+    usage: RolePresetUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
+        ),
+    )
     filter: RolePresetFilter | None = Field(default=None, description="Filter conditions.")
     order: list[RolePresetOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")

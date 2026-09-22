@@ -4,6 +4,7 @@ from .filters import (
     RolePresetFilterGQL,
     RolePresetOrderByGQL,
     RolePresetOrderFieldGQL,
+    RolePresetPermissionNestedFilterGQL,
 )
 from .inputs import (
     BulkAddRolePermissionPresetsInputGQL,
@@ -13,6 +14,8 @@ from .inputs import (
     BulkRestoreRolePresetsInputGQL,
     CreateRolePresetInputGQL,
     RolePermissionPresetEntryInputGQL,
+    RolePresetUsageGQL,
+    RolePresetUsedByGQL,
     UpdateRolePresetInputGQL,
 )
 from .node import (
@@ -51,6 +54,7 @@ __all__ = [
     "RolePermissionPresetConnection",
     # Filter / OrderBy types
     "RolePresetFilterGQL",
+    "RolePresetPermissionNestedFilterGQL",
     "RolePresetOrderByGQL",
     "RolePresetOrderFieldGQL",
     "RolePermissionPresetFilterGQL",
@@ -63,6 +67,8 @@ __all__ = [
     "BulkRestoreRolePresetsInputGQL",
     "BulkPurgeRolePresetsInputGQL",
     "RolePermissionPresetEntryInputGQL",
+    "RolePresetUsageGQL",
+    "RolePresetUsedByGQL",
     "BulkAddRolePermissionPresetsInputGQL",
     "BulkRemoveRolePermissionPresetsInputGQL",
     # Payload types

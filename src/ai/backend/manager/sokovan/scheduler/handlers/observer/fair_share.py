@@ -13,15 +13,18 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
+
+import sqlalchemy as sa
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import KernelId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.repositories.base import BulkCreator
+from ai.backend.manager.models.fair_share.row import DEFAULT_LOOKBACK_DAYS
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -99,7 +102,40 @@ class FairShareObserver(KernelObserver):
         Returns:
             QueryCondition for fair share observation targets
         """
-        return KernelConditions.for_fair_share_observation(resource_group_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                KernelRow.resource_group_id == resource_group_id,
+                KernelRow.starts_at.isnot(None),
+                sa.or_(
+                    KernelRow.terminated_at.is_(None),
+                    sa.and_(
+                        KernelRow.terminated_at
+                        > sa.func.coalesce(KernelRow.last_observed_at, KernelRow.starts_at),
+                        KernelRow.terminated_at >= self._lookback_cutoff(resource_group_id),
+                    ),
+                ),
+            )
+
+        return inner
+
+    def _lookback_cutoff(
+        self, resource_group_id: ResourceGroupID
+    ) -> sa.sql.expression.ColumnElement[Any]:
+        """The instant before which a terminated kernel is no longer observed."""
+        lookback_days = (
+            sa.select(
+                sa.func.coalesce(
+                    sa.cast(
+                        ResourceGroupRow.fair_share_spec["lookback_days"].as_string(), sa.Integer
+                    ),
+                    DEFAULT_LOOKBACK_DAYS,
+                )
+            )
+            .where(ResourceGroupRow.id == resource_group_id)
+            .scalar_subquery()
+        )
+        return sa.func.now() - sa.func.make_interval(0, 0, 0, lookback_days)
 
     @override
     async def observe(
@@ -155,11 +191,11 @@ class FairShareObserver(KernelObserver):
 
         log.debug(
             "[FairShareObserver] Preparation result: specs_count={}, observed_count={}",
-            len(preparation_result.specs),
+            len(preparation_result.creations),
             preparation_result.observed_count,
         )
 
-        if not preparation_result.specs:
+        if not preparation_result.creations:
             log.debug("[FairShareObserver] No specs prepared, returning early")
             return ObservationResult(observed_count=0)
 
@@ -177,9 +213,8 @@ class FairShareObserver(KernelObserver):
         )
 
         # Atomic DB write for usage records
-        bulk_creator = BulkCreator(specs=preparation_result.specs)
         await self._resource_usage_repository.record_fair_share_observation(
-            bulk_creator,
+            preparation_result.creations,
             preparation_result.kernel_observation_times,
             aggregation_result,
         )

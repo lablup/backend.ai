@@ -33,6 +33,7 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
@@ -43,6 +44,7 @@ from .dev import (
     install_git_hooks,
     install_git_lfs,
     pants_export,
+    pull_git_lfs,
 )
 from .docker import (
     check_docker,
@@ -639,8 +641,9 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-runtime-variant-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path("ai.backend.install.fixtures", "example-roles.json") as path:
+        with self.resource_path("ai.backend.install.fixtures", "example-role-presets.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        await self.run_manager_cli(["mgr", "permissions", "provision"])
         with self.resource_path(
             "ai.backend.install.fixtures", "example-prometheus-query-preset-categories.json"
         ) as path:
@@ -1440,6 +1443,24 @@ class Context(metaclass=ABCMeta):
         default_domain_id = next(
             domain["id"] for domain in user_fixture["domains"] if domain["name"] == "default"
         )
+        default_domain_node_id = next(
+            node["id"]
+            for node in user_fixture["virtual_entities"]
+            if node["entity_type"] == "domain" and node["entity_id"] == default_domain_id
+        )
+        resource_group_node_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"backend.ai/virtual-entity/resource_group/{resource_group_id}",
+            )
+        )
+        membership_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"backend.ai/entity-membership/resource_group/{resource_group_id}"
+                f"/domain/{default_domain_id}",
+            )
+        )
         with tempfile.TemporaryDirectory() as tmpdir:
             fixture_path = Path(tmpdir) / "fixture.json"
             with fixture_path.open("w") as fw:
@@ -1466,6 +1487,35 @@ class Context(metaclass=ABCMeta):
                             {
                                 "resource_group_id": resource_group_id,
                                 "domain_id": default_domain_id,
+                            }
+                        ],
+                        "virtual_entities": [
+                            {
+                                "id": resource_group_node_id,
+                                "entity_type": "resource_group",
+                                "entity_id": resource_group_id,
+                            }
+                        ],
+                        "entity_memberships": [
+                            {
+                                "id": membership_id,
+                                "virtual_entity_id": resource_group_node_id,
+                                "member_entity_id": default_domain_node_id,
+                                "capped": True,
+                            }
+                        ],
+                        "entity_membership_caps": [
+                            {
+                                "membership_id": membership_id,
+                                "permission": int(Permission.READ),
+                                "all_fields": True,
+                            }
+                        ],
+                        "scope_bindings": [
+                            {
+                                "virtual_entity_id": resource_group_node_id,
+                                "scope_entity_id": default_domain_node_id,
+                                "permission_cap": int(Permission.READ),
                             }
                         ],
                     })
@@ -2014,6 +2064,7 @@ class DevContext(Context):
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
+        await pull_git_lfs(self)
         await install_git_hooks(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)

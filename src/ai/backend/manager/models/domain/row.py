@@ -21,10 +21,9 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.domain.types import DomainData, DomainStatus
+from ai.backend.manager.data.domain.types import DomainStatus
 from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
@@ -127,28 +126,12 @@ class DomainRow(LifecycleTimestampsMixin, Base):
     )
 
     @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+    def scope_id_expr(cls) -> SQLColumnExpression[DomainID]:
         return cls.id
 
     @classmethod
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
-
-    def to_data(self) -> DomainData:
-        return DomainData(
-            id=self.id,
-            name=self.name,
-            description=self.description,
-            is_active=self.is_active,
-            is_default=self.is_default,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-            total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            allowed_docker_registries=self.allowed_docker_registries,
-            integration_name=self.integration_id,  # DB column is integration_id
-            dotfiles=self.dotfiles,
-        )
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.

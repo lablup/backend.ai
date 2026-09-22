@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -24,7 +26,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.rbac.types import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .permission import (
@@ -33,6 +34,7 @@ from .permission import (
     RolePermissionPresetFilterGQL,
     RolePermissionPresetGQL,
     RolePermissionPresetOrderByGQL,
+    RolePermissionPresetOrderFieldGQL,
 )
 
 
@@ -45,8 +47,14 @@ from .permission import (
 )
 class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     id: NodeID[str] = gql_field(description="Role preset UUID (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the role preset.",
+        ),
+    )
     name: str = gql_field(description="Role preset name.")
-    scope_type: RBACElementTypeGQL = gql_field(
+    scope_type: str = gql_field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
     auto_assign: bool = gql_field(
@@ -83,9 +91,11 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         offset: int | None = None,
     ) -> RolePermissionPresetConnection | None:
         filter_dto: RolePermissionPresetFilter | None = filter.to_pydantic() if filter else None
-        orders_dto: list[RolePermissionPresetOrder] | None = (
-            [o.to_pydantic() for o in order_by] if order_by else None
-        )
+        orders_dto: list[RolePermissionPresetOrder] | None = [
+            o.to_pydantic()
+            for o in order_by or []
+            if o.field is not RolePermissionPresetOrderFieldGQL.OPERATION
+        ] or None
         search_input = SearchRolePermissionPresetsInput(
             filter=filter_dto,
             order=orders_dto,
@@ -102,7 +112,7 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         edges = [
             RolePermissionPresetEdge(
                 node=RolePermissionPresetGQL.from_pydantic(item),
-                cursor=str(item.id),
+                cursor=encode_cursor(item.id),
             )
             for item in result.items
         ]

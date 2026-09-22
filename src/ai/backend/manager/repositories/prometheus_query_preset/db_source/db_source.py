@@ -5,15 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-import sqlalchemy as sa
-
 from ai.backend.common.exception import PrometheusQueryPresetNotFound
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
     PrometheusQueryPresetListResult,
 )
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -26,9 +30,11 @@ class PrometheusQueryPresetDBSource:
     """Database source for prometheus query preset operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     async def get_by_id(self, preset_id: UUID) -> PrometheusQueryPresetData:
         """Retrieves a prometheus query preset by ID."""
@@ -38,24 +44,22 @@ class PrometheusQueryPresetDBSource:
                 raise PrometheusQueryPresetNotFound(
                     f"Prometheus query preset {preset_id} not found"
                 )
-            return row.to_data()
+            return PrometheusQueryPresetSearchableFields.own.to_data(row)
 
     async def search(
         self,
-        querier: BatchQuerier,
+        searcher: PrometheusQueryPresetSearcher,
     ) -> PrometheusQueryPresetListResult:
         """Read presets for an internal caller.
 
         The API searches through the action. This stays for the metric repository,
         which resolves preset ids with no action to run.
         """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(PrometheusQueryPresetRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.PrometheusQueryPresetRow.to_data() for row in result.rows]
-            return PrometheusQueryPresetListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return PrometheusQueryPresetListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

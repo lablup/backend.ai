@@ -6,16 +6,14 @@ from typing import (
     override,
 )
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder_invitation import (
-    VFOLDER_INVITATION_ENTITY_TYPE,
-    VFolderInvitationID,
-)
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType, EntityShareID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderAction,
     VFolderScopeActionResult,
@@ -24,34 +22,57 @@ from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
 
 @dataclass
-class VFolderInvitationAction(BaseSingleEntityAction):
-    """Base for an operation on one invitation.
+class VFolderInvitationAnswerAction(BaseScopeAction):
+    """Base for an answer to one invitation, which is a share offered to the requester.
 
-    An invitation answers for itself rather than through the folder: the invitee
-    acts on it while holding no permission on the folder yet.
+    Scoped to the requester rather than to the offer: they hold no permission on the
+    share before answering, so what is checked is that they may answer offers at all.
     """
 
-    invitation_id: VFolderInvitationID
+    invitation_id: EntityShareID
+    requester_user_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> EntityIdentifier:
-        return self.invitation_id
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityShareEntityType()
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.requester_user_uuid),)
+
+
+@dataclass
+class VFolderInvitationAnswerActionResult(BaseScopeActionResult):
+    invitation_id: EntityShareID
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.invitation_id,)
 
 
 @dataclass
 class VFolderInvitationScopeAction(BaseScopeAction):
-    """Base for reading the invitations a user sent or received."""
+    """Base for reading the invitations a user sent or received.
+
+    The rows read are ``entity_share``, so permission is asked on that type.
+    """
 
     user_uuid: uuid.UUID
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_INVITATION_ENTITY_TYPE
+        return EntityShareEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.user_uuid),)
 
 
 @dataclass
@@ -59,7 +80,7 @@ class InviteVFolderAction(VFolderAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
     invitee_emails: list[str]
 
     @override
@@ -80,12 +101,7 @@ class InviteVFolderActionResult:
 
 
 @dataclass
-class AcceptInvitationAction(VFolderInvitationAction):
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
+class AcceptInvitationAction(VFolderInvitationAnswerAction):
     @override
     @classmethod
     def action_name(cls) -> str:
@@ -93,19 +109,12 @@ class AcceptInvitationAction(VFolderInvitationAction):
 
 
 @dataclass
-class AcceptInvitationActionResult:
-    invitation_id: uuid.UUID
+class AcceptInvitationActionResult(VFolderInvitationAnswerActionResult):
+    pass
 
 
 @dataclass
-class RejectInvitationAction(VFolderInvitationAction):
-    requester_user_uuid: uuid.UUID
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
+class RejectInvitationAction(VFolderInvitationAnswerAction):
     @override
     @classmethod
     def action_name(cls) -> str:
@@ -113,14 +122,21 @@ class RejectInvitationAction(VFolderInvitationAction):
 
 
 @dataclass
-class RejectInvitationActionResult:
-    invitation_id: uuid.UUID
+class RejectInvitationActionResult(VFolderInvitationAnswerActionResult):
+    pass
 
 
 @dataclass
-class UpdateInvitationAction(VFolderInvitationAction):
+class UpdateInvitationAction(BaseSingleEntityAction):
+    """Restate what an invitation of one's own lends."""
+
+    invitation_id: EntityShareID
     requester_user_uuid: uuid.UUID
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.invitation_id
 
     @override
     @classmethod
@@ -213,7 +229,7 @@ class RevokeInvitedVFolderActionResult:
 @dataclass
 class UpdateInvitedVFolderMountPermissionAction(VFolderAction):
     user_id: uuid.UUID
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
 
     @override
     @classmethod
@@ -230,7 +246,7 @@ class UpdateInvitedVFolderMountPermissionAction(VFolderAction):
 class UpdateInvitedVFolderMountPermissionActionResult:
     vfolder_id: uuid.UUID
     user_id: uuid.UUID
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
 
 
 @dataclass

@@ -6,13 +6,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.manager.data.artifact.types import ArtifactRemoteStatus, ArtifactRevisionData
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchable_fields import (
+    ArtifactRevisionSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 
@@ -44,7 +46,7 @@ class ArtifactRevisionScanUpdater(DataUpdater[ArtifactRevisionRow, ArtifactRevis
         return ArtifactRevisionRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ArtifactRevisionID:
         return self.revision_id
 
     @property
@@ -68,4 +70,4 @@ class ArtifactRevisionScanUpdater(DataUpdater[ArtifactRevisionRow, ArtifactRevis
 
     @override
     def to_data(self, row: ArtifactRevisionRow) -> ArtifactRevisionData:
-        return row.to_dataclass()
+        return ArtifactRevisionSearchableFields.own.to_data(row)

@@ -1,6 +1,9 @@
-"""Permission reads: what a role holds per (scope, entity_type) key, field scopes
-included, composed from the per-bit rows and their path rows; and what a user
-effectively holds on an entity, resolved through the graph."""
+"""Permission reads: what a role holds per entity type, field scopes included,
+composed from the per-bit rows and their path rows; and what a user effectively
+holds on an entity, resolved through the graph.
+
+A permission row names no scope. The role it belongs to does, so a grant reaches an
+entity through the role's scope."""
 
 from __future__ import annotations
 
@@ -12,9 +15,11 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
@@ -24,7 +29,8 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.specs.permission import PermissionEntry, PermissionKey
+from ai.backend.manager.models.specs.permission import PermissionEntry
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -39,7 +45,7 @@ class _GroupKey:
     """Keys resolved in one round-trip: ``entity_type`` matches the graph rows,
     ``subject_entity_type`` the permission rows."""
 
-    user_id: uuid.UUID
+    user_id: UserID
     entity_type: EntityType
     subject_entity_type: EntityType
 
@@ -47,20 +53,26 @@ class _GroupKey:
 class PermissionReadOps(V2ReadOps):
     """The general v2 read ops plus the role permission read."""
 
+    async def held_entity_types(self, role_id: RoleID) -> set[EntityType]:
+        """Every entity type the role holds a permission on."""
+        rows = (
+            await self._sess.execute(
+                sa.select(PermissionRow.entity_type)
+                .where(PermissionRow.role_id == role_id)
+                .distinct()
+            )
+        ).scalars()
+        return {EntityType(entity_type) for entity_type in rows}
+
     async def permissions(
-        self, role_id: RoleID, keys: Sequence[PermissionKey]
-    ) -> dict[PermissionKey, PermissionEntry]:
-        """The named keys' entries; a key holding nothing is absent."""
-        if not keys:
+        self, role_id: RoleID, entity_types: Sequence[EntityType]
+    ) -> dict[EntityType, PermissionEntry]:
+        """The named entity types' entries; one holding nothing is absent."""
+        if not entity_types:
             return {}
-        by_columns = {
-            (str(k.scope.entity_type()), str(k.scope), str(k.entity_type)): k for k in keys
-        }
         rows = (
             await self._sess.execute(
                 sa.select(
-                    PermissionRow.scope_type,
-                    PermissionRow.scope_id,
                     PermissionRow.entity_type,
                     PermissionRow.permission,
                     PermissionRow.all_fields,
@@ -70,39 +82,28 @@ class PermissionReadOps(V2ReadOps):
                 .outerjoin(PermissionFieldRow, PermissionFieldRow.permission_id == PermissionRow.id)
                 .where(
                     PermissionRow.role_id == role_id,
-                    self._key_filter(keys),
+                    PermissionRow.entity_type.in_([str(t) for t in entity_types]),
                 )
             )
         ).all()
-        whole: dict[PermissionKey, Permission] = {}
-        fields: dict[PermissionKey, dict[FieldPath, Permission]] = {}
+        whole: dict[EntityType, Permission] = {}
+        fields: dict[EntityType, dict[FieldPath, Permission]] = {}
         for row in rows:
-            key = by_columns[(str(row.scope_type), row.scope_id, str(row.entity_type))]
-            whole.setdefault(key, Permission.NONE)
+            entity_type = EntityType(row.entity_type)
+            whole.setdefault(entity_type, Permission.NONE)
             if row.all_fields:
-                whole[key] |= row.permission
+                whole[entity_type] |= row.permission
             elif row.path is not None:
-                scoped = fields.setdefault(key, {})
+                scoped = fields.setdefault(entity_type, {})
                 scoped[row.path] = scoped.get(row.path, Permission.NONE) | row.permission
         return {
-            key: PermissionEntry(
-                scope=key.scope,
-                entity_type=key.entity_type,
-                permission=whole[key],
-                fields=fields.get(key, {}),
+            entity_type: PermissionEntry(
+                entity_type=entity_type,
+                permission=bits,
+                fields=fields.get(entity_type, {}),
             )
-            for key in whole
+            for entity_type, bits in whole.items()
         }
-
-    def _key_filter(self, keys: Sequence[PermissionKey]) -> sa.ColumnElement[bool]:
-        return sa.tuple_(
-            PermissionRow.scope_type, PermissionRow.scope_id, PermissionRow.entity_type
-        ).in_([self._key_columns(k.scope, k.entity_type) for k in keys])
-
-    def _key_columns(
-        self, scope: EntityIdentifier, entity_type: EntityType
-    ) -> tuple[EntityType, str, EntityType]:
-        return (scope.entity_type(), str(scope), entity_type)
 
     # -- effective permissions over the graph ------------------------------------------
 
@@ -118,11 +119,20 @@ class PermissionReadOps(V2ReadOps):
         entity's own type and only through the ve's own govern. Every-field rows only:
         path-scoped bits wait for the field check. Keys sharing ``(user, entity type)``
         share one round-trip; a key nothing reaches maps to :attr:`Permission.NONE`.
+        A superadmin holds every bit on an entity that has a node, and none on one that has not.
         """
         if not keys:
             return {}
+        superadmins = await self._superadmin_ids({key.user_id for key in keys})
+        result: dict[OwnCheckKey, Permission] = {}
+        admin_keys = [key for key in keys if key.user_id in superadmins]
+        provisioned = await self._provisioned([key.entity for key in admin_keys])
+        for key in admin_keys:
+            result[key] = self._full_if_provisioned(key.entity, provisioned)
         groups: defaultdict[_GroupKey, list[OwnCheckKey]] = defaultdict(list)
         for key in keys:
+            if key.user_id in superadmins:
+                continue
             groups[
                 _GroupKey(
                     user_id=key.user_id,
@@ -131,7 +141,6 @@ class PermissionReadOps(V2ReadOps):
                 )
             ].append(key)
 
-        result: dict[OwnCheckKey, Permission] = {}
         for group_key, members in groups.items():
             granted = await self._resolve_group(group_key, [k.entity for k in members])
             for key in members:
@@ -143,35 +152,71 @@ class PermissionReadOps(V2ReadOps):
         keys: Collection[GovernCheckKey],
     ) -> Mapping[GovernCheckKey, Permission]:
         """The bits each user holds on ``entity_type`` within each scope through the
-        scopes governing it."""
+        scopes governing it. A superadmin holds every bit within a scope that has a node."""
         if not keys:
             return {}
+        superadmins = await self._superadmin_ids({key.user_id for key in keys})
+        result: dict[GovernCheckKey, Permission] = {}
+        admin_keys = [key for key in keys if key.user_id in superadmins]
+        provisioned = await self._provisioned([key.scope for key in admin_keys])
+        for key in admin_keys:
+            result[key] = self._full_if_provisioned(key.scope, provisioned)
         groups: defaultdict[_GroupKey, list[GovernCheckKey]] = defaultdict(list)
         for key in keys:
+            if key.user_id in superadmins:
+                continue
             groups[
                 _GroupKey(
                     user_id=key.user_id,
-                    entity_type=EntityType(key.scope.scope_type),
+                    entity_type=key.scope.entity_type(),
                     subject_entity_type=key.entity_type,
                 )
             ].append(key)
 
-        result: dict[GovernCheckKey, Permission] = {}
         for group_key, members in groups.items():
-            granted = await self._resolve_group(group_key, [k.scope.scope_id for k in members])
+            granted = await self._resolve_group(group_key, [k.scope for k in members])
             for key in members:
-                result[key] = granted.get(key.scope.scope_id, Permission.NONE)
+                result[key] = granted.get(key.scope, Permission.NONE)
         return result
 
+    async def _superadmin_ids(self, user_ids: Collection[UserID]) -> set[uuid.UUID]:
+        rows = await self._sess.scalars(
+            sa.select(UserRow.uuid).where(
+                UserRow.uuid.in_(list(user_ids)), UserRow.role == UserRole.SUPERADMIN
+            )
+        )
+        return {uuid.UUID(int=user_id.int) for user_id in rows.all()}
+
+    async def _provisioned(
+        self, entities: Sequence[EntityIdentifier]
+    ) -> set[tuple[str, uuid.UUID]]:
+        """The ``(entity type, id)`` pairs among ``entities`` that have a node."""
+        if not entities:
+            return set()
+        rows = await self._sess.execute(
+            sa.select(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).where(
+                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                    (entity.entity_type(), entity) for entity in entities
+                ])
+            )
+        )
+        return {(str(row.entity_type), uuid.UUID(int=row.entity_id.int)) for row in rows}
+
+    def _full_if_provisioned(
+        self, entity: EntityIdentifier, provisioned: set[tuple[str, uuid.UUID]]
+    ) -> Permission:
+        key = (str(entity.entity_type()), uuid.UUID(int=entity.int))
+        return Permission.full() if key in provisioned else Permission.NONE
+
     async def _resolve_group(
-        self, group_key: _GroupKey, entity_ids: Sequence[EntityID]
-    ) -> Mapping[EntityID, Permission]:
+        self, group_key: _GroupKey, entity_ids: Sequence[uuid.UUID]
+    ) -> Mapping[uuid.UUID, Permission]:
         result = await self._sess.execute(self._owned_query(group_key, entity_ids))
         return {row.entity_id: Permission(row.granted) for row in result}
 
     def _owned_query(
-        self, group_key: _GroupKey, entity_ids: Sequence[EntityID]
-    ) -> sa.Select[tuple[EntityID, int]]:
+        self, group_key: _GroupKey, entity_ids: Sequence[uuid.UUID]
+    ) -> sa.Select[tuple[uuid.UUID, int]]:
         """Run the virtual-entity-chain query for a single ``(user_id, entity_type,
         subject_entity_type)`` group with N entity_ids.
 
@@ -202,17 +247,20 @@ class PermissionReadOps(V2ReadOps):
                 .join(govern, govern.c.virtual_entity_id == own.c.virtual_entity_id)
                 .join(governor, governor.c.id == govern.c.scope_entity_id)
                 .join(
+                    roles,
+                    sa.and_(
+                        roles.c.scope_type == governor.c.entity_type,
+                        roles.c.scope_id == governor.c.entity_id,
+                    ),
+                )
+                .join(
                     perm,
                     sa.and_(
-                        perm.c.scope_type == governor.c.entity_type,
-                        # virtual_entities.entity_id is a native UUID; permissions.scope_id
-                        # stores its canonical string form. Cast to compare.
-                        perm.c.scope_id == sa.cast(governor.c.entity_id, sa.String),
+                        perm.c.role_id == roles.c.id,
                         perm.c.entity_type == group_key.subject_entity_type,
                         perm.c.all_fields.is_(True),
                     ),
                 )
-                .join(roles, roles.c.id == perm.c.role_id)
                 .join(user_roles, user_roles.c.role_id == roles.c.id)
                 .outerjoin(
                     share_cap,

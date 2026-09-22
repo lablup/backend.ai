@@ -42,12 +42,14 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
+from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
-    PreviewPresetAction,
-    UpdatePresetAction,
 )
+from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
+    PreviewPresetAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.update import UpdatePresetAction
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
@@ -106,7 +108,7 @@ class TestPrometheusQueryPresetService:
         mock_ops_repository: MagicMock,
         preset_data: PrometheusQueryPresetData,
     ) -> None:
-        mock_ops_repository.create_global_entity = AsyncMock(return_value=preset_data)
+        mock_ops_repository.create_entity = AsyncMock(return_value=preset_data)
         creator = PrometheusQueryPresetCreator(
             name="cpu_usage",
             metric_name="backendai_container_cpu_util",
@@ -119,14 +121,14 @@ class TestPrometheusQueryPresetService:
         result = await service.create_preset(CreatePresetAction(creator=creator))
 
         assert result.data == preset_data
-        mock_ops_repository.create_global_entity.assert_awaited_once_with(creator)
+        mock_ops_repository.create_entity.assert_awaited_once_with(creator)
 
     async def test_create_preset_rejects_an_unfillable_template(
         self,
         service: PrometheusQueryPresetService,
         mock_ops_repository: MagicMock,
     ) -> None:
-        mock_ops_repository.create_global_entity = AsyncMock()
+        mock_ops_repository.create_entity = AsyncMock()
         action = CreatePresetAction(
             creator=PrometheusQueryPresetCreator(
                 name="test",
@@ -140,7 +142,7 @@ class TestPrometheusQueryPresetService:
 
         with pytest.raises(InvalidMetricPresetTemplate):
             await service.create_preset(action)
-        mock_ops_repository.create_global_entity.assert_not_awaited()
+        mock_ops_repository.create_entity.assert_not_awaited()
 
     async def test_modify_preset(
         self,
@@ -159,6 +161,23 @@ class TestPrometheusQueryPresetService:
 
         assert result.preset == preset_data
         mock_ops_repository.update.assert_called_once_with(updater)
+
+    async def test_modify_preset_without_a_template_skips_validation(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_ops_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        mock_ops_repository.update = AsyncMock(return_value=preset_data)
+        updater = PrometheusQueryPresetUpdater(
+            preset_id=preset_data.id,
+            name=OptionalState[str].update("renamed"),
+        )
+
+        result = await service.update_preset(UpdatePresetAction(updater=updater))
+
+        assert result.preset == preset_data
+        mock_ops_repository.update.assert_awaited_once_with(updater)
 
     async def test_modify_preset_rejects_invalid_template(
         self,

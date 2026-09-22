@@ -11,11 +11,16 @@ scope lookup so fixture ordering stays flexible.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.data.permission.types import Permission, ScopeType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -44,14 +49,14 @@ class VirtualEntitySeeder:
         return row.id
 
     async def get_or_create_scope(
-        self, sess: AsyncSession, scope_type: ScopeType, scope_id: uuid.UUID
+        self, sess: AsyncSession, scope_type: EntityType, scope_id: uuid.UUID
     ) -> uuid.UUID:
         return await self.get_or_create_node(sess, scope_type, scope_id)
 
     async def seed_user_scope(self, sess: AsyncSession, user_id: uuid.UUID) -> None:
         """Give a directly-inserted user the chain rows ``create_user`` would
         have made: their own virtual entity plus the self membership/binding."""
-        scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
+        scope_id = await self.get_or_create_scope(sess, UserEntityType(), user_id)
         sess.add(
             EntityMembershipRow(
                 virtual_entity_id=scope_id,
@@ -68,6 +73,48 @@ class VirtualEntitySeeder:
         )
         await sess.flush()
 
+    async def provision(
+        self, sess: AsyncSession, entity_type: EntityType, entity_id: uuid.UUID
+    ) -> uuid.UUID:
+        """Put an entity into the graph the way the write path does: its node, which
+        owns and governs itself."""
+        node_id = await self.get_or_create_node(sess, entity_type, entity_id)
+        await self._own(sess, node_id, node_id)
+        await self._govern(sess, node_id, node_id)
+        return node_id
+
+    async def _own(self, sess: AsyncSession, holder: uuid.UUID, member: uuid.UUID) -> None:
+        """Idempotent like the graph writer: an edge already there stays."""
+        await sess.execute(
+            pg_insert(EntityMembershipRow)
+            .values(virtual_entity_id=holder, member_entity_id=member, capped=False)
+            .on_conflict_do_nothing()
+        )
+        await sess.flush()
+
+    async def _govern(self, sess: AsyncSession, node: uuid.UUID, scope: uuid.UUID) -> None:
+        await sess.execute(
+            pg_insert(ScopeBindingRow)
+            .values(virtual_entity_id=node, scope_entity_id=scope, permission_cap=None)
+            .on_conflict_do_nothing()
+        )
+        await sess.flush()
+
+    async def create_in(
+        self,
+        sess: AsyncSession,
+        entity_type: EntityType,
+        entity_id: uuid.UUID,
+        scopes: Sequence[tuple[EntityType, uuid.UUID]],
+    ) -> None:
+        """Write what creating the entity in those scopes writes: each scope owns it
+        and governs it."""
+        entity_node = await self.provision(sess, entity_type, entity_id)
+        for scope_type, scope_id in scopes:
+            scope_node = await self.provision(sess, scope_type, scope_id)
+            await self._own(sess, scope_node, entity_node)
+            await self._govern(sess, entity_node, scope_node)
+
     async def enroll_user_in_project(
         self, sess: AsyncSession, group_id: uuid.UUID, user_id: uuid.UUID
     ) -> None:
@@ -75,16 +122,9 @@ class VirtualEntitySeeder:
         membership: the user joins the project's virtual entity. The project is not bound
         into the user's own virtual entity — a member does not hand the project its
         personal entities."""
-        project_scope_id = await self.get_or_create_scope(sess, ScopeType.PROJECT, group_id)
-        user_scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
-        sess.add(
-            EntityMembershipRow(
-                virtual_entity_id=project_scope_id,
-                member_entity_id=user_scope_id,
-                capped=False,
-            )
-        )
-        await sess.flush()
+        project_scope_id = await self.provision(sess, ProjectEntityType(), group_id)
+        user_scope_id = await self.provision(sess, UserEntityType(), user_id)
+        await self._own(sess, project_scope_id, user_scope_id)
 
     async def cap_edge(
         self,

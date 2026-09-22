@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
@@ -21,8 +20,9 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
-from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
+from ai.backend.manager.models.rbac_models.role.searchable_fields import (
+    RoleSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role.updaters import RoleUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -40,6 +40,8 @@ class RoleAdapter(BaseFilterAdapter):
         return RoleDTO(
             id=data.id,
             name=data.name,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
             source=data.source,
             status=data.status,
             created_at=data.created_at,
@@ -50,18 +52,11 @@ class RoleAdapter(BaseFilterAdapter):
 
     def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> RoleUpdater:
         """Convert update request to updater."""
-        name = OptionalState[str].nop()
-        description = TriState[str].nop()
-
-        if request.name is not None:
-            name = OptionalState.update(request.name)
-        if request.description is not SENTINEL:
-            if request.description is None:
-                description = TriState.nullify()
-            else:
-                description = TriState.update(request.description)
-
-        return RoleUpdater(role_id=RoleID(role_id), name=name, description=description)
+        return RoleUpdater(
+            role_id=RoleID(role_id),
+            name=OptionalState.from_unset(request.name),
+            description=TriState.from_unset(request.description),
+        )
 
     def build_querier(self, request: SearchRolesRequest) -> BatchQuerier:
         """
@@ -84,41 +79,25 @@ class RoleAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: RoleFilter) -> list[QueryCondition]:
         """Convert role filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        # Name filter
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=RoleConditions.by_name_contains,
-                equals_factory=RoleConditions.by_name_equals,
-                starts_with_factory=RoleConditions.by_name_starts_with,
-                ends_with_factory=RoleConditions.by_name_ends_with,
-                in_factory=RoleConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        # Sources filter
-        if filter.sources is not None and len(filter.sources) > 0:
-            conditions.append(RoleConditions.by_sources(filter.sources))
-
-        # Statuses filter
-        if filter.statuses is not None and len(filter.statuses) > 0:
-            conditions.append(RoleConditions.by_statuses(filter.statuses))
-
+        fields = RoleSearchableFields.own
+        conditions = [*self.apply_string_filter(filter.name, fields.name.filter)]
+        if filter.sources:
+            conditions.append(fields.source.filter.in_(filter.sources))
+        if filter.statuses:
+            conditions.append(fields.status.filter.in_(filter.statuses))
         return conditions
 
     def _convert_order(self, order: RoleOrder) -> QueryOrder:
         """Convert role order specification to query order."""
+        fields = RoleSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == RoleOrderField.NAME:
-            return RoleOrders.name(ascending=ascending)
+            return fields.name.order.apply(ascending)
         if order.field == RoleOrderField.CREATED_AT:
-            return RoleOrders.created_at(ascending=ascending)
+            return fields.created_at.order.apply(ascending)
         if order.field == RoleOrderField.UPDATED_AT:
-            return RoleOrders.updated_at(ascending=ascending)
+            return fields.updated_at.order.apply(ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

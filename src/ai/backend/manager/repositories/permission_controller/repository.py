@@ -1,66 +1,44 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Mapping
-from typing import cast
+from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import Permission, RBACElementType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
-from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
-    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
-    BatchEntityPermissionCheckInput,
-    BulkPermissionCheckInput,
-    BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
-    BulkRolePermissionAddFailure,
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
-    PermissionResolutionKey,
     RoleData,
     RoleDetailData,
-    RoleListResult,
     RoleRevocationResult,
-    ScopeChainPermissionCheckInput,
-    ScopePermissionCheckInput,
-    SingleEntityPermissionCheckInput,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.types import (
-    ScopeListResult,
+from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
+from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
+from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
+from ai.backend.manager.models.rbac_models.role.searchable_fields import (
+    RoleSearchableFields,
 )
-from ai.backend.manager.data.permission.virtual_entity import (
-    GovernCheckKey,
-    OwnCheckKey,
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
 )
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
-from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
-    Creator,
-)
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import (
-    PermissionCreatorSpec,
-    UserRoleCreatorSpec,
-)
 
 from .db_source.db_source import PermissionDBSource
 
@@ -92,20 +70,20 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def create_permission(
         self,
-        creator: Creator[PermissionRow],
+        role_id: RoleID,
+        creator: RolePermissionCreator,
     ) -> PermissionData:
         """
         Create a new permission in the database.
 
         Returns the created permission data.
         """
-        row = await self._db_source.create_permission(creator)
-        return row.to_data()
+        return await self._db_source.create_permission(role_id, creator)
 
     @permission_controller_repository_resilience.apply()
     async def delete_permission(
         self,
-        purger: Purger[PermissionRow],
+        purger: RolePermissionPurger,
     ) -> PermissionData:
         """
         Delete a permission from the database.
@@ -113,15 +91,14 @@ class PermissionControllerRepository:
         Returns the deleted permission data.
 
         Raises:
-            ObjectNotFound: If permission does not exist.
+            PermissionNotFound: If permission does not exist.
         """
-        row = await self._db_source.delete_permission(purger)
-        return row.to_data()
+        return await self._db_source.delete_permission(purger)
 
     @permission_controller_repository_resilience.apply()
     async def update_permission(
         self,
-        updater: Updater[PermissionRow],
+        updater: RolePermissionUpdater,
     ) -> PermissionData:
         """
         Update a permission in the database.
@@ -129,39 +106,23 @@ class PermissionControllerRepository:
         Returns the updated permission data.
 
         Raises:
-            ObjectNotFound: If permission does not exist.
+            PermissionNotFound: If permission does not exist.
         """
-        row = await self._db_source.update_permission(updater)
-        return row.to_data()
+        return await self._db_source.update_permission(updater)
 
     @permission_controller_repository_resilience.apply()
     async def replace_role_permissions(
         self,
-        role_id: uuid.UUID,
-        creator: BulkCreator[PermissionRow],
+        role_id: RoleID,
+        entries: Sequence[PermissionEntry],
     ) -> BulkRolePermissionReplaceResultData:
-        result = await self._db_source.replace_role_permissions(role_id=role_id, creator=creator)
-        failures = [
-            BulkRolePermissionAddFailure(
-                role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=spec.scope_type,
-                scope_id=spec.scope_id,
-                entity_type=spec.entity_type,
-                permission=spec.permission,
-                message=str(error.exception),
-            )
-            for error in result.errors
-        ]
-        return BulkRolePermissionReplaceResultData(
-            role_id=role_id,
-            successes=[row.to_data() for row in result.successes],
-            failures=failures,
-        )
+        successes = await self._db_source.replace_role_permissions(role_id=role_id, entries=entries)
+        return BulkRolePermissionReplaceResultData(role_id=role_id, successes=successes)
 
     @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
         result = await self._db_source.assign_role(data)
-        return result.to_data()
+        return RoleAssignmentSearchableFields.own.to_assignment_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -169,19 +130,14 @@ class PermissionControllerRepository:
 
     @permission_controller_repository_resilience.apply()
     async def bulk_assign_role(
-        self, bulk_creator: BulkCreator[UserRoleRow]
+        self,
+        role_id: RoleID,
+        user_ids: Sequence[UserID],
+        granted_by: UserID | None = None,
     ) -> BulkRoleAssignmentResultData:
-        result = await self._db_source.bulk_assign_role(bulk_creator)
-        failures = [
-            BulkRoleAssignmentFailure(
-                user_id=cast(UserRoleCreatorSpec, error.spec).user_id,
-                message=str(error.exception),
-            )
-            for error in result.errors
-        ]
+        rows = await self._db_source.bulk_assign_role(role_id, user_ids, granted_by)
         return BulkRoleAssignmentResultData(
-            successes=[row.to_data() for row in result.successes],
-            failures=failures,
+            successes=[RoleAssignmentSearchableFields.own.to_assignment_data(row) for row in rows]
         )
 
     @permission_controller_repository_resilience.apply()
@@ -193,177 +149,29 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> RoleData | None:
         result = await self._db_source.get_role(role_id)
-        return result.to_data() if result else None
-
-    @permission_controller_repository_resilience.apply()
-    async def check_permission_of_entity(self, data: SingleEntityPermissionCheckInput) -> bool:
-        target_object_id = data.target_object_id
-        roles = await self._db_source.get_user_roles(data.user_id)
-        for role in roles:
-            for object_perm in role.object_permission_rows:
-                if object_perm.operation != data.operation:
-                    continue
-                if object_perm.object_id() == target_object_id:
-                    return True
-        return False
-
-    @permission_controller_repository_resilience.apply()
-    async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
-        return await self._db_source.check_scope_permission_exist(
-            data.user_id, data.target_scope_id, data.permission
-        )
-
-    @permission_controller_repository_resilience.apply()
-    async def check_permission_of_entities(
-        self,
-        data: BatchEntityPermissionCheckInput,
-    ) -> Mapping[ObjectId, bool]:
-        """
-        Check if the user has the requested operation permission on the given entity IDs.
-        Returns a mapping of entity ID to a boolean indicating permission.
-        """
-        return await self._db_source.check_batch_object_permission_exist(
-            data.user_id, data.target_object_ids, data.operation
-        )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_roles(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleListResult:
-        """Searches roles with pagination and filtering."""
-        return await self._db_source.search_roles(querier=querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_roles_in_scope(
-        self,
-        querier: BatchQuerier,
-        scope: ScopedRoleOperationScope,
-    ) -> RoleListResult:
-        """Search roles registered in a project scope."""
-        return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
-        return await self._db_source.search_permissions(querier=querier, scope=scope)
+        return RoleSearchableFields.own.to_data(result) if result else None
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
         """Get role with all permission details (without users)."""
         result = await self._db_source.get_role_with_permissions(role_id)
-        return result.to_detail_data_without_users()
+        return RoleSearchableFields.own.to_detail_data(result)
 
     @permission_controller_repository_resilience.apply()
-    async def search_users_assigned_to_role(
+    async def search_role_assignments_in_global(
         self,
-        querier: BatchQuerier,
+        searcher: RoleAssignmentSearcher,
     ) -> AssignedUserListResult:
-        """Searches users assigned to a specific role with pagination and filtering."""
-        return await self._db_source.search_users_assigned_to_role(
-            querier=querier,
+        """Search every assignment row, with no scope filter."""
+        return await self._db_source.search_role_assignments_in_global(searcher)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_role_assignments_in_scope(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: RoleAssignmentSearcher,
+    ) -> AssignedUserListResult:
+        """Search the assignment rows the named scopes reach, combined with OR."""
+        return await self._db_source.search_role_assignments_in_scope(
+            scopes=scopes, searcher=searcher
         )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_scopes(
-        self,
-        element_type: RBACElementType,
-        querier: BatchQuerier,
-    ) -> ScopeListResult:
-        """Search scopes based on element type.
-
-        Args:
-            element_type: The RBAC element type of scope to search.
-            querier: BatchQuerier with conditions, orders, and pagination.
-
-        Returns:
-            ScopeListResult with matching scopes.
-        """
-        match element_type:
-            case RBACElementType.DOMAIN:
-                return await self._db_source.search_domain_scopes(querier)
-            case RBACElementType.PROJECT:
-                return await self._db_source.search_project_scopes(querier)
-            case RBACElementType.USER:
-                return await self._db_source.search_user_scopes(querier)
-            case _:
-                raise NotImplementedError(
-                    "This function will be deprecated and new repository functions will be implemented for each scope"
-                )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_entities(
-        self,
-        querier: BatchQuerier,
-    ) -> EntityListResult:
-        """Search entities within a scope.
-
-        Args:
-            querier: BatchQuerier with scope conditions and pagination settings.
-
-        Returns:
-            EntityListResult with matching entities.
-        """
-        return await self._db_source.search_entities_in_scope(querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_element_associations(
-        self,
-        querier: BatchQuerier,
-    ) -> ElementAssociationListResult:
-        """Search element associations (full association rows) within a scope.
-
-        Args:
-            querier: BatchQuerier with scope conditions and pagination settings.
-
-        Returns:
-            ElementAssociationListResult with full association row data.
-        """
-        return await self._db_source.search_element_associations_in_scope(querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def check_permission_with_scope_chain(
-        self,
-        data: ScopeChainPermissionCheckInput,
-    ) -> bool:
-        """Permission check that traverses the scope chain via AUTO edges only.
-
-        Walks the association_scopes_entities hierarchy upward from the target
-        entity, checking if the user has the requested operation at any ancestor
-        scope. REF edges are not traversed.
-        """
-        return await self._db_source.check_permission_with_scope_chain(data)
-
-    @permission_controller_repository_resilience.apply()
-    async def check_bulk_permission_with_scope_chain(
-        self,
-        data: BulkPermissionCheckInput,
-    ) -> Mapping[PermissionResolutionKey, bool]:
-        """Batch permission check that traverses the scope chain via AUTO edges.
-
-        Same semantics as check_permission_with_scope_chain but for an
-        arbitrary collection of per-target keys in a single query.
-        """
-        return await self._db_source.check_bulk_permission_with_scope_chain(data)
-
-    @permission_controller_repository_resilience.apply()
-    async def owned_permissions(
-        self,
-        keys: Collection[OwnCheckKey],
-    ) -> Mapping[OwnCheckKey, Permission]:
-        """The bits each user holds on each entity through own and govern; a key
-        nothing reaches maps to :attr:`Permission.NONE`."""
-        return await self._db_source.owned_permissions(keys)
-
-    @permission_controller_repository_resilience.apply()
-    async def governed_permissions(
-        self,
-        keys: Collection[GovernCheckKey],
-    ) -> Mapping[GovernCheckKey, Permission]:
-        """The bits each user holds on the key's entity type within the key's scope;
-        a key nothing reaches maps to :attr:`Permission.NONE`."""
-        return await self._db_source.governed_permissions(keys)

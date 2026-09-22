@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import Any, Self, cast, override
+from typing import Self, cast, override
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     RegisterStorageNamespaceInput as RegisterStorageNamespaceInputDTO,
 )
@@ -18,10 +19,15 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     RegisterStorageNamespaceGQLPayload as RegisterStorageNamespaceGQLPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_namespace.response import (
+    StorageNamespaceNode as StorageNamespaceNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     UnregisterStorageNamespacePayload as UnregisterStorageNamespacePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_mutation,
@@ -48,8 +54,14 @@ from .types import StrawberryGQLContext
         """),
     ),
 )
-class StorageNamespace(PydanticNodeMixin[Any]):
+class StorageNamespace(PydanticNodeMixin[StorageNamespaceNodeDTO]):
     id: NodeID[str]
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the storage namespace.",
+        ),
+    )
     storage_id: ID
     namespace: str
 
@@ -63,7 +75,7 @@ class StorageNamespace(PydanticNodeMixin[Any]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.storage_namespace_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            StorageNamespaceID(uuid.UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

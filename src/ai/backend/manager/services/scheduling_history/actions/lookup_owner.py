@@ -6,16 +6,18 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
 from ai.backend.common.data.entity.types import EntityType, FieldIdentifier
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
+from ai.backend.manager.models.replica_group_history.lookups import ReplicaGroupHistoryOwnerLookup
 from ai.backend.manager.models.scheduling_history.lookups import (
     DeploymentHistoryOwnerLookup,
     KernelSchedulingHistoryOwnerLookup,
@@ -50,7 +52,7 @@ class LookupSessionSchedulingHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod
@@ -81,7 +83,7 @@ class LookupBulkSessionSchedulingHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod
@@ -112,7 +114,7 @@ class LookupKernelSchedulingHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod
@@ -143,7 +145,7 @@ class LookupBulkKernelSchedulingHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return SESSION_ENTITY_TYPE
+        return SessionEntityType()
 
     @override
     @classmethod
@@ -174,7 +176,7 @@ class LookupDeploymentHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -205,7 +207,7 @@ class LookupBulkDeploymentHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -234,7 +236,7 @@ class LookupRouteHistoryOwnerAction(LookupFieldOwnerOpsAction[RouteHistoryID, De
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -265,7 +267,7 @@ class LookupBulkRouteHistoryOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -283,3 +285,65 @@ class LookupBulkRouteHistoryOwnerAction(
     @override
     def to_owner_lookup(self) -> RouteHistoryOwnerLookup:
         return RouteHistoryOwnerLookup()
+
+
+@dataclass
+class LookupReplicaGroupHistoryOwnerAction(
+    LookupFieldOwnerOpsAction[ReplicaGroupHistoryID, DeploymentID]
+):
+    """The deployment a replica-group history row was recorded under."""
+
+    history_id: ReplicaGroupHistoryID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_replica_group_history_owner"
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return HistoryIDLookupKey(self.history_id)
+
+    @override
+    def field_id(self) -> ReplicaGroupHistoryID:
+        return self.history_id
+
+    @override
+    def to_owner_lookup(self) -> ReplicaGroupHistoryOwnerLookup:
+        return ReplicaGroupHistoryOwnerLookup()
+
+
+@dataclass
+class LookupBulkReplicaGroupHistoryOwnerAction(
+    LookupBulkFieldOwnerOpsAction[ReplicaGroupHistoryID, DeploymentID]
+):
+    """The deployments several replica-group history rows were recorded under."""
+
+    history_ids: Sequence[ReplicaGroupHistoryID]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_bulk_replica_group_history_owner"
+
+    @override
+    def to_lookup_key(self, field_id: ReplicaGroupHistoryID) -> LookupKey:
+        return HistoryIDLookupKey(field_id)
+
+    @override
+    def field_ids(self) -> Sequence[ReplicaGroupHistoryID]:
+        return tuple(self.history_ids)
+
+    @override
+    def to_owner_lookup(self) -> ReplicaGroupHistoryOwnerLookup:
+        return ReplicaGroupHistoryOwnerLookup()

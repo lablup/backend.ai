@@ -9,16 +9,21 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 
 @dataclass(frozen=True)
-class DeploymentReplicaOperationScope(OperationScope):
+class DeploymentReplicaTarget(ScopeTarget):
     """The replicas one deployment holds."""
 
     deployment_id: DeploymentID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.deployment_id
 
     @override
     def to_condition(self) -> QueryCondition:

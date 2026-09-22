@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -9,7 +9,10 @@ from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.result import BasePartialBulkActionResult, BulkEntityResult
-from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
+from ai.backend.manager.repositories.idle_checker.types import (
+    SessionIdleCheckPair,
+    SessionIdleCheckPairResult,
+)
 
 
 @dataclass(frozen=True)
@@ -34,30 +37,35 @@ class IncludeSessionIdleChecksAction(BaseBulkAction):
 
 @dataclass(frozen=True)
 class IncludeSessionIdleChecksActionResult(BasePartialBulkActionResult):
-    success: Sequence[SessionIdleCheckPair]
-    errors: Mapping[SessionIdleCheckPair, Exception]
+    results: Sequence[SessionIdleCheckPairResult]
 
     @override
     def entity_results(self) -> Sequence[BulkEntityResult]:
-        """Successes first, then errors, classified by :class:`ActionRunStatus` so a
-        bulk entity's error reads exactly like a single run's."""
-        results = [
-            BulkEntityResult(
-                entity_id=SessionID(pair.session_id),
-                status=OperationStatus.SUCCESS,
-                description=f"Included into idle checks by checker {pair.checker_id}.",
-                error_code=None,
-            )
-            for pair in self.success
-        ]
-        for pair, exception in self.errors.items():
-            failure = ActionRunStatus.of_failure(exception, during_validation=False)
-            results.append(
+        """One entry per pair the caller named, in that order, so a bulk entity's
+        error reads exactly like a single run's."""
+        entries: list[BulkEntityResult] = []
+        for item in self.results:
+            if item.error is not None:
+                failure = ActionRunStatus.of_failure(item.error, during_validation=False)
+                entries.append(
+                    BulkEntityResult(
+                        entity_id=SessionID(item.pair.session_id),
+                        status=failure.status,
+                        description=f"{failure.description} (checker {item.pair.checker_id})",
+                        error_code=failure.error_code,
+                    )
+                )
+                continue
+            entries.append(
                 BulkEntityResult(
-                    entity_id=SessionID(pair.session_id),
-                    status=failure.status,
-                    description=f"{failure.description} (checker {pair.checker_id})",
-                    error_code=failure.error_code,
+                    entity_id=SessionID(item.pair.session_id),
+                    status=OperationStatus.SUCCESS,
+                    description=(
+                        f"Included into idle checks by checker {item.pair.checker_id}."
+                        if item.applied
+                        else f"Checker {item.pair.checker_id} does not apply to this session."
+                    ),
+                    error_code=None,
                 )
             )
-        return results
+        return entries

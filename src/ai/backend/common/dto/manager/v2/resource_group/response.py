@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 __all__ = (
@@ -195,6 +196,9 @@ class ResourceGroupDetailNode(BaseResponseModel):
     """Detail node DTO for a resource group (GQL-layer representation)."""
 
     id: ResourceGroupID = Field(description="Resource group UUID used as the relay node ID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the resource group. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Unique name of the resource group.")
     status: ResourceGroupStatusInfo = Field(
         description="Status information including active and public flags."

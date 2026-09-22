@@ -1,5 +1,4 @@
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
@@ -61,7 +60,7 @@ class DomainProcessors:
     bulk_lookup: BulkLookupActionProcessor[
         BulkLookupDomainsAction, BulkLookupOpsResult[DomainName, DomainID]
     ]
-    # What the DataLoaders read: open to every authenticated caller.
+    # What the DataLoaders read: one READ check per domain named.
     bulk_get: PartialBulkActionProcessor[BulkGetDomainsAction, DomainData]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
     scoped_search: ScopeActionProcessor[ScopedSearchDomainsAction, ScopedBatchOpsResult[DomainData]]
@@ -88,14 +87,13 @@ class DomainProcessors:
         self,
         group: ProcessorGroup[DomainData],
         service: DomainService,
-        action_monitors: list[ActionMonitor],
     ) -> None:
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup = group.public_lookup_ops(LookupDomainAction)
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
-        self.bulk_get = group.public_partial_bulk_get_ops(BulkGetDomainsAction)
-        self.global_search = group.global_search_ops(GlobalSearchDomainsAction)
-        self.scoped_search = group.scope_search_ops(ScopedSearchDomainsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetDomainsAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchDomainsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchDomainsAction)
         self.update_domain = group.single_update_ops(UpdateDomainAction)
         self.delete_domain = group.single_delete_ops(DeleteDomainAction)
         self.restore_domain = group.single_restore_ops(RestoreDomainAction)

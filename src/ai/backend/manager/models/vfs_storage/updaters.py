@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -14,6 +13,9 @@ from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.searchable_fields import (
+    VFSStorageSearchableFields,
+)
 from ai.backend.manager.types import OptionalState
 
 
@@ -34,7 +36,7 @@ class VFSStorageUpdater(DataUpdater[VFSStorageRow, VFSStorageData]):
         return VFSStorageRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> VFSStorageID:
         return self.storage_id
 
     @property
@@ -52,4 +54,4 @@ class VFSStorageUpdater(DataUpdater[VFSStorageRow, VFSStorageData]):
 
     @override
     def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return row.to_dataclass()
+        return VFSStorageSearchableFields.own.to_data(row)

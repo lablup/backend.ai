@@ -6,6 +6,7 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -84,6 +85,9 @@ class DomainNode(BaseResponseModel):
 
     id: DomainID = Field(
         description="Domain uuid. The name lives at basic_info.name.",
+    )
+    entity_id: UUID = Field(
+        description=f"UUID of the domain. Added in {NEXT_RELEASE_VERSION}.",
     )
     basic_info: DomainBasicInfo = Field(
         description="Basic domain information including name and description.",

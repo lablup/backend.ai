@@ -5,7 +5,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
-from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -34,14 +33,3 @@ class RuntimeVariantRow(LifecycleTimestampsMixin, Base):
         PydanticColumn(DefaultModelDefinition, exclude_unset=True),
         nullable=False,
     )
-
-    def to_data(self) -> RuntimeVariantData:
-        return RuntimeVariantData(
-            id=self.id,
-            name=self.name,
-            description=self.description,
-            reads_vfolder_config_files=self.reads_vfolder_config_files,
-            default_model_definition=self.default_model_definition,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

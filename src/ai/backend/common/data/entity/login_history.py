@@ -2,15 +2,34 @@
 
 from typing import override
 
-from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
+from ai.backend.common.data.entity.types import (
+    EntityType,
+    FieldIdentifier,
+    FieldType,
+)
+from ai.backend.common.data.entity.user import UserEntityType
 
 __all__ = (
-    "LOGIN_HISTORY_FIELD_TYPE",
+    "LoginHistoryFieldType",
     "LoginHistoryID",
 )
 
 
-LOGIN_HISTORY_FIELD_TYPE = FieldType("login_history")
+class LoginHistoryFieldType(FieldType):
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return "login_history"
+
+    @override
+    @classmethod
+    def description(cls) -> str:
+        return "One login attempt recorded for a user."
+
+    @override
+    @classmethod
+    def owner_type(cls) -> type[EntityType]:
+        return UserEntityType
 
 
 class LoginHistoryID(FieldIdentifier):
@@ -23,4 +42,4 @@ class LoginHistoryID(FieldIdentifier):
     @override
     @classmethod
     def field_type(cls) -> FieldType:
-        return LOGIN_HISTORY_FIELD_TYPE
+        return LoginHistoryFieldType()

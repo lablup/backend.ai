@@ -3,9 +3,11 @@
 ``OperationScope`` bounds the rows a DB operation may touch — searches and batch
 writes alike — and converts to a
 :data:`~ai.backend.manager.models.clauses.QueryCondition`; ``ExistenceCheck``
-validates that required entities exist before the operation runs. They live at
-the models layer so that repositories/services can build scoped operations
-without importing upward into the repositories layer.
+names an entity whose existence the operation depends on. They live at the models
+layer so that repositories/services can build scoped operations without importing
+upward into the repositories layer.
+
+What a condition may read depends on the row's shape; see ``KNOWLEDGE.md``.
 """
 
 from __future__ import annotations
@@ -17,16 +19,16 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.clauses import QueryCondition
 
 
 @dataclass(frozen=True)
 class ExistenceCheck[T]:
-    """Defines an existence check for scope validation.
+    """An entity a scope names, and the error raised when it does not exist.
 
-    Used to validate that required entities exist before executing a query.
-    Multiple checks are combined into a single query for efficiency.
+    Omitted where authorization has already settled that existence.
     """
 
     column: sa.orm.attributes.InstrumentedAttribute[T]
@@ -43,21 +45,38 @@ class OperationScope(ABC):
     """Abstract base class for an operation's scope restriction.
 
     Bounds the rows an operation may touch — a scoped search reads within it, a
-    scoped batch write cannot reach past it. It converts to a QueryCondition that
-    is merged into the operation's statement; existence checks are validated
-    first.
+    scoped batch write cannot reach past it. It never authorizes: the action's
+    scope or bulk check runs first and this narrows what that check allowed.
     """
 
     @abstractmethod
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition."""
+        """Convert scope to a query condition.
+
+        The conditions of several scopes are OR-ed; an empty scope list is rejected
+        rather than widened into a read of everything.
+        """
         raise NotImplementedError
 
     @property
     @abstractmethod
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        """Return existence checks for scope validation.
+        """Return the entities this scope names.
 
-        All checks are validated in a single query before the main query executes.
+        Every check of every scope is validated in one query before the main query
+        runs. Empty where authorization already answered for them.
         """
+        raise NotImplementedError
+
+
+class ScopeTarget(OperationScope):
+    """An operation scope that also names the scope the operation is authorized against.
+
+    What a read is authorized against and what it is served are declared on one class, so
+    they cannot come apart. Every scope is one except where no entity id can be named.
+    """
+
+    @abstractmethod
+    def scope_id(self) -> EntityIdentifier:
+        """The scope the caller must hold the operation's permission in."""
         raise NotImplementedError

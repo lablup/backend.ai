@@ -2,9 +2,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 
 __all__ = ("ProjectRosterAction",)
@@ -23,10 +23,10 @@ class ProjectRosterAction(BaseScopeAction):
     user_ids: list[UserID]
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return [ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)]
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [self.project_id]
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return USER_ENTITY_TYPE
+        return UserEntityType()

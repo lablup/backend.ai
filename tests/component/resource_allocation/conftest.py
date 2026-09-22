@@ -16,12 +16,12 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
-from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -43,6 +43,10 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -82,6 +86,7 @@ def resource_allocation_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
+        v2_ops_provider=ShareOpsProvider(database_engine),
     )
     service = ResourceAllocationService(
         resource_allocation_repository=ra_repo,
@@ -89,12 +94,12 @@ def resource_allocation_processors(
     )
     groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return ResourceAllocationProcessors(
-        groups.group(GroupMeta(USER_ENTITY_TYPE)),
-        groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-        groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-        groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-        groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-        groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+        groups.group(GroupMeta(UserEntityType())),
+        groups.group(GroupMeta(ProjectEntityType())),
+        groups.group(GroupMeta(DomainEntityType())),
+        groups.group(GroupMeta(ResourceGroupEntityType())),
+        groups.group(GroupMeta(SessionEntityType())),
+        groups.group(GroupMeta(ResourcePresetEntityType())),
         service,
     )
 
@@ -113,11 +118,12 @@ def user_processors(
             database_engine,
             V2DBOpsProvider(database_engine),
             ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
         scheduling_controller=AsyncMock(),
     )
-    return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
 
 
 @pytest.fixture()
@@ -127,9 +133,9 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
@@ -149,7 +155,9 @@ def server_module_registries(
     processors.session.resource_allocation = resource_allocation_processors
 
     adapter = ResourceAllocationAdapter(
-        processors=processors,
+        processors.session,
+        processors.domain,
+        processors.user,
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)

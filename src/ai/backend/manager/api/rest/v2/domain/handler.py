@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     DeleteDomainInput,
     PurgeDomainInput,
     RestoreDomainInput,
+    ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -55,6 +56,14 @@ class V2DomainHandler:
     ) -> APIResponse:
         """Search domains with filters, orders, and pagination (superadmin only)."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchDomainsInput],
+    ) -> APIResponse:
+        """Search the domains the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_create(

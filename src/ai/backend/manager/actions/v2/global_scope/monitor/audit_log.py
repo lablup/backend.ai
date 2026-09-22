@@ -5,13 +5,13 @@ from typing import override
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.result import GlobalActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.models.audit_log.creators import GlobalAuditLogCreator
@@ -45,7 +45,7 @@ class GlobalActionAuditLogMonitor(GlobalActionMonitor):
         self._client_ip_masking = client_ip_masking
 
     @override
-    async def prepare(self, action: BaseGlobalAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseGlobalAction, meta: ActionTriggerMeta) -> None:
         pass
 
     @override
@@ -59,7 +59,7 @@ class GlobalActionAuditLogMonitor(GlobalActionMonitor):
             ClientIPMaskingTarget.AUDIT_LOGS, current_client_ip()
         )
         creator = GlobalAuditLogCreator(
-            entity_type=GLOBAL_ENTITY_TYPE,
+            entity_type=GlobalEntityType(),
             action_id=meta.action_id,
             operation=action.operation_type(),
             action_name=action.action_name(),

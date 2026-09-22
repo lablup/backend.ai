@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
+from ai.backend.manager.repositories.app_config.repositories import AppConfigRepositories
 from ai.backend.manager.repositories.artifact.repositories import ArtifactRepositories
 from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
@@ -37,7 +38,6 @@ from ai.backend.manager.repositories.model_card.repositories import ModelCardRep
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
@@ -68,6 +68,9 @@ from ai.backend.manager.repositories.scheduling_history.repositories import (
     SchedulingHistoryRepositories,
 )
 from ai.backend.manager.repositories.secret.repositories import SecretRepositories
+from ai.backend.manager.repositories.service_catalog.repositories import (
+    ServiceCatalogRepositories,
+)
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
@@ -86,7 +89,7 @@ from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageR
 @dataclass
 class Repositories:
     agent: AgentRepositories
-    ops_provider: DBOpsProvider
+    app_config: AppConfigRepositories
     v2_ops_provider: V2DBOpsProvider
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
@@ -136,10 +139,12 @@ class Repositories:
     retention: RetentionRepositories
     role_preset: RolePresetRepositories
     secret: SecretRepositories
+    service_catalog: ServiceCatalogRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         agent_repositories = AgentRepositories.create(args)
+        app_config_repositories = AppConfigRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
@@ -188,10 +193,11 @@ class Repositories:
         retention_repositories = RetentionRepositories.create(args)
         role_preset_repositories = RolePresetRepositories.create(args)
         secret_repositories = SecretRepositories.create(args)
+        service_catalog_repositories = ServiceCatalogRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
-            ops_provider=args.ops_provider,
+            app_config=app_config_repositories,
             v2_ops_provider=args.v2_ops_provider,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
@@ -241,4 +247,5 @@ class Repositories:
             retention=retention_repositories,
             role_preset=role_preset_repositories,
             secret=secret_repositories,
+            service_catalog=service_catalog_repositories,
         )

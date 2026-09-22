@@ -7,7 +7,12 @@ import json
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    nullable_option,
+    print_result,
+)
 
 from .revision import revision
 
@@ -43,32 +48,35 @@ def get(artifact_id: str) -> None:
 @click.option(
     "--readonly", default=None, type=bool, help="Whether the artifact should be readonly."
 )
+@click.option("--description", default=None, help="Updated description.")
 @click.option(
-    "--description", default=None, help="Updated description. Pass empty string to clear."
+    "--set-null-description",
+    is_flag=True,
+    default=False,
+    help="Clear the description. Mutually exclusive with --description.",
 )
 def update(
     artifact_id: str,
     readonly: bool | None,
     description: str | None,
+    set_null_description: bool,
 ) -> None:
     """Update artifact metadata."""
     from uuid import UUID
 
-    from ai.backend.common.api_handlers import SENTINEL, Sentinel
     from ai.backend.common.dto.manager.v2.artifact.request import UpdateArtifactInput
+    from ai.backend.common.tristate.unset import UNSET, Unset
 
-    # SENTINEL means "no change" in the DTO; None means "clear the field".
-    # When the CLI user does not pass --description, keep SENTINEL (no change).
-    desc_value: str | Sentinel | None = SENTINEL
-    if description is not None:
-        desc_value = description
+    # An option the user did not pass stays UNSET so the field is left unchanged.
+    readonly_value: bool | Unset = UNSET if readonly is None else readonly
+    desc_value = nullable_option(description, set_null_description, option="description")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact.update(
                 UUID(artifact_id),
-                UpdateArtifactInput(readonly=readonly, description=desc_value),
+                UpdateArtifactInput(readonly=readonly_value, description=desc_value),
             )
             print_result(result)
         finally:

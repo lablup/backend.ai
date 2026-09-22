@@ -10,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -18,18 +19,23 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
-from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -48,10 +54,10 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -62,9 +68,13 @@ async def database(
             RoleRow,
             PermissionRow,
             IdleCheckerRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -95,7 +105,7 @@ async def created_checker(
     repository: OpsRepository[IdleCheckerData],
     creator: IdleCheckerCreator,
 ) -> IdleCheckerData:
-    return await repository.create_global_entity(creator)
+    return await repository.create_entity(creator)
 
 
 @pytest.fixture
@@ -103,7 +113,7 @@ async def network_checker(
     repository: OpsRepository[IdleCheckerData],
     creator: IdleCheckerCreator,
 ) -> IdleCheckerData:
-    return await repository.create_global_entity(
+    return await repository.create_entity(
         replace(
             creator,
             name="network timeout",
@@ -121,7 +131,7 @@ class TestCreate:
         repository: OpsRepository[IdleCheckerData],
         creator: IdleCheckerCreator,
     ) -> None:
-        checker = await repository.create_global_entity(creator)
+        checker = await repository.create_entity(creator)
 
         assert checker.name == creator.name
         assert checker.checker_type == creator.spec.type
@@ -149,7 +159,7 @@ class TestSearch:
         creator: IdleCheckerCreator,
         created_checker: IdleCheckerData,
     ) -> None:
-        second_checker = await repository.create_global_entity(
+        second_checker = await repository.create_entity(
             replace(creator, name="second session lifetime")
         )
 
@@ -168,7 +178,11 @@ class TestSearch:
     ) -> None:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
-                conditions=[IdleCheckerConditions.by_ids([created_checker.id])],
+                conditions=[
+                    IdleCheckerSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=[created_checker.id], negated=False)
+                    )
+                ],
                 pagination=NoPagination(),
             )
         )
@@ -181,7 +195,11 @@ class TestSearch:
     ) -> None:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
-                conditions=[IdleCheckerConditions.by_ids([_missing_id()])],
+                conditions=[
+                    IdleCheckerSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=[_missing_id()], negated=False)
+                    )
+                ],
                 pagination=NoPagination(),
             )
         )
@@ -197,7 +215,9 @@ class TestSearch:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
                 conditions=[
-                    IdleCheckerConditions.by_checker_type_equals(CheckerType.NETWORK_TIMEOUT)
+                    IdleCheckerSearchableFields.own.checker_type.filter.equals(
+                        CheckerType.NETWORK_TIMEOUT
+                    )
                 ],
                 pagination=NoPagination(),
             )
@@ -214,7 +234,7 @@ class TestSearch:
     ) -> None:
         result = await repository.search_in_global(
             IdleCheckerSearcher(
-                orders=[IdleCheckerOrders.checker_type(ascending=True)],
+                orders=[IdleCheckerSearchableFields.own.checker_type.order.apply(ascending=True)],
                 pagination=NoPagination(),
             )
         )
@@ -236,7 +256,11 @@ class TestUpdate:
         )
         result = await repository.search_in_global(
             IdleCheckerSearcher(
-                conditions=[IdleCheckerConditions.by_ids([created_checker.id])],
+                conditions=[
+                    IdleCheckerSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=[created_checker.id], negated=False)
+                    )
+                ],
                 pagination=NoPagination(),
             )
         )

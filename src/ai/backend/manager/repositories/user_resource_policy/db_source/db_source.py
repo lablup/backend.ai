@@ -4,13 +4,17 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
-from ai.backend.common.exception import BackendAIError, UserResourcePolicyNotFound
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    UserResourcePolicySearchableFields,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -53,4 +57,4 @@ class UserResourcePolicyDBSource:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."
                 )
-            return row.to_dataclass()
+            return UserResourcePolicySearchableFields.own.to_data(row)

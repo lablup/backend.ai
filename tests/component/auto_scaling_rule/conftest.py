@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
@@ -30,7 +30,11 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -64,6 +68,8 @@ def deployment_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors for auto-scaling-rule tests."""
+    rbac_off = MagicMock()
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     repo = DeploymentRepository(
         database_engine,
         ReconcileOpsProvider(database_engine),
@@ -71,6 +77,7 @@ def deployment_processors(
         valkey_clients.stat,
         valkey_clients.live,
         valkey_clients.schedule,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off),
     )
     deployment_controller = AsyncMock()
     service = DeploymentService(
@@ -79,7 +86,7 @@ def deployment_processors(
         appproxy_client_pool=mock_appproxy_client_pool,
     )
     return DeploymentProcessors(
-        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 

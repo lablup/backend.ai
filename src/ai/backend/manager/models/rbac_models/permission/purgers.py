@@ -3,13 +3,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import FieldPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -30,7 +32,7 @@ class RolePermissionPurger(FieldPurger[PermissionRow, PermissionData]):
         return PermissionRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> PermissionID:
         return self.permission_id
 
     @override
@@ -39,4 +41,4 @@ class RolePermissionPurger(FieldPurger[PermissionRow, PermissionData]):
 
     @override
     def to_data(self, row: PermissionRow) -> PermissionData:
-        return row.to_data()
+        return PermissionSearchableFields.own.to_data(row)

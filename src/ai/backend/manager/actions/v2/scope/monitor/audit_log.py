@@ -5,12 +5,12 @@ from typing import Any, override
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.result import ScopeActionProcessResult
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.models.audit_log.creators import (
@@ -50,7 +50,7 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         self._client_ip_masking = client_ip_masking
 
     @override
-    async def prepare(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseScopeAction, meta: ActionTriggerMeta) -> None:
         pass
 
     @override
@@ -59,7 +59,7 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         if not self._policy.should_record(action.operation_type(), meta.status):
             return
         nested = [
-            AuditLogScopeCreator(scope_type=str(s.scope_type), scope_id=s.scope_id)
+            AuditLogScopeCreator(scope_type=str(s.entity_type()), scope_id=s)
             for s in meta.scope_targets
         ]
         client_ip = await self._client_ip_masking.mask(

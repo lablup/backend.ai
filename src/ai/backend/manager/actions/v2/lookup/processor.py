@@ -3,9 +3,9 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
@@ -19,9 +19,10 @@ from ai.backend.manager.actions.v2.lookup.validator import (
 )
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.repository import EntityNotFoundError
 
 __all__ = ("LookupActionProcessor",)
 
@@ -42,7 +43,8 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
 
     Where post-validators are wired, a key naming nothing and a key the caller may not
     reach raise the same exception, so the status code cannot be read as an answer to
-    whether the key exists. The audit record keeps the two apart.
+    whether the key exists. A superadmin, who passes every check, gets the miss as is.
+    The audit record keeps the two apart.
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
@@ -62,7 +64,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         self._validators = [AuthenticatedActionValidator(), *(validators or [])]
         self._post_validators = post_validators or []
 
-    async def _prepare_monitors(self, action: TAction, trigger_meta: BaseActionTriggerMeta) -> None:
+    async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
@@ -94,6 +96,11 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         for validator in self._post_validators:
             await validator.validate(meta)
 
+    def _caller_is_superadmin(self) -> bool:
+        """Whether the acting user is a superadmin."""
+        user = current_user()
+        return user is not None and user.is_superadmin
+
     def _unresolvable(self, action: TAction) -> GenericBadRequest:
         """The single answer a gated lookup gives to either failure.
 
@@ -105,7 +112,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
-        trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
+        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
         run_status = ActionRunStatus.unknown()
         entity_id: EntityIdentifier | None = None
@@ -122,9 +129,9 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
                 raise
             try:
                 result = await self._func(action)
-            except EntityNotFoundError as e:
+            except NotFoundError as e:
                 run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                if not self._post_validators:
+                if not self._post_validators or self._caller_is_superadmin():
                     raise
                 raise self._unresolvable(action) from e
             except BaseException as e:

@@ -103,13 +103,11 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-)
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
@@ -326,11 +324,11 @@ class ModelServingService:
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
-        querier = BatchQuerier(
+        searcher = DeploymentInfoSearcher(
             pagination=OffsetPagination(offset=action.offset, limit=action.limit),
             conditions=action.conditions,
         )
-        result = await self._repository.search_services_paginated(action.session_owner_id, querier)
+        result = await self._repository.search_services_paginated(action.session_owner_id, searcher)
         return SearchServicesActionResult(
             items=result.items,
             total_count=result.total_count,
@@ -476,9 +474,9 @@ class ModelServingService:
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=AccessKey(service_prepare_ctx.owner_access_key),
-                domain_name=action.domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(service_prepare_ctx.group_id),
+                user_id=UserID(created_user.uuid),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id

@@ -7,11 +7,13 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.field.lookup import (
@@ -23,8 +25,10 @@ from ai.backend.manager.models.deployment_policy.lookups import DeploymentPolicy
 from ai.backend.manager.models.deployment_revision.lookups import DeploymentRevisionOwnerLookup
 from ai.backend.manager.models.endpoint.lookups import (
     AutoScalingRuleDeploymentLookup,
+    AutoScalingRuleOwnerLookup,
     DeploymentAccessTokenOwnerLookup,
 )
+from ai.backend.manager.models.replica_group.lookups import ReplicaGroupOwnerLookup
 from ai.backend.manager.models.routing.lookups import ReplicaOwnerLookup
 
 
@@ -52,7 +56,7 @@ class LookupAutoScalingRuleDeploymentAction(LookupFieldOwnerByKeyOpsAction[Deplo
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -66,6 +70,141 @@ class LookupAutoScalingRuleDeploymentAction(LookupFieldOwnerByKeyOpsAction[Deplo
     @override
     def to_owner_lookup(self) -> AutoScalingRuleDeploymentLookup:
         return AutoScalingRuleDeploymentLookup(rule_id=self.rule_id)
+
+
+@dataclass
+class LookupAutoScalingRuleOwnerAction(LookupFieldOwnerOpsAction[AutoScalingRuleID, DeploymentID]):
+    """The deployment an auto-scaling rule belongs to."""
+
+    rule_id: AutoScalingRuleID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_auto_scaling_rule_owner"
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return AutoScalingRuleKey(rule_id=self.rule_id)
+
+    @override
+    def field_id(self) -> AutoScalingRuleID:
+        return self.rule_id
+
+    @override
+    def to_owner_lookup(self) -> AutoScalingRuleOwnerLookup:
+        return AutoScalingRuleOwnerLookup()
+
+
+@dataclass
+class LookupBulkAutoScalingRuleOwnerAction(
+    LookupBulkFieldOwnerOpsAction[AutoScalingRuleID, DeploymentID]
+):
+    """The deployments several auto-scaling rules belong to."""
+
+    rule_ids: Sequence[AutoScalingRuleID]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_bulk_auto_scaling_rule_owner"
+
+    @override
+    def to_lookup_key(self, field_id: AutoScalingRuleID) -> LookupKey:
+        return AutoScalingRuleKey(rule_id=field_id)
+
+    @override
+    def field_ids(self) -> Sequence[AutoScalingRuleID]:
+        return tuple(self.rule_ids)
+
+    @override
+    def to_owner_lookup(self) -> AutoScalingRuleOwnerLookup:
+        return AutoScalingRuleOwnerLookup()
+
+
+@dataclass(frozen=True)
+class ReplicaGroupIDLookupKey(LookupKey):
+    """A replica group's id, resolved into the deployment it belongs to."""
+
+    replica_group_id: ReplicaGroupID
+
+    @override
+    def kind(self) -> str:
+        return "replica_group_id"
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        return {"id": str(self.replica_group_id)}
+
+
+@dataclass
+class LookupReplicaGroupOwnerAction(LookupFieldOwnerOpsAction[ReplicaGroupID, DeploymentID]):
+    """The deployment a replica group belongs to."""
+
+    replica_group_id: ReplicaGroupID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_replica_group_owner"
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return ReplicaGroupIDLookupKey(self.replica_group_id)
+
+    @override
+    def field_id(self) -> ReplicaGroupID:
+        return self.replica_group_id
+
+    @override
+    def to_owner_lookup(self) -> ReplicaGroupOwnerLookup:
+        return ReplicaGroupOwnerLookup()
+
+
+@dataclass
+class LookupBulkReplicaGroupOwnerAction(
+    LookupBulkFieldOwnerOpsAction[ReplicaGroupID, DeploymentID]
+):
+    """The deployments several replica groups belong to."""
+
+    replica_group_ids: Sequence[ReplicaGroupID]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_bulk_replica_group_owner"
+
+    @override
+    def to_lookup_key(self, field_id: ReplicaGroupID) -> LookupKey:
+        return ReplicaGroupIDLookupKey(field_id)
+
+    @override
+    def field_ids(self) -> Sequence[ReplicaGroupID]:
+        return tuple(self.replica_group_ids)
+
+    @override
+    def to_owner_lookup(self) -> ReplicaGroupOwnerLookup:
+        return ReplicaGroupOwnerLookup()
 
 
 @dataclass(frozen=True)
@@ -94,7 +233,7 @@ class LookupDeploymentRevisionOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -125,7 +264,7 @@ class LookupBulkDeploymentRevisionOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -169,7 +308,7 @@ class LookupReplicaOwnerAction(LookupFieldOwnerOpsAction[ReplicaID, DeploymentID
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -198,7 +337,7 @@ class LookupBulkReplicaOwnerAction(LookupBulkFieldOwnerOpsAction[ReplicaID, Depl
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -244,7 +383,7 @@ class LookupDeploymentAccessTokenOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -275,7 +414,7 @@ class LookupBulkDeploymentAccessTokenOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -321,7 +460,7 @@ class LookupDeploymentPolicyOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod
@@ -352,7 +491,7 @@ class LookupBulkDeploymentPolicyOwnerAction(
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return DEPLOYMENT_ENTITY_TYPE
+        return DeploymentEntityType()
 
     @override
     @classmethod

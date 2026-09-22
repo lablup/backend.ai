@@ -67,8 +67,8 @@ class KeypairResourcePolicyProcessors:
     def __init__(self, group: ProcessorGroup[KeyPairResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetKeyPairResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupKeypairResourcePolicyAction)
-        self.search = group.scope_search_ops(SearchKeypairResourcePoliciesAction)
-        self.global_search = group.global_search_ops(GlobalSearchKeypairResourcePoliciesAction)
+        self.search = group.scoped_search_ops(SearchKeypairResourcePoliciesAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchKeypairResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateKeyPairResourcePolicyAction)
         self.update = group.single_update_ops(UpdateKeyPairResourcePolicyAction)
         self.purge = group.entity_purge_ops(PurgeKeyPairResourcePolicyAction)

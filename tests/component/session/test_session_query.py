@@ -21,10 +21,10 @@ from ai.backend.client.v2.exceptions import (
     PermissionDeniedError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
     SearchComputeSessionsResponse,
@@ -90,10 +90,10 @@ def server_module_registries(
         register_session_routes(
             SessionHandler(
                 project=ProjectProcessors(
-                    processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
+                    processor_registry.group(GroupMeta(ProjectEntityType())), AsyncMock()
                 ),
                 user=UserProcessors(
-                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+                    processor_registry.group(GroupMeta(UserEntityType())),
                     AsyncMock(),
                 ),
                 auth=auth_processors,
@@ -453,20 +453,6 @@ class TestSessionInfo:
         assert result.root["status"] == "RUNNING"
         assert "domainName" in result.root
         assert result.root["domainName"] == session_seed.domain_name
-
-    async def test_different_user_session_raises_not_found(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """F-AUTH-2: Different user's session info → SessionNotFound.
-
-        The session is owned by admin_user_fixture. When a regular user
-        (user_registry) tries to access it, the owner_access_key mismatch
-        results in SessionNotFound (HTTP 404).
-        """
-        with pytest.raises(NotFoundError):
-            await user_registry.session.get_info(session_seed.session_id)
 
 
 class TestSessionDirectAccessInfo:

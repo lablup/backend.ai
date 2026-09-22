@@ -9,17 +9,19 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.row import UserRow
 
-__all__ = ("UserKeypairOperationScope",)
+__all__ = ("UserKeypairTarget",)
 
 
 @dataclass(frozen=True)
-class UserKeypairOperationScope(OperationScope):
+class UserKeypairTarget(ScopeTarget):
     """Required scope for searching keypairs owned by a specific user.
 
     Used for my_keypairs query (current authenticated user).
@@ -27,6 +29,10 @@ class UserKeypairOperationScope(OperationScope):
 
     user_uuid: UUID
     """Required. The user whose keypairs to search."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return UserID(self.user_uuid)
 
     @override
     def to_condition(self) -> QueryCondition:

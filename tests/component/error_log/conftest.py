@@ -7,8 +7,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.data.entity.error_log import ERROR_LOG_FIELD_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.error_log import ErrorLogFieldType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
     GroupMeta,
@@ -17,6 +17,7 @@ from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -29,10 +30,15 @@ from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
-def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
+def error_log_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ErrorLogProcessors:
     return ErrorLogProcessors(
-        ops_processor_group(database_engine, GroupMeta(USER_ENTITY_TYPE)).field_group(
-            FieldGroupMeta(ERROR_LOG_FIELD_TYPE),
+        ops_processor_group(
+            database_engine, GroupMeta(UserEntityType()), config_provider
+        ).field_group(
+            FieldGroupMeta(ErrorLogFieldType()),
             ErrorLogData,
             LookupErrorLogOwnerAction,
             LookupBulkErrorLogOwnerAction,

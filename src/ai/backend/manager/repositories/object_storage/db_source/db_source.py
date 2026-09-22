@@ -10,20 +10,24 @@ from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
 from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.searchable_fields import (
+    ObjectStorageSearchableFields,
+)
+from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 class ObjectStorageDBSource:
     """Database source for object storage operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     async def get_by_name(self, storage_name: str) -> ObjectStorageData:
         """
@@ -37,7 +41,7 @@ class ObjectStorageDBSource:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with name {storage_name} not found."
                 )
-            return row.to_dataclass()
+            return ObjectStorageSearchableFields.own.to_data(row)
 
     async def get_by_id(self, storage_id: uuid.UUID) -> ObjectStorageData:
         """
@@ -49,7 +53,7 @@ class ObjectStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-            return row.to_dataclass()
+            return ObjectStorageSearchableFields.own.to_data(row)
 
     async def get_by_namespace_id(self, storage_namespace_id: uuid.UUID) -> ObjectStorageData:
         """
@@ -71,43 +75,7 @@ class ObjectStorageDBSource:
                 raise ObjectStorageNotFoundError(
                     f"Object storage not found for namespace ID {storage_namespace_id}."
                 )
-            return row.object_storage_row.to_dataclass()
-
-    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
-        """
-        Create a new object storage configuration in the database.
-        """
-        async with self._db.begin_session() as db_session:
-            creator_result = await execute_creator(db_session, creator)
-            return creator_result.row.to_dataclass()
-
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
-        """
-        Update an existing object storage configuration in the database.
-        """
-        async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectStorageNotFoundError(
-                    f"Object storage with ID {updater.pk_value} not found."
-                )
-            return result.row.to_dataclass()
-
-    async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
-        """
-        Delete an existing object storage configuration from the database.
-        """
-        async with self._db.begin_session() as db_session:
-            delete_query = (
-                sa.delete(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .returning(ObjectStorageRow.id)
-            )
-            result = await db_session.execute(delete_query)
-            deleted_id = result.scalar()
-            if deleted_id is None:
-                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-            return deleted_id
+            return ObjectStorageSearchableFields.own.to_data(row.object_storage_row)
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
         """
@@ -117,27 +85,18 @@ class ObjectStorageDBSource:
             query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
+            return [ObjectStorageSearchableFields.own.to_data(row) for row in rows]
 
     async def search(
         self,
-        querier: BatchQuerier,
+        searcher: ObjectStorageSearcher,
     ) -> ObjectStorageListResult:
         """Searches Object storages with total count."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ObjectStorageRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.ObjectStorageRow.to_dataclass() for row in result.rows]
-
-            return ObjectStorageListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return ObjectStorageListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

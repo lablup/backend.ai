@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import MetricLabelEntryInfo, MetricValueInfo, QueryDefinitionOptionsInfo
 
@@ -38,6 +39,9 @@ class QueryDefinitionNode(BaseResponseModel):
     """Node representing a single prometheus query definition."""
 
     id: UUID = Field(description="Query definition ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the query preset. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Human-readable name")
     description: str | None = Field(default=None, description="Human-readable description")
     rank: int = Field(default=0, description="Sort rank")

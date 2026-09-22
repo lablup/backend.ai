@@ -22,6 +22,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import StringInMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.types import (
     AgentId,
@@ -43,12 +44,20 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
     get_permission_ctx,
 )
+from ai.backend.manager.models.image.scopes import (
+    ImageTarget,
+    VisibleImageTarget,
+)
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.image.searchers import ImageSearcher, ReferenceImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -58,6 +67,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
@@ -76,16 +86,13 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageByIdAction,
 )
-from ai.backend.manager.services.image.actions.get_all_images import PublicGetAllImagesAction
-from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+from ai.backend.manager.services.image.actions.public_get_image_installed_agents import (
     PublicGetImageInstalledAgentsAction,
 )
-from ai.backend.manager.services.image.actions.get_images import (
-    PublicGetImageByIdAction,
-    PublicGetImageByIdentifierAction,
-    PublicGetImagesByCanonicalsAction,
-)
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.search_install_status import (
+    SearchImagesWithInstallStatusAction,
+)
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -128,6 +135,35 @@ __all__ = (
     "RescanImages",
     "UntagImageFromRegistry",
 )
+
+
+def _status_searcher(statuses: list[ImageStatus], *conditions: QueryCondition) -> ImageSearcher:
+    """Every image matching the conditions and one of the statuses."""
+    return ImageSearcher(
+        pagination=NoPagination(),
+        conditions=[ImageSearchableFields.own.status.filter.in_(statuses), *conditions],
+    )
+
+
+def _single_image(
+    items: Sequence[ImageWithAgentInstallStatus], key: str
+) -> ImageWithAgentInstallStatus:
+    """The image a key was expected to name. Several matches is a broken state, so it is
+    logged and the first the searcher's order picked answers."""
+    if not items:
+        raise ImageNotFound()
+    if len(items) > 1:
+        log.warning("Image key {} matched {} rows; answering with the first.", key, len(items))
+    return items[0]
+
+
+def _caller_targets(ctx: GraphQueryContext) -> list[ImageTarget]:
+    """The one scope these reads are answered from: everything the caller's roles grant
+    image READ on. These reads take no project, so a caller who named nothing still has
+    to be answered with everything they reach. A superadmin's read is unscoped, which
+    the service decides."""
+    return [VisibleImageTarget(user_id=UserID(ctx.user["uuid"]))]
+
 
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
@@ -246,16 +282,20 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await graph_ctx.processors.image.public_get_images_by_canonicals.run(
-            PublicGetImagesByCanonicalsAction(
-                image_canonicals=list(image_names),
-                image_status=filter_by_statuses,
+        result = await graph_ctx.processors.image.search_with_install_status.run(
+            SearchImagesWithInstallStatusAction(
+                targets=_caller_targets(graph_ctx),
+                searcher=_status_searcher(
+                    filter_by_statuses,
+                    ImageSearchableFields.own.name.filter.in_(
+                        StringInMatchSpec(
+                            values=list(image_names), case_insensitive=False, negated=False
+                        )
+                    ),
+                ),
             )
         )
-        return [
-            cls.from_image_with_agent_install_status(img)
-            for img in result.images_with_agent_install_status
-        ]
+        return [cls.from_image_with_agent_install_status(img) for img in result.items]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -278,13 +318,18 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await ctx.processors.image.public_get_image_by_id.run(
-            PublicGetImageByIdAction(
-                image_id=ImageID(id),
-                image_status=filter_by_statuses,
+        result = await ctx.processors.image.search_with_install_status.run(
+            SearchImagesWithInstallStatusAction(
+                targets=_caller_targets(ctx),
+                searcher=_status_searcher(
+                    filter_by_statuses,
+                    ImageSearchableFields.own.id.filter.equals(
+                        UUIDEqualMatchSpec(value=id, negated=False)
+                    ),
+                ),
             )
         )
-        return cls.from_image_with_agent_install_status(result.image_with_agent_install_status)
+        return cls.from_image_with_agent_install_status(_single_image(result.items, str(id)))
 
     @classmethod
     async def load_item(
@@ -296,13 +341,15 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
-        result = await ctx.processors.image.public_get_image_by_identifier.run(
-            PublicGetImageByIdentifierAction(
-                image_identifier=ImageIdentifier(reference, architecture),
-                image_status=filter_by_statuses,
+        result = await ctx.processors.image.search_with_install_status.run(
+            SearchImagesWithInstallStatusAction(
+                targets=_caller_targets(ctx),
+                searcher=ReferenceImageSearcher(reference, architecture, filter_by_statuses),
             )
         )
-        return cls.from_image_with_agent_install_status(result.image_with_agent_install_status)
+        return cls.from_image_with_agent_install_status(
+            _single_image(result.items, f"{reference} ({architecture})")
+        )
 
     @classmethod
     async def load_all(
@@ -316,10 +363,12 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             filter_by_statuses = [ImageStatus.ALIVE]
         if types is None:
             types = set()
-        result = await ctx.processors.image.public_get_all_images.run(
-            PublicGetAllImagesAction(status_filter=filter_by_statuses)
+        result = await ctx.processors.image.search_with_install_status.run(
+            SearchImagesWithInstallStatusAction(
+                targets=_caller_targets(ctx), searcher=_status_searcher(filter_by_statuses)
+            )
         )
-        all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
+        all_items = [cls.from_image_with_agent_install_status(img) for img in result.items]
         return [item for item in all_items if item.matches_filter(ctx, types)]
 
     @staticmethod
@@ -734,13 +783,20 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
-        action_result = await ctx.processors.image.public_get_image_by_id.run(
-            PublicGetImageByIdAction(
-                image_id=ImageID(UUID(image_id)),
-                image_status=None,
+        action_result = await ctx.processors.image.search_with_install_status.run(
+            SearchImagesWithInstallStatusAction(
+                targets=_caller_targets(ctx),
+                searcher=ImageSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        ImageSearchableFields.own.id.filter.equals(
+                            UUIDEqualMatchSpec(value=UUID(image_id), negated=False)
+                        )
+                    ],
+                ),
             )
         )
-        image_data = action_result.image_with_agent_install_status.image
+        image_data = _single_image(action_result.items, image_id).image
         return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
 
 

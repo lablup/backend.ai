@@ -43,13 +43,3 @@ class ErrorLogData(FieldData):
     id: ErrorLogID
     meta: ErrorLogMeta
     content: ErrorLogContent
-
-
-@dataclass
-class ErrorLogListResult:
-    """Search result with total count and pagination info for error logs."""
-
-    items: list[ErrorLogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool

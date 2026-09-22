@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     AdminSearchStorageNamespacesInput,
@@ -19,8 +20,10 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
+from ai.backend.manager.models.storage_namespace.scopes import ObjectStorageNamespaceTarget
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.bulk_get import (
     BulkGetStorageNamespacesAction,
@@ -36,6 +39,7 @@ from ai.backend.manager.services.storage_namespace.actions.search import (
 from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
 )
+from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 
 DEFAULT_PAGINATION_LIMIT = 10
 
@@ -43,11 +47,16 @@ DEFAULT_PAGINATION_LIMIT = 10
 class StorageNamespaceAdapter(BaseAdapter):
     """Adapter for storage namespace domain operations."""
 
+    _storage_namespace: StorageNamespaceProcessors
+
+    def __init__(self, storage_namespace: StorageNamespaceProcessors) -> None:
+        self._storage_namespace = storage_namespace
+
     async def register(
         self, input: RegisterStorageNamespaceInput
     ) -> RegisterStorageNamespacePayload:
         """Register a new namespace within a storage."""
-        action_result = await self._processors.storage_namespace.global_register.run(
+        action_result = await self._storage_namespace.global_register.run(
             RegisterNamespaceAction(
                 creator=StorageNamespaceCreator(
                     storage_id=input.storage_id,
@@ -65,26 +74,32 @@ class StorageNamespaceAdapter(BaseAdapter):
         """Unregister a namespace from a storage."""
         # The API names a namespace by the pair it was registered under, so the id the
         # purge needs is resolved first rather than taught to the purge itself.
-        resolved = await self._processors.storage_namespace.lookup.run(
+        resolved = await self._storage_namespace.lookup.run(
             LookupStorageNamespaceAction(
                 storage_id=input.storage_id,
                 namespace=input.namespace,
             )
         )
-        action_result = await self._processors.storage_namespace.unregister.run(
+        action_result = await self._storage_namespace.unregister.run(
             UnregisterNamespaceAction(id=resolved.entity_id())
         )
         return UnregisterStorageNamespacePayload(id=action_result.data.storage_id)
 
     async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceNode]:
         """Retrieve all namespaces for a given storage."""
-        action_result = await self._processors.storage_namespace.global_get_namespaces.run(
-            GetNamespacesAction(storage_id)
+        action_result = await self._storage_namespace.get_namespaces.run(
+            GetNamespacesAction(
+                searcher=ScopedSearcher(
+                    scopes=[ObjectStorageNamespaceTarget(storage_id=ObjectStorageID(storage_id))],
+                    used_by=(),
+                    searcher=StorageNamespaceSearcher(pagination=NoPagination()),
+                )
+            )
         )
         return [self._storage_namespace_data_to_dto(item) for item in action_result.items]
 
     async def batch_load_by_ids(
-        self, ids: Sequence[uuid.UUID]
+        self, ids: Sequence[StorageNamespaceID]
     ) -> list[StorageNamespaceNode | Exception | None]:
         """Batch load storage namespaces by id for DataLoader use.
 
@@ -94,7 +109,7 @@ class StorageNamespaceAdapter(BaseAdapter):
         if not ids:
             return []
         entity_ids = [StorageNamespaceID(value) for value in ids]
-        result = await self._processors.storage_namespace.bulk_get.run(
+        result = await self._storage_namespace.bulk_get.run(
             BulkGetStorageNamespacesAction(ids=entity_ids)
         )
         return [
@@ -113,8 +128,8 @@ class StorageNamespaceAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
         searcher = StorageNamespaceSearcher(conditions=[], orders=[], pagination=pagination)
-        action_result = await self._processors.storage_namespace.global_search.run(
-            SearchStorageNamespacesAction(searcher=searcher)
+        action_result = await self._storage_namespace.global_search.run(
+            SearchStorageNamespacesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchStorageNamespacesPayload(
             items=[self._storage_namespace_data_to_dto(item) for item in action_result.items],
@@ -127,6 +142,7 @@ class StorageNamespaceAdapter(BaseAdapter):
     def _storage_namespace_data_to_dto(data: StorageNamespaceData) -> StorageNamespaceNode:
         return StorageNamespaceNode(
             id=data.id,
+            entity_id=data.entity_id(),
             storage_id=data.storage_id,
             namespace=data.namespace,
         )

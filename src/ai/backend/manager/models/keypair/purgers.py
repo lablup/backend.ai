@@ -5,15 +5,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.user import KeyPairForbidden
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.purger import GuardedFieldPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
 
@@ -37,14 +36,14 @@ class NonDefaultKeypairPurger(GuardedFieldPurger[KeyPairRow, KeyPairData]):
         return KeyPairRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> KeyPairID:
         return self.keypair_id
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=KeypairConditions.by_is_default(False),
+                condition=KeyPairSearchableFields.own.is_default.filter.equals(False),
                 error=KeyPairForbidden(
                     "Cannot delete the default access key. Switch the default access key first."
                 ),
@@ -57,4 +56,4 @@ class NonDefaultKeypairPurger(GuardedFieldPurger[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)

@@ -3,12 +3,12 @@
 from .entity import (
     EntityConnection,
     EntityEdge,
-    EntityFilter,
-    EntityOrderBy,
+    EntityFilterGQL,
+    EntityOrderByGQL,
     EntityOrderField,
     EntityRefGQL,
 )
-from .entity_node import EntityNode
+from .entity_node import EntityNodeGQL
 from .permission import (
     BulkAddRolePermissionFailureInfoGQL,
     BulkAddRolePermissionsInputGQL,
@@ -22,8 +22,7 @@ from .permission import (
     EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
-    OperationTypeFilterGQL,
-    OperationTypeGQL,
+    PermissionBitFilterGQL,
     PermissionConnection,
     PermissionEdge,
     PermissionFilter,
@@ -69,17 +68,17 @@ from .role import (
     RoleSourceGQL,
     RoleStatusFilterGQL,
     RoleStatusGQL,
+    RoleUsageGQL,
     RoleUserNestedFilterGQL,
+    RoleUsesGQL,
     UpdateRoleInput,
 )
-from .scope import RBACElementTypeFilterGQL, RBACElementTypeGQL, ScopeInputGQL
+from .scope import PermissionBitGQL, ScopeInputGQL
 
 __all__ = [
     # Permission enums
-    "RBACElementTypeGQL",
-    "RBACElementTypeFilterGQL",
-    "OperationTypeGQL",
-    "OperationTypeFilterGQL",
+    "PermissionBitGQL",
+    "PermissionBitFilterGQL",
     "PermissionOrderField",
     # Role enums
     "RoleSourceGQL",
@@ -103,12 +102,14 @@ __all__ = [
     "RoleAssignmentRoleNestedFilterGQL",
     "RoleUserNestedFilterGQL",
     "PermissionNestedFilterGQL",
-    "EntityFilter",
+    "EntityFilterGQL",
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
+    "RoleUsageGQL",
+    "RoleUsesGQL",
     "RoleAssignmentOrderBy",
-    "EntityOrderBy",
+    "EntityOrderByGQL",
     # Inputs
     "CreatePermissionInput",
     "UpdatePermissionInput",
@@ -146,7 +147,6 @@ __all__ = [
     "RoleAssignmentConnection",
     "RoleAssignmentEdge",
     # Entity types
-    "EntityNode",
     "EntityEdge",
     "EntityConnection",
     # Scope types
@@ -154,6 +154,7 @@ __all__ = [
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
     # Entity-operation combination
+    "EntityNodeGQL",
     "EntityOperationCombinationGQL",
     "OperationInfoGQL",
     # Scope-entity-operation combination (permission matrix)

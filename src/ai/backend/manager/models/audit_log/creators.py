@@ -11,11 +11,15 @@ from typing import override
 
 from ai.backend.common.data.entity.action import ActionID
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType, ScopeID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
+from ai.backend.manager.models.audit_log.searchable_fields import (
+    AuditLogScopeSearchableFields,
+    AuditLogSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     FieldCreator,
@@ -35,7 +39,6 @@ __all__ = (
     "EmptyScopeAuditLogCreator",
     "RelationAuditLogCreator",
     "GlobalAuditLogCreator",
-    "LegacyAuditLogCreator",
     "AuditLogScopeCreator",
 )
 
@@ -72,13 +75,13 @@ class BaseAuditLogFields:
         return ()
 
     def to_data(self, row: AuditLogRow) -> AuditLogData:
-        return row.to_dataclass()
+        return AuditLogSearchableFields.own.to_data(row)
 
     def _build_row(
         self,
         *,
         entity_type: str | None,
-        entity_id: EntityID | str | None = None,
+        entity_id: uuid.UUID | str | None = None,
         lookup_kind: str | None = None,
         lookup_key: str | None = None,
     ) -> AuditLogRow:
@@ -231,6 +234,17 @@ class RelationAuditLogCreator(DanglingAuditLogCreator):
 
 
 @dataclass
+class MembershipAuditLogCreator(OwnedAuditLogCreator):
+    """One entity moved into scopes or out of them. The scopes go to
+    ``audit_log_scopes``."""
+
+    @classmethod
+    @override
+    def action_kind(cls) -> ActionKind:
+        return ActionKind.MEMBERSHIP
+
+
+@dataclass
 class GlobalAuditLogCreator(DanglingAuditLogCreator):
     @classmethod
     @override
@@ -239,25 +253,11 @@ class GlobalAuditLogCreator(DanglingAuditLogCreator):
 
 
 @dataclass
-class LegacyAuditLogCreator(DanglingAuditLogCreator):
-    """An action on the legacy ``BaseAction`` base, which declares no shape.
-
-    ``entity_id`` is whatever the runner resolved, often nothing. Goes away with
-    the legacy base.
-    """
-
-    @classmethod
-    @override
-    def action_kind(cls) -> ActionKind:
-        return ActionKind.UNKNOWN
-
-
-@dataclass
 class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, AuditLogScopeData]):
     """A scope the audited run covered, owned by the audit row it is written under."""
 
     scope_type: str
-    scope_id: ScopeID
+    scope_id: uuid.UUID
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -273,8 +273,4 @@ class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, Audi
 
     @override
     def to_data(self, row: AuditLogScopeRow) -> AuditLogScopeData:
-        return AuditLogScopeData(
-            audit_log_id=AuditLogID(row.audit_log_id),
-            scope_type=row.scope_type,
-            scope_id=row.scope_id,
-        )
+        return AuditLogScopeSearchableFields.own.to_data(row)

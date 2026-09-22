@@ -1,123 +1,106 @@
-"""
-Unit tests for PermissionConditions and exists_permission_combined.
-Tests verify that condition factories produce correct SQLAlchemy expressions.
+"""Unit tests for the deprecated role assignment filters reaching permission rows.
+
+The conditions inside the EXISTS come from the permission declaration, so the tests
+check that they land on the same permission row.
 """
 
 from __future__ import annotations
 
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    Permission,
-    ScopeType,
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.filter_specs import StringInMatchSpec
+from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
 )
-from ai.backend.manager.models.rbac_models.conditions import (
-    AssignedUserConditions,
-    PermissionConditions,
+from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
+    DeprecatedRoleAssignmentConditions,
 )
 
 
-class TestPermissionConditions:
-    """Tests for PermissionConditions query condition factories."""
+def _entity_types_in(*entity_types: str) -> StringInMatchSpec:
+    return StringInMatchSpec(values=list(entity_types), case_insensitive=False, negated=False)
 
-    def test_by_scope_id_produces_equality_clause(self) -> None:
-        """by_scope_id should generate scope_id == 'global' clause."""
-        condition = PermissionConditions.by_scope_id("global")
-        clause = condition()
 
-        # Compile to SQL and check for expected pattern
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-        assert "permissions.scope_id = 'global'" in compiled
+class TestPermissionDeclaration:
+    """The permission declaration's own filters."""
 
-    def test_by_scope_types_produces_in_clause(self) -> None:
-        """by_scope_types should generate scope_type IN (...) clause."""
-        condition = PermissionConditions.by_scope_types([ScopeType.DOMAIN, ScopeType.PROJECT])
-        clause = condition()
+    def test_entity_type_in_produces_in_clause(self) -> None:
+        condition = PermissionSearchableFields.own.entity_type.filter.in_(
+            _entity_types_in(str(SessionEntityType()))
+        )
+        compiled = str(condition().compile(compile_kwargs={"literal_binds": True}))
 
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-        assert "permissions.scope_type IN" in compiled
-        assert "domain" in compiled.lower()
-        assert "project" in compiled.lower()
-
-    def test_by_entity_types_produces_in_clause(self) -> None:
-        """by_entity_types should generate entity_type IN (...) clause."""
-        condition = PermissionConditions.by_entity_types([EntityType.SESSION])
-        clause = condition()
-
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
         assert "permissions.entity_type IN" in compiled
         assert "session" in compiled.lower()
 
-    def test_by_permissions_produces_in_clause(self) -> None:
-        """by_permissions should generate permission IN (...) clause."""
-        condition = PermissionConditions.by_permissions([Permission.READ, Permission.CREATE])
-        clause = condition()
+    def test_permission_in_produces_in_clause(self) -> None:
+        condition = PermissionSearchableFields.own.permission.filter.in_([
+            Permission.READ,
+            Permission.CREATE,
+        ])
+        compiled = str(condition().compile(compile_kwargs={"literal_binds": True}))
 
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
         assert "permissions.permission IN" in compiled
         assert str(int(Permission.READ)) in compiled
         assert str(int(Permission.CREATE)) in compiled
 
 
 class TestExistsPermissionCombined:
-    """Tests for AssignedUserConditions.exists_permission_combined."""
+    """Tests for DeprecatedRoleAssignmentConditions.exists_permission_combined."""
 
     def test_exists_permission_combined_structure(self) -> None:
         """exists_permission_combined should produce EXISTS subquery with role_id join."""
-        # Create sample permission conditions
         permission_conditions = [
-            PermissionConditions.by_scope_id("global"),
-            PermissionConditions.by_entity_types([EntityType.SESSION]),
+            PermissionSearchableFields.own.permission.filter.in_([Permission.READ]),
+            PermissionSearchableFields.own.entity_type.filter.in_(
+                _entity_types_in(str(SessionEntityType()))
+            ),
         ]
 
-        condition = AssignedUserConditions.exists_permission_combined(permission_conditions)
-        clause = condition()
+        condition = DeprecatedRoleAssignmentConditions.exists_permission_combined(
+            permission_conditions
+        )
+        compiled = str(condition().compile(compile_kwargs={"literal_binds": True}))
 
-        # Compile to SQL
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-
-        # Verify EXISTS structure
         assert "EXISTS" in compiled.upper()
         assert "SELECT 1" in compiled.upper()
-
-        # Verify role_id join
         assert "permissions.role_id = user_roles.role_id" in compiled
-
-        # Verify both conditions are present
-        assert "permissions.scope_id = 'global'" in compiled
+        assert "permissions.permission IN" in compiled
         assert "permissions.entity_type IN" in compiled
         assert "session" in compiled.lower()
 
     def test_exists_permission_combined_with_multiple_operations(self) -> None:
         """exists_permission_combined should combine multiple operation filters."""
         permission_conditions = [
-            PermissionConditions.by_scope_types([ScopeType.DOMAIN, ScopeType.PROJECT]),
-            PermissionConditions.by_permissions([Permission.READ, Permission.UPDATE]),
+            PermissionSearchableFields.own.entity_type.filter.in_(
+                _entity_types_in(str(SessionEntityType()), str(VFolderEntityType()))
+            ),
+            PermissionSearchableFields.own.permission.filter.in_([
+                Permission.READ,
+                Permission.UPDATE,
+            ]),
         ]
 
-        condition = AssignedUserConditions.exists_permission_combined(permission_conditions)
-        clause = condition()
+        condition = DeprecatedRoleAssignmentConditions.exists_permission_combined(
+            permission_conditions
+        )
+        compiled = str(condition().compile(compile_kwargs={"literal_binds": True}))
 
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-
-        # Verify both scope_types and operations are in the WHERE clause
-        assert "permissions.scope_type IN" in compiled
+        assert "permissions.entity_type IN" in compiled
         assert "permissions.permission IN" in compiled
-        assert "domain" in compiled.lower()
-        assert "project" in compiled.lower()
+        assert "session" in compiled.lower()
+        assert "vfolder" in compiled.lower()
         assert str(int(Permission.READ)) in compiled
         assert str(int(Permission.UPDATE)) in compiled
 
     def test_exists_permission_combined_empty_conditions(self) -> None:
-        """exists_permission_combined with empty list should produce basic EXISTS with join only."""
-        condition = AssignedUserConditions.exists_permission_combined([])
-        clause = condition()
+        """An empty list leaves the EXISTS carrying the join alone."""
+        condition = DeprecatedRoleAssignmentConditions.exists_permission_combined([])
+        compiled = str(condition().compile(compile_kwargs={"literal_binds": True}))
 
-        compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-
-        # Should have EXISTS and join, but no additional WHERE clauses
         assert "EXISTS" in compiled.upper()
         assert "permissions.role_id = user_roles.role_id" in compiled
-        # Should not have extra conditions
         assert "scope_id" not in compiled
         assert "entity_type" not in compiled
         assert "operation" not in compiled

@@ -16,15 +16,16 @@ from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
-from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
@@ -48,7 +49,11 @@ from ai.backend.manager.errors.user import (
     UserPurgeInProgress,
 )
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
+from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
@@ -59,9 +64,8 @@ from ai.backend.manager.models.keypair.row import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
@@ -81,29 +85,23 @@ from ai.backend.manager.models.user.purgers import (
     UserGroupAssociationPurger,
     UserKeyPairPurger,
     UserPurger,
-    UserScopeAssociationPurger,
     UserSessionGroupPurger,
-    UserVFolderPermissionPurger,
 )
-from ai.backend.manager.models.user.scopes import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-    RoleUserOperationScope,
-)
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
-    vfolder_invitations,
-    vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.purgers import VFolderUserPermissionBatchPurger
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import (
@@ -123,6 +121,7 @@ class UserDBSource:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
     _share_ops: ShareOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _user_ops_provider: UserOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -131,11 +130,13 @@ class UserDBSource:
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
         self._share_ops = share_ops_provider
+        self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
@@ -146,7 +147,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
-            return user_row.to_data()
+            return UserSearchableFields.own.to_data(user_row)
 
     async def get_by_email_validated(
         self,
@@ -158,7 +159,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return user_row.to_data()
+            return UserSearchableFields.own.to_data(user_row)
 
     async def _default_keypair_resource_policy(self, session: SASession) -> str:
         """The name of the policy a keypair gets when nothing else names one."""
@@ -341,6 +342,7 @@ class UserDBSource:
             await self._sync_user_project_memberships(
                 updated_user.uuid, updated_user.domain_name, group_ids
             )
+        await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
 
     async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
@@ -402,8 +404,8 @@ class UserDBSource:
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.
+            # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
-            await w.batch_purge_field_entities(user_id, UserScopeAssociationPurger())
             # Finally the user itself as a scope: the row and the RBAC graph it left.
             await w.purge_entity(UserPurger(user_id=user_id))
 
@@ -464,9 +466,19 @@ class UserDBSource:
         user_uuid: UUID,
         delete_destroyed_only: bool = False,
     ) -> None:
-        """Delete user's endpoints."""
-        async with self._db.begin_session() as session:
-            await self._delete_endpoints(session, user_uuid, delete_destroyed_only)
+        """Delete user's endpoints; their tokens cascade with them."""
+        if delete_destroyed_only:
+            lifecycle_stages = frozenset({EndpointLifecycle.DESTROYED})
+        else:
+            lifecycle_stages = frozenset(EndpointLifecycle)
+        async with self._v2_ops.write_ops() as w:
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(
+                UserEndpointPurger(
+                    user_id=UserID(user_uuid),
+                    lifecycle_stages=lifecycle_stages,
+                )
+            )
 
     async def get_kernel_rows_for_monthly_stats(
         self,
@@ -523,7 +535,6 @@ class UserDBSource:
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
-            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,
@@ -704,6 +715,19 @@ class UserDBSource:
                 UserID(user_uuid), domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
             )
 
+    async def _restate_user_policy_shares(self, user_id: UserID) -> None:
+        """Lend the user the user and keypair policies they are now subject to — the
+        write above may have moved either one."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_user_resource_policy_share(user_id)
+            await w.restate_keypair_resource_policy_share(user_id)
+
+    async def _restate_keypair_policy_share(self, user_id: UserID) -> None:
+        """Lend the user the keypair policy the key they now authorize with is subject
+        to."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_keypair_resource_policy_share(user_id)
+
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""
         result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
@@ -743,27 +767,39 @@ class UserDBSource:
     async def _revoke_shared_vfolders(
         self, user_uuid: UUID, vfolder_ids: Sequence[UUID] | None = None
     ) -> None:
-        """Take back what a user was lent: the legacy mount rows and the share caps.
+        """Take back what a user was lent: the shares settled from invitations and the
+        share caps. Their mount policy rows stay.
 
-        Without ``vfolder_ids`` every folder they hold goes; the purge answers with the
-        folders it took back, so no separate read stands between the two writes. What a
-        person is lent lands in the project that is theirs alone (BEP-1077 5.5), which
-        is the scope the caps come off.
+        Without ``vfolder_ids`` every folder they hold goes. What a person is lent lands
+        in the project that is theirs alone (BEP-1077 5.5), which is the scope the caps
+        come off.
         """
         user_id = UserID(user_uuid)
+        if vfolder_ids is not None and not vfolder_ids:
+            return
+        held = sa.select(EntityShareRow.id, EntityShareRow.target_entity_id).where(
+            EntityShareRow.target_entity_type == VFolderEntityType(),
+            EntityShareRow.status == EntityShareStatus.ACCEPTED,
+            EntityShareRow.recipient_entity_type == UserEntityType(),
+            EntityShareRow.recipient_entity_id == user_id,
+        )
+        if vfolder_ids is not None:
+            held = held.where(EntityShareRow.target_entity_id.in_(vfolder_ids))
+        async with self._db.begin_readonly_session() as session:
+            shares = [
+                (EntityShareID(row.id), VFolderUUID(row.target_entity_id))
+                for row in (await session.execute(held)).all()
+            ]
         async with self._share_ops.write_ops() as w:
-            if vfolder_ids is None:
-                taken = await w.batch_purge_field_entities(user_id, UserVFolderPermissionPurger())
-            else:
-                if not vfolder_ids:
-                    return
-                taken = []
-                for vfolder_id in vfolder_ids:
-                    await w.batch_purge_field_entities(
-                        VFolderUUID(vfolder_id),
-                        VFolderUserPermissionBatchPurger(user_id=user_uuid),
-                    )
-                    taken.append(VFolderUUID(vfolder_id))
+            taken: list[VFolderUUID] = (
+                [VFolderUUID(vfolder_id) for vfolder_id in vfolder_ids]
+                if vfolder_ids is not None
+                else []
+            )
+            for share_id, target in shares:
+                await w.revoke_share(EntityShareRevokeUpdater(share_id=share_id))
+                if target not in taken:
+                    taken.append(target)
             if not taken:
                 return
             personal_project = await w.lookup_entity_id(
@@ -796,14 +832,15 @@ class UserDBSource:
         # Migrate shared virtual folders.
         # If virtual folder's name collides with target user's folder,
         # append random string to the name of the migrating folder.
-        j = vfolder_permissions.join(
-            vfolders,
-            vfolder_permissions.c.vfolder == vfolders.c.id,
+        lent = sa.select(sa.literal(1)).where(
+            EntityShareRow.target_entity_type == VFolderEntityType(),
+            EntityShareRow.target_entity_id == vfolders.c.id,
+            EntityShareRow.status == EntityShareStatus.ACCEPTED,
         )
         query = (
             sa.select(vfolders.c.id, vfolders.c.name)
-            .select_from(j)
-            .where(vfolders.c.user == deleted_user_uuid)
+            .select_from(vfolders)
+            .where(vfolders.c.user == deleted_user_uuid, lent.exists())
         )
         migrate_updates = []
         async for row in await conn.stream(query):
@@ -813,17 +850,18 @@ class UserDBSource:
             migrate_updates.append({"vid": row.id, "vname": name})
 
         if migrate_updates:
-            # Remove invitations and vfolder_permissions from target user.
             # Target user will be the new owner, and it does not make sense to have
             # invitation and shared permission for its own folder.
             migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == target_user_email)
-                & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
-            # The target user becomes the owner, so what they held as an invitee goes:
-            # the mount row and the share cap alike.
+            async with self._v2_ops.write_ops() as w:
+                # TODO: scope this purge. A user operation must not use in_global.
+                await w.batch_purge_entities_in_global(
+                    EntitySharePendingOfferBatchPurger(
+                        entity_type=VFolderEntityType(),
+                        entity_ids=migrate_vfolder_ids,
+                        recipient_email=target_user_email,
+                    )
+                )
             await self._revoke_shared_vfolders(target_user_uuid, migrate_vfolder_ids)
 
             rowcount = 0
@@ -841,146 +879,21 @@ class UserDBSource:
             return rowcount
         return 0
 
-    async def _delete_endpoints(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        delete_destroyed_only: bool = False,
-    ) -> None:
-        """Private method to delete user's endpoints."""
-        if delete_destroyed_only:
-            status_filter = {EndpointLifecycle.DESTROYED}
-        else:
-            status_filter = {status for status in EndpointLifecycle}
-
-        endpoint_rows = await EndpointRow.list_endpoint(
-            session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
-        )
-
-        token_ids_to_delete = []
-        endpoint_ids_to_delete = []
-        for row in endpoint_rows:
-            token_ids_to_delete.extend([token.id for token in row.tokens])
-            endpoint_ids_to_delete.append(row.id)
-
-        if token_ids_to_delete:
-            await session.execute(
-                sa.delete(EndpointTokenRow).where(EndpointTokenRow.id.in_(token_ids_to_delete))
-            )
-
-        if endpoint_ids_to_delete:
-            await session.execute(
-                sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
-            )
-
     # ==================== Search Methods ====================
 
     async def search_users(
         self,
-        querier: BatchQuerier,
+        searcher: UserSearcher,
     ) -> UserSearchResult:
-        """Search all users with pagination and filters (admin only).
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier)
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_domain(
-        self,
-        scope: DomainUserOperationScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users within a domain.
-
-        Args:
-            scope: DomainUserOperationScope defining the domain to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_project(
-        self,
-        scope: ProjectUserOperationScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users within a project.
-
-        Membership comes from the project's virtual entity; the scope supplies
-        the membership predicate.
-
-        Args:
-            scope: ProjectUserOperationScope defining the project to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow).select_from(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_role(
-        self,
-        scope: RoleUserOperationScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users assigned to a role.
-
-        Joins with user_roles to find users assigned to the role.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(UserRow)
-                .select_from(UserRow)
-                .join(
-                    UserRoleRow,
-                    UserRow.uuid == UserRoleRow.user_id,
-                )
-            )
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search all users with pagination and filters (admin only)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return UserSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def keypair_settings_to_inherit(self, user_uuid: UUID) -> KeyPairCreator:
         """The settings a newly issued keypair takes from the user's default keypair,
@@ -1035,47 +948,7 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
             await self._switch_default_keypair(session, user_id, access_key)
-
-    async def search_my_keypairs(
-        self,
-        scope: UserKeypairOperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs owned by the scoped user.
-
-        Args:
-            scope: Search scope containing the user UUID whose keypairs to retrieve.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def admin_search_keypairs(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Admin search all keypairs without scope restriction."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        await self._restate_keypair_policy_share(user_id)
 
     async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Read one keypair by its id."""
@@ -1087,7 +960,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {keypair_id} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:
         """Admin retrieves a single keypair by access key."""
@@ -1101,7 +974,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_update_ssh_keypair(
         self,

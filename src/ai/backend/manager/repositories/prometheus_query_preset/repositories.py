@@ -13,7 +13,9 @@ class PrometheusQueryPresetRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = PrometheusQueryPresetRepository(args.db, args.prometheus_client)
+        repository = PrometheusQueryPresetRepository(
+            args.db, args.prometheus_client, args.v2_ops_provider
+        )
 
         return cls(
             repository=repository,

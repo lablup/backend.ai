@@ -4,12 +4,13 @@ from collections.abc import Awaitable, Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Final
+from typing import Any, Final, assert_never
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelCancelledAnycastEvent,
@@ -33,19 +34,22 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
+    KernelMatchType,
     SchedulingResult,
     SessionStatus,
     StatusTransitions,
     TransitionStatus,
 )
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
-from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
@@ -571,12 +575,12 @@ class ScheduleCoordinator:
         total_observed = 0
 
         while True:
-            querier = BatchQuerier(
+            searcher = KernelSearcher(
                 pagination=OffsetPagination(limit=_OBSERVER_BATCH_SIZE, offset=offset),
                 conditions=[condition],
             )
 
-            kernel_result = await self._repository.search_kernels_for_handler(querier)
+            kernel_result = await self._repository.search_kernels_for_handler(searcher)
 
             log.debug(
                 "[Coordinator] Observer {} batch: offset={}, items_count={}, has_next_page={}",
@@ -635,15 +639,18 @@ class ScheduleCoordinator:
         # Build querier with kernel conditions
         target_kernel_statuses = handler.target_kernel_statuses()
 
-        querier = BatchQuerier(
+        fields = KernelSearchableFields.own
+        searcher = KernelSearcher(
             pagination=NoPagination(),
             conditions=[
-                KernelConditions.by_resource_group_id(resource_group_id),
-                KernelConditions.by_statuses(target_kernel_statuses),
+                fields.resource_group_id.filter.equals(
+                    UUIDEqualMatchSpec(value=resource_group_id, negated=False)
+                ),
+                fields.status.filter.in_(target_kernel_statuses),
             ],
         )
 
-        kernel_result = await self._repository.search_kernels_for_handler(querier)
+        kernel_result = await self._repository.search_kernels_for_handler(searcher)
 
         if not kernel_result.items:
             return
@@ -818,6 +825,24 @@ class ScheduleCoordinator:
             else:
                 session.last_phase = None
 
+    def _kernel_match_conditions(self, spec: PromotionSpec) -> list[QueryCondition]:
+        """The kernel-status shape a promotion asks for, as conditions on the session.
+
+        ``ALL`` and ``NOT_ANY`` also require a kernel to exist: a session with none
+        satisfies neither.
+        """
+        kernels = SessionSearchableFields.nested.kernels
+        status = kernels.fields.status.filter.in_(spec.target_kernel_statuses)
+        match spec.kernel_match_type:
+            case KernelMatchType.ALL:
+                return [kernels.correlation.every([status]), kernels.correlation.exists()]
+            case KernelMatchType.ANY:
+                return [kernels.correlation.some([status])]
+            case KernelMatchType.NOT_ANY:
+                return [kernels.correlation.none([status]), kernels.correlation.exists()]
+            case _:
+                assert_never(spec.kernel_match_type)
+
     async def _process_promotion_resource_group(
         self,
         spec: PromotionSpec,
@@ -834,20 +859,20 @@ class ScheduleCoordinator:
             schedule_type: Type of scheduling operation
             resource_group_id: The id of the resource group to process
         """
-        querier = BatchQuerier(
+        fields = SessionSearchableFields.own
+        searcher = SessionInfoSearcher(
             pagination=NoPagination(),
             conditions=[
-                SessionConditions.by_resource_group_id(resource_group_id),
-                SessionConditions.by_statuses(spec.target_statuses),
-                SessionConditions.by_kernel_match(
-                    spec.target_kernel_statuses,
-                    spec.kernel_match_type,
+                fields.resource_group_id.filter.equals(
+                    UUIDEqualMatchSpec(value=resource_group_id, negated=False)
                 ),
+                fields.status.filter.in_(spec.target_statuses),
+                *self._kernel_match_conditions(spec),
             ],
         )
 
         # Query sessions (only session data, no kernels)
-        session_infos = await self._repository.search_sessions_for_handler(querier)
+        session_infos = await self._repository.search_sessions_for_handler(searcher)
 
         if not session_infos:
             return
@@ -999,11 +1024,15 @@ class ScheduleCoordinator:
 
         # Fetch full session+kernel data for hook execution
         session_ids = [s.session_id for s in session_infos]
-        querier = BatchQuerier(
+        searcher = SessionInfoSearcher(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids(session_ids)],
+            conditions=[
+                SessionSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=session_ids, negated=False)
+                )
+            ],
         )
-        full_sessions = await self._repository.search_sessions_with_kernels_for_handler(querier)
+        full_sessions = await self._repository.search_sessions_with_kernels_for_handler(searcher)
 
         if not full_sessions:
             log.warning(

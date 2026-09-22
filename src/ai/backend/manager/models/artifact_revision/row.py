@@ -8,14 +8,11 @@ from typing import Any, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
-    ArtifactRemoteStatus,
-    ArtifactRevisionData,
     ArtifactStatus,
 )
 from ai.backend.manager.models.base import (
@@ -103,37 +100,6 @@ class ArtifactRevisionRow(Base):
             f"updated_at={updated_at_str}, "
             f"digest={self.digest}"
             f")"
-        )
-
-    def to_dataclass(self) -> ArtifactRevisionData:
-        # Convert JSON dict back to Pydantic model if present
-        verification_result = None
-        if self.verification_result is not None:
-            try:
-                verification_result = VerificationStepResult.model_validate(
-                    self.verification_result
-                )
-            except Exception as e:
-                # If validation fails, keep as None
-                verification_result = None
-                log.warning(
-                    "Failed to validate verification_result for ArtifactRevisionRow id={}: {}",
-                    self.id,
-                    e,
-                )
-
-        return ArtifactRevisionData(
-            id=self.id,
-            artifact_id=self.artifact_id,
-            version=self.version,
-            readme=self.readme,
-            size=self.size,
-            status=ArtifactStatus(self.status),
-            remote_status=ArtifactRemoteStatus(self.remote_status) if self.remote_status else None,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-            digest=self.digest,
-            verification_result=verification_result,
         )
 
     @classmethod

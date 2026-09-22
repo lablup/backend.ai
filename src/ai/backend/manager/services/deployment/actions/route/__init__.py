@@ -2,7 +2,6 @@
 
 from .search_routes import (
     SearchRoutesAction,
-    SearchRoutesActionResult,
 )
 from .update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
@@ -11,7 +10,6 @@ from .update_route_traffic_status import (
 
 __all__ = [
     "SearchRoutesAction",
-    "SearchRoutesActionResult",
     "UpdateRouteTrafficStatusAction",
     "UpdateRouteTrafficStatusActionResult",
 ]

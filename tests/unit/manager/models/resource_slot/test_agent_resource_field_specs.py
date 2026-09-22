@@ -18,7 +18,7 @@ from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.lookups import AgentResourceOwnerLookup
-from ai.backend.manager.models.resource_slot.scopes import AgentResourceOperationScope
+from ai.backend.manager.models.resource_slot.scopes import AgentResourceTarget
 from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -38,20 +38,29 @@ async def agent_uuid(
         db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=40))
         db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=10))
         await db_sess.flush()
+        found = await db_sess.scalar(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))
+        assert found is not None
+        owner = AgentUUID(found)
         db_sess.add(
             AgentResourceRow(
-                agent_id=agent_id, slot_name="cpu", capacity=Decimal(4), used=Decimal(1)
+                agent_id=agent_id,
+                agent_uuid=owner,
+                slot_name="cpu",
+                capacity=Decimal(4),
+                used=Decimal(1),
             )
         )
         db_sess.add(
             AgentResourceRow(
-                agent_id=agent_id, slot_name="mem", capacity=Decimal(1024), used=Decimal(512)
+                agent_id=agent_id,
+                agent_uuid=owner,
+                slot_name="mem",
+                capacity=Decimal(1024),
+                used=Decimal(512),
             )
         )
         await db_sess.flush()
-        found = await db_sess.scalar(sa.select(AgentRow.uuid).where(AgentRow.id == agent_id))
-        assert found is not None
-        return AgentUUID(found)
+        return owner
 
 
 @pytest.fixture
@@ -65,7 +74,7 @@ async def test_scope_reads_one_agent_s_rows_in_rank_order(
     repository: OpsRepository[AgentResourceData], agent_uuid: AgentUUID
 ) -> None:
     result = await repository.search_in_scopes(
-        [AgentResourceOperationScope(agent_uuid=agent_uuid)], _searcher()
+        [AgentResourceTarget(agent_uuid=agent_uuid)], _searcher()
     )
 
     assert [item.slot_name for item in result.items] == ["mem", "cpu"]
@@ -75,7 +84,7 @@ async def test_scope_of_an_unknown_agent_reads_nothing(
     repository: OpsRepository[AgentResourceData], agent_uuid: AgentUUID
 ) -> None:
     result = await repository.search_in_scopes(
-        [AgentResourceOperationScope(agent_uuid=AgentUUID(uuid.uuid4()))],
+        [AgentResourceTarget(agent_uuid=AgentUUID(uuid.uuid4()))],
         _searcher(),
     )
 
@@ -86,7 +95,7 @@ async def test_owner_lookup_crosses_to_the_agent_uuid(
     repository: OpsRepository[AgentResourceData], agent_uuid: AgentUUID
 ) -> None:
     rows = await repository.search_in_scopes(
-        [AgentResourceOperationScope(agent_uuid=agent_uuid)], _searcher()
+        [AgentResourceTarget(agent_uuid=agent_uuid)], _searcher()
     )
     row_ids = [item.id for item in rows.items]
     absent = AgentResourceID(uuid.uuid4())

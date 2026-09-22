@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -21,6 +20,8 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.event_dispatcher.handlers.service_catalog import (
     ServiceCatalogEventHandler,
 )
+from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
+from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
 
 
 def _make_mock_db(mock_session: AsyncMock) -> MagicMock:
@@ -77,31 +78,28 @@ def sample_deregistered_event() -> ServiceDeregisteredEvent:
 class TestHandleRegistered:
     """Tests for handle_registered method."""
 
-    async def test_upserts_service_and_endpoints(
+    async def test_registers_service_with_its_endpoints(
         self,
         sample_registered_event: ServiceRegisteredEvent,
     ) -> None:
-        """handle_registered should execute upsert, delete old endpoints, insert new ones."""
-        service_id = uuid.uuid4()
-        mock_session = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.scalar_one.return_value = service_id
-        mock_session.execute = AsyncMock(side_effect=[mock_result, None, None])
+        """handle_registered hands the instance and every announced endpoint to the repository."""
+        repository = AsyncMock()
+        handler = ServiceCatalogEventHandler(db=MagicMock(), repository=repository)
 
-        mock_db = _make_mock_db(mock_session)
-        handler = ServiceCatalogEventHandler(db=mock_db)
+        await handler.handle_registered(None, AgentId("i-test"), sample_registered_event)
 
-        await handler.handle_registered(
-            None,
-            AgentId("i-test"),
-            sample_registered_event,
-        )
+        repository.register.assert_awaited_once()
+        upserter, endpoints = repository.register.await_args.args
+        assert isinstance(upserter, ServiceCatalogUpserter)
+        assert (upserter.service_group, upserter.instance_id) == ("manager", "mgr-001")
+        assert [
+            (endpoint.role, endpoint.scope)
+            for endpoint in endpoints
+            if isinstance(endpoint, ServiceCatalogEndpointCreator)
+        ] == [("main", "private"), ("health", "internal")]
 
-        # Should have 3 execute calls: upsert, delete endpoints, insert endpoints
-        assert mock_session.execute.call_count == 3
-
-    async def test_no_endpoints_skips_insert(self) -> None:
-        """handle_registered with no endpoints should skip the insert."""
+    async def test_no_endpoints_registers_none(self) -> None:
+        """handle_registered with no endpoints passes an empty endpoint list."""
         event = ServiceRegisteredEvent(
             instance_id="agent-001",
             service_group="agent",
@@ -110,20 +108,13 @@ class TestHandleRegistered:
             endpoints=[],
             startup_time=datetime.now(tz=UTC),
         )
-
-        service_id = uuid.uuid4()
-        mock_session = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.scalar_one.return_value = service_id
-        mock_session.execute = AsyncMock(side_effect=[mock_result, None])
-
-        mock_db = _make_mock_db(mock_session)
-        handler = ServiceCatalogEventHandler(db=mock_db)
+        repository = AsyncMock()
+        handler = ServiceCatalogEventHandler(db=MagicMock(), repository=repository)
 
         await handler.handle_registered(None, AgentId("i-test"), event)
 
-        # Should have 2 execute calls: upsert, delete endpoints (no insert)
-        assert mock_session.execute.call_count == 2
+        _, endpoints = repository.register.await_args.args
+        assert endpoints == []
 
 
 class TestHandleDeregistered:
@@ -136,7 +127,7 @@ class TestHandleDeregistered:
         """handle_deregistered should update the service status to DEREGISTERED."""
         mock_session = AsyncMock()
         mock_db = _make_mock_db(mock_session)
-        handler = ServiceCatalogEventHandler(db=mock_db)
+        handler = ServiceCatalogEventHandler(db=mock_db, repository=AsyncMock())
 
         await handler.handle_deregistered(
             None,
@@ -158,7 +149,7 @@ class TestSweepStaleServices:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         mock_db = _make_mock_db(mock_session)
-        handler = ServiceCatalogEventHandler(db=mock_db)
+        handler = ServiceCatalogEventHandler(db=mock_db, repository=AsyncMock())
 
         count = await handler._sweep_stale_services(threshold_minutes=5)
 
@@ -173,7 +164,7 @@ class TestSweepStaleServices:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         mock_db = _make_mock_db(mock_session)
-        handler = ServiceCatalogEventHandler(db=mock_db)
+        handler = ServiceCatalogEventHandler(db=mock_db, repository=AsyncMock())
 
         count = await handler._sweep_stale_services()
 
@@ -181,8 +172,7 @@ class TestSweepStaleServices:
 
     async def test_handle_sweep_delegates_to_sweep(self) -> None:
         """handle_sweep_stale_services should delegate to _sweep_stale_services."""
-        mock_db = MagicMock()
-        handler = ServiceCatalogEventHandler(db=mock_db)
+        handler = ServiceCatalogEventHandler(db=MagicMock(), repository=AsyncMock())
         with patch.object(handler, "_sweep_stale_services", new_callable=AsyncMock) as mock_sweep:
             mock_sweep.return_value = 2
             await handler.handle_sweep_stale_services(

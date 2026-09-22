@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -18,10 +20,13 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     DeleteModelCardOptions,
     ModelCardFilter,
     ModelCardOrder,
+    ScopedSearchModelCardsInput,
     SearchModelCardsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -43,6 +48,8 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardFilterGQL,
     ModelCardGQL,
     ModelCardOrderByGQL,
+    ModelCardScopeGQL,
+    ModelCardUsageGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
     ProjectModelCardScopeGQL,
@@ -62,6 +69,16 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )  # type: ignore[misc]
 async def admin_model_cards_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        ModelCardUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; model cards the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
     filter: ModelCardFilterGQL | None = None,
     order_by: list[ModelCardOrderByGQL] | None = None,
     before: str | None = None,
@@ -72,9 +89,59 @@ async def admin_model_cards_v2(
     offset: int | None = None,
 ) -> ModelCardV2Connection | None:
     check_admin_only()
-    search_input = _build_search_input(filter, order_by, first, after, last, before, limit, offset)
+    search_input = _build_search_input(
+        usage, filter, order_by, first, after, last, before, limit, offset
+    )
     result = await info.context.adapters.model_card.admin_search(search_input)
     return _build_connection(result)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the model cards the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ModelCardScopeGQL,
+    usage: Annotated[
+        ModelCardUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; model cards the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
+    filter: ModelCardFilterGQL | None = None,
+    order_by: list[ModelCardOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelCardV2Connection | None:
+    payload = await info.context.adapters.model_card.scoped_search(
+        ScopedSearchModelCardsInput(
+            scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    return _build_connection(payload)
 
 
 @gql_root_field(
@@ -86,6 +153,16 @@ async def admin_model_cards_v2(
 async def project_model_cards_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectModelCardScopeGQL,
+    usage: Annotated[
+        ModelCardUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; model cards the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
     filter: ModelCardFilterGQL | None = None,
     order_by: list[ModelCardOrderByGQL] | None = None,
     before: str | None = None,
@@ -95,7 +172,9 @@ async def project_model_cards_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ModelCardV2Connection | None:
-    search_input = _build_search_input(filter, order_by, first, after, last, before, limit, offset)
+    search_input = _build_search_input(
+        usage, filter, order_by, first, after, last, before, limit, offset
+    )
     result = await info.context.adapters.model_card.project_search(scope.project_id, search_input)
     return _build_connection(result)
 
@@ -218,6 +297,7 @@ async def deploy_model_card_v2(
 
 
 def _build_search_input(
+    usage: ModelCardUsageGQL | None,
     filter: ModelCardFilterGQL | None,
     order_by: list[ModelCardOrderByGQL] | None,
     first: int | None,
@@ -238,6 +318,7 @@ def _build_search_input(
             for o in order_by
         ]
     return SearchModelCardsInput(
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,
@@ -297,7 +378,7 @@ def _build_connection(result: SearchModelCardsPayload) -> ModelCardV2Connection:
     edges = [
         ModelCardV2Edge(
             node=ModelCardGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]

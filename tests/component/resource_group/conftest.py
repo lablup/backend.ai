@@ -16,9 +16,9 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
@@ -60,7 +60,7 @@ def resource_group_processors(
     repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo)
     return ResourceGroupProcessors(
-        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())), service
     )
 
 
@@ -71,9 +71,9 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
@@ -85,14 +85,13 @@ def rbac_processors(
     rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
     return RbacProcessors(
         rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        rbac_groups.group(GroupMeta(UserEntityType())),
         RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
         RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
         RbacRoleService(
             PermissionControllerRepository(database_engine),
             RbacRosterRepository(RosterOpsProvider(database_engine)),
         ),
-        [],
     )
 
 
@@ -110,7 +109,9 @@ def server_module_registries(
     processors.rbac = rbac_processors
 
     adapter = ResourceGroupAdapter(
-        processors,
+        processors.resource_group,
+        processors.rbac,
+        processors.domain,
         deployment_coordinator=MagicMock(),
         schedule_coordinator=MagicMock(),
     )

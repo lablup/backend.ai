@@ -2,28 +2,31 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
-from strawberry.relay import Connection, Edge, PageInfo
+from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
+    ScopedSearchResourceGroupsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_connection_type,
     gql_mutation,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
+from .scopes import ResourceGroupScopeGQL, ResourceGroupUsageGQL
 from .types import (
     AllowedDomainsPayloadGQL,
     AllowedProjectsPayloadGQL,
@@ -35,6 +38,8 @@ from .types import (
     ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL,
     ReplaceResourceGroupDefaultSessionOptionsInputGQL,
     ReplaceResourceGroupDefaultSessionOptionsPayloadGQL,
+    ResourceGroupConnection,
+    ResourceGroupEdge,
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
@@ -48,26 +53,66 @@ from .types import (
     UpdateResourceGroupPayload,
 )
 
-# Connection types
-
-ResourceGroupEdge = Edge[ResourceGroupGQL]
-
-
-@gql_connection_type(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Resource group connection",
-    )
-)
-class ResourceGroupConnection(Connection[ResourceGroupGQL]):
-    count: int
-
-    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.count = count
-
-
 # Query fields
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Page through the resource groups the named scopes reach, combined with OR. "
+            "Every scope is authorized before the read runs."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_resource_groups(
+    info: Info[StrawberryGQLContext],
+    scope: ResourceGroupScopeGQL,
+    usage: Annotated[
+        ResourceGroupUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; resource groups the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
+    filter: ResourceGroupFilterGQL | None = None,
+    order_by: list[ResourceGroupOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ResourceGroupConnection | None:
+    payload = await info.context.adapters.resource_group.scoped_search(
+        ScopedSearchResourceGroupsInput(
+            scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
+    edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return ResourceGroupConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
 
 
 @gql_root_field(
@@ -75,6 +120,16 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 )  # type: ignore[misc]
 async def admin_resource_groups(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        ResourceGroupUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; resource groups the caller cannot "
+                "read are left out."
+            )
+        ),
+    ] = None,
     filter: ResourceGroupFilterGQL | None = None,
     order_by: list[ResourceGroupOrderByGQL] | None = None,
     before: str | None = None,
@@ -91,6 +146,7 @@ async def admin_resource_groups(
 
     payload = await info.context.adapters.resource_group.search(
         AdminSearchResourceGroupsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,

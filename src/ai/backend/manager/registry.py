@@ -27,7 +27,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
 from typeguard import check_type
@@ -50,6 +49,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
@@ -83,7 +83,6 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     CommitStatus,
     HardwareMetadata,
-    ImageAlias,
     ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
@@ -101,9 +100,10 @@ from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -123,8 +123,14 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ImageSearcher,
+    ReferenceImageSearcher,
+)
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -134,6 +140,7 @@ from .agent_cache import AgentRPCCache
 from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from .errors.agent import AgentNotAllocated, AgentNotFound
 from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
@@ -143,9 +150,7 @@ from .errors.kernel import (
     TooManySessionsMatched,
 )
 from .errors.resource import (
-    AgentNotAllocated,
     DatabaseConnectionUnavailable,
-    InstanceNotFound,
     NoCurrentTaskContext,
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
@@ -153,9 +158,6 @@ from .errors.resource import (
 from .models.agent import AgentRow, agents
 from .models.domain import domains
 from .models.endpoint import EndpointRow
-from .models.image import (
-    ImageRow,
-)
 from .models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -164,7 +166,7 @@ from .models.kernel import (
 )
 from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
-from .models.resource_group import query_allowed_sgroups, resource_groups
+from .models.resource_group import resource_groups
 from .models.runtime_variant.row import RuntimeVariantRow
 from .models.session import (
     PRIVATE_SESSION_TYPES,
@@ -184,7 +186,7 @@ from .models.vfolder import (
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
-__all__ = ["AgentRegistry", "InstanceNotFound"]
+__all__ = ["AgentRegistry"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -296,11 +298,13 @@ class AgentRegistry:
         network_plugin_ctx: NetworkPluginContext,
         scheduling_controller: SchedulingController,
         scheduler_repository: SchedulerRepository,
+        ops_provider: V2DBOpsProvider,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
+        self._ops_provider = ops_provider
         self.config_provider = config_provider
         self.docker = aiodocker.Docker()
         self.db = db
@@ -322,6 +326,19 @@ class AgentRegistry:
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self._client_pool = ClientPool(tcp_client_session_factory)
+
+    def _canonical_image_searcher(self, canonical: str, architecture: str) -> ImageSearcher:
+        return CanonicalImageSearcher(canonical, architecture, [ImageStatus.ALIVE])
+
+    def _reference_image_searcher(self, reference: str, architecture: str) -> ImageSearcher:
+        return ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
+
+    async def _first_image(self, searcher: ImageSearcher) -> ImageData:
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        if not result.items:
+            raise ImageNotFound()
+        return result.items[0]
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -351,7 +368,7 @@ class AgentRegistry:
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
-                raise InstanceNotFound(inst_id)
+                raise AgentNotFound(inst_id)
             return AgentId(row)
 
     async def enumerate_instances(self, check_shadow: bool = True) -> list[AgentId]:
@@ -499,12 +516,10 @@ class AgentRegistry:
 
         # Resolve the image reference.
         try:
-            async with self.db.begin_readonly_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [image_ref],
-                )
-            if image_row.customized and image_row.creator_id != user_scope.user_uuid:
+            image = await self._first_image(
+                self._canonical_image_searcher(image_ref.canonical, image_ref.architecture)
+            )
+            if image.customized and image.creator_id != user_scope.user_uuid:
                 raise ImageNotFound
             if not image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
@@ -535,11 +550,10 @@ class AgentRegistry:
                 if sess.main_kernel.architecture is None:
                     raise InvalidKernelConfig("Session main kernel has no architecture specified")
                 running_image_ref = (
-                    await ImageRow.resolve(
-                        db_session,
-                        [
-                            ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
-                        ],
+                    await self._first_image(
+                        self._canonical_image_searcher(
+                            sess.main_kernel.image, sess.main_kernel.architecture
+                        )
                     )
                 ).image_ref
             if running_image_ref != image_ref:
@@ -838,15 +852,12 @@ class AgentRegistry:
 
             # Resolve the image reference.
             try:
-                async with self.db.begin_readonly_session() as session:
-                    image_row = await ImageRow.resolve(
-                        session,
-                        [
-                            ImageIdentifier(kernel_config["image"], kernel_config["architecture"]),
-                            ImageAlias(kernel_config["image"]),
-                        ],
+                image = await self._first_image(
+                    self._reference_image_searcher(
+                        kernel_config["image"], kernel_config["architecture"]
                     )
-                requested_image_ref = image_row.image_ref
+                )
+                requested_image_ref = image.image_ref
                 async with self.db.begin_readonly() as conn:
                     query = (
                         sa.select(domains.c.allowed_docker_registries)
@@ -1061,13 +1072,14 @@ class AgentRegistry:
         # ``image_id`` already populated (task #29 migrates the read path
         # to persist ``ImageID`` end-to-end).
         image_id_by_ref: dict[ImageRef, ImageID] = {}
-        async with self.db.begin_readonly_session() as db_sess:
-            for kernel in kernel_enqueue_configs:
-                image_ref = kernel["image_ref"]
-                if image_ref in image_id_by_ref:
-                    continue
-                image_row = await ImageRow.resolve(db_sess, [image_ref])
-                image_id_by_ref[image_ref] = ImageID(image_row.id)
+        for kernel in kernel_enqueue_configs:
+            image_ref = kernel["image_ref"]
+            if image_ref in image_id_by_ref:
+                continue
+            image = await self._first_image(
+                self._canonical_image_searcher(image_ref.canonical, image_ref.architecture)
+            )
+            image_id_by_ref[image_ref] = image.id
 
         def _build_execution_spec(
             kernel: KernelEnqueueingConfig,
@@ -1135,9 +1147,9 @@ class AgentRegistry:
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=access_key,
-                domain_name=user_scope.domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(user_scope.group_id),
+                user_id=UserID(user_scope.user_uuid),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
@@ -1638,7 +1650,7 @@ class AgentRegistry:
                 else session.main_kernel
             )
             if kernel.agent is None:
-                raise InstanceNotFound(
+                raise AgentNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
                 )
             async with self._agent_client_pool.acquire(AgentId(kernel.agent)) as client:
@@ -1908,33 +1920,24 @@ class AgentRegistry:
         await wsproxy_client.delete_endpoint(endpoint.id)
 
 
-async def check_resource_group(
-    conn: SAConnection,
+def check_resource_group(
+    candidates: Sequence[ResourceGroupData],
     resource_group: str | None,
     session_type: SessionTypes,
-    access_key: AccessKey,
-    domain_name: str,
-    group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if resource_group parameter is given.
     # If resource_group is not provided, it will be selected as the first one among
     # the list of allowed scaling groups.
-    candidates = await query_allowed_sgroups(
-        conn,
-        domain_name,
-        group_id,
-        access_key,
-    )
     if public_sgroup_only:
-        candidates = [sgroup for sgroup in candidates if sgroup.is_public]
+        candidates = [sgroup for sgroup in candidates if sgroup.status.is_public]
     if not candidates:
         raise ResourceGroupNotFound("You have no scaling groups allowed to use.")
 
     stype = session_type.value.lower()
     if resource_group is None:
         for sgroup in candidates:
-            allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+            allowed_session_types = sgroup.scheduler.options.allowed_session_types
             if stype in allowed_session_types:
                 resource_group = sgroup.name
                 break
@@ -1949,7 +1952,7 @@ async def check_resource_group(
                 # resource_group's unique key is 'name' field for now,
                 # but we will change resource_group's unique key to new 'id' field.
                 resource_group_found = True
-                allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+                allowed_session_types = sgroup.scheduler.options.allowed_session_types
                 if stype in allowed_session_types:
                     break
         else:

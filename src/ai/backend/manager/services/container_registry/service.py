@@ -13,6 +13,10 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryGlobalUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
@@ -61,9 +65,9 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
-from ai.backend.manager.services.container_registry.actions.search_container_registries import (
-    SearchContainerRegistriesAction,
-    SearchContainerRegistriesActionResult,
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+    SetContainerRegistryGlobalActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
@@ -110,6 +114,16 @@ class ContainerRegistryService:
         data = await self._container_registry_repository.modify_registry(action.updater)
         return UpdateContainerRegistryActionResult(data=data)
 
+    async def set_container_registry_global(
+        self, action: SetContainerRegistryGlobalAction
+    ) -> SetContainerRegistryGlobalActionResult:
+        data = await self._container_registry_repository.set_global(
+            ContainerRegistryGlobalUpdater(
+                registry_id=action.registry_id, is_global=action.is_global
+            )
+        )
+        return SetContainerRegistryGlobalActionResult(data=data)
+
     async def delete_container_registry(
         self, action: DeleteContainerRegistryAction
     ) -> DeleteContainerRegistryActionResult:
@@ -131,7 +145,9 @@ class ContainerRegistryService:
         result = await scanner.rescan_single_registry(action.progress_reporter)
 
         return RescanImagesActionResult(
-            images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
+            images=result.images,
+            errors=result.errors,
+            registry=ContainerRegistrySearchableFields.own.to_data(registry_row),
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
@@ -167,20 +183,6 @@ class ContainerRegistryService:
     ) -> LoadAllContainerRegistriesActionResult:
         registries = await self._container_registry_repository.get_all()
         return LoadAllContainerRegistriesActionResult(registries=registries)
-
-    async def search_container_registries(
-        self, action: SearchContainerRegistriesAction
-    ) -> SearchContainerRegistriesActionResult:
-        """Search container registries with pagination and ordering."""
-        result = await self._container_registry_repository.search_container_registries(
-            action.querier
-        )
-        return SearchContainerRegistriesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def get_container_registries(
         self, _action: GetContainerRegistriesAction

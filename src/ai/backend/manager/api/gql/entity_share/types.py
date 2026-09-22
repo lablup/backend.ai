@@ -37,11 +37,12 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareSideDTO,
     EntityShareStatusDTO,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -50,7 +51,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 
 EntityShareStatusGQL: type[EntityShareStatusDTO] = gql_enum(
     BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Where a share stands."),
@@ -65,15 +66,6 @@ EntityShareSideGQL: type[EntityShareSideDTO] = gql_enum(
     ),
     EntityShareSideDTO,
     name="EntityShareSide",
-)
-
-PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="One bit of a permission mask; distinct from OperationType, which names an action.",
-    ),
-    PermissionBitDTO,
-    name="PermissionBit",
 )
 
 
@@ -98,6 +90,12 @@ class EntityShareOrderFieldGQL(StrEnum):
 )
 class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the entity share.",
+        ),
+    )
     sharer_user_id: UUID | None = gql_field(
         default=None, description="Who sent the offer, while that account is still there."
     )

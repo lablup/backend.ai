@@ -6,16 +6,23 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
-    OperationTypeFilter,
     OrderDirection,
-    RBACElementTypeFilter,
-    RoleSource,
+    PermissionBitDTO,
+    PermissionBitFilter,
     RoleSourceFilter,
     RoleStatus,
     RoleStatusFilter,
@@ -23,7 +30,7 @@ from .types import (
 )
 
 __all__ = (
-    "AdminSearchEntitiesGQLInput",
+    "MAX_SCOPE_PERMISSION_TARGETS",
     "AdminSearchPermissionsGQLInput",
     "SearchRoleAssignmentsInput",
     "SearchRolesInput",
@@ -38,9 +45,12 @@ __all__ = (
     "DeleteRoleInput",
     "EntityFilter",
     "EntityOrderBy",
+    "MyAtomicBulkScopePermissionsInput",
+    "MyScopePermissionsInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
+    "PermissionTarget",
     "PurgeRoleInput",
     "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
@@ -48,6 +58,9 @@ __all__ = (
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
+    "RolePermissionNestedFilter",
+    "RoleUsage",
+    "RoleUses",
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
@@ -60,7 +73,6 @@ class CreateRoleInput(BaseRequestModel):
 
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
-    source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
     auto_assign: bool = Field(
         default=False,
         description=(
@@ -68,8 +80,10 @@ class CreateRoleInput(BaseRequestModel):
             "to a scope this role is registered in."
         ),
     )
+    scope: ScopeInputDTO | None = Field(default=None, description="The scope the role belongs to")
     scopes: list[ScopeInputDTO] | None = Field(
-        default=None, description="Scopes to register the role in"
+        default=None,
+        description="Deprecated: use `scope`. Accepts exactly one entry.",
     )
 
     @field_validator("name")
@@ -80,27 +94,52 @@ class CreateRoleInput(BaseRequestModel):
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
 
+    @model_validator(mode="after")
+    def exactly_one_scope(self) -> CreateRoleInput:
+        if self.scope is not None:
+            if self.scopes:
+                raise ValueError("scope and scopes cannot both be given")
+            return self
+        if not self.scopes:
+            raise ValueError("scope is required")
+        if len(self.scopes) != 1:
+            raise ValueError("A role belongs to exactly one scope")
+        return self
+
+    def scope_input(self) -> ScopeInputDTO:
+        """The scope the role belongs to, from whichever field carried it."""
+        if self.scope is not None:
+            return self.scope
+        if not self.scopes:
+            raise ValueError("scope is required")
+        return self.scopes[0]
+
 
 class UpdateRoleInput(BaseRequestModel):
     """Input for updating a role."""
 
-    name: str | None = Field(default=None, description="Updated role name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL, description="Updated role description. Use SENTINEL to clear."
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated role name. Omit to leave unchanged."
     )
-    status: RoleStatus | None = Field(default=None, description="Updated role status")
-    auto_assign: bool | None = Field(
-        default=None,
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
+    )
+    status: RoleStatus | None | Unset = Field(
+        default=UNSET, description="Updated role status. Omit to leave unchanged."
+    )
+    auto_assign: bool | None | Unset = Field(
+        default=UNSET,
         description=(
             "Updated value for the `auto_assign` flag. When true, the role is automatically "
-            "granted to a user when the user is added to a scope this role is registered in."
+            "granted to a user when the user is added to a scope this role is registered in. "
+            "Omit to leave unchanged."
         ),
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -124,20 +163,30 @@ class CreatePermissionInput(BaseRequestModel):
     """Input for creating a scoped permission."""
 
     role_id: UUID = Field(description="Role ID to assign this permission to")
-    scope_type: str = Field(description="Scope element type (e.g. 'domain', 'project')")
-    scope_id: str = Field(description="Scope element ID")
-    entity_type: str = Field(description="Entity element type (e.g. 'session', 'vfolder')")
-    operation: str = Field(description="Operation type (e.g. 'read', 'create')")
+    entity_type: DeclaredEntityType = Field(description="Entity type (e.g. 'session', 'vfolder')")
+    permission: PermissionBitDTO = Field(description="The operation bit the row holds")
+
+    def permission_bit(self) -> Permission:
+        """The bit this input names, as the permission row records it."""
+        return self.permission.to_permission()
 
 
 class UpdatePermissionInput(BaseRequestModel):
     """Input for updating a scoped permission."""
 
     id: UUID = Field(description="Permission ID to update")
-    scope_type: str | None = Field(default=None, description="Updated scope element type")
-    scope_id: str | None = Field(default=None, description="Updated scope element ID")
-    entity_type: str | None = Field(default=None, description="Updated entity element type")
-    operation: str | None = Field(default=None, description="Updated operation type")
+    entity_type: DeclaredEntityType | None | Unset = Field(
+        default=UNSET, description="Updated entity type. Omit to leave unchanged."
+    )
+    permission: PermissionBitDTO | None | Unset = Field(
+        default=UNSET, description="Updated operation bit. Omit to leave unchanged."
+    )
+
+    def permission_bit(self) -> Permission | None | Unset:
+        """The bit this input names; ``None`` and ``UNSET`` pass through untouched."""
+        if isinstance(self.permission, PermissionBitDTO):
+            return self.permission.to_permission()
+        return self.permission
 
 
 class DeletePermissionInput(BaseRequestModel):
@@ -231,8 +280,8 @@ UserNestedFilter.model_rebuild()
 class MappedScopeNestedFilter(BaseRequestModel):
     """Filter roles by the scope they are mapped (registered) to."""
 
-    scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
+    scope_type: StringFilter | None = None
+    scope_id: UUIDFilter | None = None
     AND: list[MappedScopeNestedFilter] | None = None
     OR: list[MappedScopeNestedFilter] | None = None
     NOT: list[MappedScopeNestedFilter] | None = None
@@ -241,14 +290,62 @@ class MappedScopeNestedFilter(BaseRequestModel):
 MappedScopeNestedFilter.model_rebuild()
 
 
+class PermissionNestedFilter(BaseRequestModel):
+    """Nested filter for permissions within a role assignment."""
+
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = None
+    AND: list[PermissionNestedFilter] | None = None
+    OR: list[PermissionNestedFilter] | None = None
+    NOT: list[PermissionNestedFilter] | None = None
+
+
+PermissionNestedFilter.model_rebuild()
+
+
+class PermissionFilter(BaseRequestModel):
+    """Filter for scoped permissions."""
+
+    role_id: UUIDFilter | None = None
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = Field(
+        default=None, description="Filter by the permission bit the entry grants."
+    )
+    created_at: DateTimeFilter | None = None
+    AND: list[PermissionFilter] | None = None
+    OR: list[PermissionFilter] | None = None
+    NOT: list[PermissionFilter] | None = None
+
+
+PermissionFilter.model_rebuild()
+
+
+class RolePermissionNestedFilter(ToManyFilter[PermissionFilter]):
+    """The `permissions` field of a role filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the role filter's own `AND`.
+    """
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    assigned_user: UserNestedFilter | None = None
+    assigned_user: UserNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the users holding the role. Deprecated: read a user's roles "
+            "through the role search scoped to that user."
+        ),
+        deprecated=True,
+    )
     mapped_scope: MappedScopeNestedFilter | None = None
+    permissions: RolePermissionNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the role's permission entries."
+    )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -271,27 +368,26 @@ class RoleNestedFilter(BaseRequestModel):
 RoleNestedFilter.model_rebuild()
 
 
-class PermissionNestedFilter(BaseRequestModel):
-    """Nested filter for permissions within a role assignment."""
-
-    scope_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
-    entity_type: RBACElementTypeFilter | None = None
-    operation: OperationTypeFilter | None = None
-    AND: list[PermissionNestedFilter] | None = None
-    OR: list[PermissionNestedFilter] | None = None
-    NOT: list[PermissionNestedFilter] | None = None
-
-
-PermissionNestedFilter.model_rebuild()
-
-
 class RoleAssignmentFilter(BaseRequestModel):
     """Filter for role assignments."""
 
     role_id: UUIDFilter | None = None
-    role: RoleNestedFilter | None = None
-    permission: PermissionNestedFilter | None = None
+    role: RoleNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the role the assignment names. Deprecated: search roles first, "
+            "then narrow by `role_id`."
+        ),
+        deprecated=True,
+    )
+    permission: PermissionNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the permissions the assignment's role carries. Deprecated: search "
+            "roles by permission first, then narrow by `role_id`."
+        ),
+        deprecated=True,
+    )
     username: StringFilter | None = None
     email: StringFilter | None = None
     AND: list[RoleAssignmentFilter] | None = None
@@ -303,11 +399,11 @@ RoleAssignmentFilter.model_rebuild()
 
 
 class EntityFilter(BaseRequestModel):
-    """Filter for entity associations."""
+    """Filter for the deprecated `Role.scopes` connection. Accepted and ignored."""
 
-    entity_type: RBACElementTypeFilter | None = None
+    entity_type: StringFilter | None = None
     entity_id: StringFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
+    scope_type: StringFilter | None = None
     scope_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
@@ -315,22 +411,6 @@ class EntityFilter(BaseRequestModel):
 
 
 EntityFilter.model_rebuild()
-
-
-class PermissionFilter(BaseRequestModel):
-    """Filter for scoped permissions."""
-
-    role_id: UUIDFilter | None = None
-    scope_type: RBACElementTypeFilter | None = None
-    scope_id: StringFilter | None = None
-    entity_type: RBACElementTypeFilter | None = None
-    created_at: DateTimeFilter | None = None
-    AND: list[PermissionFilter] | None = None
-    OR: list[PermissionFilter] | None = None
-    NOT: list[PermissionFilter] | None = None
-
-
-PermissionFilter.model_rebuild()
 
 
 class RoleOrderBy(BaseRequestModel):
@@ -348,7 +428,7 @@ class RoleAssignmentOrderBy(BaseRequestModel):
 
 
 class EntityOrderBy(BaseRequestModel):
-    """Order by specification for entity associations."""
+    """Order of the deprecated `Role.scopes` connection. Accepted and ignored."""
 
     field: str
     direction: OrderDirection = OrderDirection.DESC
@@ -374,9 +454,30 @@ class AdminSearchPermissionsGQLInput(BaseRequestModel):
     offset: int | None = None
 
 
+class RoleUses(BaseRequestModel):
+    """Entities the role uses, whose ids narrow the result."""
+
+    role_preset: list[UUID] | None = Field(
+        default=None, description="Role presets the roles were instantiated from"
+    )
+
+
+class RoleUsage(BaseRequestModel):
+    """Uses narrowing the roles read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Roles the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    uses: RoleUses | None = Field(
+        default=None, description="Entities the role uses, whose ids narrow the result"
+    )
+
+
 class SearchRolesInput(BaseRequestModel):
     """Pagination search input for roles."""
 
+    usage: RoleUsage | None = None
     filter: RoleFilter | None = None
     order: list[RoleOrderBy] | None = None
     first: int | None = None
@@ -400,14 +501,29 @@ class SearchRoleAssignmentsInput(BaseRequestModel):
     offset: int | None = None
 
 
-class AdminSearchEntitiesGQLInput(BaseRequestModel):
-    """GQL pagination search input for entity associations."""
+MAX_SCOPE_PERMISSION_TARGETS = 100
 
-    filter: EntityFilter | None = None
-    order: list[EntityOrderBy] | None = None
-    first: int | None = None
-    after: str | None = None
-    last: int | None = None
-    before: str | None = None
-    limit: int | None = None
-    offset: int | None = None
+
+class PermissionTarget(BaseRequestModel):
+    """One scope and entity type to answer the caller's permissions for."""
+
+    scope_type: str = Field(description="Type of the scope, e.g. 'project'.")
+    scope_id: UUID = Field(description="ID of the scope.")
+    entity_type: str = Field(description="Entity type the permissions are asked about.")
+
+
+class MyScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on one scope and entity type."""
+
+    target: PermissionTarget = Field(description="The scope and entity type to answer for.")
+
+
+class MyAtomicBulkScopePermissionsInput(BaseRequestModel):
+    """Input for the caller's permissions on several scopes and entity types."""
+
+    targets: list[PermissionTarget] = Field(
+        max_length=MAX_SCOPE_PERMISSION_TARGETS,
+        description=(
+            f"The scopes and entity types to answer for, at most {MAX_SCOPE_PERMISSION_TARGETS}."
+        ),
+    )

@@ -18,17 +18,19 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project import (
@@ -132,6 +134,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
         "name": ("name", None),
+        "type": (EnumFieldItem("type", ProjectType), None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("updated_at", dtparse),
@@ -225,7 +228,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         # Project membership comes from the virtual-entity chain (PROJECT/USER).
-        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.id, UserRow.uuid)
+        membership_filter = user_scope_membership_exists(ProjectEntityType(), self.id, UserRow.uuid)
         user_query = query.where(membership_filter)
         cnt_query = sa.select(sa.func.count()).select_from(UserRow).where(membership_filter)
         for cond in conditions:
@@ -410,7 +413,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=dto.integration_name,  # ProjectData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry,
+            container_registry=dto.container_registry.to_json() if dto.container_registry else None,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -506,7 +509,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             _type = [ProjectType.GENERAL]
         else:
             _type = type
-        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = sa.join(groups, ms, groups.c.id == ms.c.scope_id)
         query = (
             sa.select(groups, ms.c.user_id)
@@ -532,7 +535,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
         query = sa.select(groups).where(
-            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
+            user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_id)
         )
         async with graph_ctx.db.begin_readonly() as conn:
             return [
@@ -580,7 +583,13 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        container_registry_val = value_or_none(self.container_registry)
+        registry = value_or_none(self.container_registry)
+        container_registry_val = None
+        if registry:
+            parsed = ImageCommitRegistryReq.model_validate(registry)
+            container_registry_val = ImageCommitRegistry(
+                registry_name=parsed.registry, project_name=parsed.project
+            )
 
         return CreateProjectAction(
             domain_id=domain_id,
@@ -616,6 +625,16 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     )
 
     def to_action(self, group_id: uuid.UUID) -> UpdateProjectAction:
+        registry = self.container_registry
+        if registry is Undefined:
+            container_registry = TriState[ImageCommitRegistry].nop()
+        elif not registry:
+            container_registry = TriState[ImageCommitRegistry].nullify()
+        else:
+            parsed = ImageCommitRegistryReq.model_validate(registry)
+            container_registry = TriState.update(
+                ImageCommitRegistry(registry_name=parsed.registry, project_name=parsed.project)
+            )
         updater = ProjectUpdater(
             project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
@@ -644,9 +663,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=TriState[dict[str, str]].from_graphql(
-                self.container_registry,
-            ),
+            container_registry=container_registry,
         )
         return UpdateProjectAction(updater=updater)
 

@@ -5,13 +5,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
-from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry.searchable_fields import (
+    ReservoirRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState
@@ -37,7 +39,7 @@ class ReservoirRegistryUpdater(DataUpdater[ReservoirRegistryRow, ReservoirRegist
         return ReservoirRegistryRow.id
 
     @override
-    def target_id_value(self) -> UUID:
+    def target_id_value(self) -> ArtifactRegistryID:
         return self.registry_id
 
     @property
@@ -56,4 +58,4 @@ class ReservoirRegistryUpdater(DataUpdater[ReservoirRegistryRow, ReservoirRegist
 
     @override
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryData:
-        return row.to_dataclass()
+        return ReservoirRegistrySearchableFields.own.to_data(row)

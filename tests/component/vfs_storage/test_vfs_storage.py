@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.storage.response import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
@@ -296,10 +297,13 @@ class TestVFSStorageCRUD:
         await vfs_storage_factory(name="search-gamma", host="nfs:share1")
 
         action = SearchVFSStoragesAction(
-            searcher=VFSStorageSearcher(
-                pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[],
-                orders=[],
+            searcher=GlobalSearcher(
+                used_by=(),
+                searcher=VFSStorageSearcher(
+                    pagination=OffsetPagination(limit=10, offset=0),
+                    conditions=[],
+                    orders=[],
+                ),
             )
         )
         result = await vfs_storage_processors.global_search_vfs_storages.run(action)
@@ -345,7 +349,11 @@ class TestVFSStorageCRUD:
         assert delete_result.data.id == storage["id"]
 
         # Verify no longer in list
-        list_action = ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
+        list_action = ListVFSStorageAction(
+            searcher=GlobalSearcher(
+                used_by=(), searcher=VFSStorageSearcher(pagination=NoPagination())
+            )
+        )
         list_result = await vfs_storage_processors.global_list_storages.run(list_action)
         storage_names = [s.name for s in list_result.items]
         assert "to-delete" not in storage_names

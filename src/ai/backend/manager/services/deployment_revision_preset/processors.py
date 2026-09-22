@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from ai.backend.common.data.entity.preset_resource_slot import (
-    DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE,
+    DeploymentPresetResourceSlotFieldType,
 )
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
-    BatchOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntityOpsResult,
+    ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -19,6 +21,9 @@ from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotDa
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     ResourceSlotEntryData,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
+    BulkGetDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.create import (
     CreateDeploymentPresetAction,
@@ -33,8 +38,8 @@ from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
 )
-from ai.backend.manager.services.deployment_revision_preset.actions.search import (
-    GlobalSearchDeploymentPresetsAction,
+from ai.backend.manager.services.deployment_revision_preset.actions.scoped_search import (
+    ScopedSearchDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.search_resource_slots import (
     SearchPresetResourceSlotsAction,
@@ -56,8 +61,12 @@ class DeploymentPresetProcessors:
     get: SingleEntityActionProcessor[
         GetDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
-    global_search: GlobalActionProcessor[
-        GlobalSearchDeploymentPresetsAction, BatchOpsResult[DeploymentRevisionPresetData]
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchDeploymentPresetsAction, ScopedBatchOpsResult[DeploymentRevisionPresetData]
+    ]
+    # What the DataLoader reads: checked per preset.
+    bulk_get: PartialBulkActionProcessor[
+        BulkGetDeploymentPresetsAction, DeploymentRevisionPresetData
     ]
     update: SingleEntityActionProcessor[
         UpdateDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
@@ -65,7 +74,7 @@ class DeploymentPresetProcessors:
     purge: SingleEntityActionProcessor[
         PurgeDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
-    search_resource_slots: ScopeActionProcessor[
+    search_resource_slots: BulkActionProcessor[
         SearchPresetResourceSlotsAction, ScopedFieldsOpsResult[PresetResourceSlotData]
     ]
 
@@ -76,14 +85,17 @@ class DeploymentPresetProcessors:
     ) -> None:
         self.create = group.global_create_with_fields_ops(CreateDeploymentPresetAction)
         self.get = group.single_get_ops(GetDeploymentPresetAction)
-        self.global_search = group.global_search_ops(GlobalSearchDeploymentPresetsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchDeploymentPresetsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetDeploymentPresetsAction)
         self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
 
         slots: LookupFieldGroup[PresetResourceSlotData] = group.field_group(
-            FieldGroupMeta(DEPLOYMENT_PRESET_RESOURCE_SLOT_FIELD_TYPE),
+            FieldGroupMeta(DeploymentPresetResourceSlotFieldType()),
             PresetResourceSlotData,
             LookupPresetResourceSlotOwnerAction,
             LookupBulkPresetResourceSlotOwnerAction,
         )
-        self.search_resource_slots = slots.search_ops(SearchPresetResourceSlotsAction)
+        self.search_resource_slots = slots.atomic_bulk_scoped_search_ops(
+            SearchPresetResourceSlotsAction
+        )

@@ -52,7 +52,7 @@ class EntityShareProcessors:
     ) -> None:
         self.create = group.scope(CreateEntityShareAction, service.create)
         self.get = group.single_get_ops(GetEntityShareAction)
-        self.search = group.scope_search_ops(SearchEntitySharesAction)
+        self.search = group.scoped_search_ops(SearchEntitySharesAction)
         self.accept = group.scope(AcceptEntityShareAction, service.accept)
         self.reject = group.scope(RejectEntityShareAction, service.reject)
         self.cancel = group.single_entity(CancelEntityShareAction, service.cancel)

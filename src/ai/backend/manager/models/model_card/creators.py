@@ -20,6 +20,10 @@ from ai.backend.manager.data.model_card.types import (
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardResourceRequirementSearchableFields,
+    ModelCardSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -29,8 +33,8 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
     """Creator for a model card.
 
-    A card is its own scope and joins the model-store project it is registered in,
-    which is what the RBAC element reference used to say from the call site.
+    A card is its own scope and joins the model-store project it is registered in
+    and the user who created it.
     """
 
     name: str
@@ -57,7 +61,7 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
 
     @override
     def created_in(self, row: ModelCardRow) -> Collection[EntityIdentifier]:
-        return (ProjectID(self.project_id),)
+        return (ProjectID(row.project), UserID(row.creator))
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -92,7 +96,7 @@ class ModelCardCreator(EntityCreator[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return row.to_data()
+        return ModelCardSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -121,4 +125,4 @@ class ModelCardResourceRequirementCreator(
 
     @override
     def to_data(self, row: ModelCardResourceRequirementRow) -> ModelCardResourceRequirementData:
-        return row.to_data()
+        return ModelCardResourceRequirementSearchableFields.own.to_data(row)

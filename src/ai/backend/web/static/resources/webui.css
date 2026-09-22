@@ -9,30 +9,35 @@ body {
   --lumo-font-family: var(--token-fontFamily);
   --lumo-primary-text-color: var(--token-colorPrimary, #27824f);
   --lumo-primary-color-50pct: var(--token-colorPrimary, #27824f);
-  background-color: var(--token-colorBgBase, rgba(247, 247, 246, 1));
-}
-
-body.dark-theme {
-  background-color: #191919;
+  /* The page backdrop is owned by the literal `light-dark()` rule in
+     index.html's critical <style> (follows `color-scheme`, no token). Declaring
+     it here too — and especially the old mode-blind
+     `body.dark-theme { background-color: #191919 }` pair — gave the backdrop a
+     second, non-reactive owner. */
 }
 
 /* ── Splash / loading curtain (Diagonal Weave) ─────────────────────────────
    A minimal backdrop (body + #splash background) is inlined in index.html so
    the page paints its background immediately. The full splash styling lives
    here; webui.css is a render-blocking <head> stylesheet, so these rules are in
-   effect on first paint (no flash of unstyled splash). */
+   effect on first paint (no flash of unstyled splash).
+
+   background-color is a LITERAL, not `var(--color-background-body)`: that
+   token sits unscoped on `:root` in `@astryxdesign/core/astryx.css` (its own
+   cool-toned default) until the brand theme's `@scope`d override registers on
+   `data-astryx-theme`, so reading it here flashed to Astryx's default for that
+   window. See the matching note in index.html's critical <style>. */
 .splash {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background-color: var(--token-colorBgBase, rgba(247, 247, 246, 1));
+  background-color: light-dark(#f7f7f6, #191919);
   transition: opacity 0.3s ease-out;
   font-family:
     "Ubuntu",
@@ -53,7 +58,8 @@ body.dark-theme {
 }
 
 body.dark-theme .splash {
-  background-color: #191919;
+  /* Backdrop is the literal `light-dark()` above (mode-reactive via
+     `color-scheme`); only the weave palette differs per mode. */
   /* Diagonal Weave tokens — dark */
   --splash-fg: #dcdcdc;
   --splash-line: rgba(255, 255, 255, 0.05);
@@ -222,8 +228,16 @@ body.dark-theme .splash {
   align-items: flex-start;
   gap: 2px;
 }
+/* Both meta lines pin `line-height` AND a fixed `height`, so the block geometry
+   is a function of `font-size` alone. `line-height` by itself is not enough:
+   each line mixes two families (its own + the monospace `.splash-ver` /
+   `.splash-meta-sub`), and baseline negotiation between two fonts of equal
+   line-height still yields a taller line box — measured 17.5px -> 18.5px the
+   moment Ubuntu resolves, which walked the whole bottom-anchored block 1px. */
 .splash-meta-main {
   font-size: 12.5px;
+  line-height: 1.4;
+  height: 1.4em;
   color: var(--splash-fg);
   opacity: 0.72;
 }
@@ -234,6 +248,14 @@ body.dark-theme .splash {
 }
 .splash-meta-sub {
   font-size: 11px;
+  line-height: 1.4;
+  /* This div holds ONLY #mode-detail + #build-detail, which are empty in the
+     markup and filled by the inline boot script. Until that runs it generates
+     no line box at all (measured height 0), and `.splash-meta` is anchored by
+     `bottom`, so the line above it sat 16.5px lower on every paint that landed
+     before the script and jumped up when it filled. A fixed height makes the
+     block identical empty and filled. */
+  height: 1.4em;
   opacity: 0.6;
   letter-spacing: 0.01em;
   font-family:

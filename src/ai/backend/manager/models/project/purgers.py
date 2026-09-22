@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
@@ -15,7 +14,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -24,9 +22,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
 )
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
@@ -140,38 +136,6 @@ class ProjectEndpointPurger(EntityBatchPurger[EndpointRow, DeploymentID]):
 
 
 @dataclass
-class ProjectScopeAssociationPurger(
-    FieldBatchPurger[ProjectID, AssociationScopesEntitiesRow, UUID]
-):
-    """Clears the legacy scope associations a project leaves behind, on both sides: the
-    rows enrolling the project under other scopes, and the rows enrolled under the scope
-    the project is."""
-
-    @override
-    def build_subquery(self, owner_id: ProjectID) -> sa.sql.Select[Any]:
-        return sa.select(AssociationScopesEntitiesRow).where(
-            sa.or_(
-                sa.and_(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_id == str(owner_id),
-                ),
-                sa.and_(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(owner_id),
-                ),
-            )
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: AssociationScopesEntitiesRow) -> UUID:
-        return row.id
-
-
-@dataclass
 class ProjectPurger(EntityPurger[ProjectRow, ProjectData]):
     """Removes a project along with the scope it was."""
 
@@ -195,4 +159,4 @@ class ProjectPurger(EntityPurger[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)

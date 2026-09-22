@@ -13,7 +13,8 @@ import pytest
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.testutils.db import with_tables
 
@@ -43,7 +44,7 @@ class TestVFSStorageRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VFSStorageRepository:
         """Create a VFSStorageRepository instance"""
-        return VFSStorageRepository(db_with_cleanup)
+        return VFSStorageRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def sample_vfs_storage_id(
@@ -146,7 +147,7 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_filtering: dict[str, uuid.UUID],
     ) -> None:
         """Test searching VFS storages filtered by host returns only matching storages"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -155,7 +156,7 @@ class TestVFSStorageRepository:
             orders=[],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         result_storage_ids = [storage.id for storage in result.items]
         assert sample_vfs_storages_for_filtering["host-a"] in result_storage_ids
@@ -167,7 +168,7 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching VFS storages with name pattern filter"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -176,7 +177,7 @@ class TestVFSStorageRepository:
             orders=[],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 1
         assert result.items[0].name == "alpha-storage"
@@ -191,13 +192,13 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching VFS storages ordered by name ascending"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[VFSStorageRow.name.asc()],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         result_names = [storage.name for storage in result.items]
         assert result_names == sorted(result_names)
@@ -210,13 +211,13 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching VFS storages ordered by name descending"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[VFSStorageRow.name.desc()],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         result_names = [storage.name for storage in result.items]
         assert result_names == sorted(result_names, reverse=True)
@@ -233,13 +234,13 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -250,13 +251,13 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -267,13 +268,13 @@ class TestVFSStorageRepository:
         sample_vfs_storages_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -291,7 +292,7 @@ class TestVFSStorageRepository:
         # Filter: only storages with localhost host
         # Order: by name ascending
         # Pagination: limit 5, offset 2
-        querier = BatchQuerier(
+        searcher = VFSStorageSearcher(
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -300,7 +301,7 @@ class TestVFSStorageRepository:
             orders=[VFSStorageRow.name.asc()],
         )
 
-        result = await vfs_storage_repository.search(querier=querier)
+        result = await vfs_storage_repository.search(searcher=searcher)
 
         # Total localhost storages: 25, so total_count should be 25
         assert result.total_count == 25

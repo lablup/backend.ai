@@ -27,10 +27,14 @@ to the API through one validated surface instead of hand-rolled HTTP.
 - **Integration tests** drive the live server with it.
 - A v2 endpoint without an SDK method is invisible to both — shipping an endpoint includes shipping the client method.
 
-## Scoped search unification is a direction, not yet a rule
+## Scoped search unification: the server has moved, the SDK has not
 
-- Today: a separate method per scope (`project_search(project_id, request)`, `domain_search(domain_name, request)`) maps to a parent-pinned URL.
-- Direction: one `scoped_search(request)` per entity, with the scope as a field of the request DTO — matching the server's `scoped/search` transition (scope as request data, not a URL segment).
-- Why it is not yet a rule: the server URL pattern, the SDK method shape, and the CLI options — three surfaces must move together.
-- Until it settles, new SDK code follows the current per-scope shape and does not mix the two shapes within one entity.
-- Cost of the current shape: every new scope type adds one method per entity, and drift risk against the server's scoped endpoints grows — the reason unification is being discussed.
+- Today in the SDK: a separate method per scope (`project_search(project_id, request)`, `domain_search(domain_name, request)`) maps to a parent-pinned URL.
+- The server settled its half in BA-7742: `POST /{entity}/scoped/search` takes a `scope` object of
+  per-kind `UUIDScope` lists, all OR'd, and the per-scope routes stay beside it. So the URL pattern
+  and the request shape are no longer open questions.
+- What remains: one `scoped_search(request)` per entity in the SDK and the CLI options that drive it.
+  Until those land, new SDK code follows the current per-scope shape and does not mix the two shapes
+  within one entity.
+- Cost of the current shape: every new scope type adds one method per entity, and the drift against the
+  server's scoped endpoints now grows with every entity the server converts.

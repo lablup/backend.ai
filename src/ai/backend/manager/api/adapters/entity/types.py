@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE, EntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.errors.api import InvalidAPIParameters
 
@@ -25,7 +25,7 @@ class WiredEntityTypes:
         self._types = frozenset(
             wiring.entity_type
             for wiring in registry.wired_processors()
-            if wiring.entity_type is not None and wiring.entity_type != GLOBAL_ENTITY_TYPE
+            if wiring.entity_type is not None and wiring.entity_type != GlobalEntityType()
         )
         self._sorted = tuple(sorted(self._types))
 

@@ -13,6 +13,8 @@ from strawberry.scalars import JSON
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     ArtifactGQLFilterInputDTO,
@@ -94,6 +96,7 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -107,6 +110,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
     gql_connection_type,
+    gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
@@ -128,7 +132,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 
 
 async def get_registry_url(
@@ -255,6 +258,23 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
     NOT: list[Self] | None = None
 
 
+_ARTIFACT_SIZE_ORDER_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A size belongs to a revision rather than"
+    " the artifact, so this value is not used for ordering. It is removed in the next"
+    " release."
+)
+
+ArtifactOrderFieldGQL: type[ArtifactOrderField] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="24.09.0",
+        description="Fields available for ordering artifact query results.",
+    ),
+    ArtifactOrderField,
+    name="ArtifactOrderField",
+    deprecated_values={"SIZE": _ARTIFACT_SIZE_ORDER_DEPRECATION},
+)
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=dedent_strip("""
@@ -264,7 +284,7 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
     ),
 )
 class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy):
-    field: ArtifactOrderField
+    field: ArtifactOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
 
@@ -636,6 +656,12 @@ class SourceInfo:
 )
 class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     id: NodeID[str]
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the artifact.",
+        ),
+    )
     name: str
     type: ArtifactType
     description: str | None
@@ -663,8 +689,6 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
         pydantic_filter = filter.to_pydantic() if filter is not None else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
-        base_conditions = [ArtifactRevisionConditions.by_artifact_id(uuid.UUID(self.id))]
-
         search_input = AdminSearchArtifactRevisionsInput(
             filter=pydantic_filter,
             order=pydantic_order,
@@ -675,15 +699,16 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
             limit=limit,
             offset=offset,
         )
-        payload = await info.context.adapters.artifact.search_revisions_gql(
+        payload = await info.context.adapters.artifact.search_revisions_of_artifact_gql(
+            ArtifactID(uuid.UUID(self.id)),
             search_input,
-            base_conditions=base_conditions,
         )
 
         edges = []
         for item in payload.items:
             revision = ArtifactRevision(
                 id=ID(str(item.id)),
+                field_id=item.field_id,
                 status=ArtifactStatus(item.status.value),
                 remote_status=ArtifactRemoteStatus(item.remote_status)
                 if item.remote_status
@@ -721,6 +746,12 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
 )
 class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
+    field_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the artifact revision.",
+        ),
+    )
     status: ArtifactStatus
     remote_status: ArtifactRemoteStatus | None = gql_added_field(
         BackendAIGQLMeta(
@@ -759,7 +790,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         # cast is required because mypy cannot unify list[ArtifactRevision | None]
         # with Iterable[Self | None] across generic DataLoader[UUID, ArtifactRevision | None].
         results = await info.context.data_loaders.artifact_revision_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            ArtifactRevisionID(uuid.UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -787,6 +818,7 @@ def to_artifact_gql_node(node: ArtifactNode, registry_url: str, source_url: str)
     """Build an ArtifactGQLNode DTO from an ArtifactNode and resolved registry URLs."""
     return ArtifactGQLNode(
         id=node.id,
+        entity_id=node.entity_id,
         name=node.name,
         type=node.type,
         description=node.description,
@@ -804,6 +836,7 @@ def make_artifact_revision_from_node(node: ArtifactRevisionNode) -> ArtifactRevi
     """Create an ArtifactRevision GQL type from an ArtifactRevisionNode DTO (search result)."""
     return ArtifactRevision(
         id=ID(str(node.id)),
+        field_id=node.field_id,
         status=ArtifactStatus(node.status.value),
         remote_status=ArtifactRemoteStatus(node.remote_status) if node.remote_status else None,
         readme=None,

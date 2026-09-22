@@ -6,9 +6,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
     PermissionStatus,
     RoleSource,
     RoleStatus,
@@ -17,13 +16,11 @@ from ai.backend.common.data.permission.types import (
 __all__ = (
     "AssignedUserOrderField",
     "EntityType",
-    "OperationType",
     "OrderDirection",
     "PermissionStatus",
     "RoleOrderField",
     "RoleSource",
     "RoleStatus",
-    "ScopeOrderField",
 )
 
 
@@ -48,10 +45,3 @@ class AssignedUserOrderField(StrEnum):
     USERNAME = "username"
     EMAIL = "email"
     GRANTED_AT = "granted_at"
-
-
-class ScopeOrderField(StrEnum):
-    """Fields available for ordering scope IDs."""
-
-    NAME = "name"
-    CREATED_AT = "created_at"

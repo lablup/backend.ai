@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 
 
@@ -9,7 +9,7 @@ class BaseScopeAction(ABC):
     """Base for actions that target entities by scope rather than by identity."""
 
     @abstractmethod
-    def scope_targets(self) -> Sequence[ScopeRef]:
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
         """Return the Sequence of scopes that this action applies to."""
         raise NotImplementedError
 

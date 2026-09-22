@@ -17,8 +17,9 @@ from ai.backend.common.dto.manager.resource_slot.response import (
 )
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions
-from ai.backend.manager.models.resource_slot.orders import ResourceSlotTypeOrders
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.searchers import ResourceSlotTypeSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -58,54 +59,22 @@ class ResourceSlotAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         """Convert resource slot type filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter.slot_name is not None:
-            condition = self.convert_string_filter(
-                filter.slot_name,
-                contains_factory=ResourceSlotTypeConditions.by_slot_name_contains,
-                equals_factory=ResourceSlotTypeConditions.by_slot_name_equals,
-                starts_with_factory=ResourceSlotTypeConditions.by_slot_name_starts_with,
-                ends_with_factory=ResourceSlotTypeConditions.by_slot_name_ends_with,
-                in_factory=ResourceSlotTypeConditions.by_slot_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.slot_type is not None:
-            condition = self.convert_string_filter(
-                filter.slot_type,
-                contains_factory=ResourceSlotTypeConditions.by_slot_type_contains,
-                equals_factory=ResourceSlotTypeConditions.by_slot_type_equals,
-                starts_with_factory=ResourceSlotTypeConditions.by_slot_type_starts_with,
-                ends_with_factory=ResourceSlotTypeConditions.by_slot_type_ends_with,
-                in_factory=ResourceSlotTypeConditions.by_slot_type_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.display_name is not None:
-            condition = self.convert_string_filter(
-                filter.display_name,
-                contains_factory=ResourceSlotTypeConditions.by_display_name_contains,
-                equals_factory=ResourceSlotTypeConditions.by_display_name_equals,
-                starts_with_factory=ResourceSlotTypeConditions.by_display_name_starts_with,
-                ends_with_factory=ResourceSlotTypeConditions.by_display_name_ends_with,
-                in_factory=ResourceSlotTypeConditions.by_display_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = ResourceSlotTypeSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_string_filter(filter.slot_type, fields.slot_type.filter),
+            *self.apply_string_filter(filter.display_name, fields.display_name.filter),
+        ]
 
     def _convert_order(self, order: ResourceSlotTypeOrder) -> QueryOrder:
         """Convert resource slot type order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
 
+        fields = ResourceSlotTypeSearchableFields.own
         if order.field == ResourceSlotTypeOrderField.SLOT_NAME:
-            return ResourceSlotTypeOrders.slot_name(ascending=ascending)
+            return fields.slot_name.order.apply(ascending)
         if order.field == ResourceSlotTypeOrderField.RANK:
-            return ResourceSlotTypeOrders.rank(ascending=ascending)
+            return fields.rank.order.apply(ascending)
         if order.field == ResourceSlotTypeOrderField.DISPLAY_NAME:
-            return ResourceSlotTypeOrders.display_name(ascending=ascending)
+            return fields.display_name.order.apply(ascending)
         raise ValueError(f"Unknown order field: {order.field}")

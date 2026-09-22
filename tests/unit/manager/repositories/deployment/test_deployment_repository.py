@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Sequence
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, override
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,20 +18,20 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
@@ -67,9 +66,11 @@ from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -87,9 +88,6 @@ from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -116,7 +114,6 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -129,33 +126,12 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-
-
-@dataclass
-class DeploymentPolicyPurgerSpec(PurgerSpec[DeploymentPolicyRow]):
-    """Test-local PurgerSpec for deleting a deployment policy."""
-
-    policy_id: uuid.UUID
-
-    @override
-    def row_class(self) -> type[DeploymentPolicyRow]:
-        return DeploymentPolicyRow
-
-    @override
-    def pk_value(self) -> uuid.UUID:
-        return self.policy_id
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -418,7 +394,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -463,7 +439,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -809,6 +785,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def test_fetch_single_route_with_inference_port(
@@ -1177,6 +1154,7 @@ class TestGetDefaultArchitectureFromScalingGroup:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     async def _create_agent(
@@ -1465,7 +1443,6 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
-                AssociationScopesEntitiesRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
@@ -1600,7 +1577,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -1625,7 +1602,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -1759,6 +1736,7 @@ class TestDeploymentRevisionOperations:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -2015,12 +1993,12 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: DeploymentID,
     ) -> None:
         """Test search_revisions returns empty result when no revisions exist."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 0
         assert result.items == []
@@ -2034,12 +2012,12 @@ class TestDeploymentRevisionOperations:
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions returns correct results."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 3
         assert len(result.items) == 3
@@ -2054,11 +2032,11 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test search_revisions respects pagination."""
         # First page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2066,11 +2044,11 @@ class TestDeploymentRevisionOperations:
         assert result.has_previous_page is False
 
         # Second page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=2),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2325,7 +2303,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -2350,7 +2328,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -2404,6 +2382,7 @@ class TestDeploymentPolicyOperations:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -2494,15 +2473,15 @@ class TestDeploymentPolicyOperations:
         test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
-        """Test deleting a deployment policy using Purger."""
-        purger = Purger(
-            spec=DeploymentPolicyPurgerSpec(policy_id=test_deployment_policy_data.id),
+        """Test deleting a deployment policy."""
+        purger = DeploymentPolicyPurger(
+            policy_id=DeploymentPolicyID(test_deployment_policy_data.id)
         )
 
         result = await deployment_repository.delete_deployment_policy(purger)
 
         assert result is not None
-        assert result.row.id == test_deployment_policy_data.id
+        assert result.id == test_deployment_policy_data.id
 
         # Verify the policy no longer exists
         with pytest.raises(DeploymentPolicyNotFound):
@@ -2513,10 +2492,7 @@ class TestDeploymentPolicyOperations:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that delete_deployment_policy returns None for nonexistent policy."""
-        nonexistent_id = uuid.uuid4()
-        purger = Purger(
-            spec=DeploymentPolicyPurgerSpec(policy_id=nonexistent_id),
-        )
+        purger = DeploymentPolicyPurger(policy_id=DeploymentPolicyID(uuid.uuid4()))
 
         result = await deployment_repository.delete_deployment_policy(purger)
 
@@ -2761,148 +2737,24 @@ class TestSearchDeploymentPolicies:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     # =========================================================================
     # Tests - Search with pagination
     # =========================================================================
 
-    async def test_search_first_page(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test first page of search results."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == 4
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
-
-    async def test_search_second_page(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test second page of search results."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=2),
-            conditions=[],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == 4
-        assert result.has_next_page is False
-        assert result.has_previous_page is True
-
     # =========================================================================
     # Tests - Search with filtering
     # =========================================================================
-
-    async def test_search_filter_by_strategy(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test filtering deployment policies by strategy."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.strategy == DeploymentStrategy.BLUE_GREEN,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 1
-        assert result.items[0].strategy == DeploymentStrategy.BLUE_GREEN
-
-    async def test_search_filter_by_endpoint(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-        sample_endpoint_ids: list[DeploymentID],
-    ) -> None:
-        """Test filtering deployment policies by endpoint ID."""
-        target_endpoint_id = sample_endpoint_ids[0]
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.endpoint == target_endpoint_id,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 1
-        assert result.items[0].endpoint == target_endpoint_id
 
     # =========================================================================
     # Tests - Search with ordering
     # =========================================================================
 
-    async def test_search_order_by_created_at_ascending(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test ordering deployment policies by created_at ascending."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[DeploymentPolicyRow.created_at.asc()],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        created_ats = [item.created_at for item in result.items]
-        assert created_ats == sorted(created_ats)
-
-    async def test_search_order_by_created_at_descending(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test ordering deployment policies by created_at descending."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[DeploymentPolicyRow.created_at.desc()],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        created_ats = [item.created_at for item in result.items]
-        assert created_ats == sorted(created_ats, reverse=True)
-
     # =========================================================================
     # Tests - Empty results
     # =========================================================================
-
-    async def test_search_no_results(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test search with no matching results."""
-        nonexistent_id = uuid.uuid4()
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.endpoint == nonexistent_id,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 0
-        assert result.total_count == 0
 
 
 class TestRouteOperations:
@@ -2930,7 +2782,6 @@ class TestRouteOperations:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
-                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3050,7 +2901,7 @@ class TestRouteOperations:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -3075,7 +2926,7 @@ class TestRouteOperations:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
             await db_sess.commit()
 
         return group_id
@@ -3129,6 +2980,7 @@ class TestRouteOperations:
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     @pytest.fixture
@@ -3318,7 +3170,6 @@ class TestDeploymentRepositoryDuplicateName:
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
-                AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -3449,7 +3300,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3474,7 +3325,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(group)
             await db_sess.flush()
             # A session group joins its project, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group.id))
             await db_sess.commit()
             return group
 
@@ -3522,7 +3373,7 @@ class TestDeploymentRepositoryDuplicateName:
             db_sess.add(user)
             await db_sess.flush()
             # A session group joins its owner, which must be in the graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await db_sess.commit()
             return user
 
@@ -3543,6 +3394,7 @@ class TestDeploymentRepositoryDuplicateName:
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,
             valkey_schedule=mock_valkey_schedule,
+            permission_check=MagicMock(),
         )
 
     def _create_endpoint_creator(

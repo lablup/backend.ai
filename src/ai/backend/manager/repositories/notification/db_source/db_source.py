@@ -23,6 +23,10 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -57,7 +61,10 @@ class NotificationDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             pairs = await self._fetch_matching_rules(db_sess, rule_type, enabled_only)
             return [
-                MatchingNotificationRuleData(rule=rule.to_data(), channel=channel.to_data())
+                MatchingNotificationRuleData(
+                    rule=NotificationRuleSearchableFields.own.to_data(rule),
+                    channel=NotificationChannelSearchableFields.own.to_data(channel),
+                )
                 for rule, channel in pairs
             ]
 
@@ -92,7 +99,7 @@ class NotificationDBSource:
             row = await db_sess.get(NotificationChannelRow, channel_id)
             if not row:
                 raise NotificationChannelNotFound(f"Notification channel {channel_id} not found")
-            return row.to_data()
+            return NotificationChannelSearchableFields.own.to_data(row)
 
     async def get_rule_by_id(self, rule_id: UUID) -> NotificationRuleData:
         """Retrieves a notification rule by ID."""
@@ -102,4 +109,4 @@ class NotificationDBSource:
             row = result.scalar_one_or_none()
             if not row:
                 raise NotificationRuleNotFound(f"Notification rule {rule_id} not found")
-            return row.to_data()
+            return NotificationRuleSearchableFields.own.to_data(row)

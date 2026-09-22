@@ -11,8 +11,22 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 
 Domains migrated to the v2 specs add them next to `row.py` — `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
-reads, `scopes.py` for the `OperationScope` subclasses that filter the row. The spec bases
-live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
+reads, `scopes.py` for the scopes that filter the row.
+What a search can filter and order by is declared in `searchable_fields.py`; see
+`models/specs/search/AGENTS.md`. A scope inherits `ScopeTarget` (`models/scopes.py`), names
+the scope the operation is authorized against in `scope_id()`, and is named
+`{scope entity}{target entity}Target` (`DomainVFolderTarget`). Where several targets reach
+one entity, they share an ABC named `{target entity}Target` that the action takes as its
+list type. Inherit `OperationScope` directly only where no entity id can be named; say why
+in the class docstring.
+An `OperationScope` on the domain, project or user axis answers from the ownership graph:
+`scope_membership_exists` (`models/virtual_entity/queries.py`) asks whether the scope's
+virtual entity holds the row, correlating on the column the creator's `entity_id(row)`
+names. A cap bounds what the scope may do with the row, not whether it holds it, so a
+share answers alongside an own edge. Until the ownership backfill puts the existing rows
+in the graph the predicate is OR'd with the column it replaces, marked `TODO(BA-7571)`.
+
+The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 ## Row class rules
 
@@ -27,6 +41,14 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
   by foreign key. A row attached to an entity (`entity_labels`, `entity_invitations`) carries the
   `(entity_type, entity_id)` pair.
 - A node id never goes on a `data/` type. A Row's `to_data()` names the entity as an `EntityIdentifier`.
+
+## Singleton scopes (`global_entities`)
+
+- Do NOT delete a `global_entities` row or its node (a `virtual_entities` row with
+  `entity_type = 'global'`). Deleting the node cascades to the scope's edges, roles and
+  role assignments.
+- The migration writes the rows and nodes. Do NOT add a code path that creates or deletes them.
+- The manager checks both rows and nodes at startup and refuses to start when one is missing.
 
 ## No logic in Row classes
 

@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
 
-from ai.backend.manager.data.permission.id import ScopeType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.rbac_models.migration.enums import (
     EntityType,
     OperationType,
@@ -123,7 +123,7 @@ def _migrate_new_entity_type(db_conn: Connection) -> None:
 def _associate_notification_channels_to_scopes(db_conn: Connection) -> None:
     """Associate all notification channels to user scopes based on created_by."""
     offset = 0
-    scope_type = ScopeType.USER.value
+    scope_type = str(UserEntityType())
     entity_type = EntityType.NOTIFICATION_CHANNEL.value
 
     while True:
@@ -154,7 +154,7 @@ def _associate_notification_channels_to_scopes(db_conn: Connection) -> None:
 def _associate_notification_rules_to_scopes(db_conn: Connection) -> None:
     """Associate all notification rules to user scopes based on created_by."""
     offset = 0
-    scope_type = ScopeType.USER.value
+    scope_type = str(UserEntityType())
     entity_type = EntityType.NOTIFICATION_RULE.value
 
     while True:

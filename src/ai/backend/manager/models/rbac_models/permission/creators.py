@@ -6,13 +6,16 @@ from typing import override
 
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -26,7 +29,6 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
     settle the parent row and its paths together.
     """
 
-    scope: EntityIdentifier
     entity_type: EntityType
     permission: Permission
 
@@ -40,8 +42,7 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
                 error=PermissionAlreadyGranted(
-                    f"Duplicate permission entry ({self.scope}, {self.entity_type},"
-                    f" {self.permission})."
+                    f"Duplicate permission entry ({self.entity_type}, {self.permission})."
                 ),
             ),
         )
@@ -50,12 +51,10 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
     def build_row(self, owner_id: RoleID) -> PermissionRow:
         return PermissionRow(
             role_id=owner_id,
-            scope_type=self.scope.entity_type(),
-            scope_id=str(self.scope),
             entity_type=self.entity_type,
             permission=single_bit(self.permission),
         )
 
     @override
     def to_data(self, row: PermissionRow) -> PermissionData:
-        return row.to_data()
+        return PermissionSearchableFields.own.to_data(row)

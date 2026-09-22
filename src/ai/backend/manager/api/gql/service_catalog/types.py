@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
+from uuid import UUID
 
 from strawberry.relay import NodeID
 from strawberry.scalars import JSON
@@ -22,9 +23,11 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -86,6 +89,12 @@ class ServiceCatalogEndpointGQL(PydanticOutputMixin[EndpointInfo]):
 )
 class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     id: NodeID[str] = gql_field(description="Relay-style global node ID.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the service catalog.",
+        ),
+    )
     service_group: str = gql_field(
         description="Logical group name (e.g., 'manager', 'agent', 'storage-proxy')."
     )

@@ -6,12 +6,14 @@ from typing import Self
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import String64
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "SearchLoginClientTypesInput",
@@ -39,19 +41,16 @@ class CreateLoginClientTypeInput(BaseRequestModel):
 class UpdateLoginClientTypeInput(BaseRequestModel):
     """Input for updating a login client type.
 
-    Fields default to "no change". For ``description``, pass ``null`` to clear the
-    existing value; omit the field (SENTINEL) to leave it untouched.
+    Every field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.
     """
 
-    name: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=64,
+    name: String64 | None | Unset = Field(
+        default=UNSET,
         description="Updated name. Omit to leave unchanged.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated description. Use null to clear, omit to leave unchanged.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
 
 

@@ -14,6 +14,7 @@ from graphql import Undefined, UndefinedType
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import (
@@ -452,7 +453,6 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 url=OptionalState.from_graphql(url),
                 type=OptionalState.from_graphql(type),
                 registry_name=OptionalState.from_graphql(registry_name),
-                is_global=TriState.from_graphql(is_global),
                 project=TriState.from_graphql(project),
                 username=TriState.from_graphql(username),
                 password=TriState.from_graphql(password),
@@ -463,8 +463,13 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 
         # Execute action through processor
         result = await ctx.processors.container_registry.update_container_registry.run(action)
+        data = result.data
+        if not isinstance(is_global, UndefinedType):
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(ContainerRegistryID(reg_id), is_global)
 
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(data))
 
 
 class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
@@ -698,6 +703,22 @@ class ContainerRegistry(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @classmethod
+    def from_dataclass(cls, data: ContainerRegistryData) -> ContainerRegistry:
+        return cls(
+            id=data.id,  # auto-converted to Relay global ID
+            hostname=data.registry_name,
+            config=ContainerRegistryConfig(
+                url=data.url,
+                type=str(data.type),
+                project=[data.project],
+                username=data.username,
+                password=PASSWORD_PLACEHOLDER if data.password is not None else None,
+                ssl_verify=data.ssl_verify,
+                is_global=data.is_global,
+            ),
+        )
+
+    @classmethod
     async def load_by_hostname(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
         async with ctx.db.begin_readonly_session() as session:
             return cls.from_row(
@@ -756,15 +777,10 @@ class CreateContainerRegistry(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, input_config, "ssl_verify")
         set_if_set(props, input_config, "is_global")
 
-        async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(id=ContainerRegistryID(uuid.uuid4()), **input_config)
-            db_session.add(reg_row)
-            await db_session.flush()
-            await db_session.refresh(reg_row)
-
-            return cls(
-                container_registry=ContainerRegistry.from_row(ctx, reg_row),
-            )
+        result = await ctx.processors.container_registry.create_container_registry.run(
+            CreateContainerRegistryAction(creator=ContainerRegistryCreator(**input_config))
+        )
+        return cls(container_registry=ContainerRegistry.from_dataclass(result.data))
 
 
 class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
@@ -800,7 +816,6 @@ class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
             input_config["type"] = ContainerRegistryType(props.type)
 
         set_if_set(props, input_config, "url")
-        set_if_set(props, input_config, "is_global")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
@@ -815,8 +830,15 @@ class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
 
             for field, val in input_config.items():
                 setattr(reg_row, field, val)
+            registry_id = ContainerRegistryID(reg_row.id)
+            container_registry = ContainerRegistry.from_row(ctx, reg_row)
 
-            return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
+        if props.is_global is not Undefined:
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(registry_id, props.is_global)
+            container_registry.is_global = data.is_global
+        return cls(container_registry=container_registry)
 
 
 class DeleteContainerRegistry(graphene.Mutation):  # type: ignore[misc]
@@ -838,10 +860,16 @@ class DeleteContainerRegistry(graphene.Mutation):  # type: ignore[misc]
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        container_registry = await ContainerRegistry.load_by_hostname(ctx, hostname)
-        async with ctx.db.begin_session() as session:
-            stmt = sa.delete(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == hostname
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await ContainerRegistryRow.list_by_registry_name(session, hostname)
+            container_registry = ContainerRegistry.from_row(ctx, rows[0])
+            registry_ids = [ContainerRegistryID(row.id) for row in rows]
+        # The hostname names a row per project, and the delete has always taken them
+        # all; each goes with the RBAC graph it left.
+        for registry_id in registry_ids:
+            await ctx.processors.container_registry.delete_container_registry.run(
+                DeleteContainerRegistryAction(
+                    purger=ContainerRegistryPurger(registry_id=registry_id)
+                )
             )
-            await session.execute(stmt)
         return cls(container_registry=container_registry)

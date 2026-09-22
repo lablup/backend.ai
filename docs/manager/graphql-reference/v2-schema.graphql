@@ -6,10 +6,20 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "
   subscription: Subscription
 }
 
+"""
+Added in 26.4.4. Input for accepting a role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input AcceptRoleInvitationInput {
+  invitationId: UUID!
+}
+
 """Added in 25.16.0. An access token for model deployment."""
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the access token."""
+  fieldId: UUID!
 
   """The access token."""
   token: String!
@@ -42,9 +52,11 @@ type AccessTokenEdge {
 
 """Added in 25.16.0. """
 input AccessTokenFilter {
-  token: StringFilter = null
   expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by access token ID."""
+  fieldId: UUIDFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
   NOT: [AccessTokenFilter!] = null
@@ -58,6 +70,8 @@ input AccessTokenOrderBy {
 
 enum AccessTokenOrderField {
   CREATED_AT
+  FIELD_ID
+  EXPIRES_AT
 }
 
 """
@@ -388,6 +402,9 @@ type AgentResourceSlot implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the agent resource."""
+  fieldId: UUID!
+
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   slotName: String!
 
@@ -505,15 +522,32 @@ type AgentSystemInfo {
   computePlugins: ComputePlugins!
 }
 
+"""
+Added in 26.9.0. Uses narrowing an agent query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only agents the caller can read are returned, even when a listed entity is tied to others.
+"""
+input AgentUsage {
+  """Entities whose use of the agent narrows the read."""
+  usedBy: AgentUsedBy = null
+}
+
+"""Added in 26.9.0. Entities whose use of an agent narrows the read."""
+input AgentUsedBy {
+  """Sessions running a kernel on the agent."""
+  session: [UUID!] = null
+}
+
 """Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
 type AgentV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the agent."""
+  entityId: UUID!
+
   """
-  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead.
+  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead. Deprecated since 26.9.0. Use entityId.
   """
-  uuid: UUID!
+  uuid: UUID! @deprecated(reason: "Deprecated since 26.9.0. Use entityId.")
 
   """
   Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
@@ -668,6 +702,9 @@ type AppConfigAllowList implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the app config allow list."""
+  entityId: UUID!
+
   """The config name this entry permits writes for."""
   configName: String!
 
@@ -762,6 +799,9 @@ type AppConfigDefinition implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the app config definition."""
+  entityId: UUID!
+
   """Registered config name."""
   configName: String!
 
@@ -842,6 +882,9 @@ Added in 26.8.0. One config document written at a single scope, merged by rank a
 type AppConfigFragment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the app config fragment."""
+  entityId: UUID!
 
   """Config name the fragment belongs to."""
   configName: String!
@@ -1018,6 +1061,9 @@ Added in 25.14.0. An artifact represents AI models, packages, images, or other r
 type Artifact implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the artifact."""
+  entityId: UUID!
   name: String!
   type: ArtifactType!
   description: String
@@ -1098,10 +1144,13 @@ input ArtifactOrderBy {
   direction: OrderDirection! = ASC
 }
 
+"""
+Added in 24.09.0. Fields available for ordering artifact query results.
+"""
 enum ArtifactOrderField {
   NAME
   TYPE
-  SIZE
+  SIZE @deprecated(reason: "Deprecated since 26.9.0. A size belongs to a revision rather than the artifact, so this value is not used for ordering. It is removed in the next release.")
   SCANNED_AT
   UPDATED_AT
 }
@@ -1131,6 +1180,9 @@ Added in 25.15.0. Represents common metadata for an artifact registry. All artif
 type ArtifactRegistryMeta implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the artifact registry."""
+  entityId: UUID!
   name: String!
   registryId: ID!
   type: ArtifactRegistryType!
@@ -1175,6 +1227,9 @@ Added in 25.14.0. A specific version/revision of an artifact containing the actu
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the artifact revision."""
+  fieldId: UUID!
   status: ArtifactStatus!
 
   """
@@ -1460,6 +1515,9 @@ type AuditLogV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the audit log record."""
+  fieldId: UUID!
+
   """UUID of the action that generated this log."""
   actionId: UUID!
 
@@ -1503,6 +1561,11 @@ type AuditLogV2 implements Node {
   clientIp: String
 
   """
+  Added in 26.9.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
+  """
+  entity: EntityNode
+
+  """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
@@ -1541,10 +1604,28 @@ enum AutoScalingMetricSource {
   PROMETHEUS
 }
 
+"""Added in 26.9.0. Filter for the auto-scaling metric source."""
+input AutoScalingMetricSourceFilter {
+  """Metric sources to match."""
+  in: [AutoScalingMetricSource!] = null
+
+  """Exact metric source match."""
+  equals: AutoScalingMetricSource = null
+
+  """Excludes metric sources in the list."""
+  notIn: [AutoScalingMetricSource!] = null
+
+  """Excludes exact metric source match."""
+  notEquals: AutoScalingMetricSource = null
+}
+
 """Added in 25.19.0. An auto-scaling rule for a model deployment."""
 type AutoScalingRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the auto scaling rule."""
+  fieldId: UUID!
 
   """The source of the scaling metric (e.g. KERNEL, INFERENCE_FRAMEWORK)."""
   metricSource: AutoScalingMetricSource!
@@ -1606,6 +1687,36 @@ type AutoScalingRuleEdge {
 input AutoScalingRuleFilter {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: NullableDateTimeFilter = null
+
+  """Added in 26.9.0. Filter by rule ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by metric source."""
+  metricSource: AutoScalingMetricSourceFilter = null
+
+  """Added in 26.9.0. Filter by metric name."""
+  metricName: StringFilter = null
+
+  """Added in 26.9.0. Filter by the scale-down threshold."""
+  minThreshold: DecimalFilter = null
+
+  """Added in 26.9.0. Filter by the scale-up threshold."""
+  maxThreshold: DecimalFilter = null
+
+  """Added in 26.9.0. Filter by step size."""
+  stepSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the cooldown window."""
+  timeWindow: IntFilter = null
+
+  """Added in 26.9.0. Filter by the replica floor."""
+  minReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by the replica ceiling."""
+  maxReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by the Prometheus query preset."""
+  prometheusQueryPresetId: UUIDFilter = null
   AND: [AutoScalingRuleFilter!] = null
   OR: [AutoScalingRuleFilter!] = null
   NOT: [AutoScalingRuleFilter!] = null
@@ -1619,6 +1730,17 @@ input AutoScalingRuleOrderBy {
 
 enum AutoScalingRuleOrderField {
   CREATED_AT
+  FIELD_ID
+  METRIC_SOURCE
+  METRIC_NAME
+  MIN_THRESHOLD
+  MAX_THRESHOLD
+  STEP_SIZE
+  TIME_WINDOW
+  MIN_REPLICAS
+  MAX_REPLICAS
+  PROMETHEUS_QUERY_PRESET_ID
+  LAST_TRIGGERED_AT
 }
 
 """Added in 24.3.0. Background task event payload."""
@@ -1680,20 +1802,23 @@ input BlueGreenConfigInput {
 Added in 26.4.4. Failure detail for a single permission entry in bulk add
 """
 type BulkAddRolePermissionFailureInfo {
-  """Role ID of the failed entry."""
-  roleId: UUID!
-
   """Scope element type of the failed entry."""
-  scopeType: String!
+  scopeType: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
 
   """Scope element ID of the failed entry."""
-  scopeId: String!
+  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Operation type of the failed entry."""
+  operation: String @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
+  """Role ID of the failed entry."""
+  roleId: UUID!
 
   """Entity element type of the failed entry."""
   entityType: String!
 
-  """Operation type of the failed entry."""
-  operation: String!
+  """Operation bit of the failed entry."""
+  permission: PermissionBit!
 
   """Error message describing the failure."""
   message: String!
@@ -1703,11 +1828,14 @@ type BulkAddRolePermissionFailureInfo {
 Added in 26.4.4. Failure detail for a single permission entry in a bulk add operation.
 """
 type BulkAddRolePermissionPresetFailureInfo {
-  """Entity type of the permission entry that failed."""
-  entityType: RBACElementType!
-
   """Operation of the permission entry that failed."""
-  operation: OperationType!
+  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
+  """Entity type of the permission entry that failed."""
+  entityType: String!
+
+  """The operation bit of the permission entry that failed."""
+  permission: PermissionBit!
 
   """Error message describing the failure."""
   message: String!
@@ -1775,7 +1903,7 @@ type BulkAssignRolePayload {
   assigned: [RoleAssignment!]!
 
   """List of errors for users that failed to be assigned."""
-  failed: [BulkAssignRoleError!]!
+  failed: [BulkAssignRoleError!]! @deprecated(reason: "Always empty. A user already holding the role keeps it; every other refusal raises.")
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
@@ -2230,6 +2358,13 @@ type CancelImportArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""
+Added in 26.4.4. Input for canceling a role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input CancelRoleInvitationInput {
+  invitationId: UUID!
+}
+
 """Added in 26.3.0. Filter input for querying query preset categories."""
 input CategoryFilter {
   """Filter by name."""
@@ -2327,6 +2462,9 @@ Added in 26.9.0. The masking one target gets. A target with no policy falls back
 type ClientIPMaskingPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the client IP masking policy."""
+  entityId: UUID!
 
   """Which recorded client IP is governed."""
   targetType: ClientIPMaskingTarget!
@@ -2581,6 +2719,9 @@ input ContainerRegistryTypeFilter {
 type ContainerRegistryV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the container registry."""
+  entityId: UUID!
 
   """URL of the container registry"""
   url: String!
@@ -3186,10 +3327,17 @@ type CreateObjectStoragePayload {
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
-  entityType: RBACElementType!
-  operation: OperationType!
+  entityType: String!
+  permission: PermissionBit!
+
+  """Scope type."""
+  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope ID."""
+  scopeId: String = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Operation type."""
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 }
 
 """Added in 26.4.2. Input for creating a new project."""
@@ -3413,13 +3561,36 @@ input CreateRevisionInput {
 input CreateRoleInput {
   name: String!
   description: String = null
-  source: RoleSource! = CUSTOM
+
+  """Deprecated and ignored: a created role is always custom."""
+  source: RoleSource = null @deprecated(reason: "Deprecated since 26.9.0. Ignored: a created role is always custom.")
 
   """
   Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean! = false
-  scopes: [ScopeInput!] = null
+
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: ScopeInput = null
+
+  """Deprecated: use `scope`. Accepts exactly one entry."""
+  scopes: [ScopeInput!] = null @deprecated(reason: "Deprecated since 26.9.0. Use `scope`.")
+}
+
+"""
+Added in 26.4.4. Input for creating role invitations. Deprecated since 26.9.0. Use role assignments.
+"""
+input CreateRoleInvitationInput {
+  roleId: UUID!
+  emails: [String!]!
+}
+
+"""
+Added in 26.4.4. Payload for role invitation creation. Deprecated since 26.9.0. Use role assignments.
+"""
+type CreateRoleInvitationPayload {
+  """List of created role invitations."""
+  items: [RoleInvitation!]!
 }
 
 """Added in 26.4.4. Input for creating a new role preset."""
@@ -3428,7 +3599,7 @@ input CreateRolePresetInput {
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag on roles instantiated from this preset.
@@ -3495,6 +3666,16 @@ input CreateRuntimeVariantPresetInput {
   Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean! = false
+
+  """
+  Added in 26.9.0. Runtime version this preset becomes available in. Dot-separated numbers.
+  """
+  addedVersion: String
+
+  """
+  Added in 26.9.0. Runtime version this preset is removed in, exclusive. Dot-separated numbers.
+  """
+  deprecatedVersion: String
 
   """Added in 26.9.0. UI category group for organizing parameters."""
   category: String
@@ -3722,6 +3903,18 @@ input DateTimeFilter {
 
 """Decimal (fixed-point)"""
 scalar Decimal
+
+"""
+Added in 26.9.0. Filter for decimal fields supporting equality and comparison operations.
+"""
+input DecimalFilter {
+  equals: Decimal = null
+  notEquals: Decimal = null
+  greaterThan: Decimal = null
+  greaterThanOrEqual: Decimal = null
+  lessThan: Decimal = null
+  lessThanOrEqual: Decimal = null
+}
 
 """
 Added in 26.4.4. A single (handler_name, options) entry response for session handler options.
@@ -4206,8 +4399,18 @@ input DeleteRuntimeVariantsInput {
   ids: [UUID!]!
 }
 
-"""Added in 26.4.2. Payload for bulk runtime variant deletion."""
+"""
+Added in 26.4.2. Partial-success payload for a bulk runtime variant deletion.
+"""
 type DeleteRuntimeVariantsPayload {
+  """Added in 26.9.0. Ids of successfully deleted runtime variants."""
+  items: [UUID!]!
+
+  """
+  Added in 26.9.0. Per-item failures, each naming the runtime variant it targeted.
+  """
+  failed: [RuntimeVariantBulkFailureInfo!]!
+
   """Number of runtime variants successfully deleted."""
   deletedCount: Int!
 }
@@ -4372,6 +4575,15 @@ input DeploymentFilter {
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.9.0. Filter by deployment ID."""
+  entityId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by the requested replica count."""
+  desiredReplicas: IntFilter = null
+
+  """Added in 26.9.0. Filter by scaling state."""
+  scalingState: ScalingStateFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -4396,6 +4608,9 @@ input DeploymentHandlerOptionsInput {
 type DeploymentHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment history record."""
+  fieldId: UUID!
   deploymentId: ID!
   phase: String!
   fromStatus: String
@@ -4490,12 +4705,21 @@ enum DeploymentOrderField {
   PROJECT
   RESOURCE_GROUP
   TAG
+  ENTITY_ID
+  DESIRED_REPLICAS
+  SCALING_STATE
+  CREATED_USER_ID
+  OPEN_TO_PUBLIC
+  ENDPOINT_URL
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
 type DeploymentPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment policy."""
+  fieldId: UUID!
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -4507,6 +4731,9 @@ Added in 26.4.2. A reusable deployment configuration template. Users select a pr
 type DeploymentRevisionPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment revision preset."""
+  entityId: UUID!
 
   """The runtime variant this preset is designed for (e.g., vLLM, SGLang)."""
   runtimeVariantId: UUID!
@@ -4635,10 +4862,40 @@ enum DeploymentRevisionPresetOrderField {
   CREATED_AT
 }
 
+"""
+Added in 26.9.0. Uses narrowing a deployment preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
+"""
+input DeploymentRevisionPresetUsage {
+  """Entities whose use of the preset narrows the read."""
+  usedBy: DeploymentRevisionPresetUsedBy = null
+}
+
+"""
+Added in 26.9.0. Entities whose use of a deployment preset narrows the read.
+"""
+input DeploymentRevisionPresetUsedBy {
+  """Deployments whose revisions name the preset."""
+  deployment: [UUID!] = null
+}
+
 """Added in 24.09.0. Scope for deployment scheduling history query"""
 input DeploymentScope {
   """Deployment ID to get history for"""
   deploymentId: UUID!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped deployment query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input DeploymentSearchScope {
+  """Domains whose deployments are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose deployments are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose deployments are being read."""
+  user: [UUIDScope!] = null
 }
 
 """
@@ -4701,6 +4958,41 @@ Added in 25.19.0. This enum represents the deployment strategy type of a model d
 enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
+}
+
+"""
+Added in 26.9.0. Uses narrowing a deployment query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only deployments the caller can read are returned, even when a listed entity is tied to others.
+"""
+input DeploymentUsage {
+  """Entities the deployment uses, whose ids narrow the read."""
+  uses: DeploymentUses = null
+}
+
+"""
+Added in 26.9.0. Entities a deployment uses, whose ids narrow the read.
+"""
+input DeploymentUses {
+  """Resource groups the deployment runs in."""
+  resourceGroup: [UUID!] = null
+
+  """
+  Images the deployment's live replica group names in its current revision.
+  """
+  image: [UUID!] = null
+
+  """
+  VFolders the deployment's live replica group names as the model of its current revision.
+  """
+  vfolder: [UUID!] = null
+
+  """Sessions the deployment's route rows serve as their replicas."""
+  session: [UUID!] = null
+
+  """Runtime variants the deployment's revisions name."""
+  runtimeVariant: [UUID!] = null
+
+  """Presets the deployment's revisions name."""
+  deploymentPreset: [UUID!] = null
 }
 
 """
@@ -4799,9 +5091,9 @@ input DomainFairShareFilter {
   domainName: StringFilter = null
 
   """
-  Added in 26.2.0. Nested filter for domain entity properties. Allows filtering by domain active status.
+  Added in 26.2.0. Filter by the domain this fair share is calculated for.
   """
-  domain: DomainFairShareDomainNestedFilter = null
+  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainFairShareFilter!] = null
@@ -4839,7 +5131,7 @@ enum DomainFairShareOrderField {
   FAIR_SHARE_FACTOR
   DOMAIN_NAME
   CREATED_AT
-  DOMAIN_IS_ACTIVE
+  DOMAIN_IS_ACTIVE @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search domains first, then order there.")
 }
 
 """Added in 24.09.0. """
@@ -4915,11 +5207,22 @@ type DomainResourceAllocationV2 {
 }
 
 """
+Added in 26.9.0. Scope for the scoped domain query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+"""
+input DomainScope {
+  """Resource groups whose domains are being read."""
+  resourceGroup: [UUIDScope!] = null
+}
+
+"""
 Added in 26.1.0. Domain-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
 """
 type DomainUsageBucket implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the usage bucket."""
+  fieldId: UUID!
 
   """Name of the domain this usage bucket belongs to."""
   domainName: String!
@@ -5062,6 +5365,9 @@ type DomainV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the domain."""
+  entityId: UUID!
+
   """Basic domain information including name and description."""
   basicInfo: DomainBasicInfo!
 
@@ -5070,11 +5376,6 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: DomainLifecycleInfo!
-
-  """
-  Added in 26.9.0. Domain uuid as a plain scalar, without the Relay global-id encoding.
-  """
-  entityId: UUID!
 
   """
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
@@ -5096,6 +5397,9 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this domain may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """
@@ -5133,8 +5437,12 @@ input DomainV2Filter {
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
   modifiedAt: DateTimeFilter = null
-  project: DomainProjectNestedFilter = null
-  user: DomainUserNestedFilter = null
+
+  """Filter by the projects the domain holds."""
+  project: DomainProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by their domain.")
+
+  """Filter by the users the domain holds."""
+  user: DomainUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by their domain.")
   AND: [DomainV2Filter!] = null
   OR: [DomainV2Filter!] = null
   NOT: [DomainV2Filter!] = null
@@ -5149,16 +5457,16 @@ input DomainV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name. USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
 """
 enum DomainV2OrderField {
   CREATED_AT
   MODIFIED_AT
   NAME
   IS_ACTIVE
-  PROJECT_NAME
-  USER_USERNAME
-  USER_EMAIL
+  PROJECT_NAME @deprecated(reason: "Deprecated since 26.9.0. A domain holds many projects, so this order folds them into a single project name. Narrow the results with the matching filter instead.")
+  USER_USERNAME @deprecated(reason: "Deprecated since 26.9.0. A domain holds many users, so this order folds them into a single username. Narrow the results with the matching filter instead.")
+  USER_EMAIL @deprecated(reason: "Deprecated since 26.9.0. A domain holds many users, so this order folds them into a single email address. Narrow the results with the matching filter instead.")
 }
 
 """
@@ -5268,8 +5576,11 @@ input EnqueueSessionInput {
   """Bootstrap script."""
   bootstrapScript: String = null
 
-  """Scheduling priority (0-100)."""
-  priority: Int! = 10
+  """Added in 26.9.0. Scheduling tier (0-100)."""
+  tier: Int = null
+
+  """Scheduling tier (0-100)."""
+  priority: Int = null @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """Scope-local preemption priority among the requester's own sessions."""
   jobPriority: Int! = 0
@@ -5313,13 +5624,15 @@ type EnqueueSessionPayload {
 """Added in 26.4.2. Entity with its allowed actions within a scope."""
 type EntityActionInfo {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity in the given scope"""
   actions: [OperationInfo!]!
 }
 
-"""Added in 26.3.0. Entity connection."""
+"""
+Added in 26.3.0. Entity connection. Deprecated since 26.9.0. Use `Role.scope`.
+"""
 type EntityConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -5329,15 +5642,17 @@ type EntityConnection {
   count: Int!
 }
 
-"""Added in 26.3.0. Filter for entity associations"""
+"""
+Added in 26.3.0. Filter for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+"""
 input EntityFilter {
-  entityType: RBACElementTypeFilter = null
+  entityType: StringFilter = null
   entityId: StringFilter = null
 
   """
   Added in 26.8.0. Filter by the type of scope the entity is registered in.
   """
-  scopeType: RBACElementTypeFilter = null
+  scopeType: StringFilter = null
 
   """
   Added in 26.8.0. Filter by the id of scope the entity is registered in.
@@ -5352,6 +5667,9 @@ input EntityFilter {
 type EntityLabel implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the entity label."""
+  fieldId: UUID!
 
   """Type of the labeled entity."""
   entityType: String!
@@ -5370,6 +5688,9 @@ type EntityLabel implements Node {
 
   """When the label's value was last replaced."""
   updatedAt: DateTime!
+
+  """Added in 26.9.0. The labeled entity."""
+  entity: EntityNode
 }
 
 """Added in 26.9.0. Paginated connection for label records."""
@@ -5410,6 +5731,7 @@ input EntityLabelFilter {
 Added in 26.9.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
 """
 input EntityLabelNestedFilter {
+  exists: Boolean = null
   some: EntityLabelFilter = null
   every: EntityLabelFilter = null
   none: EntityLabelFilter = null
@@ -5428,38 +5750,42 @@ enum EntityLabelOrderField {
   CREATED_AT
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role | AgentV2 | AppConfigAllowList | AppConfigDefinition | AppConfigFragment | IdleChecker | ObjectStorage | RuntimeVariant | RuntimeVariantPreset | StorageNamespace | VFolder | VFSStorage
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
 type EntityOperationCombination {
   """Entity element type"""
-  entityType: RBACElementType!
+  entityType: String!
 
   """Valid operations for this entity"""
   operations: [OperationInfo!]!
 }
 
-"""Added in 26.3.0. Order by specification for entity associations"""
+"""
+Added in 26.3.0. Order by specification for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+"""
 input EntityOrderBy {
   field: EntityOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.3.0. Entity ordering field"""
+"""
+Added in 26.3.0. Entity ordering field Deprecated since 26.9.0. Use `Role.scope`.
+"""
 enum EntityOrderField {
   ENTITY_TYPE
   REGISTERED_AT
 }
 
 """
-Added in 26.3.0. Entity reference from the association_scopes_entities table.
+Added in 26.3.0. A role and the scope it belongs to. Deprecated since 26.9.0. Use `Role.scope`.
 """
 type EntityRef implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
-  entityType: RBACElementType!
+  entityType: String!
   entityId: String!
   registeredAt: DateTime!
 
@@ -5487,6 +5813,9 @@ Added in 26.9.0. One entity handed to one scope: offered, taken, or taken back.
 type EntityShare implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the entity share."""
+  entityId: UUID!
 
   """Who sent the offer, while that account is still there."""
   sharerUserId: UUID
@@ -5663,8 +5992,8 @@ type EntityType implements Node {
 
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
 input EntityTypeScope {
-  """RBAC element type of the entity."""
-  entityType: RBACElementType!
+  """Type of the entity."""
+  entityType: String!
 
   """ID of the entity."""
   entityId: String!
@@ -5976,6 +6305,9 @@ input HandlerOptionsInput {
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the HuggingFace registry."""
+  entityId: UUID!
   url: String!
   name: String!
   token: String
@@ -6010,6 +6342,9 @@ Added in 26.8.0. Represents a reusable idle checker definition independent of it
 type IdleChecker implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the idle checker."""
+  entityId: UUID!
 
   """Idle checker name."""
   name: String!
@@ -6332,11 +6667,53 @@ extend type ImageNode implements Node @key(fields: "id") {
 }
 
 """
+Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` is answered for at the public scope, which every account reaches.
+"""
+input ImageSearchScope {
+  """Domains whose images are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose images are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose images are being read."""
+  user: [UUIDScope!] = null
+
+  """Container registries whose images are being read."""
+  containerRegistry: [UUIDScope!] = null
+
+  """Include the images of every registry registered in public."""
+  public: Boolean! = false
+}
+
+"""
+Added in 26.9.0. Uses narrowing an image query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only images the caller can read are returned, even when a listed entity is tied to others.
+"""
+input ImageUsage {
+  """Entities whose use of the image narrows the read."""
+  usedBy: ImageUsedBy = null
+}
+
+"""Added in 26.9.0. Entities whose use of an image narrows the read."""
+input ImageUsedBy {
+  """Sessions whose kernels run the image."""
+  session: [UUID!] = null
+
+  """
+  Deployments whose live replica groups name the image in their current revision.
+  """
+  deployment: [UUID!] = null
+}
+
+"""
 Added in 26.2.0. Represents a container image in Backend.AI. Images are container specifications that define the runtime environment for compute sessions. Each image has identity information, metadata, resource requirements, and permission settings. This is the V2 implementation using Strawberry GraphQL with Relay-style connections as part of BEP-1010 migration.
 """
 type ImageV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the image."""
+  entityId: UUID!
 
   """Image identity information (name, architecture)."""
   identity: ImageV2IdentityInfo!
@@ -6368,6 +6745,9 @@ Added in 26.2.0. Represents an alias for a container image. Aliases provide alte
 type ImageV2Alias implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the image alias."""
+  fieldId: UUID!
 
   """The alias string for the image."""
   alias: String!
@@ -6404,6 +6784,9 @@ input ImageV2AliasFilter {
 
   """Added in 26.4.0. Filter by image ID."""
   imageId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by alias row ID."""
+  fieldId: UUIDFilter = null
   AND: [ImageV2AliasFilter!] = null
   OR: [ImageV2AliasFilter!] = null
   NOT: [ImageV2AliasFilter!] = null
@@ -6420,6 +6803,7 @@ input ImageV2AliasOrderBy {
 """Added in 26.2.0. Fields available for ordering image alias queries."""
 enum ImageV2AliasOrderField {
   ALIAS
+  FIELD_ID
 }
 
 """
@@ -6458,6 +6842,36 @@ input ImageV2Filter {
 
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by namespace/path within the registry."""
+  image: StringFilter = null
+
+  """Added in 26.9.0. Filter by registry hostname."""
+  registry: StringFilter = null
+
+  """Added in 26.9.0. Filter by project (namespace) within the registry."""
+  project: StringFilter = null
+
+  """Added in 26.9.0. Filter by image tag."""
+  tag: StringFilter = null
+
+  """Added in 26.9.0. Filter by image config digest."""
+  configDigest: StringFilter = null
+
+  """Added in 26.9.0. Filter by accelerator requirement string."""
+  accelerators: StringFilter = null
+
+  """Added in 26.9.0. Filter by image size in bytes."""
+  sizeBytes: IntFilter = null
+
+  """Added in 26.9.0. Filter by local-only status."""
+  isLocal: Boolean = null
+
+  """Added in 26.9.0. Filter by image type category."""
+  type: ImageV2TypeFilter = null
+
+  """Added in 26.9.0. Filter by creation datetime (before/after)."""
+  createdAt: DateTimeFilter = null
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
@@ -6534,6 +6948,19 @@ enum ImageV2OrderField {
   NAME
   CREATED_AT
   LAST_USED
+  ENTITY_ID
+  IMAGE
+  PROJECT
+  TAG
+  REGISTRY
+  REGISTRY_ID
+  ARCHITECTURE
+  CONFIG_DIGEST
+  SIZE_BYTES
+  IS_LOCAL
+  TYPE
+  STATUS
+  ACCELERATORS
 }
 
 """Added in 26.2.0. Permission types for image operations."""
@@ -6607,6 +7034,30 @@ Added in 26.2.0. A key-value pair representing a parsed tag component. Tags are 
 type ImageV2TagEntry {
   key: String!
   value: String!
+}
+
+"""Added in 26.9.0. Type category of an image."""
+enum ImageV2Type {
+  COMPUTE
+  SYSTEM
+  SERVICE
+}
+
+"""
+Added in 26.9.0. Filter for the image type category with equality and membership operators.
+"""
+input ImageV2TypeFilter {
+  """Matches images of this exact type."""
+  equals: ImageV2Type = null
+
+  """Matches images whose type is in this list."""
+  in: [ImageV2Type!] = null
+
+  """Excludes images of this exact type."""
+  notEquals: ImageV2Type = null
+
+  """Excludes images whose type is in this list."""
+  notIn: [ImageV2Type!] = null
 }
 
 """
@@ -6735,6 +7186,9 @@ type KernelResourceAllocation implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the resource allocation."""
+  fieldId: UUID!
+
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   slotName: String!
 
@@ -6785,6 +7239,9 @@ enum KernelResourceAllocationOrderField {
 type KernelSchedulingHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the kernel scheduling history record."""
+  fieldId: UUID!
   kernelId: ID!
   sessionId: ID!
   phase: String!
@@ -6875,6 +7332,9 @@ Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 type KernelV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the kernel."""
+  fieldId: UUID!
 
   """
   The UUID of the image used by this kernel. Null if the image has been purged.
@@ -7130,6 +7590,9 @@ type KeyPairV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the keypair."""
+  fieldId: UUID!
+
   """The access key string."""
   accessKey: String!
 
@@ -7241,6 +7704,9 @@ Added in 26.4.2. Keypair resource policy defining session and storage limits for
 type KeypairResourcePolicyV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the policy."""
+  entityId: UUID!
 
   """Policy name."""
   name: String!
@@ -7412,6 +7878,9 @@ type LoginClientType implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the login client type."""
+  entityId: UUID!
+
   """Unique login client type name (e.g. 'core', 'webui')."""
   name: String!
 
@@ -7524,6 +7993,9 @@ type LoginHistoryV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the login history record."""
+  fieldId: UUID!
+
   """UUID of the user who attempted to log in."""
   userId: UUID!
 
@@ -7623,6 +8095,9 @@ type LoginSessionV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the login session."""
+  fieldId: UUID!
+
   """UUID of the user who owns the session."""
   userId: UUID!
 
@@ -7720,11 +8195,44 @@ input ModelCardAvailablePresetsScope {
 }
 
 """
+Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+"""
+input ModelCardScope {
+  """Added in 26.9.0. Domains whose model cards are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose model cards are being read."""
+  project: [UUIDScope!] = null
+
+  """Added in 26.9.0. Users whose model cards are being read."""
+  user: [UUIDScope!] = null
+}
+
+"""
+Added in 26.9.0. Uses narrowing a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity is tied to others.
+"""
+input ModelCardUsage {
+  """Entities the model card uses, whose ids narrow the read."""
+  uses: ModelCardUses = null
+}
+
+"""
+Added in 26.9.0. Entities a model card uses, whose ids narrow the read.
+"""
+input ModelCardUses {
+  """VFolders the model card is built on."""
+  vfolder: [UUID!] = null
+}
+
+"""
 Added in 26.4.2. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
 """
 type ModelCardV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the model card."""
+  entityId: UUID!
 
   """Display name of the registered model."""
   name: String!
@@ -7818,8 +8326,14 @@ type ModelCardV2Edge {
 
 """Added in 26.4.2. Filter for model cards."""
 input ModelCardV2Filter {
+  """Added in 26.9.0. Filter by model card ID."""
+  entityId: UUIDFilter = null
+
   """Name filter."""
   name: StringFilter = null
+
+  """Added in 26.9.0. Filter by the VFolder holding the model."""
+  vfolderId: UUIDFilter = null
 
   """Domain filter."""
   domainName: StringFilter = null
@@ -7827,10 +8341,50 @@ input ModelCardV2Filter {
   """Project filter."""
   projectId: UUIDFilter = null
 
+  """Added in 26.9.0. Filter by the user who created the model card."""
+  creatorId: UUIDFilter = null
+
+  """Added in 26.9.0. Author filter."""
+  author: StringFilter = null
+
+  """Added in 26.9.0. Title filter."""
+  title: StringFilter = null
+
+  """Added in 26.9.0. Model version filter."""
+  modelVersion: StringFilter = null
+
+  """Added in 26.9.0. Task filter."""
+  task: StringFilter = null
+
+  """Added in 26.9.0. Category filter."""
+  category: StringFilter = null
+
+  """Added in 26.9.0. Architecture filter."""
+  architecture: StringFilter = null
+
+  """Added in 26.9.0. License filter."""
+  license: StringFilter = null
+
+  """
+  Added in 26.9.0. Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison.
+  """
+  accessLevel: StringFilter = null
+
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
   """
-  storageHost: StringFilter = null
+  storageHost: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. Search vfolders by host first, then pass their ids as `usedBy.vfolder`.")
+
+  """Added in 26.9.0. Creation datetime filter."""
+  createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Update datetime filter."""
+  updatedAt: NullableDateTimeFilter = null
+
+  """
+  Added in 26.9.0. Filter by conditions on the minimum resource requirements.
+  """
+  minResource: ModelCardV2ResourceRequirementNestedFilter = null
 
   """Combine nested filters with logical AND."""
   AND: [ModelCardV2Filter!] = null
@@ -7896,8 +8450,54 @@ input ModelCardV2OrderBy {
 
 """Added in 26.4.2. Order fields for model cards."""
 enum ModelCardV2OrderField {
+  ENTITY_ID
   NAME
+  VFOLDER_ID
+  DOMAIN_NAME
+  PROJECT_ID
+  CREATOR_ID
+  AUTHOR
+  TITLE
+  MODEL_VERSION
+  TASK
+  CATEGORY
+  ARCHITECTURE
+  LICENSE
+  ACCESS_LEVEL
   CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.9.0. Filter for one minimum resource requirement of a model card.
+"""
+input ModelCardV2ResourceRequirementFilter {
+  """Resource slot name filter."""
+  slotName: StringFilter = null
+
+  """Minimum quantity filter."""
+  minQuantity: DecimalFilter = null
+}
+
+"""
+Added in 26.9.0. Filter model cards by conditions on their minimum resource requirements.
+"""
+input ModelCardV2ResourceRequirementNestedFilter {
+  """
+  Matches cards that carry at least one requirement when true, and cards carrying none when false. Says nothing about what the requirements hold.
+  """
+  exists: Boolean = null
+
+  """Matches cards with at least one requirement satisfying all conditions."""
+  some: ModelCardV2ResourceRequirementFilter = null
+
+  """
+  Matches cards where every requirement satisfies all conditions (also true when the card has none).
+  """
+  every: ModelCardV2ResourceRequirementFilter = null
+
+  """Matches cards with no requirement satisfying all conditions."""
+  none: ModelCardV2ResourceRequirementFilter = null
 }
 
 """
@@ -7967,6 +8567,9 @@ Added in 25.19.0. Represents a model deployment in Backend.AI. A deployment is a
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the deployment."""
+  entityId: UUID!
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   currentRevisionId: ID
@@ -8267,6 +8870,9 @@ Added in 25.19.0. A single replica instance of a model deployment. Each replica 
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the replica."""
+  fieldId: UUID!
   sessionId: ID
   revisionId: ID!
 
@@ -8339,6 +8945,9 @@ type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   imageId: ID!
+
+  """Added in 26.9.0. UUID of the revision."""
+  fieldId: UUID!
 
   """
   Added in 26.4.4. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
@@ -8432,6 +9041,27 @@ input ModelRevisionFilter {
 
   """Added in 26.4.3. Filter by revision creation datetime."""
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by runtime variant ID."""
+  runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by revision ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by the model mount destination."""
+  modelMountDestination: StringFilter = null
+
+  """Added in 26.9.0. Filter by the subpath within the model vfolder."""
+  vfolderSubpath: StringFilter = null
+
+  """Added in 26.9.0. Filter by the model definition path."""
+  modelDefinitionPath: StringFilter = null
+
+  """Added in 26.9.0. Filter by cluster size."""
+  clusterSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the preset that produced the revision."""
+  revisionPresetId: UUIDFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
@@ -8584,10 +9214,10 @@ input ModifyQueryDefinitionInput {
 """Added in 26.3.0. Options for modifying an existing query definition."""
 input ModifyQueryDefinitionOptionsInput {
   """Allowed filter label keys."""
-  filterLabels: [String!] = null
+  filterLabels: [String!]
 
   """Allowed group-by label keys."""
-  groupLabels: [String!] = null
+  groupLabels: [String!]
 }
 
 """Added in 26.3.0. Payload returned after modifying a query definition."""
@@ -9287,6 +9917,26 @@ type Mutation {
   """
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload
 
+  """
+  Added in 26.4.4. Create role invitations by email. Deprecated since 26.9.0.
+  """
+  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
+  """
+  Added in 26.4.4. Accept a pending role invitation. Deprecated since 26.9.0.
+  """
+  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
+  """
+  Added in 26.4.4. Reject a pending role invitation. Deprecated since 26.9.0.
+  """
+  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
+  """
+  Added in 26.4.4. Cancel a pending role invitation (admin only). Deprecated since 26.9.0.
+  """
+  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
   adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInput!): CreateKeypairResourcePolicyPayload
 
@@ -9465,6 +10115,16 @@ type Mutation {
   """
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload
 
+  """
+  Added in 26.9.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
+  """
+  setVFolderMountPolicy(vfolderId: UUID!, input: SetVFolderMountPolicyInput!): SetVFolderMountPolicyPayload
+
+  """
+  Added in 26.9.0. Take back the mount level one user was given on a virtual folder.
+  """
+  unsetVFolderMountPolicy(vfolderId: UUID!, input: UnsetVFolderMountPolicyInput!): UnsetVFolderMountPolicyPayload
+
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload
 
@@ -9525,11 +10185,45 @@ type Mutation {
 }
 
 """
+Added in 26.9.0. Input for the caller's permissions on several scopes and entity types.
+"""
+input MyAtomicBulkScopePermissionsInput {
+  """
+  The scopes and entity types to answer for, at most 100. A longer list is refused.
+  """
+  targets: [PermissionTarget!]!
+}
+
+"""
+Added in 26.9.0. Payload for the caller's permissions on several scopes and entity types.
+"""
+type MyAtomicBulkScopePermissionsPayload {
+  """One answer per target, in the order the targets were given."""
+  items: [ScopeEntityPermission!]!
+}
+
+"""
 Added in 26.4.2. Query result returning the current client's IP address.
 """
 type MyClientIp {
   """The client's IP address as seen by the server."""
   clientIp: String!
+}
+
+"""
+Added in 26.9.0. Input for the caller's permissions on one scope and entity type.
+"""
+input MyScopePermissionsInput {
+  """The scope and entity type to answer for."""
+  target: PermissionTarget!
+}
+
+"""
+Added in 26.9.0. Payload for the caller's permissions on one scope and entity type.
+"""
+type MyScopePermissionsPayload {
+  """The answer for the named target."""
+  item: ScopeEntityPermission!
 }
 
 """
@@ -9577,6 +10271,9 @@ interface Node {
 type NotificationChannel implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the notification channel."""
+  entityId: UUID!
   name: String!
   description: String
   channelType: NotificationChannelType!
@@ -9668,6 +10365,9 @@ input NotificationChannelTypeFilter {
 type NotificationRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the notification rule."""
+  entityId: UUID!
   name: String!
   description: String
   ruleType: NotificationRuleType!
@@ -9795,6 +10495,9 @@ type NumberOption {
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the object storage."""
+  entityId: UUID!
   name: String!
   host: String!
   accessKey: String!
@@ -9837,11 +10540,13 @@ type OperationInfo {
   """Human-readable description"""
   description: String!
 
-  """Required RBAC permission"""
-  requiredPermission: OperationType!
+  """The permission bit required"""
+  requiredPermission: PermissionBit!
 }
 
-"""Added in 26.3.0. RBAC operation type"""
+"""
+Added in 26.3.0. RBAC operation type Deprecated since 26.9.0. Use `PermissionBit`.
+"""
 enum OperationType {
   CREATE
   READ
@@ -9856,7 +10561,7 @@ enum OperationType {
 }
 
 """
-Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in. Deprecated since 26.9.0. Use `PermissionBitFilter`.
 """
 input OperationTypeFilter {
   """Matches rows with this exact operation."""
@@ -9897,29 +10602,56 @@ type PageInfo @shareable {
 type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the permission row."""
+  fieldId: UUID!
   roleId: UUID!
-  scopeType: RBACElementType!
-  scopeId: String!
-  entityType: RBACElementType!
-  operation: OperationType!
+  entityType: String!
   createdAt: DateTime!
+
+  """Added in 26.9.0. The permission bit the row holds."""
+  permission: PermissionBit!
 
   """The role this permission belongs to."""
   role: Role
 
+  """Scope type."""
+  scopeType: RBACElementType @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Scope ID."""
+  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Operation type."""
+  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
   """The scope this permission applies to."""
-  scope: EntityNode
+  scope: EntityNode @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
 }
 
-"""
-Added in 26.9.0. One bit of a permission mask; distinct from OperationType, which names an action.
-"""
+"""Added in 26.9.0. One bit of a permission mask."""
 enum PermissionBit {
   READ
   UPDATE
   CREATE
   SOFT_DELETE
   HARD_DELETE
+}
+
+"""
+Added in 26.9.0. Filter for a permission-bit column. Supports equals / in / not_equals / not_in.
+"""
+input PermissionBitFilter {
+  """Matches rows with this exact bit."""
+  equals: PermissionBit = null
+
+  """Matches rows whose bit is in this list."""
+  in: [PermissionBit!] = null
+
+  """Excludes rows with this exact bit."""
+  notEquals: PermissionBit = null
+
+  """Excludes rows whose bit is in this list."""
+  notIn: [PermissionBit!] = null
 }
 
 """Added in 26.3.0. Permission connection."""
@@ -9944,10 +10676,17 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUIDFilter = null
-  scopeType: RBACElementTypeFilter = null
-  scopeId: StringFilter = null
-  entityType: RBACElementTypeFilter = null
+  entityType: StringFilter = null
+
+  """Added in 26.9.0. Filter by the permission bit the entry grants."""
+  permission: PermissionBitFilter = null
   createdAt: DateTimeFilter = null
+
+  """Scope type."""
+  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope ID."""
+  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
   NOT: [PermissionFilter!] = null
@@ -9957,10 +10696,17 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  scopeId: StringFilter = null
-  scopeType: RBACElementTypeFilter = null
-  entityType: RBACElementTypeFilter = null
-  operation: OperationTypeFilter = null
+  entityType: StringFilter = null
+  permission: PermissionBitFilter = null
+
+  """Scope ID."""
+  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope type."""
+  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Operation type."""
+  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -9977,6 +10723,20 @@ enum PermissionOrderField {
   ID
   ENTITY_TYPE
   CREATED_AT
+}
+
+"""
+Added in 26.9.0. One scope and entity type to answer the caller's permissions for.
+"""
+input PermissionTarget {
+  """Type of the scope, e.g. `project`."""
+  scopeType: String!
+
+  """ID of the scope."""
+  scopeId: UUID!
+
+  """Entity type the permissions are asked about."""
+  entityType: String!
 }
 
 """
@@ -10538,9 +11298,9 @@ input ProjectFairShareFilter {
   domainName: StringFilter = null
 
   """
-  Added in 26.2.0. Nested filter for project entity properties. Allows filtering by project name, active status, and type.
+  Added in 26.2.0. Filter by the project this fair share is calculated for.
   """
-  project: ProjectFairShareProjectNestedFilter = null
+  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectFairShareFilter!] = null
@@ -10577,8 +11337,8 @@ Added in 26.1.0. Fields available for ordering project fair share query results.
 enum ProjectFairShareOrderField {
   FAIR_SHARE_FACTOR
   CREATED_AT
-  PROJECT_NAME
-  PROJECT_IS_ACTIVE
+  PROJECT_NAME @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
+  PROJECT_IS_ACTIVE @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
 }
 
 """
@@ -10681,6 +11441,9 @@ type ProjectResourcePolicyV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the policy."""
+  entityId: UUID!
+
   """Policy name."""
   name: String!
 
@@ -10757,6 +11520,20 @@ enum ProjectResourcePolicyV2OrderField {
 }
 
 """
+Added in 26.9.0. Scope for the scoped project query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ProjectScope {
+  """Domains whose projects are being read."""
+  domain: [UUIDScope!] = null
+
+  """Users whose project memberships are being read."""
+  user: [UUIDScope!] = null
+
+  """Resource groups whose projects are being read."""
+  resourceGroup: [UUIDScope!] = null
+}
+
+"""
 Added in 26.4.2. Scope for session operations within a specific project.
 """
 input ProjectSessionV2Scope {
@@ -10799,6 +11576,9 @@ Added in 26.1.0. Project-level usage bucket representing aggregated resource con
 type ProjectUsageBucket implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the usage bucket."""
+  fieldId: UUID!
 
   """UUID of the project this usage bucket belongs to."""
   projectId: UUID!
@@ -10961,6 +11741,9 @@ type ProjectV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the project."""
+  entityId: UUID!
+
   """Basic project information including name, type, and description."""
   basicInfo: ProjectBasicInfo!
 
@@ -10995,6 +11778,12 @@ type ProjectV2 implements Node @key(fields: "id") {
 
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """Added in 26.9.0. Resource groups this project may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """Added in 26.9.0. Model cards belonging to this project."""
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
 """
@@ -11027,12 +11816,22 @@ input ProjectV2Filter {
   id: UUIDFilter = null
   name: StringFilter = null
   domainName: StringFilter = null
+
+  """Added in 26.9.0. Filter by project description."""
+  description: StringFilter = null
+
+  """Added in 26.9.0. Filter by the external integration name."""
+  integrationName: StringFilter = null
   type: ProjectTypeV2EnumFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
   modifiedAt: DateTimeFilter = null
-  domain: ProjectDomainNestedFilter = null
-  user: ProjectUserNestedFilter = null
+
+  """Filter by the domain holding the project."""
+  domain: ProjectDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by `domainName`.")
+
+  """Filter by the users enrolled in the project."""
+  user: ProjectUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then pass their ids as the `user` scope.")
   AND: [ProjectV2Filter!] = null
   OR: [ProjectV2Filter!] = null
   NOT: [ProjectV2Filter!] = null
@@ -11047,7 +11846,7 @@ input ProjectV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
+Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name. ID: Order by project ID. DESCRIPTION: Order by project description. INTEGRATION_NAME: Order by the external integration name. USER_USERNAME: Order by username. USER_EMAIL: Order by user email.
 """
 enum ProjectV2OrderField {
   CREATED_AT
@@ -11056,8 +11855,11 @@ enum ProjectV2OrderField {
   IS_ACTIVE
   TYPE
   DOMAIN_NAME
-  USER_USERNAME
-  USER_EMAIL
+  ID
+  DESCRIPTION
+  INTEGRATION_NAME
+  USER_USERNAME @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single username. Narrow the results with the `user` filter instead.")
+  USER_EMAIL @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single email address. Narrow the results with the `user` filter instead.")
 }
 
 """
@@ -11237,7 +12039,20 @@ type Query {
   agentStats: AgentStats
 
   """Added in 26.1.0. List agents with filtering and pagination"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection
+  agentsV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; agents the caller cannot read are left out.
+    """
+    usage: AgentUsage = null
+    filter: AgentFilter = null
+    orderBy: [AgentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): AgentV2Connection
 
   """
   Added in 26.7.0. Get a single app config allow-list entry by id (super admin only).
@@ -11372,7 +12187,40 @@ type Query {
   imageAlias(id: ID!): ImageV2Alias
 
   """Added in 26.2.0. List resource groups (admin only)"""
-  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+  adminResourceGroups(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
+    """
+    usage: ResourceGroupUsage = null
+    filter: ResourceGroupFilter = null
+    orderBy: [ResourceGroupOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ResourceGroupConnection
+
+  """
+  Added in 26.9.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedResourceGroups(
+    scope: ResourceGroupScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
+    """
+    usage: ResourceGroupUsage = null
+    filter: ResourceGroupFilter = null
+    orderBy: [ResourceGroupOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ResourceGroupConnection
 
   """Added in 26.4.2. Get a single resource group by name (admin only)."""
   adminResourceGroupV2(name: String!): ResourceGroup
@@ -11417,7 +12265,20 @@ type Query {
   adminKernelSchedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
 
   """Added in 25.16.0. List all deployments (superadmin only)."""
-  adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  adminDeployments(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usage: DeploymentUsage = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """Added in 26.4.2. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
@@ -11472,7 +12333,40 @@ type Query {
   """
   Added in 26.2.0. Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
+  adminImagesV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    """
+    usage: ImageUsage = null
+    filter: ImageV2Filter = null
+    orderBy: [ImageV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ImageV2Connection
+
+  """
+  Added in 26.9.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedImagesV2(
+    scope: ImageSearchScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    """
+    usage: ImageUsage = null
+    filter: ImageV2Filter = null
+    orderBy: [ImageV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ImageV2Connection
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
@@ -11517,12 +12411,60 @@ type Query {
   """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
-  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection
+  adminSessionsV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usage: SessionUsage = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection
 
   """
   Added in 26.4.2. List sessions within a specific project. Requires project membership or higher privileges.
   """
-  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection
+  projectSessionsV2(
+    scope: ProjectSessionV2Scope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usage: SessionUsage = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection
+
+  """
+  Added in 26.9.0. Page through the sessions the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedSessionsV2(
+    scope: SessionSearchScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usage: SessionUsage = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection
 
   """
   Added in 26.4.3. Query a single session by ID. Returns an error if not found.
@@ -11530,10 +12472,58 @@ type Query {
   sessionV2(id: UUID!): SessionV2
 
   """Added in 25.19.0. List deployments within a specific project."""
-  projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  projectDeployments(
+    scope: ProjectDeploymentScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usage: DeploymentUsage = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
+
+  """
+  Added in 26.9.0. Page through the deployments the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedDeployments(
+    scope: DeploymentSearchScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usage: DeploymentUsage = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """Added in 25.19.0. List deployments owned by the current user."""
-  myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+  myDeployments(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    """
+    usage: DeploymentUsage = null
+    filter: DeploymentFilter = null
+    orderBy: [DeploymentOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelDeploymentConnection
 
   """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
@@ -11586,7 +12576,20 @@ type Query {
   """
   Added in 26.4.4. List role presets with filtering and pagination (admin only).
   """
-  adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection
+  adminRolePresets(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    """
+    usage: RolePresetUsage = null
+    filter: RolePresetFilter = null
+    orderBy: [RolePresetOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RolePresetConnection
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
@@ -11594,7 +12597,20 @@ type Query {
   """
   Added in 26.3.0. List roles with filtering and pagination (admin only).
   """
-  adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
+  adminRoles(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    """
+    usage: RoleUsage = null
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection
 
   """
   Added in 26.3.0. List scoped permissions with filtering and pagination (admin only).
@@ -11607,9 +12623,29 @@ type Query {
   adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """
-  Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
+  Added in 26.3.0. Search entity associations (admin only). Deprecated since 26.9.0.
   """
-  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
+  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.9.0. The scope-entity association is removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List all role invitations across the system (superadmin only). Deprecated since 26.9.0.
+  """
+  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List the current user's role invitations. Deprecated since 26.9.0.
+  """
+  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List role invitations sent by the current user. Deprecated since 26.9.0.
+  """
+  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+
+  """
+  Added in 26.4.4. List invitations for a specific role. Deprecated since 26.9.0.
+  """
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
 
   """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
@@ -11647,12 +12683,43 @@ type Query {
   myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection
 
   """
-  Added in 26.3.0. List roles assigned to the current authenticated user.
+  Added in 26.3.0. List the assignment rows joining the current authenticated user to the roles they hold. Deprecated since 26.9.0. Use `myRolesV2`.
   """
-  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves.")
+
+  """Added in 26.9.0. List the roles the current authenticated user holds."""
+  myRolesV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    """
+    usage: RoleUsage = null
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection
 
   """Added in 26.4.2. List roles registered in a project scope."""
-  projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
+  projectRoles(
+    projectId: UUID!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    """
+    usage: RoleUsage = null
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]
@@ -11664,6 +12731,16 @@ type Query {
   Added in 26.4.2. List complete RBAC scope-entity-operation combinations (permission matrix).
   """
   rbacPermissionMatrix: [ScopeEntityOperationCombination!]
+
+  """
+  Added in 26.9.0. The permissions the caller holds on one entity type within one scope, read through every scope that governs it. A scope that does not exist and a scope the caller reaches nothing on answer alike, with no bits.
+  """
+  myScopePermissions(input: MyScopePermissionsInput!): MyScopePermissionsPayload
+
+  """
+  Added in 26.9.0. The same answer as `myScopePermissions` for several targets at once, resolved in one grouped pass. Atomic: there is no per-target failure, so the payload carries no failure channel and the whole query fails or none of it does.
+  """
+  myAtomicBulkScopePermissions(input: MyAtomicBulkScopePermissionsInput!): MyAtomicBulkScopePermissionsPayload
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -11818,6 +12895,11 @@ type Query {
   projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
+  Added in 26.9.0. Page through the users the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedUsersV2(scope: UserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
   """
   domainV2(domainName: String!): DomainV2
@@ -11829,6 +12911,11 @@ type Query {
 
   """Added in 26.2.0. List domains within resource group scope."""
   rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """
+  Added in 26.9.0. Page through the domains the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedDomainsV2(scope: DomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
 
   """
   Added in 26.2.0. Get a single project by ID. Returns an error if project is not found.
@@ -11844,6 +12931,11 @@ type Query {
   Added in 26.2.0. List projects within a specific domain. Requires domain admin privileges or higher.
   """
   domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """
+  Added in 26.9.0. Page through the projects the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedProjectsV2(scope: ProjectScope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
@@ -11887,6 +12979,11 @@ type Query {
   myUserResourcePolicyV2: UserResourcePolicyV2
 
   """
+  Added in 26.9.0. Get the resource policy the named project is subject to.
+  """
+  scopedProjectResourcePolicyV2(projectId: ID!): ProjectResourcePolicyV2
+
+  """
   Added in 26.4.2. List storage hosts the current user is allowed to mount, with the union of permissions inherited from domain, project, and keypair resource policies.
   """
   myStorageHostPermissions: MyStorageHostPermissionsPayload
@@ -11916,7 +13013,20 @@ type Query {
   adminAppConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection
 
   """Added in 26.4.2. Search runtime variants."""
-  runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection
+  runtimeVariants(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    """
+    usage: RuntimeVariantUsage = null
+    filter: RuntimeVariantFilter = null
+    orderBy: [RuntimeVariantOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RuntimeVariantConnection
 
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant
@@ -11956,16 +13066,77 @@ type Query {
   runtimeVariantPreset(id: UUID!): RuntimeVariantPreset
 
   """Added in 26.4.2. Search deployment revision presets."""
-  deploymentRevisionPresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
+  deploymentRevisionPresets(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    """
+    usage: DeploymentRevisionPresetUsage = null
+    filter: DeploymentRevisionPresetFilter = null
+    orderBy: [DeploymentRevisionPresetOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): DeploymentRevisionPresetConnection
 
   """Added in 26.4.2. Get a single deployment revision preset by ID."""
   deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset
 
   """Added in 26.4.2. Search all model cards (superadmin only)."""
-  adminModelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  adminModelCardsV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usage: ModelCardUsage = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
 
   """Added in 26.4.2. Search model cards within a MODEL_STORE project."""
-  projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  projectModelCardsV2(
+    scope: ProjectModelCardV2Scope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usage: ModelCardUsage = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
+
+  """
+  Added in 26.9.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedModelCardsV2(
+    scope: ModelCardScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usage: ModelCardUsage = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
 
   """Added in 26.4.2. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
@@ -12003,18 +13174,84 @@ type Query {
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2
 
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
-  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  adminVfoldersV2(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usage: VFolderUsage = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 
   """Added in 26.4.2. Get a single virtual folder by ID."""
   vfolderV2(vfolderId: UUID!): VFolder
 
   """Added in 26.4.2. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  projectVfolders(
+    projectId: UUID!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usage: VFolderUsage = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
+
+  """
+  Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  scopedVFoldersV2(
+    scope: VFolderScope!
+
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usage: VFolderUsage = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
+
+  """
+  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+  """
+  vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
   """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
+  myVfolders(
+    """
+    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    """
+    usage: VFolderUsage = null
+    filter: VFolderFilter = null
+    orderBy: [VFolderOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): VFolderConnection
 }
 
 """
@@ -12023,6 +13260,9 @@ Added in 26.3.0. Prometheus query definition entity implementing Relay Node patt
 type QueryDefinition implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the query preset."""
+  entityId: UUID!
 
   """Human-readable query definition identifier."""
   name: String!
@@ -12200,7 +13440,7 @@ input QueryTimeRangeInput {
 }
 
 """
-Added in 26.3.0. Unified RBAC element type for scope-entity relationships
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships. Deprecated since 26.9.0. Use an entity type string.
 """
 enum RBACElementType {
   DOMAIN
@@ -12251,7 +13491,7 @@ enum RBACElementType {
 }
 
 """
-Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in. Deprecated since 26.9.0. Use `StringFilter`.
 """
 input RBACElementTypeFilter {
   """Matches rows with this exact element type."""
@@ -12277,8 +13517,8 @@ input RGDomainFairShareFilter {
   """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by domain properties."""
-  domain: DomainFairShareDomainNestedFilter = null
+  """Filter by the domain this fair share is calculated for."""
+  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
 
   """Combine with AND logic."""
   AND: [RGDomainFairShareFilter!] = null
@@ -12303,8 +13543,8 @@ input RGProjectFairShareFilter {
   """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by project properties."""
-  project: ProjectFairShareProjectNestedFilter = null
+  """Filter by the project this fair share is calculated for."""
+  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
 
   """Combine with AND logic."""
   AND: [RGProjectFairShareFilter!] = null
@@ -12332,8 +13572,8 @@ input RGUserFairShareFilter {
   """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by user properties."""
-  user: UserFairShareUserNestedFilter = null
+  """Filter by the user this fair share is calculated for."""
+  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
 
   """Combine with AND logic."""
   AND: [RGUserFairShareFilter!] = null
@@ -12386,6 +13626,13 @@ type RejectArtifactPayload {
 }
 
 """
+Added in 26.4.4. Input for rejecting a role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input RejectRoleInvitationInput {
+  invitationId: UUID!
+}
+
+"""
 Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput {
@@ -12433,20 +13680,23 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload {
 Added in 26.4.4. Failure detail for a single permission entry in replace
 """
 type ReplaceRolePermissionFailureInfo {
-  """Role ID of the failed entry."""
-  roleId: UUID!
-
   """Scope element type of the failed entry."""
-  scopeType: String!
+  scopeType: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
 
   """Scope element ID of the failed entry."""
-  scopeId: String!
+  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+
+  """Operation type of the failed entry."""
+  operation: String @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+
+  """Role ID of the failed entry."""
+  roleId: UUID!
 
   """Entity element type of the failed entry."""
   entityType: String!
 
-  """Operation type of the failed entry."""
-  operation: String!
+  """Operation bit of the failed entry."""
+  permission: PermissionBit!
 
   """Error message describing the failure."""
   message: String!
@@ -12468,7 +13718,7 @@ type ReplaceRolePermissionsPayload {
   items: [Permission!]!
 
   """Permission entries that failed to insert."""
-  failed: [ReplaceRolePermissionFailureInfo!]!
+  failed: [ReplaceRolePermissionFailureInfo!]! @deprecated(reason: "Always empty. The write states the whole set or raises; a later API reports what it refused.")
 }
 
 """Added in 25.19.0. """
@@ -12478,6 +13728,18 @@ input ReplicaFilter {
   """Added in 26.8.0. Filter by replica health status."""
   healthStatus: ReplicaHealthStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
+
+  """Added in 26.9.0. Filter by replica creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by replica ID."""
+  fieldId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by session ID."""
+  sessionId: UUIDFilter = null
+
+  """Added in 26.9.0. Filter by revision ID."""
+  revisionId: UUIDFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
@@ -12487,6 +13749,9 @@ input ReplicaFilter {
 type ReplicaGroupHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the replica group history record."""
+  fieldId: UUID!
   deploymentId: ID!
   category: ReplicaGroupHistoryCategory!
   phase: String!
@@ -12605,6 +13870,11 @@ input ReplicaHealthStatusFilter {
 
 """Added in 26.8.0. Filter deployments by conditions on their replicas."""
 input ReplicaNestedFilter {
+  """
+  Added in 26.9.0. Matches parents that have at least one replica when true, and parents with none when false. Says nothing about what the replicas hold.
+  """
+  exists: Boolean = null
+
   """Matches parents with at least one replica satisfying all conditions."""
   some: ReplicaFilter = null
 
@@ -12626,6 +13896,12 @@ input ReplicaOrderBy {
 enum ReplicaOrderField {
   CREATED_AT
   ID
+  DEPLOYMENT_ID
+  SESSION_ID
+  REVISION_ID
+  STATUS
+  TRAFFIC_STATUS
+  HEALTH_STATUS
 }
 
 """
@@ -12669,6 +13945,9 @@ input ReplicaStatusFilter {
 type ReservoirRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the reservoir registry."""
+  entityId: UUID!
   name: String!
   endpoint: String!
   accessKey: String!
@@ -12760,6 +14039,9 @@ type ResourceGroup implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the resource group."""
+  entityId: UUID!
+
   """
   Unique name identifying the resource group. Used as primary key and referenced by agents, sessions, and resource presets.
   """
@@ -12800,6 +14082,12 @@ type ResourceGroup implements Node {
   Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
   """
   resourceInfo: ResourceInfo
+
+  """Added in 26.9.0. Domains this resource group serves."""
+  domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
+
+  """Added in 26.9.0. Projects this resource group serves."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -12900,6 +14188,20 @@ type ResourceGroupSchedulerConfig {
   preemption: PreemptionConfig!
 }
 
+"""
+Added in 26.9.0. Scope for the scoped resource group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input ResourceGroupScope {
+  """Domains whose resource groups are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose resource groups are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose resource groups are being read."""
+  user: [UUIDScope!] = null
+}
+
 """Added in 26.2.0. Status information for a resource group."""
 type ResourceGroupStatus {
   """Whether the resource group is active and can accept new sessions."""
@@ -12912,6 +14214,14 @@ type ResourceGroupStatus {
   Whether this is the default resource group. At most one resource group is the default at a time; an agent registering for the first time without a resolvable resource group name falls back to it.
   """
   isDefault: Boolean!
+}
+
+"""
+Added in 26.9.0. Uses narrowing a resource group query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only resource groups the caller can read are returned, even when a listed entity is tied to others.
+"""
+input ResourceGroupUsage {
+  """Entities whose use of the resource group narrows the read."""
+  usedBy: ResourceGroupUsedBy = null
 }
 
 """
@@ -12929,6 +14239,17 @@ type ResourceGroupUsageV2 {
 
   """Largest single-agent free resources."""
   maxPerNode: [ResourceSlotEntry!]!
+}
+
+"""
+Added in 26.9.0. Entities whose use of a resource group narrows the read.
+"""
+input ResourceGroupUsedBy {
+  """Sessions the resource group runs."""
+  session: [UUID!] = null
+
+  """Deployments the resource group runs."""
+  deployment: [UUID!] = null
 }
 
 """
@@ -13048,6 +14369,9 @@ type ResourcePresetV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the resource preset."""
+  entityId: UUID!
+
   """Resource preset name."""
   name: String!
 
@@ -13124,6 +14448,9 @@ and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
 type ResourceSlotType implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the resource slot type."""
+  entityId: UUID!
 
   """
   Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device').
@@ -13307,6 +14634,9 @@ type RetentionPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the retention policy."""
+  entityId: UUID!
+
   """Retention category."""
   category: RetentionCategory!
 
@@ -13419,6 +14749,9 @@ input RevokeRoleInput {
 type Role implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the role."""
+  entityId: UUID!
   name: String!
   description: String
   source: RoleSource!
@@ -13432,14 +14765,30 @@ type Role implements Node {
   """
   autoAssign: Boolean!
 
+  """Added in 26.9.0. Type of the scope the role belongs to."""
+  scopeType: String!
+
+  """Added in 26.9.0. ID of the scope the role belongs to."""
+  scopeId: UUID!
+
+  """Added in 26.9.0. The scope the role belongs to."""
+  scope: EntityNode
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
-  """Added in 26.3.0. Users assigned to this role."""
-  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
+  """
+  Added in 26.3.0. Users assigned to this role, as assignment rows. Deprecated since 26.9.0. Use `usersV2`.
+  """
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves.")
 
-  """Added in 26.4.2. Scopes this role is registered in."""
-  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
+  """Added in 26.9.0. Users holding this role."""
+  usersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
+  Added in 26.4.2. Scopes this role is registered in. Deprecated since 26.9.0. Use `scope`.
+  """
+  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.9.0. Use `scope`. A role belongs to one scope, so this connection holds that one scope and ignores `filter` and `order_by`.")
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -13489,8 +14838,12 @@ type RoleAssignmentEdge {
 """Added in 26.3.0. Filter for role assignments"""
 input RoleAssignmentFilter {
   roleId: UUIDFilter = null
-  role: RoleAssignmentRoleNestedFilter = null
-  permission: PermissionNestedFilter = null
+
+  """Filter assignments by the role they name."""
+  role: RoleAssignmentRoleNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
+
+  """Filter assignments by the permissions their role carries."""
+  permission: PermissionNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
   username: StringFilter = null
   email: StringFilter = null
   AND: [RoleAssignmentFilter!] = null
@@ -13547,19 +14900,157 @@ input RoleFilter {
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
-  assignedUser: RoleUserNestedFilter = null
+
+  """Filter roles by the users holding them."""
+  assignedUser: RoleUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter reaching the rows that join a role to a user cannot check whether the caller may read that user. Search roles within that user's scope instead.")
   mappedScope: RoleMappedScopeNestedFilter = null
+
+  """
+  Added in 26.9.0. Filter by conditions on the role's permission entries.
+  """
+  permissions: RolePermissionNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
 }
 
 """
+Added in 26.4.4. A role invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+type RoleInvitation implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Inviter user ID."""
+  inviterUserId: UUID
+
+  """Invitee user ID."""
+  inviteeUserId: UUID!
+
+  """Role ID."""
+  roleId: UUID!
+
+  """Invitation state."""
+  state: RoleInvitationState!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+
+  """The user who sent this invitation. Null for system-issued invitations."""
+  inviter: UserV2
+
+  """
+  The user who received this invitation. Null if the user no longer exists.
+  """
+  invitee: UserV2
+
+  """
+  The role this invitation grants on acceptance. Null if the role no longer exists.
+  """
+  role: Role
+}
+
+"""
+Added in 26.4.4. Role invitation connection. Deprecated since 26.9.0. Use role assignments.
+"""
+type RoleInvitationConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleInvitationEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleInvitationEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleInvitation!
+}
+
+"""
+Added in 26.4.4. Filter for role invitations. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationFilter {
+  state: RoleInvitationStateFilter = null
+  roleId: UUIDFilter = null
+  role: RoleInvitationRoleNestedFilter = null
+  inviter: RoleInvitationUserNestedFilter = null
+  invitee: RoleInvitationUserNestedFilter = null
+  AND: [RoleInvitationFilter!] = null
+  OR: [RoleInvitationFilter!] = null
+  NOT: [RoleInvitationFilter!] = null
+}
+
+"""
+Added in 26.4.4. Order by specification for role invitations. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationOrderBy {
+  field: RoleInvitationOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.4.4. Role invitation ordering field. Deprecated since 26.9.0. Use role assignments.
+"""
+enum RoleInvitationOrderField {
+  CREATED_AT
+  UPDATED_AT
+  STATE
+}
+
+"""
+Added in 26.4.4. Nested filter for the role associated with an invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationRoleNestedFilter {
+  name: StringFilter = null
+}
+
+"""
+Added in 26.4.4. Role invitation state. Deprecated since 26.9.0. Use role assignments.
+"""
+enum RoleInvitationState {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+"""
+Added in 26.4.4. Filter for role invitation state. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationStateFilter {
+  equals: RoleInvitationState = null
+
+  """Match any of the provided states."""
+  in: [RoleInvitationState!] = null
+
+  """Exclude exact state match."""
+  notEquals: RoleInvitationState = null
+
+  """Exclude any of the provided states."""
+  notIn: [RoleInvitationState!] = null
+}
+
+"""
+Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation. Deprecated since 26.9.0. Use role assignments.
+"""
+input RoleInvitationUserNestedFilter {
+  email: StringFilter = null
+}
+
+"""
 Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
 """
 input RoleMappedScopeNestedFilter {
-  scopeType: RBACElementTypeFilter = null
-  scopeId: StringFilter = null
+  scopeType: StringFilter = null
+  scopeId: UUIDFilter = null
   AND: [RoleMappedScopeNestedFilter!] = null
   OR: [RoleMappedScopeNestedFilter!] = null
   NOT: [RoleMappedScopeNestedFilter!] = null
@@ -13578,22 +15069,51 @@ enum RoleOrderField {
   UPDATED_AT
 }
 
+"""
+Added in 26.9.0. Filter roles by conditions on the permission entries they carry.
+"""
+input RolePermissionNestedFilter {
+  """
+  Matches roles that carry at least one permission entry when true, and roles carrying none when false. Says nothing about what the entries hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches roles with at least one permission entry satisfying all conditions.
+  """
+  some: PermissionFilter = null
+
+  """
+  Matches roles whose every permission entry satisfies all conditions (also true when the role carries none).
+  """
+  every: PermissionFilter = null
+
+  """Matches roles with no permission entry satisfying all conditions."""
+  none: PermissionFilter = null
+}
+
 """Added in 26.4.4. A stored permission entry under a role preset."""
 type RolePermissionPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the role permission preset."""
+  fieldId: UUID!
+
   """UUID of the parent role preset."""
   rolePresetId: UUID!
 
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
 
-  """Operation granted by the permission."""
-  operation: OperationType!
+  """The operation bit the entry grants."""
+  permission: PermissionBit!
 
   """Creation timestamp."""
   createdAt: DateTime!
+
+  """Operation granted by the permission."""
+  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
 }
 
 """
@@ -13620,14 +15140,17 @@ type RolePermissionPresetEdge {
 }
 
 """
-Added in 26.4.4. A single (entity_type, operation) pair carried by a role preset.
+Added in 26.4.4. A single (entity_type, permission) pair carried by a role preset.
 """
 input RolePermissionPresetEntryInput {
   """Entity type the permission applies to."""
-  entityType: RBACElementType!
+  entityType: String!
+
+  """The operation bit the entry grants."""
+  permission: PermissionBit!
 
   """Operation granted by the permission."""
-  operation: OperationType!
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 }
 
 """
@@ -13638,10 +15161,13 @@ input RolePermissionPresetFilter {
   rolePresetId: UUIDFilter = null
 
   """Filter by entity type the permission applies to."""
-  entityType: RBACElementTypeFilter = null
+  entityType: StringFilter = null
+
+  """Filter by the operation bit granted."""
+  permission: PermissionBitFilter = null
 
   """Filter by granted operation."""
-  operation: OperationTypeFilter = null
+  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
 
   """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
@@ -13674,8 +15200,9 @@ Added in 26.4.4. Fields available for ordering role permission preset entries.
 """
 enum RolePermissionPresetOrderField {
   ENTITY_TYPE
-  OPERATION
+  PERMISSION
   CREATED_AT
+  OPERATION @deprecated(reason: "Deprecated since 26.9.0. Use `PERMISSION`; ordering by it is ignored.")
 }
 
 """
@@ -13685,11 +15212,14 @@ type RolePreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the role preset."""
+  entityId: UUID!
+
   """Role preset name."""
   name: String!
 
   """Scope type this preset targets (e.g., domain, project)."""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """
   Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
@@ -13738,7 +15268,7 @@ input RolePresetFilter {
   name: StringFilter = null
 
   """Filter by scope type."""
-  scopeType: RBACElementTypeFilter = null
+  scopeType: StringFilter = null
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
@@ -13747,6 +15277,11 @@ input RolePresetFilter {
   Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
   """
   deleted: Boolean = null
+
+  """
+  Added in 26.9.0. Filter by conditions on the permission entries the preset carries.
+  """
+  permissions: RolePresetPermissionNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [RolePresetFilter!] = null
@@ -13775,6 +15310,43 @@ enum RolePresetOrderField {
   SCOPE_TYPE
   CREATED_AT
   UPDATED_AT
+}
+
+"""
+Added in 26.9.0. Filter role presets by conditions on the permission entries they carry.
+"""
+input RolePresetPermissionNestedFilter {
+  """
+  Matches presets carrying at least one permission entry when true, and presets carrying none when false. Says nothing about what the entries hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches presets with at least one permission entry satisfying all conditions.
+  """
+  some: RolePermissionPresetFilter = null
+
+  """
+  Matches presets whose every permission entry satisfies all conditions (also true when the preset carries none).
+  """
+  every: RolePermissionPresetFilter = null
+
+  """Matches presets with no permission entry satisfying all conditions."""
+  none: RolePermissionPresetFilter = null
+}
+
+"""
+Added in 26.9.0. Uses narrowing a role preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
+"""
+input RolePresetUsage {
+  """Entities whose use of the preset narrows the read."""
+  usedBy: RolePresetUsedBy = null
+}
+
+"""Added in 26.9.0. Entities whose use of a role preset narrows the read."""
+input RolePresetUsedBy {
+  """Roles instantiated from the preset."""
+  role: [ID!] = null
 }
 
 """Added in 26.3.0. Role definition source"""
@@ -13824,12 +15396,26 @@ input RoleStatusFilter {
   notIn: [RoleStatus!] = null
 }
 
+"""
+Added in 26.9.0. Uses narrowing a role query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only roles the caller can read are returned, even when a listed entity is tied to others.
+"""
+input RoleUsage {
+  """Entities the role uses, whose ids narrow the read."""
+  uses: RoleUses = null
+}
+
 """Added in 26.4.4. Filter roles by their user assignments."""
 input RoleUserNestedFilter {
   userId: UUIDFilter = null
   AND: [RoleUserNestedFilter!] = null
   OR: [RoleUserNestedFilter!] = null
   NOT: [RoleUserNestedFilter!] = null
+}
+
+"""Added in 26.9.0. Entities a role uses, whose ids narrow the read."""
+input RoleUses {
+  """Role presets the roles were instantiated from."""
+  rolePreset: [UUID!] = null
 }
 
 """
@@ -13844,6 +15430,9 @@ input RollingUpdateConfigInput {
 type Route implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the route."""
+  fieldId: UUID!
   deploymentId: ID!
   sessionId: ID
   revisionId: ID
@@ -13906,9 +15495,14 @@ type RouteEdge {
 
 """Added in 25.19.0. Filter for routes."""
 input RouteFilter {
-  status: [RouteStatus!] = null
-  healthStatus: [RouteHealthStatus!] = null
-  trafficStatus: [RouteTrafficStatus!] = null
+  """Route lifecycle statuses to match."""
+  status: [RouteStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Route health statuses to match."""
+  healthStatus: [RouteHealthStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Route traffic statuses to match."""
+  trafficStatus: [RouteTrafficStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
@@ -13926,6 +15520,9 @@ enum RouteHealthStatus {
 type RouteHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the route history record."""
+  fieldId: UUID!
   routeId: ID!
   deploymentId: ID!
   category: String!
@@ -14039,6 +15636,9 @@ type RuntimeVariant implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the runtime variant."""
+  entityId: UUID!
+
   """
   Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi').
   """
@@ -14064,6 +15664,17 @@ type RuntimeVariant implements Node {
 
   """Timestamp of the last modification to this runtime variant."""
   updatedAt: DateTime
+}
+
+"""
+Added in 26.9.0. One failed item of a partial-success bulk runtime variant operation.
+"""
+type RuntimeVariantBulkFailureInfo {
+  """Id of the runtime variant the failed item targeted."""
+  id: UUID!
+
+  """Reason the item failed."""
+  message: String!
 }
 
 """Added in 26.4.2. Paginated list of runtime variants."""
@@ -14193,6 +15804,9 @@ type RuntimeVariantPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the runtime variant preset."""
+  entityId: UUID!
+
   """The runtime variant this preset belongs to."""
   runtimeVariantId: UUID!
 
@@ -14220,6 +15834,16 @@ type RuntimeVariantPreset implements Node {
   Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean!
+
+  """
+  Added in 26.9.0. Runtime version this preset became available in; null means it always was.
+  """
+  addedVersion: String
+
+  """
+  Added in 26.9.0. Runtime version this preset was removed in, exclusive; null means it is still offered.
+  """
+  deprecatedVersion: String
 
   """UI category group for organizing parameters."""
   category: String
@@ -14284,6 +15908,11 @@ input RuntimeVariantPresetFilter {
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
 
+  """
+  Added in 26.9.0. Keep only presets valid at this runtime version, that is added_version <= version < deprecated_version. Dot-separated numbers.
+  """
+  runtimeVersion: String = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [RuntimeVariantPresetFilter!] = null
 
@@ -14317,6 +15946,8 @@ enum RuntimeVariantPresetOrderField {
   NAME
   RANK
   CREATED_AT
+  ADDED_VERSION
+  DEPRECATED_VERSION
 }
 
 """Added in 26.9.0. Slider UI config input."""
@@ -14415,6 +16046,22 @@ input RuntimeVariantPresetValueInput {
   value: String!
 }
 
+"""
+Added in 26.9.0. Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only runtime variants the caller can read are returned, even when a listed entity is tied to others.
+"""
+input RuntimeVariantUsage {
+  """Entities whose use of the runtime variant narrows the read."""
+  usedBy: RuntimeVariantUsedBy = null
+}
+
+"""
+Added in 26.9.0. Entities whose use of a runtime variant narrows the read.
+"""
+input RuntimeVariantUsedBy {
+  """Deployments whose revisions name the runtime variant."""
+  deployment: [UUID!] = null
+}
+
 """Added in 24.09.0. Input for SMTP authentication credentials"""
 input SMTPAuthInput {
   username: String = null
@@ -14451,6 +16098,21 @@ Added in 26.4.4. Replica scaling axis for a deployment, orthogonal to the lifecy
 enum ScalingState {
   STABLE
   SCALING
+}
+
+"""Added in 26.9.0. Filter for the deployment scaling state."""
+input ScalingStateFilter {
+  """Scaling states to match."""
+  in: [ScalingState!] = null
+
+  """Exact scaling state match."""
+  equals: ScalingState = null
+
+  """Excludes scaling states in the list."""
+  notIn: [ScalingState!] = null
+
+  """Excludes exact scaling state match."""
+  notEquals: ScalingState = null
 }
 
 """
@@ -14602,10 +16264,10 @@ Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
 """
 type ScopeEntityCombination {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Valid entity types for this scope type"""
-  validEntityTypes: [RBACElementType!]!
+  validEntityTypes: [String!]!
 }
 
 """
@@ -14613,17 +16275,36 @@ Added in 26.4.2. Scope-entity-operation combination for RBAC permission matrix.
 """
 type ScopeEntityOperationCombination {
   """Scope element type"""
-  scopeType: RBACElementType!
+  scopeType: String!
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
 }
 
 """
+Added in 26.9.0. The bits the caller holds on one entity type within one scope.
+"""
+type ScopeEntityPermission {
+  """Type of the scope, echoed from the target."""
+  scopeType: String!
+
+  """ID of the scope, echoed from the target."""
+  scopeId: UUID!
+
+  """Entity type, echoed from the target."""
+  entityType: String!
+
+  """
+  The bits the caller holds. Empty when it holds none, which is also the answer for a scope that does not exist and for an entity type this build does not declare: the two are not told apart, so the answer cannot reveal whether a scope exists.
+  """
+  permissions: [PermissionBit!]!
+}
+
+"""
 Added in 26.4.2. Scope reference for associating an entity with a scope.
 """
 input ScopeInput {
-  scopeType: RBACElementType!
+  scopeType: String!
   scopeId: String!
 }
 
@@ -14675,6 +16356,9 @@ type SecretKeyCount {
 type ServiceCatalog implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the service catalog."""
+  entityId: UUID!
 
   """Logical group name (e.g., 'manager', 'agent', 'storage-proxy')."""
   serviceGroup: String!
@@ -14934,6 +16618,9 @@ input SessionResourceSlotEntryInput {
 type SessionSchedulingHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the session scheduling history record."""
+  fieldId: UUID!
   sessionId: ID!
   phase: String!
   fromStatus: String
@@ -15008,6 +16695,20 @@ input SessionScope {
   sessionId: UUID!
 }
 
+"""
+Added in 26.9.0. Scope for the scoped session query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input SessionSearchScope {
+  """Domains whose sessions are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose sessions are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose sessions are being read."""
+  user: [UUIDScope!] = null
+}
+
 enum SessionTypes {
   INTERACTIVE
   BATCH
@@ -15015,10 +16716,42 @@ enum SessionTypes {
   SYSTEM
 }
 
+"""
+Added in 26.9.0. Uses narrowing a session query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only sessions the caller can read are returned, even when a listed entity is tied to others.
+"""
+input SessionUsage {
+  """Entities whose use of the session narrows the read."""
+  usedBy: SessionUsedBy = null
+
+  """Entities the session uses, whose ids narrow the read."""
+  uses: SessionUses = null
+}
+
+"""Added in 26.9.0. Entities whose use of a session narrows the read."""
+input SessionUsedBy {
+  """Deployments whose route rows the session serves as a replica."""
+  deployment: [UUID!] = null
+}
+
+"""Added in 26.9.0. Entities a session uses, whose ids narrow the read."""
+input SessionUses {
+  """Images the session's kernels run."""
+  image: [UUID!] = null
+
+  """Agents running a kernel of the session."""
+  agent: [UUID!] = null
+
+  """Resource groups the session runs in."""
+  resourceGroup: [UUID!] = null
+}
+
 """Added in 26.3.0. Represents a compute session in Backend.AI."""
 type SessionV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the session."""
+  entityId: UUID!
 
   """
   UUIDs of the images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
@@ -15112,6 +16845,64 @@ input SessionV2Filter {
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.9.0. Filter by the id the creating request carried."""
+  creationId: StringFilter = null
+
+  """Added in 26.9.0. Filter by session type."""
+  sessionType: SessionV2TypeFilter = null
+
+  """Added in 26.9.0. Filter by the scheduling tier of the pending queue."""
+  tier: IntFilter = null
+
+  """Added in 26.9.0. Filter by the scheduling tier of the pending queue."""
+  priority: IntFilter = null @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+
+  """
+  Added in 26.9.0. Filter by the preemption priority among the owner's sessions.
+  """
+  jobPriority: IntFilter = null
+
+  """Added in 26.9.0. Filter by whether the session may be preempted."""
+  isPreemptible: Boolean = null
+
+  """Added in 26.9.0. Filter by the number of kernels in the session."""
+  clusterSize: IntFilter = null
+
+  """Added in 26.9.0. Filter by the resource group the session runs in."""
+  resourceGroupName: StringFilter = null
+
+  """
+  Added in 26.9.0. Filter by the access key the session was created with.
+  """
+  accessKey: StringFilter = null
+
+  """Added in 26.9.0. Filter by the user-supplied tag."""
+  tag: StringFilter = null
+
+  """Added in 26.9.0. Filter by whether the session uses the host network."""
+  useHostNetwork: Boolean = null
+
+  """Added in 26.9.0. Filter by the batch execution timeout in seconds."""
+  batchTimeout: IntFilter = null
+
+  """Added in 26.9.0. Filter by when the session started running."""
+  startsAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by when the session terminated."""
+  terminatedAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by the session result."""
+  result: SessionV2ResultFilter = null
+
+  """Added in 26.9.0. Filter by the inter-container network type."""
+  networkType: SessionV2NetworkTypeFilter = null
+
+  """Added in 26.9.0. Filter by the network reference the session uses."""
+  networkId: StringFilter = null
+
+  """Added in 26.9.0. Filter by the deployment replica the session serves."""
+  replicaId: UUIDFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -15158,8 +16949,11 @@ type SessionV2MetadataInfo {
   """Number of nodes in the cluster."""
   clusterSize: Int!
 
-  """Scheduling priority of the session."""
-  priority: Int!
+  """Added in 26.9.0. Scheduling tier of the session."""
+  tier: Int!
+
+  """Scheduling tier of the session."""
+  priority: Int! @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """
   Added in 26.8.0. Preemption priority among the owner's own sessions. A pending session may reclaim another session's resources only when both belong to the same user and the other session's value is strictly lower, so equal values never preempt each other; among the eligible sessions the lowest value is reclaimed first. Independent of `priority`, which orders the pending queue and takes no part in this comparison.
@@ -15187,6 +16981,28 @@ type SessionV2NetworkInfo {
   networkId: String
 }
 
+"""Added in 26.9.0. Inter-container network type a session uses."""
+enum SessionV2NetworkType {
+  VOLATILE
+  PERSISTENT
+  HOST
+}
+
+"""Added in 26.9.0. Filter for the session network type."""
+input SessionV2NetworkTypeFilter {
+  """Exact network type match."""
+  equals: SessionV2NetworkType = null
+
+  """Network types to match."""
+  in: [SessionV2NetworkType!] = null
+
+  """Excludes exact network type match."""
+  notEquals: SessionV2NetworkType = null
+
+  """Excludes network types in the list."""
+  notIn: [SessionV2NetworkType!] = null
+}
+
 """Added in 26.3.0. Ordering specification for sessions."""
 input SessionV2OrderBy {
   field: SessionV2OrderField!
@@ -15200,6 +17016,26 @@ enum SessionV2OrderField {
   STATUS
   ID
   NAME
+  CREATION_ID
+  SESSION_TYPE
+  PRIORITY @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+  TIER
+  JOB_PRIORITY
+  IS_PREEMPTIBLE
+  CLUSTER_SIZE
+  RESOURCE_GROUP_NAME
+  DOMAIN_NAME
+  PROJECT_ID
+  USER_ID
+  ACCESS_KEY
+  TAG
+  USE_HOST_NETWORK
+  BATCH_TIMEOUT
+  STARTS_AT
+  RESULT
+  NETWORK_TYPE
+  NETWORK_ID
+  REPLICA_ID
 }
 
 """Added in 26.3.0. Resource allocation information for a session."""
@@ -15218,6 +17054,21 @@ enum SessionV2Result {
   UNDEFINED
   SUCCESS
   FAILURE
+}
+
+"""Added in 26.9.0. Filter for the session result."""
+input SessionV2ResultFilter {
+  """Exact result match."""
+  equals: SessionV2Result = null
+
+  """Results to match."""
+  in: [SessionV2Result!] = null
+
+  """Excludes exact result match."""
+  notEquals: SessionV2Result = null
+
+  """Excludes results in the list."""
+  notIn: [SessionV2Result!] = null
 }
 
 """Added in 26.3.0. Runtime execution configuration for a session."""
@@ -15274,6 +17125,40 @@ enum SessionV2Type {
   SYSTEM
 }
 
+"""Added in 26.9.0. Filter for the session type."""
+input SessionV2TypeFilter {
+  """Exact session type match."""
+  equals: SessionV2Type = null
+
+  """Session types to match."""
+  in: [SessionV2Type!] = null
+
+  """Excludes exact session type match."""
+  notEquals: SessionV2Type = null
+
+  """Excludes session types in the list."""
+  notIn: [SessionV2Type!] = null
+}
+
+"""
+Added in 26.9.0. Input for setting the mount level one user gets on a virtual folder.
+"""
+input SetVFolderMountPolicyInput {
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """
+  Mount level: NONE, READ_ONLY or READ_WRITE. RW_DELETE is stored as READ_WRITE.
+  """
+  permission: VFolderMountPermission!
+}
+
+"""Added in 26.9.0. Payload returned after setting a mount policy."""
+type SetVFolderMountPolicyPayload {
+  """The mount level now set."""
+  policy: VFolderMountPolicy!
+}
+
 """Added in 26.4.2. Slider UI config."""
 type SliderOption {
   """Minimum value."""
@@ -15319,6 +17204,9 @@ Implementation varies by storage type:
 type StorageNamespace implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the storage namespace."""
+  entityId: UUID!
   storageId: ID!
   namespace: String!
 }
@@ -15593,6 +17481,26 @@ type UnschedulableReasonHint {
   requiredReduction: [ResourceSlotEntry!]
 }
 
+"""
+Added in 26.9.0. Input for taking back the mount level one user was given on a virtual folder.
+"""
+input UnsetVFolderMountPolicyInput {
+  """User whose mount level is taken back."""
+  userId: UUID!
+}
+
+"""Added in 26.9.0. Payload returned after unsetting a mount policy."""
+type UnsetVFolderMountPolicyPayload {
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User whose mount level was taken back."""
+  userId: UUID!
+
+  """Whether a row was removed."""
+  removed: Boolean!
+}
+
 """Added in 26.8.0. Input for changing the resource group of an agent."""
 input UpdateAgentResourceGroupInput {
   """ID of the agent to move."""
@@ -15837,16 +17745,16 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in 26.4.4. New runtime variant for the preset. Omit to leave unchanged.
   """
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUID
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New rank."""
-  rank: Int = null
+  rank: Int
 
   """
   Default open_to_public for deployments created from this preset. Set to null to clear.
@@ -15873,8 +17781,10 @@ input UpdateDeploymentRevisionPresetInput {
   """
   imageId: UUID
 
-  """Added in 26.9.0. Parsed model definition. Set to null to clear."""
-  modelDefinition: PresetModelDefinitionInput
+  """
+  Added in 26.9.0. Model definition patch. Set to null to clear the whole model definition.
+  """
+  modelDefinition: UpdatePresetModelDefinitionInput
 
   """Added in 26.4.4. Container startup command. Set to null to clear."""
   startupCommand: String
@@ -15887,28 +17797,28 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in 26.4.4. Replace resource slot allocations. Omit to leave unchanged.
   """
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]
 
   """
   Added in 26.4.4. Replace additional resource options. Omit to leave unchanged.
   """
-  resourceOpts: [ResourceOptsEntryInput!] = null
+  resourceOpts: [ResourceOptsEntryInput!]
 
   """Added in 26.4.4. New cluster topology mode. Omit to leave unchanged."""
-  clusterMode: ClusterMode = null
+  clusterMode: ClusterMode
 
   """Added in 26.4.4. New cluster size. Omit to leave unchanged."""
-  clusterSize: Int = null
+  clusterSize: Int
 
   """
   Added in 26.4.4. Replace environment variables. Omit to leave unchanged.
   """
-  environ: [EnvironEntryInput!] = null
+  environ: [EnvironEntryInput!]
 
   """
   Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
   """
-  presetValues: [RuntimeVariantPresetValueEntryInput!] = null
+  presetValues: [RuntimeVariantPresetValueEntryInput!]
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
@@ -15922,16 +17832,16 @@ Added in 26.4.2. Input for updating domain information. All fields optional.
 """
 input UpdateDomainInput {
   """New domain name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!] = null
+  allowedDockerRegistries: [String!]
 
   """New external integration identifier."""
   integrationName: String
@@ -16008,16 +17918,16 @@ Added in 26.4.2. Input for updating a keypair resource policy. All fields option
 """
 input UpdateKeypairResourcePolicyInput {
   """Updated default for unspecified."""
-  defaultForUnspecified: String = null
+  defaultForUnspecified: String
 
   """Updated resource slot limits."""
-  totalResourceSlots: [ResourceSlotEntryInput!] = null
+  totalResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max session lifetime."""
-  maxSessionLifetime: Int = null
+  maxSessionLifetime: Int
 
   """Updated max concurrent sessions."""
-  maxConcurrentSessions: Int = null
+  maxConcurrentSessions: Int
 
   """Updated max pending sessions."""
   maxPendingSessionCount: Int
@@ -16031,16 +17941,16 @@ input UpdateKeypairResourcePolicyInput {
   maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max concurrent SFTP sessions."""
-  maxConcurrentSftpSessions: Int = null
+  maxConcurrentSftpSessions: Int
 
   """Updated max containers per session."""
-  maxContainersPerSession: Int = null
+  maxContainersPerSession: Int
 
   """Updated idle timeout."""
-  idleTimeout: Int = null
+  idleTimeout: Int
 
   """Updated vfolder host permissions."""
-  allowedVfolderHosts: [VFolderHostPermissionEntryInput!] = null
+  allowedVfolderHosts: [VFolderHostPermissionEntryInput!]
 }
 
 """Added in 26.4.2. Payload for keypair resource policy update mutation."""
@@ -16054,7 +17964,7 @@ Added in 26.4.2. Input for updating a login client type. Both fields are optiona
 """
 input UpdateLoginClientTypeInput {
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
   description: String
@@ -16078,43 +17988,43 @@ input UpdateModelCardV2Input {
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """Author."""
-  author: String = null
+  author: String
 
   """Title."""
-  title: String = null
+  title: String
 
   """Version."""
-  modelVersion: String = null
+  modelVersion: String
 
   """Description."""
-  description: String = null
+  description: String
 
   """ML task."""
-  task: String = null
+  task: String
 
   """Category."""
-  category: String = null
+  category: String
 
   """Architecture."""
-  architecture: String = null
+  architecture: String
 
   """Frameworks."""
-  framework: [String!] = null
+  framework: [String!]
 
   """Labels."""
-  label: [String!] = null
+  label: [String!]
 
   """License."""
-  license: String = null
+  license: String
 
   """README content."""
-  readme: String = null
+  readme: String
 
   """Access level (public or internal)."""
-  accessLevel: ModelCardV2AccessLevel = null
+  accessLevel: ModelCardV2AccessLevel
 }
 
 """
@@ -16209,10 +18119,160 @@ type UpdateObjectStoragePayload {
 """Added in 26.3.0. Input for updating a scoped permission"""
 input UpdatePermissionInput {
   id: UUID!
-  scopeType: RBACElementType = null
-  scopeId: String = null
-  entityType: RBACElementType = null
-  operation: OperationType = null
+  entityType: String
+  permission: PermissionBit
+
+  """Scope type."""
+  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Scope ID."""
+  scopeId: String = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Operation type."""
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+}
+
+"""
+Added in 26.9.0. Patch for a single preset model entry. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelConfigInput {
+  """Name of the model. Omit to keep the current value."""
+  name: String
+
+  """Path to the model file. Omit to keep the current value."""
+  modelPath: String
+
+  """Configuration for the model service. Omit to keep the current value."""
+  service: UpdatePresetModelServiceConfigInput
+
+  """Metadata about the model. Omit to keep the current value."""
+  metadata: UpdatePresetModelMetadataInput
+}
+
+"""
+Added in 26.9.0. Patch for a preset's model definition. Omit `models` to keep the current model entry.
+"""
+input UpdatePresetModelDefinitionInput {
+  """
+  Patch for the model definition's single model entry. Omit to keep the current model entry.
+  """
+  models: [UpdatePresetModelConfigInput!]
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's health check. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelHealthCheckInput {
+  """
+  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored. Omit to keep the current value.
+  """
+  enable: Boolean
+
+  """
+  Interval in seconds between health checks. Omit to keep the current value.
+  """
+  interval: Float
+
+  """Path to check for health status. Omit to keep the current value."""
+  path: String
+
+  """
+  Maximum number of retries for health check. Omit to keep the current value.
+  """
+  maxRetries: Int
+
+  """
+  Maximum time in seconds to wait for a health check response. Omit to keep the current value.
+  """
+  maxWaitTime: Float
+
+  """
+  Expected HTTP status code for a healthy response. Omit to keep the current value.
+  """
+  expectedStatusCode: Int
+
+  """
+  Initial delay in seconds before the first health check. Omit to keep the current value.
+  """
+  initialDelay: Float
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's metadata. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelMetadataInput {
+  """Author of the model. Omit to keep the current value."""
+  author: String
+
+  """Title of the model. Omit to keep the current value."""
+  title: String
+
+  """Version of the model. Omit to keep the current value."""
+  version: String
+
+  """Creation date of the model. Omit to keep the current value."""
+  created: String
+
+  """Description of the model. Omit to keep the current value."""
+  description: String
+
+  """Task type of the model. Omit to keep the current value."""
+  task: String
+
+  """Category of the model. Omit to keep the current value."""
+  category: String
+
+  """Architecture of the model. Omit to keep the current value."""
+  architecture: String
+
+  """Frameworks used by the model. Omit to keep the current value."""
+  framework: [String!]
+
+  """Labels for the model. Omit to keep the current value."""
+  label: [String!]
+
+  """License of the model. Omit to keep the current value."""
+  license: String
+
+  """
+  Minimum resource requirements for the model. Omit to keep the current value.
+  """
+  minResource: JSON
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's service config. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelServiceConfigInput {
+  """
+  Pre-start actions to execute before starting the model service. Omit to keep the current list; provide the full replacement list to change it.
+  """
+  preStartActions: [PreStartActionInput!]
+
+  """
+  Single-string command to start the model service. Omit to keep the current value.
+  """
+  command: String
+
+  """
+  Deprecated. Command to start the model service. Use `command` instead. Omit to keep the current value.
+  """
+  startCommand: [String!] @deprecated(reason: "Use `command` instead.")
+
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping. Omit to keep the current value.
+  """
+  shell: String
+
+  """
+  Port number for the model service. Must be greater than 1. Omit to keep the current value.
+  """
+  port: Int
+
+  """
+  Health check configuration for the model service. Omit to keep the current value.
+  """
+  healthCheck: UpdatePresetModelHealthCheckInput
 }
 
 """
@@ -16220,19 +18280,19 @@ Added in 26.4.2. Input for updating project information. All fields optional.
 """
 input UpdateProjectInput {
   """New project name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New external integration identifier."""
   integrationName: String
 
   """New resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 }
 
 """
@@ -16240,13 +18300,13 @@ Added in 26.4.2. Input for updating a project resource policy. All fields option
 """
 input UpdateProjectResourcePolicyInput {
   """Updated max vfolder count."""
-  maxVfolderCount: Int = null
+  maxVfolderCount: Int
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput = null
+  maxQuotaScopeSize: BinarySizeInput
 
   """Updated max network count."""
-  maxNetworkCount: Int = null
+  maxNetworkCount: Int
 }
 
 """Added in 26.4.2. Payload for project resource policy update mutation."""
@@ -16278,26 +18338,22 @@ input UpdateResourceGroupFairShareSpecInput {
   """Name of the resource group to update."""
   resourceGroupName: String!
 
-  """
-  Half-life for exponential decay in days. Leave null to keep existing value.
-  """
-  halfLifeDays: Int = null
+  """Half-life for exponential decay in days. Omit to leave unchanged."""
+  halfLifeDays: Int
 
-  """Total lookback period in days. Leave null to keep existing value."""
-  lookbackDays: Int = null
+  """Total lookback period in days. Omit to leave unchanged."""
+  lookbackDays: Int
 
-  """
-  Granularity of decay buckets in days. Leave null to keep existing value.
-  """
-  decayUnitDays: Int = null
+  """Granularity of decay buckets in days. Omit to leave unchanged."""
+  decayUnitDays: Int
 
-  """Default weight for entities. Leave null to keep existing value."""
-  defaultWeight: Decimal = null
+  """Default weight for entities. Omit to leave unchanged."""
+  defaultWeight: Decimal
 
   """
-  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
+  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Omit the entire list to keep all existing values.
   """
-  resourceWeights: [ResourceWeightEntryInput!] = null
+  resourceWeights: [ResourceWeightEntryInput!]
 }
 
 """
@@ -16315,42 +18371,36 @@ input UpdateResourceGroupInput {
   """Name of the resource group to update."""
   resourceGroupName: String!
 
-  """
-  Whether the resource group is active. Leave null to keep existing value.
-  """
-  isActive: Boolean = null
+  """Whether the resource group is active. Omit to leave unchanged."""
+  isActive: Boolean
+
+  """Whether the resource group is public. Omit to leave unchanged."""
+  isPublic: Boolean
 
   """
-  Whether the resource group is public. Leave null to keep existing value.
+  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.
   """
-  isPublic: Boolean = null
+  isDefault: Boolean
+
+  """Human-readable description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """App proxy address. Omit to leave unchanged; null clears."""
+  appProxyAddr: String
+
+  """App proxy API token. Omit to leave unchanged; null clears."""
+  appproxyApiToken: String
+
+  """Whether to use host network mode. Omit to leave unchanged."""
+  useHostNetwork: Boolean
+
+  """Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Omit to leave unchanged."""
+  schedulerType: SchedulerType
 
   """
-  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.
   """
-  isDefault: Boolean = null
-
-  """Human-readable description. Leave null to keep existing value."""
-  description: String = null
-
-  """App proxy address. Leave null to keep existing value."""
-  appProxyAddr: String = null
-
-  """App proxy API token. Leave null to keep existing value."""
-  appproxyApiToken: String = null
-
-  """Whether to use host network mode. Leave null to keep existing value."""
-  useHostNetwork: Boolean = null
-
-  """
-  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
-  """
-  schedulerType: SchedulerType = null
-
-  """
-  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
-  """
-  preemption: PreemptionConfigInput = null
+  preemption: PreemptionConfigInput
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""
@@ -16373,10 +18423,10 @@ input UpdateResourcePresetV2Input {
   id: UUID!
 
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated resource slot allocations."""
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]
 
   """Updated shared memory. Use null to clear."""
   sharedMemory: BinarySizeInput
@@ -16500,7 +18550,7 @@ input UpdateRuntimeVariantInput {
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description. Set to null to clear."""
   description: String
@@ -16518,30 +18568,36 @@ input UpdateRuntimeVariantPresetInput {
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New rank."""
-  rank: Int = null
+  rank: Int
 
   """New target."""
-  presetTarget: PresetTarget = null
+  presetTarget: PresetTarget
 
   """
   New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted).
   """
-  valueType: PresetValueType = null
+  valueType: PresetValueType
 
   """New default value."""
-  defaultValue: String = null
+  defaultValue: String
 
   """New key."""
-  key: String = null
+  key: String
 
   """Added in 26.4.4. New required flag."""
-  required: Boolean = null
+  required: Boolean
+
+  """Added in 26.9.0. New version this preset becomes available in."""
+  addedVersion: String
+
+  """Added in 26.9.0. New version this preset is removed in, exclusive."""
+  deprecatedVersion: String
 
   """Added in 26.9.0. New UI category group."""
   category: String
@@ -16564,7 +18620,7 @@ Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
 input UpdateUserResourcePolicyInput {
   """Updated max vfolder count."""
-  maxVfolderCount: Int = null
+  maxVfolderCount: Int
 
   """
   Added in 26.4.2. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
@@ -16572,13 +18628,13 @@ input UpdateUserResourcePolicyInput {
   maxConcurrentLogins: Int
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput = null
+  maxQuotaScopeSize: BinarySizeInput
 
   """Updated max sessions per model session."""
-  maxSessionCountPerModelSession: Int = null
+  maxSessionCountPerModelSession: Int
 
   """Updated max customized image count."""
-  maxCustomizedImageCount: Int = null
+  maxCustomizedImageCount: Int
 }
 
 """Added in 26.4.2. Payload for user resource policy update mutation."""
@@ -16919,10 +18975,8 @@ input UserFairShareFilter {
   """
   domainName: StringFilter = null
 
-  """
-  Added in 26.2.0. Nested filter for user entity properties. Allows filtering by username, email, and active status.
-  """
-  user: UserFairShareUserNestedFilter = null
+  """Added in 26.2.0. Filter by the user this fair share is calculated for."""
+  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserFairShareFilter!] = null
@@ -16959,8 +19013,8 @@ Added in 26.1.0. Fields available for ordering user fair share query results. FA
 enum UserFairShareOrderField {
   FAIR_SHARE_FACTOR
   CREATED_AT
-  USER_USERNAME
-  USER_EMAIL
+  USER_USERNAME @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
+  USER_EMAIL @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
 }
 
 """Added in 24.09.0. Scope parameters for filtering user fair shares."""
@@ -16990,6 +19044,25 @@ input UserFairShareUserNestedFilter {
   isActive: Boolean = null
 }
 
+"""Added in 26.9.0. Filter users by conditions on the keypairs they own."""
+input UserKeypairNestedFilter {
+  """
+  Matches users that own at least one keypair when true, and users owning none when false. Says nothing about what the keypairs hold.
+  """
+  exists: Boolean = null
+
+  """Matches users with at least one keypair satisfying all conditions."""
+  some: KeypairFilter = null
+
+  """
+  Matches users whose every keypair satisfies all conditions (also true when the user has no keypair).
+  """
+  every: KeypairFilter = null
+
+  """Matches users with no keypair satisfying all conditions."""
+  none: KeypairFilter = null
+}
+
 extend type UserNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -17009,6 +19082,9 @@ Added in 26.4.2. User resource policy defining vfolder and quota limits per user
 type UserResourcePolicyV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the policy."""
+  entityId: UUID!
 
   """Policy name."""
   name: String!
@@ -17118,6 +19194,20 @@ input UserRoleV2EnumFilter {
 }
 
 """
+Added in 26.9.0. Scope for the scoped user query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input UserScope {
+  """Domains whose users are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose users are being read."""
+  project: [UUIDScope!] = null
+
+  """Added in 26.9.0. Roles whose holders are being read."""
+  role: [UUIDScope!] = null
+}
+
+"""
 Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
 """
 enum UserStatusV2 {
@@ -17145,6 +19235,9 @@ Added in 26.1.0. User-level usage bucket representing aggregated resource consum
 type UserUsageBucket implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the usage bucket."""
+  fieldId: UUID!
 
   """UUID of the user this usage bucket belongs to."""
   userUuid: UUID!
@@ -17292,6 +19385,9 @@ type UserV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.9.0. UUID of the user."""
+  entityId: UUID!
+
   """Basic profile information including username, email, and display name."""
   basicInfo: UserV2BasicInfo!
 
@@ -17325,6 +19421,9 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """Added in 26.9.0. Resource groups this user may schedule on."""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
 """
@@ -17409,6 +19508,9 @@ input UserV2Filter {
   statusInfo: StringFilter = null
   domainName: StringFilter = null
 
+  """Added in 26.9.0. Filter by domain ID."""
+  domainId: UUIDFilter = null
+
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
 
@@ -17434,7 +19536,24 @@ input UserV2Filter {
   """Added in 26.4.4. Filter by container supplementary GIDs."""
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by last modification timestamp."""
+  modifiedAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by when TOTP two-factor auth was activated."""
+  totpActivatedAt: NullableDateTimeFilter = null
+
+  """Added in 26.9.0. Filter by conditions on the user's keypairs."""
+  keypairs: UserKeypairNestedFilter = null
+
+  """
+  Filter by the user's domain. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use the `domainName` filter, or look the domain up first.
+  """
   domain: UserDomainNestedFilter = null
+
+  """
+  Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
+  """
   project: UserProjectNestedFilter = null
   AND: [UserV2Filter!] = null
   OR: [UserV2Filter!] = null
@@ -17450,16 +19569,30 @@ input UserV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name (MIN aggregation).
+Added in 26.2.0. Fields available for ordering user query results. Added in 26.9.0: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. Each value orders by the user column of the same name; ENTITY_ID orders by the user's own id and PROJECT_NAME folds the projects the user is on.
 """
 enum UserV2OrderField {
+  ENTITY_ID
   CREATED_AT
   MODIFIED_AT
   USERNAME
   EMAIL
+  FULL_NAME
+  DESCRIPTION
   STATUS
+  STATUS_INFO
+  ROLE
   DOMAIN_NAME
-  PROJECT_NAME
+  DOMAIN_ID
+  INTEGRATION_NAME
+  RESOURCE_POLICY
+  NEED_PASSWORD_CHANGE
+  TOTP_ACTIVATED
+  TOTP_ACTIVATED_AT
+  SUDO_SESSION_ENABLED
+  CONTAINER_UID
+  CONTAINER_MAIN_GID
+  PROJECT_NAME @deprecated(reason: "Deprecated since 26.9.0. A user belongs to many projects, so this order folds them into a single name. Narrow the results with the `project` filter instead.")
 }
 
 """
@@ -17468,6 +19601,9 @@ Added in 26.2.0. User's organizational context and permissions. Contains domain 
 type UserV2OrganizationInfo {
   """Name of the domain this user belongs to."""
   domainName: String
+
+  """Added in 26.9.0. ID of the domain this user belongs to."""
+  domainId: UUID
 
   """User's role determining access permissions. See UserRoleV2 enum."""
   role: UserRoleV2
@@ -17593,6 +19729,9 @@ input UtilizationIdleCheckerThresholdInput {
 type VFSStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the VFS storage."""
+  entityId: UUID!
   name: String!
   host: String!
   basePath: String!
@@ -17625,6 +19764,9 @@ Added in 26.4.2. Virtual folder entity with structured field groups. Provides co
 type VFolder implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
+
+  """Added in 26.9.0. UUID of the vfolder."""
+  entityId: UUID!
 
   """
   Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
@@ -17660,11 +19802,18 @@ type VFolder implements Node {
   """
   usage: VFolderUsageInfo
 
-  """Added in 26.4.4. Model cards backed by this vfolder."""
-  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  """
+  Added in 26.4.4. Model cards backed by this vfolder. Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.
+  """
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @deprecated(reason: "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.")
 
   """Added in 26.9.0. The labels on this vfolder."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
+
+  """
+  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  """
+  permissions: [PermissionBit!]!
 }
 
 """
@@ -17805,11 +19954,43 @@ type VFolderMetadataInfo {
   cloneable: Boolean!
 }
 
-"""Added in 26.4.2. Mount permission level for a virtual folder."""
+"""
+Added in 26.4.2. Mount permission level for a virtual folder. NONE (added in 26.9.0) mounts to nobody; RW_DELETE mounts as READ_WRITE.
+"""
 enum VFolderMountPermission {
+  NONE
   READ_ONLY
   READ_WRITE
   RW_DELETE
+}
+
+"""
+Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+"""
+type VFolderMountPoliciesPayload {
+  """One row per user."""
+  items: [VFolderMountPolicy!]!
+}
+
+"""Added in 26.9.0. The mount level one user gets on a virtual folder."""
+type VFolderMountPolicy {
+  """Mount policy row ID."""
+  id: UUID!
+
+  """ID of the virtual folder."""
+  vfolderId: UUID!
+
+  """User the mount level is set for."""
+  userId: UUID!
+
+  """Mount level: NONE, RO or RW."""
+  permission: VFolderMountPermission!
+
+  """When the row was first set."""
+  createdAt: DateTime!
+
+  """When the level was last replaced."""
+  updatedAt: DateTime!
 }
 
 """Added in 26.4.2. Operation status of a virtual folder."""
@@ -17907,6 +20088,28 @@ type VFolderQuotaInfo {
 }
 
 """
+Added in 26.9.0. Scope for the scoped vfolder query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input VFolderScope {
+  """Domains whose vfolders are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose vfolders are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose vfolders are being read."""
+  user: [UUIDScope!] = null
+}
+
+"""
+Added in 26.9.0. Uses narrowing a vfolder query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only vfolders the caller can read are returned, even when a listed entity is tied to others.
+"""
+input VFolderUsage {
+  """Entities whose use of the vfolder narrows the read."""
+  usedBy: VFolderUsedBy = null
+}
+
+"""
 Added in 26.4.4. Usage statistics for a virtual folder, measured live through the storage proxy.
 """
 type VFolderUsageInfo {
@@ -17944,6 +20147,17 @@ input VFolderUsageModeFilter {
 
   """Exclude usage modes not in this list."""
   notIn: [VFolderUsageMode!] = null
+}
+
+"""Added in 26.9.0. Entities whose use of a vfolder narrows the read."""
+input VFolderUsedBy {
+  """
+  Deployments whose live replica groups use the vfolder as the model of their current revision.
+  """
+  deployment: [UUID!] = null
+
+  """Model cards built on the vfolder."""
+  modelCard: [UUID!] = null
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""

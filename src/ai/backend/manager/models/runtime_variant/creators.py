@@ -12,12 +12,18 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.runtime_variant.searchable_fields import (
+    RuntimeVariantSearchableFields,
+)
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class RuntimeVariantCreator(GlobalEntityCreator[RuntimeVariantRow, RuntimeVariantData]):
+class RuntimeVariantCreator(
+    CreatedInPublic[RuntimeVariantRow], EntityCreator[RuntimeVariantRow, RuntimeVariantData]
+):
     """Creator for a runtime variant — a name in the global runtime catalog."""
 
     name: str
@@ -46,4 +52,4 @@ class RuntimeVariantCreator(GlobalEntityCreator[RuntimeVariantRow, RuntimeVarian
 
     @override
     def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
-        return row.to_data()
+        return RuntimeVariantSearchableFields.own.to_data(row)

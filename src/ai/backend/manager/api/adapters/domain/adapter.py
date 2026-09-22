@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import assert_never
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.resource_group import ResourceGroupName
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
     CreateDomainInput,
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     DomainOrder,
     PurgeDomainInput,
     RestoreDomainInput,
+    ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
@@ -29,22 +29,37 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
     RestoreDomainPayload,
 )
-from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.dto.manager.v2.domain.types import (
+    DomainOrderField,
+    DomainProjectFilter,
+    DomainUserFilter,
+    OrderDirection,
+)
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.creators import DomainCreator
-from ai.backend.manager.models.domain.orders import DomainOrders
+from ai.backend.manager.models.domain.deprecated_search import (
+    DeprecatedDomainConditions,
+    DeprecatedDomainOrders,
+)
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.scopes import (
+    ResourceGroupDomainTarget,
+)
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.domain.updaters import (
     DomainRestoreUpdater,
     DomainSoftDeleteUpdater,
     DomainUpdater,
 )
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
@@ -54,25 +69,30 @@ from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import (
-    ResourceGroupDomainScopeItem,
     ScopedSearchDomainsAction,
 )
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
+from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
-    forward_order=DomainOrders.created_at(ascending=False),
-    backward_order=DomainOrders.created_at(ascending=True),
-    forward_condition_factory=DomainConditions.by_cursor_forward,
-    backward_condition_factory=DomainConditions.by_cursor_backward,
-    tiebreaker_order=DomainRow.name.asc(),
+    forward_order=DomainSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=DomainRow.id,
 )
 
 
 class DomainAdapter(BaseAdapter):
     """Adapter for domain operations."""
+
+    _domain: DomainProcessors
+    _resource_group: ResourceGroupProcessors
+
+    def __init__(self, domain: DomainProcessors, resource_group: ResourceGroupProcessors) -> None:
+        self._domain = domain
+        self._resource_group = resource_group
 
     async def batch_load_by_names(
         self, names: Sequence[str]
@@ -85,9 +105,9 @@ class DomainAdapter(BaseAdapter):
         if not names:
             return []
         keys = [DomainName(name) for name in names]
-        lookup = await self._processors.domain.bulk_lookup.run(BulkLookupDomainsAction(names=keys))
+        lookup = await self._domain.bulk_lookup.run(BulkLookupDomainsAction(names=keys))
         ids = [lookup.resolved[key] for key in keys if key in lookup.resolved]
-        got = await self._processors.domain.bulk_get.run(BulkGetDomainsAction(ids=ids))
+        got = await self._domain.bulk_get.run(BulkGetDomainsAction(ids=ids))
         domains = got.values()
         errors = got.errors()
         nodes: list[DomainNode | Exception | None] = []
@@ -109,7 +129,7 @@ class DomainAdapter(BaseAdapter):
         """Batch load domains by UUID for DataLoader use."""
         if not ids:
             return []
-        result = await self._processors.domain.bulk_get.run(BulkGetDomainsAction(ids=list(ids)))
+        result = await self._domain.bulk_get.run(BulkGetDomainsAction(ids=list(ids)))
         return [
             self._domain_data_to_node(item.value)
             if item.value is not None
@@ -119,12 +139,8 @@ class DomainAdapter(BaseAdapter):
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""
-        resolved = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
-        result = await self._processors.domain.get.run(
-            GetDomainAction(domain_id=resolved.entity_id())
-        )
+        resolved = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
         return self._domain_data_to_node(result.data)
 
     async def admin_search(
@@ -147,10 +163,48 @@ class DomainAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.domain.global_search.run(
-            GlobalSearchDomainsAction(searcher=searcher)
+        result = await self._domain.global_search.run(
+            GlobalSearchDomainsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
+        return AdminSearchDomainsPayload(
+            items=[self._domain_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchDomainsInput,
+    ) -> AdminSearchDomainsPayload:
+        """Search the domains the named scopes reach, combined with OR."""
+        conditions = self._convert_domain_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            DomainSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_DOMAIN_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._domain.scoped_search.run(
+            ScopedSearchDomainsAction(
+                searcher=ScopedSearcher(
+                    scopes=[
+                        ResourceGroupDomainTarget(resource_group_id=ResourceGroupID(entry.value))
+                        for entry in input.scope.resource_group or ()
+                    ],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
+        )
         return AdminSearchDomainsPayload(
             items=[self._domain_data_to_node(item) for item in result.items],
             total_count=result.total_count,
@@ -164,7 +218,7 @@ class DomainAdapter(BaseAdapter):
         input: AdminSearchDomainsInput,
     ) -> AdminSearchDomainsPayload:
         """Search the domains a resource group serves."""
-        resource_group = await self._processors.resource_group.lookup.run(
+        resource_group = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(resource_group_name))
         )
         conditions = self._convert_domain_filter(input.filter) if input.filter else []
@@ -182,10 +236,15 @@ class DomainAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.domain.scoped_search.run(
+        result = await self._domain.scoped_search.run(
             ScopedSearchDomainsAction(
-                items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group.entity_id())],
-                searcher=searcher,
+                searcher=ScopedSearcher(
+                    scopes=[
+                        ResourceGroupDomainTarget(resource_group_id=resource_group.entity_id())
+                    ],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
 
@@ -202,7 +261,7 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> DomainPayload:
         """Create a new domain (superadmin only)."""
-        result = await self._processors.domain.create_domain_node.run(
+        result = await self._domain.create_domain_node.run(
             CreateDomainNodeAction(
                 user_info=user_info,
                 creator=DomainCreator(
@@ -223,39 +282,15 @@ class DomainAdapter(BaseAdapter):
         user_info: UserInfo,
     ) -> DomainPayload:
         """Update an existing domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(domain_name))
-        )
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         updater = DomainUpdater(
             domain_id=target.entity_id(),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            allowed_docker_registries=(
-                OptionalState.nop()
-                if isinstance(input.allowed_docker_registries, Sentinel)
-                else OptionalState.update(input.allowed_docker_registries)
-                if input.allowed_docker_registries is not None
-                else OptionalState.nop()
-            ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.nullify()
-                if input.integration_name is None
-                else TriState.update(input.integration_name)
-            ),
+            description=TriState.from_unset(input.description),
+            is_active=OptionalState.from_unset(input.is_active),
+            allowed_docker_registries=OptionalState.from_unset(input.allowed_docker_registries),
+            integration_name=TriState.from_unset(input.integration_name),
         )
-        result = await self._processors.domain.update_domain_node.run(
+        result = await self._domain.update_domain_node.run(
             UpdateDomainNodeAction(
                 updater=updater,
                 user_info=user_info,
@@ -265,10 +300,8 @@ class DomainAdapter(BaseAdapter):
 
     async def admin_delete(self, input: DeleteDomainInput) -> DeleteDomainPayload:
         """Soft-delete a domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(input.name))
-        )
-        await self._processors.domain.delete_domain.run(
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        await self._domain.delete_domain.run(
             DeleteDomainAction(
                 updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
@@ -277,10 +310,8 @@ class DomainAdapter(BaseAdapter):
 
     async def admin_restore(self, input: RestoreDomainInput) -> RestoreDomainPayload:
         """Restore a soft-deleted domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(input.name))
-        )
-        await self._processors.domain.restore_domain.run(
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        await self._domain.restore_domain.run(
             RestoreDomainAction(
                 updater=DomainRestoreUpdater(domain_id=target.entity_id()),
             )
@@ -289,93 +320,24 @@ class DomainAdapter(BaseAdapter):
 
     async def admin_purge(self, input: PurgeDomainInput) -> PurgeDomainPayload:
         """Permanently purge a domain (superadmin only)."""
-        target = await self._processors.domain.lookup.run(
-            LookupDomainAction(name=DomainName(input.name))
-        )
-        await self._processors.domain.purge_domain.run(
+        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(input.name)))
+        await self._domain.purge_domain.run(
             PurgeDomainAction(domain_id=target.entity_id(), name=input.name)
         )
         return PurgeDomainPayload(purged=True)
 
     def _convert_domain_filter(self, filter: DomainFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.name is not None:
-            condition = self._convert_name_filter(filter.name)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.id is not None:
-            condition = filter.id.build_query_condition(
-                equals_factory=DomainConditions.by_id_equals,
-                in_factory=DomainConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.description is not None:
-            condition = self._convert_description_filter(filter.description)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.is_active is not None:
-            conditions.append(DomainConditions.by_is_active(filter.is_active))
-
-        if filter.created_at is not None:
-            condition = filter.created_at.build_query_condition(
-                before_factory=DomainConditions.by_created_at_before,
-                after_factory=DomainConditions.by_created_at_after,
-                equals_factory=DomainConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.modified_at is not None:
-            condition = filter.modified_at.build_query_condition(
-                before_factory=DomainConditions.by_updated_at_before,
-                after_factory=DomainConditions.by_updated_at_after,
-                equals_factory=DomainConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.project is not None:
-            if filter.project.name is not None:
-                condition = filter.project.name.build_query_condition(
-                    contains_factory=DomainConditions.by_project_name_contains,
-                    equals_factory=DomainConditions.by_project_name_equals,
-                    starts_with_factory=DomainConditions.by_project_name_starts_with,
-                    ends_with_factory=DomainConditions.by_project_name_ends_with,
-                    in_factory=DomainConditions.by_project_name_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if filter.project.is_active is not None:
-                conditions.append(DomainConditions.by_project_is_active(filter.project.is_active))
-
-        if filter.user is not None:
-            if filter.user.username is not None:
-                condition = filter.user.username.build_query_condition(
-                    contains_factory=DomainConditions.by_user_username_contains,
-                    equals_factory=DomainConditions.by_user_username_equals,
-                    starts_with_factory=DomainConditions.by_user_username_starts_with,
-                    ends_with_factory=DomainConditions.by_user_username_ends_with,
-                    in_factory=DomainConditions.by_user_username_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if filter.user.email is not None:
-                condition = filter.user.email.build_query_condition(
-                    contains_factory=DomainConditions.by_user_email_contains,
-                    equals_factory=DomainConditions.by_user_email_equals,
-                    starts_with_factory=DomainConditions.by_user_email_starts_with,
-                    ends_with_factory=DomainConditions.by_user_email_ends_with,
-                    in_factory=DomainConditions.by_user_email_in,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if filter.user.is_active is not None:
-                conditions.append(DomainConditions.by_user_is_active(filter.user.is_active))
+        fields = DomainSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_string_filter(filter.description, fields.description.filter),
+            *self.apply_bool_filter(filter.is_active, fields.is_active.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.modified_at, fields.updated_at.filter),
+            *self._convert_project_nested_filter(filter.project),
+            *self._convert_user_nested_filter(filter.user),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -397,35 +359,77 @@ class DomainAdapter(BaseAdapter):
 
         return conditions
 
-    def _convert_name_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=DomainConditions.by_name_contains,
-            equals_factory=DomainConditions.by_name_equals,
-            starts_with_factory=DomainConditions.by_name_starts_with,
-            ends_with_factory=DomainConditions.by_name_ends_with,
-            in_factory=DomainConditions.by_name_in,
-        )
+    def _convert_project_nested_filter(
+        self, project_filter: DomainProjectFilter | None
+    ) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one project of the domain."""
+        if project_filter is None:
+            return []
+        fields = ProjectSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(project_filter.name, fields.name.filter),
+            *self.apply_bool_filter(project_filter.is_active, fields.is_active.filter),
+        ]
+        if not conditions:
+            return []
+        return [DeprecatedDomainConditions.exists_project_combined(conditions)]
 
-    def _convert_description_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=DomainConditions.by_description_contains,
-            equals_factory=DomainConditions.by_description_equals,
-            starts_with_factory=DomainConditions.by_description_starts_with,
-            ends_with_factory=DomainConditions.by_description_ends_with,
-            in_factory=DomainConditions.by_description_in,
-        )
+    def _convert_user_nested_filter(
+        self, user_filter: DomainUserFilter | None
+    ) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one user of the domain."""
+        if user_filter is None:
+            return []
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(user_filter.username, fields.username.filter),
+            *self.apply_string_filter(user_filter.email, fields.email.filter),
+            *self._convert_member_active_filter(user_filter.is_active),
+        ]
+        if not conditions:
+            return []
+        return [DeprecatedDomainConditions.exists_user_combined(conditions)]
 
-    @staticmethod
-    def _convert_orders(order: list[DomainOrder]) -> list[QueryOrder]:
-        return [_resolve_order(o.field, o.direction) for o in order]
+    def _convert_member_active_filter(self, is_active: bool | None) -> list[QueryCondition]:
+        """Active means the user's account status is ACTIVE."""
+        if is_active is None:
+            return []
+        status = UserSearchableFields.own.status.filter
+        if is_active:
+            return [status.equals(UserStatus.ACTIVE)]
+        return [status.not_equals(UserStatus.ACTIVE)]
+
+    def _convert_orders(self, order: list[DomainOrder]) -> list[QueryOrder]:
+        return [self._convert_order(o) for o in order]
+
+    def _convert_order(self, order: DomainOrder) -> QueryOrder:
+        """The query order one requested order field names."""
+        fields = DomainSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case DomainOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case DomainOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case DomainOrderField.MODIFIED_AT:
+                return fields.updated_at.order.apply(ascending)
+            case DomainOrderField.IS_ACTIVE:
+                return fields.is_active.order.apply(ascending)
+            case DomainOrderField.PROJECT_NAME:
+                return DeprecatedDomainOrders.by_project_name(ascending)
+            case DomainOrderField.USER_USERNAME:
+                return DeprecatedDomainOrders.by_user_username(ascending)
+            case DomainOrderField.USER_EMAIL:
+                return DeprecatedDomainOrders.by_user_email(ascending)
+            case _:
+                assert_never(order.field)
 
     @staticmethod
     def _domain_data_to_node(data: DomainData) -> DomainNode:
         """Convert data layer type to Pydantic DTO."""
         return DomainNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=DomainBasicInfo(
                 name=data.name,
                 description=data.description,
@@ -441,23 +445,3 @@ class DomainAdapter(BaseAdapter):
                 modified_at=data.updated_at,
             ),
         )
-
-
-def _resolve_order(field: DomainOrderField, direction: OrderDirection) -> QueryOrder:
-    """Resolve a DomainOrderField + OrderDirection pair to a QueryOrder."""
-    ascending = direction == OrderDirection.ASC
-    match field:
-        case DomainOrderField.NAME:
-            return DomainOrders.name(ascending)
-        case DomainOrderField.CREATED_AT:
-            return DomainOrders.created_at(ascending)
-        case DomainOrderField.MODIFIED_AT:
-            return DomainOrders.updated_at(ascending)
-        case DomainOrderField.IS_ACTIVE:
-            return DomainOrders.is_active(ascending)
-        case DomainOrderField.PROJECT_NAME:
-            return DomainOrders.by_project_name(ascending)
-        case DomainOrderField.USER_USERNAME:
-            return DomainOrders.by_user_username(ascending)
-        case DomainOrderField.USER_EMAIL:
-            return DomainOrders.by_user_email(ascending)

@@ -225,6 +225,7 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     from sqlalchemy.engine import Connection, Engine
 
     from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
+    from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
     from ai.backend.manager.repositories.db.engine import create_async_engine
 
     ensure_all_tables_registered()
@@ -236,6 +237,8 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     def _create_all_sync(connection: Connection, engine: Engine) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
+        for statement in SEED_GLOBAL_ENTITIES_SQL:
+            connection.exec_driver_sql(statement)
         log.info("Stamping alembic version to head...")
         script = ScriptDirectory.from_config(alembic_cfg)
         heads = script.get_heads()

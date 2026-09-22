@@ -11,15 +11,53 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetOrder as RolePresetOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.role_preset.request import (
+    RolePresetPermissionNestedFilter as RolePresetPermissionNestedFilterDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types import RBACElementTypeFilterGQL
+
+from .permission import RolePermissionPresetFilterGQL
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter role presets by conditions on the permission entries they carry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RolePresetPermissionNestedFilter",
+)
+class RolePresetPermissionNestedFilterGQL(PydanticInputMixin[RolePresetPermissionNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "Matches presets carrying at least one permission entry when true, and presets "
+            "carrying none when false. Says nothing about what the entries hold."
+        ),
+        default=None,
+    )
+    some: RolePermissionPresetFilterGQL | None = gql_field(
+        description="Matches presets with at least one permission entry satisfying all conditions.",
+        default=None,
+    )
+    every: RolePermissionPresetFilterGQL | None = gql_field(
+        description=(
+            "Matches presets whose every permission entry satisfies all conditions "
+            "(also true when the preset carries none)."
+        ),
+        default=None,
+    )
+    none: RolePermissionPresetFilterGQL | None = gql_field(
+        description="Matches presets with no permission entry satisfying all conditions.",
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -31,14 +69,19 @@ from ai.backend.manager.api.gql.rbac.types import RBACElementTypeFilterGQL
 )
 class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
-    scope_type: RBACElementTypeFilterGQL | None = gql_field(
-        description="Filter by scope type.", default=None
-    )
+    scope_type: StringFilter | None = gql_field(description="Filter by scope type.", default=None)
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)
     deleted: bool | None = gql_field(
         description=(
             "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
             "set this explicitly to `true` to inspect archived presets."
+        ),
+        default=None,
+    )
+    permissions: RolePresetPermissionNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by conditions on the permission entries the preset carries.",
         ),
         default=None,
     )

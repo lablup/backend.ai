@@ -32,18 +32,22 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
 from ai.backend.manager.models.deployment_revision_preset.purgers import DeploymentPresetPurger
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
-    DeploymentPresetSlotOperationScope,
+    DeploymentPresetSlotTarget,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     PresetResourceSlotSearcher,
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -99,10 +103,10 @@ def _slots(*entries: tuple[str, str]) -> list[PresetResourceSlotCreator]:
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -116,9 +120,13 @@ async def database(
             ResourceSlotTypeRow,
             DeploymentRevisionPresetRow,
             PresetResourceSlotRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
         ],
     ):
-        async with database_connection.begin_session() as session:
+        async with global_entity_ids.begin_session() as session:
             session.add(
                 RuntimeVariantRow(
                     id=_VARIANT_ID,
@@ -130,7 +138,7 @@ async def database(
                 ResourceSlotTypeRow(slot_name="cpu", slot_type="count"),
                 ResourceSlotTypeRow(slot_name="mem", slot_type="bytes"),
             ])
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -148,7 +156,7 @@ async def _slot_map(
 ) -> dict[str, Decimal]:
     async with V2DBOpsProvider(database).read_ops() as r:
         result = await r.search_with_scopes(
-            (DeploymentPresetSlotOperationScope(preset_id=preset_id),),
+            (DeploymentPresetSlotTarget(preset_id=preset_id),),
             PresetResourceSlotSearcher(pagination=NoPagination()),
         )
     return {item.slot_name: item.quantity for item in result.items}
@@ -161,7 +169,7 @@ class TestCreate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        result = await ops.create_global_entity_with_fields(
+        result = await ops.create_entity_with_fields(
             _creator(), _slots(("cpu", "2"), ("mem", "1024"))
         )
         assert await _slot_map(database, result.data.id) == {
@@ -172,14 +180,14 @@ class TestCreate:
     async def test_first_preset_takes_the_rank_gap(
         self, ops: OpsRepository[DeploymentRevisionPresetData]
     ) -> None:
-        result = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "1")))
+        result = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "1")))
         assert result.data.rank == RANK_GAP
 
     async def test_each_preset_takes_the_next_rank(
         self, ops: OpsRepository[DeploymentRevisionPresetData]
     ) -> None:
-        first = await ops.create_global_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
-        second = await ops.create_global_entity_with_fields(_creator("p2"), _slots(("cpu", "1")))
+        first = await ops.create_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
+        second = await ops.create_entity_with_fields(_creator("p2"), _slots(("cpu", "1")))
         assert second.data.rank == first.data.rank + RANK_GAP
 
 
@@ -190,7 +198,7 @@ class TestUpdate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "2")))
+        created = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "2")))
 
         await repository.update(
             DeploymentPresetUpdater(preset_id=created.data.id),
@@ -208,7 +216,7 @@ class TestUpdate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "2")))
+        created = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "2")))
 
         updated = await repository.update(
             DeploymentPresetUpdater(
@@ -226,7 +234,7 @@ class TestUpdate:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator(), _slots(("cpu", "2")))
+        created = await ops.create_entity_with_fields(_creator(), _slots(("cpu", "2")))
 
         await repository.update(DeploymentPresetUpdater(preset_id=created.data.id), [])
 
@@ -240,7 +248,7 @@ class TestReadAndPurge:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
+        created = await ops.create_entity_with_fields(_creator("p1"), _slots(("cpu", "1")))
 
         fetched = await repository.get_by_id(created.data.id)
 
@@ -253,7 +261,7 @@ class TestReadAndPurge:
         ops: OpsRepository[DeploymentRevisionPresetData],
         repository: DeploymentPresetRepository,
     ) -> None:
-        created = await ops.create_global_entity_with_fields(
+        created = await ops.create_entity_with_fields(
             _creator(), _slots(("cpu", "1"), ("mem", "8"))
         )
 
@@ -274,11 +282,12 @@ class TestReadingBackWhatSqlComputed:
         verbs: list[str] = []
 
         def record(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
-            verbs.append(statement.split()[0].upper())
+            if "deployment_revision_presets" in statement:
+                verbs.append(statement.split()[0].upper())
 
         sa.event.listen(database.sync_engine, "before_cursor_execute", record)
         try:
-            await ops.create_global_entity(_creator())
+            await ops.create_entity(_creator())
         finally:
             sa.event.remove(database.sync_engine, "before_cursor_execute", record)
 
@@ -290,11 +299,12 @@ class TestReadingBackWhatSqlComputed:
         verbs: list[str] = []
 
         def record(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
-            verbs.append(statement.split()[0].upper())
+            if "deployment_revision_presets" in statement:
+                verbs.append(statement.split()[0].upper())
 
         sa.event.listen(database.sync_engine, "before_cursor_execute", record)
         try:
-            created = await ops.atomic_create_global_entities([
+            created = await ops.atomic_create_entities([
                 _creator("p1"),
                 _creator("p2"),
                 _creator("p3"),

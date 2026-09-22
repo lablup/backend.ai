@@ -45,6 +45,7 @@ from ai.backend.manager.actions.v2.field.processor import (
     OwnerLookupProcessor,
     SingleFieldActionProcessor,
 )
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
@@ -55,8 +56,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     BulkGetOwnedFieldOpsAction,
     BulkScopedSearchOpsAction,
     CreateFieldOpsAction,
+    GlobalSearcherOpsAction,
     OperationScopeOpsAction,
-    SearchGlobalOpsAction,
     UpsertFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
@@ -68,8 +69,10 @@ from ai.backend.manager.actions.v2.ops.result import (
     OwnedFieldsOpsResult,
     ScopedFieldsOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
 from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.processor import (
@@ -86,7 +89,7 @@ from ai.backend.manager.services.ops.service import (
     FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
-    GlobalSearchService,
+    GlobalSearcherService,
     RestoreService,
     SearchFieldsService,
     UpdateService,
@@ -137,6 +140,26 @@ class FieldGroup[TFieldData: FieldData]:
                 gate=gate,
                 backing=backing,
             )
+        )
+
+    def scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, TResult]:
+        """Rows of this kind within one scope, answered for by that scope.
+
+        The service-backed counterpart of :meth:`search_ops`, for an operation the ops
+        specs do not cover.
+        """
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return ScopeActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
         )
 
     def search_ops[TAction: OperationScopeOpsAction[Any, Any]](
@@ -198,19 +221,35 @@ class FieldGroup[TFieldData: FieldData]:
             validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+    def global_scope[TAction: BaseGlobalAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, TResult]:
+        """Run a service over this field kind system-wide, behind the global gate."""
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return GlobalActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TFieldData]]:
-        """A read across every row of this field type, behind the SUPERADMIN gate.
+        """A read across every row of this field type, behind the global gate.
 
         For one owner's rows use :meth:`search_ops`; this one names no owner."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
+            GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

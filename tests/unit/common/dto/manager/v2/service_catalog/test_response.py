@@ -34,8 +34,10 @@ def _make_endpoint_info(**kwargs: object) -> EndpointInfo:
 
 def _make_service_catalog_node(**kwargs: object) -> ServiceCatalogNode:
     now = datetime.now(tz=UTC)
+    catalog_id = uuid.uuid4()
     defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
+        "id": catalog_id,
+        "entity_id": catalog_id,
         "service_group": "my-group",
         "instance_id": "instance-001",
         "display_name": "My Service",
@@ -60,6 +62,7 @@ class TestServiceCatalogNode:
         now = datetime.now(tz=UTC)
         node = ServiceCatalogNode(
             id=catalog_id,
+            entity_id=catalog_id,
             service_group="my-group",
             instance_id="instance-001",
             display_name="My Service",

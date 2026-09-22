@@ -23,7 +23,9 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -38,6 +40,12 @@ from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+    LookupProjectResourcePolicyAction,
+)
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
+)
 from ai.backend.manager.services.user_resource_policy.actions.lookup import (
     LookupUserResourcePolicyAction,
 )
@@ -123,11 +131,12 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
@@ -136,9 +145,9 @@ from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
-    query_allowed_sgroups,
 )
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -1346,7 +1355,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             ctx.config_provider.config.manager.hide_agents
             and ctx.user["role"] != UserRole.SUPERADMIN
         ):
-            raise ObjectNotFound(object_name="agent")
+            raise AgentNotFound()
 
         loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
@@ -1378,7 +1387,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             ctx.config_provider.config.manager.hide_agents
             and ctx.user["role"] != UserRole.SUPERADMIN
         ):
-            raise ObjectNotFound(object_name="agent")
+            raise AgentNotFound()
 
         total_count = await AgentSummary.load_count(
             ctx,
@@ -1476,7 +1485,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         if ctx.user["role"] != UserRole.SUPERADMIN:
             if name != ctx.user["domain_name"]:
                 # prevent querying other domains if not superadmin
-                raise ObjectNotFound(object_name="domain")
+                raise DomainNotFound()
         loader = ctx.dataloader_manager.get_loader(ctx, "Domain.by_name")
         return cast(Domain, await loader.load(name))
 
@@ -1585,8 +1594,6 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         type: list[str] | None = None,
     ) -> Group:
-        if type is None:
-            type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1616,16 +1623,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 domain_name=client_domain,
             )
             group = cast(Group, await loader.load(id))
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "Group.by_user",
-            )
-            client_groups = [
-                group
-                for group in cast(Sequence[Group], await loader.load(client_user_id))
-                if group.type in type
-            ]
-            if group.id not in (g.id for g in client_groups):
+            async with ctx.db.begin_readonly_session() as db_session:
+                is_member = await db_session.scalar(
+                    sa.select(user_scope_membership_exists(ProjectEntityType(), id, client_user_id))
+                )
+            if not is_member:
                 raise InsufficientPrivilege
         else:
             raise InvalidAPIParameters("Unknown client role")
@@ -2216,6 +2218,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         name: str,
     ) -> ProjectResourcePolicy:
         ctx: GraphQueryContext = info.context
+        # Same rule as the keypair and user policies: the resolved policy answers for
+        # the read.
+        await ctx.processors.project_resource_policy.lookup.run(
+            LookupProjectResourcePolicyAction(name=name)
+        )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "ProjectResourcePolicy.by_name",
@@ -2302,11 +2309,16 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[ScalingGroup]:
         ctx: GraphQueryContext = info.context
         domain_name = domain_name or ctx.user["domain_name"]
-        async with ctx.db.begin() as db_conn:
-            sgroup_rows = await query_allowed_sgroups(
-                db_conn, domain_name, ProjectID(project_id), access_key
-            )
-        conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
+        owner = await ctx.processors.user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
+        )
+        domain_id = await ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
+        allowed = await ctx.scheduler_repository.query_allowed_resource_groups(
+            domain_id=domain_id,
+            project_ids=[ProjectID(project_id)],
+            user_id=UserID(owner.owner_entity_id),
+        )
+        conditions = [and_names([rg.name for rg in allowed])]
         sgroup_orm_rows = await ResourceGroupRow.list_by_condition(conditions, db=ctx.db)
         return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
 

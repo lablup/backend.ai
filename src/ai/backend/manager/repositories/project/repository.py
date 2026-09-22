@@ -23,9 +23,13 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -48,6 +52,8 @@ project_repository_resilience = Resilience(
 
 class ProjectRepository:
     _db_source: ProjectDBSource
+    _v2_ops: V2DBOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
@@ -56,15 +62,26 @@ class ProjectRepository:
         self,
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db_source = ProjectDBSource(db, v2_ops_provider)
         self._v2_ops = v2_ops_provider
+        self._policy_ops = policy_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._storage_manager = storage_manager
+
+    @project_repository_resilience.apply()
+    async def create_project(self, creator: ProjectCreator) -> ProjectData:
+        """Register a project under its domain and lend it the resource policy it is
+        subject to."""
+        async with self._policy_ops.write_ops() as w:
+            data = await w.create_role_managed_entity(creator)
+            await w.restate_project_resource_policy_share(ProjectID(data.id))
+            return data
 
     @project_repository_resilience.apply()
     async def modify_validated(
@@ -72,8 +89,12 @@ class ProjectRepository:
         updater: ProjectUpdater,
     ) -> ProjectData | None:
         """Modify a project. Who belongs to it is the roster's own operation."""
-        async with self._v2_ops.write_ops() as w:
-            return await w.update_data(updater)
+        async with self._policy_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                return None
+            await w.restate_project_resource_policy_share(ProjectID(data.id))
+            return data
 
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:

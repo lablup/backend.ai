@@ -3,13 +3,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
     QuotaScopeID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.types import ActionOperationType
@@ -26,14 +27,10 @@ from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
-    VFolderPermission,
-    VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.vfolder.types import (
-    VFolderBaseInfo,
-    VFolderOwnershipInfo,
     VFolderUsageInfo,
 )
 
@@ -85,7 +82,7 @@ class VFolderGlobalAction(BaseGlobalAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod
@@ -100,7 +97,7 @@ class VFolderScopeAction(BaseScopeAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod
@@ -156,35 +153,8 @@ class GetVFolderAction(VFolderAction):
 @dataclass
 class GetVFolderActionResult:
     user_uuid: uuid.UUID
-    base_info: VFolderBaseInfo
-    ownership_info: VFolderOwnershipInfo
+    vfolder: VFolderData
     usage_info: VFolderUsageInfo
-
-
-@dataclass
-class ListVFolderAction(VFolderScopeAction):
-    user_uuid: uuid.UUID
-    scope: ScopeRef
-
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (self.scope,)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "list_vfolder"
-
-
-@dataclass
-class ListVFolderActionResult(VFolderScopeActionResult):
-    user_uuid: uuid.UUID
-    vfolders: list[tuple[VFolderBaseInfo, VFolderOwnershipInfo]]
 
 
 @dataclass
@@ -309,7 +279,7 @@ class CloneVFolderAction(VFolderAction):
     target_quota_scope_id: QuotaScopeID | None
     cloneable: bool
     usage_mode: VFolderUsageMode
-    mount_permission: VFolderPermission
+    mount_permission: VFolderMountPolicy
 
     @override
     @classmethod
@@ -330,7 +300,7 @@ class CloneVFolderActionResult:
     target_vfolder_name: str
     target_vfolder_host: str
     usage_mode: VFolderUsageMode
-    mount_permission: VFolderPermission
+    mount_permission: VFolderMountPolicy
     creator_email: str
     ownership_type: VFolderOwnershipType
     owner_user_uuid: uuid.UUID | None
@@ -359,8 +329,8 @@ class GetTaskLogsAction(VFolderScopeAction):
     request: Any
 
     @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.user_id),)
 
     @override
     @classmethod
@@ -400,18 +370,13 @@ class LookupAccessibleVFolderAction(BaseLookupAction):
     """Resolve the folder a legacy caller named, by id or by name."""
 
     user_uuid: uuid.UUID
-    user_role: UserRole
-    domain_name: str
-    is_admin: bool
-    perm: VFolderPermissionSetAlias | VFolderPermission
     folder_id_or_name: str | uuid.UUID
     required_status: VFolderStatusSet | None = None
-    allow_privileged_access: bool = False
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return VFOLDER_ENTITY_TYPE
+        return VFolderEntityType()
 
     @override
     @classmethod

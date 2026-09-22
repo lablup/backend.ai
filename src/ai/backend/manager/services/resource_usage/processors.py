@@ -65,15 +65,15 @@ class ResourceUsageProcessors:
         project: FieldGroup[ProjectUsageBucketData],
         user: FieldGroup[UserUsageBucketData],
     ) -> None:
-        self.global_search_domain_usage_buckets = domain.global_search_ops(
+        self.global_search_domain_usage_buckets = domain.global_searcher_ops(
             GlobalSearchDomainUsageBucketsAction
         )
         self.search_domain_usage_buckets = domain.search_ops(SearchDomainUsageBucketsAction)
-        self.global_search_project_usage_buckets = project.global_search_ops(
+        self.global_search_project_usage_buckets = project.global_searcher_ops(
             GlobalSearchProjectUsageBucketsAction
         )
         self.search_project_usage_buckets = project.search_ops(SearchProjectUsageBucketsAction)
-        self.global_search_user_usage_buckets = user.global_search_ops(
+        self.global_search_user_usage_buckets = user.global_searcher_ops(
             GlobalSearchUserUsageBucketsAction
         )
         self.search_user_usage_buckets = user.search_ops(SearchUserUsageBucketsAction)

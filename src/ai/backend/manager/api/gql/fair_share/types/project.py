@@ -12,6 +12,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertProjectFairShareWeightInput as BulkUpsertProjectFairShareWeightInputDTO,
 )
@@ -40,6 +41,7 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
     UpsertProjectFairShareWeightPayload as UpsertProjectFairShareWeightPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.group.types import ProjectTypeFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -109,7 +111,9 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
         ]
         | None
     ):
-        project_data = await info.context.data_loaders.project_loader.load(self.project_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            ProjectID(self.project_id)
+        )
         if project_data is None:
             return None
         return project_data
@@ -234,6 +238,16 @@ class ProjectFairShareProjectNestedFilter(
     )
 
 
+_PROJECT_FILTER_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns cannot check"
+    " whether the caller may read that row. Search projects first, then narrow by projectId."
+)
+_PROJECT_ORDER_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. An order on another entity's columns cannot check"
+    " whether the caller may read that row. Search projects first, then order there."
+)
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
@@ -259,9 +273,10 @@ class ProjectFairShareFilter(PydanticInputMixin[ProjectFairShareFilterDTO]):
     project: ProjectFairShareProjectNestedFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.2.0",
-            description="Nested filter for project entity properties. Allows filtering by project name, active status, and type.",
+            description="Filter by the project this fair share is calculated for.",
         ),
         default=None,
+        deprecation_reason=_PROJECT_FILTER_DEPRECATION,
     )
 
     AND: list[Self] | None = gql_field(
@@ -294,7 +309,9 @@ class RGProjectFairShareFilter(PydanticInputMixin[ProjectFairShareFilterDTO]):
     project_id: UUIDFilter | None = gql_field(description="Filter by project UUID.", default=None)
     domain_name: StringFilter | None = gql_field(description="Filter by domain name.", default=None)
     project: ProjectFairShareProjectNestedFilter | None = gql_field(
-        description="Filter by project properties.", default=None
+        description="Filter by the project this fair share is calculated for.",
+        default=None,
+        deprecation_reason=_PROJECT_FILTER_DEPRECATION,
     )
 
     AND: list[Self] | None = gql_field(description="Combine with AND logic.", default=None)
@@ -314,6 +331,10 @@ class RGProjectFairShareFilter(PydanticInputMixin[ProjectFairShareFilterDTO]):
         ),
     ),
     name="ProjectFairShareOrderField",
+    deprecated_values={
+        "PROJECT_NAME": _PROJECT_ORDER_DEPRECATION,
+        "PROJECT_IS_ACTIVE": _PROJECT_ORDER_DEPRECATION,
+    },
 )
 class ProjectFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"

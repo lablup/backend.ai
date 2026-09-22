@@ -1,5 +1,5 @@
 """
-Tests for PermissionControllerRepository.search_users_assigned_to_role() functionality.
+Tests for PermissionControllerRepository.search_role_assignments_in_global() functionality.
 Tests the repository layer with real database operations.
 """
 
@@ -13,7 +13,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -24,9 +25,11 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
-from ai.backend.manager.models.rbac_models.orders import AssignedUserOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -34,8 +37,8 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -126,7 +129,12 @@ class TestSearchUsersAssignedToRole:
             db_sess.add(policy)
             await db_sess.flush()
 
-            role = RoleRow(name="test-role", description="Test role")
+            role = RoleRow(
+                scope_type=ProjectEntityType(),
+                scope_id=uuid.uuid4(),
+                name="test-role",
+                description="Test role",
+            )
             db_sess.add(role)
             await db_sess.flush()
 
@@ -181,13 +189,17 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         """Basic search filtering by role_id returns all assignments for the role."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
-            conditions=[AssignedUserConditions.by_role_id(role_id)],
+        querier = RoleAssignmentSearcher(
+            conditions=[
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                )
+            ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         assert result.total_count == len(created_users_and_assignments)
         result_user_ids = {item.user_id for item in result.items}
@@ -202,18 +214,27 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         """Searching with a different role_id should not return assignments from the test role."""
         async with db_with_tables.begin_session() as db_sess:
-            other_role = RoleRow(name="other-role", description="Other role")
+            other_role = RoleRow(
+                scope_type=ProjectEntityType(),
+                scope_id=uuid.uuid4(),
+                name="other-role",
+                description="Other role",
+            )
             db_sess.add(other_role)
             await db_sess.flush()
             other_role_id = other_role.id
 
-        querier = BatchQuerier(
-            conditions=[AssignedUserConditions.by_role_id(other_role_id)],
+        querier = RoleAssignmentSearcher(
+            conditions=[
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=other_role_id, negated=False)
+                )
+            ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0
@@ -223,22 +244,24 @@ class TestSearchUsersAssignedToRole:
         repository: PermissionControllerRepository,
         created_users_and_assignments: list[CreatedUserAssignment],
     ) -> None:
-        """EXISTS subquery filtering by exact username match."""
+        """The joined user row filtering by exact username match."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
+        querier = RoleAssignmentSearcher(
             conditions=[
-                AssignedUserConditions.by_role_id(role_id),
-                AssignedUserConditions.exists_user_combined([
-                    AssignedUserConditions.by_username_equals(
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                ),
+                *[
+                    UserSearchableFields.own.username.filter.equals(
                         StringMatchSpec(value="alice", case_insensitive=False, negated=False)
                     ),
-                ]),
+                ],
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         assert result.total_count == 1
         assert result.items[0].user_id == created_users_and_assignments[0].user_id
@@ -248,22 +271,24 @@ class TestSearchUsersAssignedToRole:
         repository: PermissionControllerRepository,
         created_users_and_assignments: list[CreatedUserAssignment],
     ) -> None:
-        """EXISTS subquery filtering by username contains."""
+        """The joined user row filtering by username contains."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
+        querier = RoleAssignmentSearcher(
             conditions=[
-                AssignedUserConditions.by_role_id(role_id),
-                AssignedUserConditions.exists_user_combined([
-                    AssignedUserConditions.by_username_contains(
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                ),
+                *[
+                    UserSearchableFields.own.username.filter.contains(
                         StringMatchSpec(value="li", case_insensitive=False, negated=False)
                     ),
-                ]),
+                ],
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         # "alice" and "charlie" contain "li"
         assert result.total_count == 2
@@ -276,22 +301,24 @@ class TestSearchUsersAssignedToRole:
         repository: PermissionControllerRepository,
         created_users_and_assignments: list[CreatedUserAssignment],
     ) -> None:
-        """EXISTS subquery filtering by email ends_with."""
+        """The joined user row filtering by email ends_with."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
+        querier = RoleAssignmentSearcher(
             conditions=[
-                AssignedUserConditions.by_role_id(role_id),
-                AssignedUserConditions.exists_user_combined([
-                    AssignedUserConditions.by_email_ends_with(
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                ),
+                *[
+                    UserSearchableFields.own.email.filter.ends_with(
                         StringMatchSpec(value="@test.org", case_insensitive=False, negated=False)
                     ),
-                ]),
+                ],
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         # Only bob@test.org
         assert result.total_count == 1
@@ -302,25 +329,27 @@ class TestSearchUsersAssignedToRole:
         repository: PermissionControllerRepository,
         created_users_and_assignments: list[CreatedUserAssignment],
     ) -> None:
-        """Combined username + email conditions in single EXISTS subquery."""
+        """Combined username and email conditions on the joined user row."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
+        querier = RoleAssignmentSearcher(
             conditions=[
-                AssignedUserConditions.by_role_id(role_id),
-                AssignedUserConditions.exists_user_combined([
-                    AssignedUserConditions.by_username_contains(
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                ),
+                *[
+                    UserSearchableFields.own.username.filter.contains(
                         StringMatchSpec(value="alice", case_insensitive=False, negated=False)
                     ),
-                    AssignedUserConditions.by_email_ends_with(
+                    UserSearchableFields.own.email.filter.ends_with(
                         StringMatchSpec(value="@example.com", case_insensitive=False, negated=False)
                     ),
-                ]),
+                ],
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         # Only alice matches both username contains "alice" AND email ends with "@example.com"
         assert result.total_count == 1
@@ -333,13 +362,17 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         """Results ordered by granted_at ascending."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
-            conditions=[AssignedUserConditions.by_role_id(role_id)],
-            orders=[AssignedUserOrders.granted_at(ascending=True)],
+        querier = RoleAssignmentSearcher(
+            conditions=[
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                )
+            ],
+            orders=[RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         result_user_ids = [item.user_id for item in result.items]
         expected_user_ids = [
@@ -354,26 +387,34 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         """Offset pagination returns correct subset."""
         role_id = created_users_and_assignments[0].role_id
-        querier = BatchQuerier(
-            conditions=[AssignedUserConditions.by_role_id(role_id)],
-            orders=[AssignedUserOrders.granted_at(ascending=True)],
+        querier = RoleAssignmentSearcher(
+            conditions=[
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                )
+            ],
+            orders=[RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=2, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         assert len(result.items) == 2
         assert result.total_count == 3
         assert result.has_next_page is True
 
         # Second page
-        querier_page2 = BatchQuerier(
-            conditions=[AssignedUserConditions.by_role_id(role_id)],
-            orders=[AssignedUserOrders.granted_at(ascending=True)],
+        querier_page2 = RoleAssignmentSearcher(
+            conditions=[
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=role_id, negated=False)
+                )
+            ],
+            orders=[RoleAssignmentSearchableFields.own.granted_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=2, offset=2),
         )
 
-        result_page2 = await repository.search_users_assigned_to_role(querier_page2)
+        result_page2 = await repository.search_role_assignments_in_global(querier_page2)
 
         assert len(result_page2.items) == 1
         assert result_page2.total_count == 3
@@ -386,13 +427,17 @@ class TestSearchUsersAssignedToRole:
     ) -> None:
         """Search with no matching assignments returns empty result."""
         nonexistent_role_id = uuid.uuid4()
-        querier = BatchQuerier(
-            conditions=[AssignedUserConditions.by_role_id(nonexistent_role_id)],
+        querier = RoleAssignmentSearcher(
+            conditions=[
+                RoleAssignmentSearchableFields.own.role_id.filter.equals(
+                    UUIDEqualMatchSpec(value=nonexistent_role_id, negated=False)
+                )
+            ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_users_assigned_to_role(querier)
+        result = await repository.search_role_assignments_in_global(querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0

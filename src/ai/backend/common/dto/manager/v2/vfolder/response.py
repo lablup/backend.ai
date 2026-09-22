@@ -61,6 +61,9 @@ class VFolderNode(BaseResponseModel):
     """Node model representing a virtual folder entity with nested sub-models."""
 
     id: UUID = Field(description="Unique identifier of the virtual folder")
+    entity_id: UUID = Field(
+        description=f"UUID of the vfolder. Added in {NEXT_RELEASE_VERSION}.",
+    )
     status: VFolderOperationStatusField = Field(description="Current operation status")
     host: str = Field(description="Storage host where the virtual folder is located")
     metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
@@ -93,6 +96,40 @@ class VFolderInvitationNode(BaseResponseModel):
     modified_at: datetime | None = Field(
         default=None, description="Last modification timestamp of the invitation"
     )
+
+
+class VFolderMountPolicyNode(BaseResponseModel):
+    """The mount level one user gets on a virtual folder."""
+
+    id: UUID = Field(description="Mount policy row ID")
+    field_id: UUID = Field(
+        description=f"UUID of the vfolder mount policy. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    vfolder_id: UUID = Field(description="ID of the virtual folder")
+    user_id: UUID = Field(description="User the mount level is set for")
+    permission: VFolderPermissionField = Field(description="Mount level: none, ro or rw")
+    created_at: datetime = Field(description="When the row was first set")
+    updated_at: datetime = Field(description="When the level was last replaced")
+
+
+class SetVFolderMountPolicyPayload(BaseResponseModel):
+    """Payload for setting a mount policy."""
+
+    policy: VFolderMountPolicyNode = Field(description="The mount level now set")
+
+
+class UnsetVFolderMountPolicyPayload(BaseResponseModel):
+    """Payload for unsetting a mount policy."""
+
+    vfolder_id: UUID = Field(description="ID of the virtual folder")
+    user_id: UUID = Field(description="User whose mount level was taken back")
+    removed: bool = Field(description="Whether a row was removed")
+
+
+class VFolderMountPoliciesPayload(BaseResponseModel):
+    """Payload listing the mount levels set on a virtual folder."""
+
+    items: list[VFolderMountPolicyNode] = Field(description="One row per user")
 
 
 class FileEntryNode(BaseResponseModel):

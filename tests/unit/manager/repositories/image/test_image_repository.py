@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -20,14 +21,23 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import BinarySize, KernelId, SessionId
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
-from ai.backend.manager.models.image.conditions import ImageConditions
+from ai.backend.manager.models.image.searchable_fields import (
+    ImageAliasSearchableFields,
+    ImageSearchableFields,
+)
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -36,16 +46,38 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.image.repository import ImageRepository
-from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
 CreateKernelForImageFunc = Callable[[ImageRow, datetime], Coroutine[Any, Any, None]]
+SearchImagesFunc = Callable[..., Coroutine[Any, Any, SearcherResult[ImageData]]]
+
+fields = ImageSearchableFields.own
+
+
+def _exact(value: str) -> StringMatchSpec:
+    return StringMatchSpec(value=value, case_insensitive=False, negated=False)
+
+
+def _alias_contains(value: str) -> QueryCondition:
+    alias_filter = ImageAliasSearchableFields.own.alias.filter
+    return ImageSearchableFields.nested.aliases.correlation.some([
+        alias_filter.contains(_exact(value))
+    ])
+
+
+def _alias_ends_with(value: str) -> QueryCondition:
+    alias_filter = ImageAliasSearchableFields.own.alias.filter
+    return ImageSearchableFields.nested.aliases.correlation.some([
+        alias_filter.ends_with(_exact(value))
+    ])
 
 
 class TestImageRepositorySearch:
@@ -69,6 +101,10 @@ class TestImageRepositorySearch:
                 ContainerRegistryRow,
                 ImageRow,
                 ImageAliasRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -188,57 +224,63 @@ class TestImageRepositorySearch:
             config_provider=mock_config,
         )
 
+    @pytest.fixture
+    def search(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> SearchImagesFunc:
+        """Run one image search the way the search actions do."""
+
+        async def run(
+            conditions: list[QueryCondition] | None = None,
+            orders: list[QueryOrder] | None = None,
+            limit: int = 10,
+            offset: int = 0,
+        ) -> SearcherResult[ImageData]:
+            async with V2DBOpsProvider(db_with_cleanup).read_ops() as r:
+                return await r.search_in_global(
+                    ImageSearcher(
+                        pagination=OffsetPagination(limit=limit, offset=offset),
+                        conditions=conditions or [],
+                        orders=orders or [],
+                    )
+                )
+
+        return run
+
     # =========================================================================
     # Tests - Search with pagination
     # =========================================================================
 
     async def test_search_images_first_page(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test first page of search results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search()
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_images_second_page(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test second page of search results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(offset=10)
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_images_last_page(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test last page with partial results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=20),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(offset=20)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -249,40 +291,24 @@ class TestImageRepositorySearch:
 
     async def test_search_images_filter_by_architecture(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test filtering images by architecture"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
-            conditions=[
-                lambda: ImageRow.architecture == "arm64",
-            ],
-            orders=[],
+        result = await search(
+            conditions=[fields.architecture.filter.equals(_exact("arm64"))],
         )
-
-        result = await image_repository.search_images(querier)
 
         assert len(result.items) == 1
         assert result.items[0].architecture == "arm64"
 
     async def test_search_images_filter_by_type(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test filtering images by type"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
-            conditions=[
-                lambda: ImageRow.type == ImageType.COMPUTE,
-            ],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(conditions=[fields.type.filter.equals(ImageType.COMPUTE)])
 
         assert len(result.items) == 2
         for item in result.items:
@@ -294,34 +320,22 @@ class TestImageRepositorySearch:
 
     async def test_search_images_order_by_name_ascending(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test ordering images by name ascending"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[ImageRow.name.asc()],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(orders=[fields.name.order.apply(ascending=True)])
 
         names = [str(item.name) for item in result.items]
         assert names == sorted(names)
 
     async def test_search_images_order_by_name_descending(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test ordering images by name descending"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[ImageRow.name.desc()],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(orders=[fields.name.order.apply(ascending=False)])
 
         names = [str(item.name) for item in result.items]
         assert names == sorted(names, reverse=True)
@@ -332,20 +346,13 @@ class TestImageRepositorySearch:
 
     async def test_search_images_no_results(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test search with no matching results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
-            conditions=[
-                lambda: ImageRow.architecture == "nonexistent",
-            ],
-            orders=[],
+        result = await search(
+            conditions=[fields.architecture.filter.equals(_exact("nonexistent"))],
         )
-
-        result = await image_repository.search_images(querier)
 
         assert len(result.items) == 0
         assert result.total_count == 0
@@ -405,44 +412,44 @@ class TestImageRepositorySearch:
 
     async def test_filter_by_single_alias_condition(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         images_with_aliases: list[ImageID],
     ) -> None:
         """Test filtering images with a single alias condition."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
+        result = await search(conditions=[_alias_contains("py")])
         assert result.total_count == 1
         assert "python" in str(result.items[0].name)
 
     async def test_filter_by_combined_alias_conditions(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         images_with_aliases: list[ImageID],
     ) -> None:
         """Test filtering images with two alias conditions combined."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
-                ),
-                ImageConditions.by_alias_ends_with(
-                    StringMatchSpec(value="39", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
+        result = await search(conditions=[_alias_contains("py"), _alias_ends_with("39")])
         assert result.total_count == 1
         assert "python:3.9" in str(result.items[0].name)
+
+    async def test_purge_image_removes_its_aliases(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        image_repository: ImageRepository,
+        images_with_aliases: list[ImageID],
+    ) -> None:
+        image_id = images_with_aliases[0]
+
+        removed = await image_repository.delete_image_with_aliases(image_id)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            remaining_image = await db_sess.get(ImageRow, image_id)
+            remaining_aliases = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(ImageAliasRow)
+                .where(ImageAliasRow.image_id == image_id)
+            )
+        assert removed.id == image_id
+        assert remaining_image is None
+        assert remaining_aliases == 0
 
 
 class TestImageRepositoryLastUsedAt:
@@ -494,7 +501,11 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db=db_with_cleanup, ops_provider=DBOpsProvider(db_with_cleanup))
+        return SessionRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def domain(
@@ -733,3 +744,348 @@ class TestImageRepositoryLastUsedAt:
         result = await image_repository.fetch_image_by_id(img.id)
         assert result.last_used_at is not None
         assert abs(result.last_used_at.timestamp() - newer.timestamp()) < 1.0
+
+
+class TestImageRepositoryRestore:
+    """Restore reaches an image in any status, not only a live one."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+        status: ImageStatus,
+    ) -> ImageID:
+        """An image inserted in the status the case names."""
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9",
+            image="python",
+            tag="3.9",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=f"sha256:{uuid4().hex}",
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=status,
+            accelerators=None,
+            labels={},
+            resources={},
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    @pytest.mark.parametrize(
+        "status",
+        [ImageStatus.ALIVE, ImageStatus.DELETED],
+        ids=lambda status: status.value,
+    )
+    async def test_restore_marks_the_image_alive(
+        self,
+        image_repository: ImageRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        image_id: ImageID,
+        status: ImageStatus,
+    ) -> None:
+        result = await image_repository.restore_image_by_id(image_id)
+
+        assert result.status == ImageStatus.ALIVE
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(sa.select(ImageRow.status).where(ImageRow.id == image_id))
+        assert stored == ImageStatus.ALIVE
+
+
+class TestImageRepositoryOwnership:
+    """The ownership check reads the statuses it is told to, so restore can run it on a forgotten image."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainRow:
+        domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid4()}")
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(domain)
+            await db_sess.flush()
+        return domain
+
+    @pytest.fixture
+    async def user_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UserResourcePolicyRow:
+        policy = UserResourcePolicyRow(
+            name=f"{uuid4()}",
+            max_vfolder_count=10,
+            max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(policy)
+            await db_sess.flush()
+        return policy
+
+    @pytest.fixture
+    async def user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain: DomainRow,
+        user_policy: UserResourcePolicyRow,
+    ) -> UserRow:
+        user = UserRow(
+            uuid=uuid4(),
+            username=f"testuser-{uuid4().hex[:8]}",
+            email=f"test-{uuid4().hex[:8]}@example.com",
+            domain_name=domain.name,
+            resource_policy=user_policy.name,
+            domain_id=DomainID(domain.id),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(user)
+            await db_sess.flush()
+        return user
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def forgotten_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+        user: UserRow,
+    ) -> ImageID:
+        """A customized image the user committed, then forgot."""
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9-customized",
+            image="python",
+            tag="3.9-customized",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=f"sha256:{uuid4().hex}",
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=ImageStatus.DELETED,
+            accelerators=None,
+            labels={},
+            resources={},
+            customized=True,
+            creator_id=user.uuid,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    async def test_ownership_of_a_forgotten_image_is_read_when_asked_to(
+        self,
+        image_repository: ImageRepository,
+        forgotten_image_id: ImageID,
+        user: UserRow,
+    ) -> None:
+        owned = await image_repository.validate_image_ownership(
+            forgotten_image_id, user.uuid, ImageStatus.restorable()
+        )
+
+        assert owned is True
+
+
+class TestImageRepositoryDigest:
+    """The digest an image answers with is the one stored, without the column's padding."""
+
+    DIGEST = "sha256:" + "a" * 64
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                ContainerRegistryRow,
+                ImageRow,
+                ImageAliasRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        return ImageRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            valkey_image=MagicMock(),
+            config_provider=MagicMock(),
+        )
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(registry_id),
+                    url="https://registry.example.com",
+                    registry_name="registry.example.com",
+                    type=ContainerRegistryType.DOCKER,
+                    project="test_project",
+                    is_global=True,
+                )
+            )
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+    ) -> ImageID:
+        image = ImageRow(
+            name="registry.example.com/test_project/python:3.9",
+            image="python",
+            tag="3.9",
+            registry="registry.example.com",
+            registry_id=test_registry_id,
+            project="test_project",
+            architecture="x86_64",
+            config_digest=self.DIGEST,
+            size_bytes=1000000,
+            type=ImageType.COMPUTE,
+            status=ImageStatus.ALIVE,
+            accelerators=None,
+            labels={},
+            resources={},
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(image)
+            await db_sess.flush()
+            return ImageID(image.id)
+
+    async def test_fetch_answers_the_digest_as_stored(
+        self,
+        image_repository: ImageRepository,
+        image_id: ImageID,
+    ) -> None:
+        result = await image_repository.fetch_image_by_id(image_id)
+
+        assert result.config_digest == self.DIGEST

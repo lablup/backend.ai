@@ -20,13 +20,19 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator, NestedFieldCreator
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
+from ai.backend.manager.models.specs.creator import EntityCreator, NestedFieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ResourceSlotTypeCreator(GlobalEntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]):
+class ResourceSlotTypeCreator(
+    CreatedInPublic[ResourceSlotTypeRow], EntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]
+):
     """Creator for a resource slot type — a global catalog row.
 
     Registering a name that already exists fails rather than overwriting: the
@@ -77,7 +83,7 @@ class ResourceSlotTypeCreator(GlobalEntityCreator[ResourceSlotTypeRow, ResourceS
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return row.to_data()
+        return ResourceSlotTypeSearchableFields.own.to_data(row)
 
 
 @dataclass(frozen=True)
@@ -108,6 +114,7 @@ class KernelResourceAllocationCreator(
     @override
     def to_data(self, row: ResourceAllocationRow) -> ResourceAllocationData:
         return ResourceAllocationData(
+            id=row.id,
             kernel_id=row.kernel_id,
             slot_name=row.slot_name,
             requested=row.requested,

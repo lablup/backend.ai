@@ -58,7 +58,7 @@ class RolePresetService:
         self, action: CreateRolePresetAction
     ) -> CreatedEntityWithFieldsOpsResult[RolePresetData, RolePermissionPresetData]:
         self._reject_unrenderable(action.creator.role_name_template)
-        result = await self._repository.create_global_entity_with_fields(
+        result = await self._repository.create_entity_with_fields(
             action.to_creator(), action.to_field_creators()
         )
         return CreatedEntityWithFieldsOpsResult(data=result.data, fields=result.fields)
