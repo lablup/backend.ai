@@ -1,4 +1,4 @@
-"""Tests for the BEP-1078 control-plane pieces.
+"""Tests for the BEP-1079 control-plane pieces.
 
 IPAM allocators are tested against an in-memory fake that models the etcd
 compare-and-swap boundary (``put_if_absent``/``delete``); CAS atomicity itself is
@@ -3984,7 +3984,7 @@ class TestJoinedIsAnAnswerNotATruthValue:
 
 
 class TestTheCniPathIsFailClosed:
-    """C42. The BEP-1078 path has no deployments older than the capability probe, so there is
+    """C42. The BEP-1079 path has no deployments older than the capability probe, so there is
     nothing for a fail-open to protect -- and only the docker agent publishes capabilities at all.
     Letting an agent that has said nothing into a session hands a descriptor to a node that has
     not wired the seam."""

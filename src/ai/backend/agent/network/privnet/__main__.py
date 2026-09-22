@@ -1,4 +1,4 @@
-"""Entry point for the privnet daemon (privileged network) (BEP-1078).
+"""Entry point for the privnet daemon (privileged network) (BEP-1079).
 
 Capabilities needed (all four, for the reasons noted):
 

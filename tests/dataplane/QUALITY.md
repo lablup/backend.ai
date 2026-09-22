@@ -88,7 +88,7 @@ Attach the following to the release decision:
 - redacted command environment showing every required variable was set;
 - complete test output and leak-guard report;
 - Prometheus rule validation result;
-- BEP-1078 approval reference.
+- BEP-1079 approval reference.
 
 Unit or mocked tests cannot replace this record. A run from an earlier commit does not qualify the
 release candidate.

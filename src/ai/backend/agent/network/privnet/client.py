@@ -1,4 +1,4 @@
-"""Agent-side client + proxies for the privnet daemon (BEP-1078).
+"""Agent-side client + proxies for the privnet daemon (BEP-1079).
 
 These let the *unprivileged* agent keep its normal composition (SessionNetworkCoordinator
 owns etcd membership; the orchestrator drives per-container attach) while every privileged

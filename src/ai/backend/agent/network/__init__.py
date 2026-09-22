@@ -1,1 +1,1 @@
-"""Agent-side cluster-network support (BEP-1078)."""
+"""Agent-side cluster-network support (BEP-1079)."""

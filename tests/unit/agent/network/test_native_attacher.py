@@ -1,4 +1,4 @@
-"""Unit tests for the native veth/bridge attach runner (BEP-1078)."""
+"""Unit tests for the native veth/bridge attach runner (BEP-1079)."""
 
 import asyncio
 from collections.abc import Sequence

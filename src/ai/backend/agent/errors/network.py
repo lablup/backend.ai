@@ -1,5 +1,5 @@
 """
-Cluster-network exceptions for the agent (BEP-1078).
+Cluster-network exceptions for the agent (BEP-1079).
 """
 
 from __future__ import annotations

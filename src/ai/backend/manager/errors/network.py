@@ -1,4 +1,4 @@
-"""Cluster-session network exceptions (BEP-1078)."""
+"""Cluster-session network exceptions (BEP-1079)."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ class VNIPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
 
 
 class RequestedSubnetInvalid(BackendAIError, web.HTTPBadRequest):
-    """An explicitly requested cluster-network subnet is not usable as-is (BEP-1078).
+    """An explicitly requested cluster-network subnet is not usable as-is (BEP-1079).
 
     Raised before any allocation for a subnet that is malformed, has host bits set (not aligned
     to its own prefix), is not contained in the IPAM pool, or is narrower than one unit block
@@ -78,7 +78,7 @@ class RequestedSubnetInvalid(BackendAIError, web.HTTPBadRequest):
 
 
 class RequestedSubnetUnavailable(BackendAIError, web.HTTPConflict):
-    """An explicitly requested subnet overlaps an already-allocated block (BEP-1078).
+    """An explicitly requested subnet overlaps an already-allocated block (BEP-1079).
 
     Unlike auto-allocation (which skips a taken block and tries the next), an explicit request
     names a specific range, so an overlap is a hard failure — as ``docker network create --subnet``
@@ -120,7 +120,7 @@ class OverlayTeardownPending(BackendAIError, web.HTTPInternalServerError):
 
 
 class ForcedBackendUnsupported(BackendAIError, web.HTTPBadRequest):
-    """The operator pinned a data-plane backend that cannot serve a multi-node session (BEP-1078).
+    """The operator pinned a data-plane backend that cannot serve a multi-node session (BEP-1079).
 
     The CNI control plane only ever provisions multi-node cluster sessions, whose IPs are
     assigned centrally and stretched across nodes over an overlay. The 'bridge' backend is
@@ -142,7 +142,7 @@ class ForcedBackendUnsupported(BackendAIError, web.HTTPBadRequest):
 
 
 class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
-    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1078).
+    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1079).
 
     This guards the deployment invariant that the agent backend (docker/containerd) and the
     global network driver (overlay/cni) must be a matched pair — a multi-node session

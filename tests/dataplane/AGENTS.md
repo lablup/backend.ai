@@ -1,6 +1,6 @@
 # Data-plane tests — Guardrails
 
-> Node-level tests for the BEP-1078 data plane: netns, netlink devices, iptables, VXLAN,
+> Node-level tests for the BEP-1079 data plane: netns, netlink devices, iptables, VXLAN,
 > runtime objects, and durable state. These require privileged real hosts.
 
 Read `CONTEXTS.md` in this directory for why the suite is shaped this way.

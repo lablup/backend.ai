@@ -130,7 +130,7 @@ async def require_members_cni_ready(
     Fail-closed, unlike `require_members_overlay_ready`, and the difference is the point. That one
     guards the Swarm overlay, which has deployments older than the capability probe: refusing an
     agent that has published nothing would strand them, and the worst case of letting one through
-    is a driver that already worked. This guards the BEP-1078 path, which has no such history --
+    is a driver that already worked. This guards the BEP-1079 path, which has no such history --
     an agent that has published nothing has not wired the seam this needs, and today only the
     docker agent publishes at all. Letting it through hands a session descriptor to a node that
     cannot act on it, and the failure surfaces as a session stuck at create.

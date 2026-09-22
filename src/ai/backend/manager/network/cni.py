@@ -1,4 +1,4 @@
-"""CNI/etcd control plane for the Docker-backed BEP-1078 cluster network.
+"""CNI/etcd control plane for the Docker-backed BEP-1079 cluster network.
 
 The runtime seam is extensible, but Docker is the only implemented runtime integration.
 """
@@ -419,7 +419,7 @@ def _tombstone(subnet: str | None, vni: Any, owner: str | None, generation: str 
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
-    """Control-plane plugin for the runtime-neutral cluster network (BEP-1078)."""
+    """Control-plane plugin for the runtime-neutral cluster network (BEP-1079)."""
 
     _etcd: AsyncEtcd | None
     _subnet_allocator: SubnetAllocator
@@ -627,7 +627,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 f"Unknown cluster-network backend: {forced_raw!r}"
             ) from e
         # Each endpoint = one container: {"container_id", "agent_id"}. The manager assigns
-        # its overlay IP centrally (BEP-1078) so per-node IPs are disjoint.
+        # its overlay IP centrally (BEP-1079) so per-node IPs are disjoint.
         endpoints = list(options.get("endpoints", []))
         # Optional explicit subnet (like `docker network create --subnet`): when set, the
         # allocator claims exactly this block and fails on overlap instead of auto-sizing.

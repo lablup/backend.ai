@@ -1,4 +1,4 @@
-"""Host-port ingress (BEP-1078): the DNAT half of the LOCAL bridge's NAT."""
+"""Host-port ingress (BEP-1079): the DNAT half of the LOCAL bridge's NAT."""
 
 import inspect
 from typing import Any, cast, override

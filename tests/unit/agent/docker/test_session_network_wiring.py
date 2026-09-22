@@ -1,4 +1,4 @@
-"""How a Docker kernel reaches, and gives back, its session network (BEP-1078).
+"""How a Docker kernel reaches, and gives back, its session network (BEP-1079).
 
 Every case here is one that leaks or hangs rather than erroring, which is why they are pinned:
 

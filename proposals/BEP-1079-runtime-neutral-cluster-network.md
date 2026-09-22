@@ -174,7 +174,7 @@ own are forwarded upstream.
 The Swarm overlay plugin stays. `network.inter_container.default-driver` selects between them,
 and an operator can pin a backend with `forced_backend`.
 
-| Runtime backend | Swarm `overlay` | BEP-1078 `cni` |
+| Runtime backend | Swarm `overlay` | BEP-1079 `cni` |
 |-----------------|-----------------|----------------|
 | Docker | Supported | Supported |
 | containerd | Not supported | Planned |

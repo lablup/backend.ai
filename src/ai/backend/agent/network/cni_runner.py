@@ -1,4 +1,4 @@
-"""Real CNI plugin executor (BEP-1078).
+"""Real CNI plugin executor (BEP-1079).
 
 Concrete `CniRunner` that invokes CNI plugin binaries per the CNI spec: the plugin
 takes no arguments; the action and container context are passed via ``CNI_*``

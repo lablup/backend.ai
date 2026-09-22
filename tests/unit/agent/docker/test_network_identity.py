@@ -1,4 +1,4 @@
-"""What a Docker agent advertises about its overlay identity at startup (BEP-1078).
+"""What a Docker agent advertises about its overlay identity at startup (BEP-1079).
 
 The manager pre-seeds session membership straight from the published VTEP, and pairs the
 cluster-network driver against the published backend. Both guards fall back to "allow" on an
@@ -374,7 +374,7 @@ class TestTheNodeIsAnnouncedOnlyOnceItCanServe:
         assert await DockerAgent.not_serving_reason(cast(Any, stub)) is None
 
     async def test_a_swarm_cluster_does_not_publish_the_advert(self) -> None:
-        """Under the Swarm driver nothing reads the BEP-1078 advert, so `start_serving` announces
+        """Under the Swarm driver nothing reads the BEP-1079 advert, so `start_serving` announces
         the node and stops there -- no publish, no refresh task."""
         agent = object.__new__(DockerAgent)
         agent._cluster_network_owned = False

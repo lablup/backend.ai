@@ -2014,7 +2014,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Pin the per-session data plane the CNI driver builds (BEP-1078), e.g. 'vxlan'. "
+                "Pin the per-session data plane the CNI driver builds (BEP-1079), e.g. 'vxlan'. "
                 "Unset lets the driver pick from what the session's member agents advertise, "
                 "which is the right answer whenever the cluster is not deliberately homogeneous."
             ),

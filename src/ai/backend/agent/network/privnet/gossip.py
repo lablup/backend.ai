@@ -1,4 +1,4 @@
-"""Endpoint propagation between the privileged network daemons of one session (BEP-1078).
+"""Endpoint propagation between the privileged network daemons of one session (BEP-1079).
 
 Which node holds which container address is the one fact in this data plane that changes as fast
 as containers do, and every node of a session needs it: an overlay peer is reached by programming
