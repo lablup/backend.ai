@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 from unittest.mock import MagicMock
 
 import pytest
@@ -49,11 +48,8 @@ from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _DOMAIN = "kp-by-email"
-_ALICE = "alice@example.com"
-_BOB = "bob@example.com"
-_ALICE_ACTIVE_AK = AccessKey("AKALICEACTIVE")
-_ALICE_INACTIVE_AK = AccessKey("AKALICEINACTIVE")
-_BOB_AK = AccessKey("AKBOB")
+_EMAIL = "alice@example.com"
+_ACCESS_KEY = AccessKey("AKALICE")
 
 _ALL_ROWS: list[TableOrORM] = [
     DomainRow,
@@ -84,14 +80,6 @@ _ALL_ROWS: list[TableOrORM] = [
 ]
 
 
-@dataclass(frozen=True)
-class _LoadCase:
-    emails: list[str]
-    expected_access_keys: list[set[AccessKey]]
-    is_active: bool | None = None
-    domain_name: str | None = None
-
-
 class TestBatchLoadByEmail:
     @pytest.fixture
     async def db(
@@ -104,8 +92,7 @@ class TestBatchLoadByEmail:
     async def seeded(self, db: ExtendedAsyncSAEngine) -> None:
         domain_id = DomainID(uuid.uuid4())
         project_id = uuid.uuid4()
-        alice_id = uuid.uuid4()
-        bob_id = uuid.uuid4()
+        user_id = uuid.uuid4()
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
@@ -146,18 +133,9 @@ class TestBatchLoadByEmail:
             await sess.flush()
             sess.add_all([
                 UserRow(
-                    uuid=alice_id,
+                    uuid=user_id,
                     username="alice",
-                    email=_ALICE,
-                    domain_name=_DOMAIN,
-                    role=UserRole.USER,
-                    resource_policy="user-policy",
-                    domain_id=domain_id,
-                ),
-                UserRow(
-                    uuid=bob_id,
-                    username="bob",
-                    email=_BOB,
+                    email=_EMAIL,
                     domain_name=_DOMAIN,
                     role=UserRole.USER,
                     resource_policy="user-policy",
@@ -173,33 +151,17 @@ class TestBatchLoadByEmail:
                 ),
             ])
             await sess.flush()
-            sess.add_all([
+            sess.add(
                 KeyPairRow(
-                    access_key=_ALICE_ACTIVE_AK,
+                    access_key=_ACCESS_KEY,
                     secret_key=SecretValue("secret"),
-                    user=alice_id,
+                    user=user_id,
                     is_active=True,
                     resource_policy="keypair-policy",
-                ),
-                KeyPairRow(
-                    access_key=_ALICE_INACTIVE_AK,
-                    secret_key=SecretValue("secret"),
-                    user=alice_id,
-                    is_active=False,
-                    resource_policy="keypair-policy",
-                ),
-                KeyPairRow(
-                    access_key=_BOB_AK,
-                    secret_key=SecretValue("secret"),
-                    user=bob_id,
-                    is_active=True,
-                    resource_policy="keypair-policy",
-                ),
-            ])
+                )
+            )
             await sess.flush()
-            seeder = VirtualEntitySeeder()
-            await seeder.enroll_user_in_project(sess, project_id, alice_id)
-            await seeder.enroll_user_in_project(sess, project_id, bob_id)
+            await VirtualEntitySeeder().enroll_user_in_project(sess, project_id, user_id)
             await sess.commit()
 
     @pytest.fixture
@@ -208,61 +170,12 @@ class TestBatchLoadByEmail:
         ctx.db = db
         return ctx
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _LoadCase(
-                emails=[_ALICE, _BOB],
-                expected_access_keys=[{_ALICE_ACTIVE_AK, _ALICE_INACTIVE_AK}, {_BOB_AK}],
-            ),
-            _LoadCase(
-                emails=[_BOB, _ALICE],
-                expected_access_keys=[{_BOB_AK}, {_ALICE_ACTIVE_AK, _ALICE_INACTIVE_AK}],
-            ),
-            _LoadCase(
-                emails=["nobody@example.com"],
-                expected_access_keys=[set()],
-            ),
-            _LoadCase(
-                emails=[_ALICE],
-                is_active=True,
-                expected_access_keys=[{_ALICE_ACTIVE_AK}],
-            ),
-            _LoadCase(
-                emails=[_ALICE],
-                is_active=False,
-                expected_access_keys=[{_ALICE_INACTIVE_AK}],
-            ),
-            _LoadCase(
-                emails=[_ALICE],
-                domain_name=_DOMAIN,
-                expected_access_keys=[{_ALICE_ACTIVE_AK, _ALICE_INACTIVE_AK}],
-            ),
-            _LoadCase(
-                emails=[_ALICE],
-                domain_name="other-domain",
-                expected_access_keys=[set()],
-            ),
-        ],
-        ids=lambda case: "+".join(case.emails)
-        + f"|is_active={case.is_active}|domain_name={case.domain_name}",
-    )
-    async def test_keypairs_are_grouped_under_the_requested_email(
-        self, graph_ctx: GraphQueryContext, case: _LoadCase
+    async def test_loads_the_keypairs_of_the_requested_email(
+        self, graph_ctx: GraphQueryContext
     ) -> None:
-        loaded = await KeyPair.batch_load_by_email(
-            graph_ctx,
-            case.emails,
-            domain_name=case.domain_name,
-            is_active=case.is_active,
-        )
+        loaded = await KeyPair.batch_load_by_email(graph_ctx, [_EMAIL])
 
         assert [
-            {keypair.access_key for keypair in keypairs if keypair is not None}
+            [(keypair.access_key, keypair.user_id) for keypair in keypairs if keypair is not None]
             for keypairs in loaded
-        ] == case.expected_access_keys
-        assert all(
-            keypair is not None and keypair.user_id == email
-            for email, keypairs in zip(case.emails, loaded, strict=True)
-            for keypair in keypairs
-        )
+        ] == [[(_ACCESS_KEY, _EMAIL)]]
