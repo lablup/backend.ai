@@ -8,6 +8,7 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     SearchDeploymentRevisionPresetsPayload,
 )
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
     DeploymentRevisionPresetEdge,
@@ -27,7 +28,7 @@ def build_preset_connection(
     edges = [
         DeploymentRevisionPresetEdge(
             node=DeploymentRevisionPresetGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]
