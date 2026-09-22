@@ -104,16 +104,16 @@ class ContainerRegistryProcessors:
     handle_harbor_webhook: AnonymousGlobalActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
     ]
-    create_registry_quota: GlobalActionProcessor[
+    create_registry_quota: AnonymousGlobalActionProcessor[
         CreateRegistryQuotaAction, CreateRegistryQuotaActionResult
     ]
-    read_registry_quota: GlobalActionProcessor[
+    read_registry_quota: AnonymousGlobalActionProcessor[
         ReadRegistryQuotaAction, ReadRegistryQuotaActionResult
     ]
-    update_registry_quota: GlobalActionProcessor[
+    update_registry_quota: AnonymousGlobalActionProcessor[
         UpdateRegistryQuotaAction, UpdateRegistryQuotaActionResult
     ]
-    delete_registry_quota: GlobalActionProcessor[
+    delete_registry_quota: AnonymousGlobalActionProcessor[
         DeleteRegistryQuotaAction, DeleteRegistryQuotaActionResult
     ]
 
@@ -151,15 +151,16 @@ class ContainerRegistryProcessors:
         self.handle_harbor_webhook = group.anonymous_global(
             HandleHarborWebhookAction, service.handle_harbor_webhook
         )
-        self.create_registry_quota = group.global_scope(
+        # Gated at the API layer (REST middleware, legacy GraphQL allowed_roles), not here.
+        self.create_registry_quota = group.anonymous_global(
             CreateRegistryQuotaAction, service.create_registry_quota
         )
-        self.read_registry_quota = group.global_scope(
+        self.read_registry_quota = group.anonymous_global(
             ReadRegistryQuotaAction, service.read_registry_quota
         )
-        self.update_registry_quota = group.global_scope(
+        self.update_registry_quota = group.anonymous_global(
             UpdateRegistryQuotaAction, service.update_registry_quota
         )
-        self.delete_registry_quota = group.global_scope(
+        self.delete_registry_quota = group.anonymous_global(
             DeleteRegistryQuotaAction, service.delete_registry_quota
         )
