@@ -801,7 +801,7 @@ class ProjectResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
         async with ctx.db.begin_readonly_session() as sess:
             return [
                 obj
-                async for r in (await sess.stream(query))
+                async for r in (await sess.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r.resource_policy_row)) is not None
             ]
 

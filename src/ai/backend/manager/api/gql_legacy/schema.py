@@ -2239,6 +2239,13 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         if client_role == UserRole.ADMIN:
             # TODO: filter resource policies by domains?
             return await ProjectResourcePolicy.load_all(info.context)
+        if client_role == UserRole.USER:
+            projects = await Group.get_groups_for_user(info.context, ctx.user["uuid"])
+            policies = await ProjectResourcePolicy.batch_load_by_project(
+                info.context, [project.id for project in projects]
+            )
+            # batch_load_by_project yields a policy once per project that uses it.
+            return list({policy.name: policy for policy in policies}.values())
         raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
