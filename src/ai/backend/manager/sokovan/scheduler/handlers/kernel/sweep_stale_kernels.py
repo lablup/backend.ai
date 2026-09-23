@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
@@ -105,7 +106,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
                     KernelTransitionInfo(
                         kernel_id=kernel_id,
                         from_status=kernel_info.lifecycle.status,
-                        reason="STALE_KERNEL",
+                        reason=KernelLifecycleEventReason.STALE_KERNEL,
                     )
                 )
             else:

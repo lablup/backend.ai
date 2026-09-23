@@ -20,6 +20,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -115,7 +116,7 @@ def _create_history_row(
 def _create_session_transition_info(
     session_id: SessionId | None = None,
     from_status: SessionStatus = SessionStatus.PREPARING,
-    reason: str | None = "test-reason",
+    reason: KernelLifecycleEventReason | None = KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
 ) -> SessionTransitionInfo:
     """Create a SessionTransitionInfo for testing."""
     return SessionTransitionInfo(
@@ -1054,7 +1055,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         Given: Session transitioning to RUNNING
         When: Apply transition is called
-        Then: SessionStatusBatchUpdater is created with reason="" to clear status_info
+        Then: The built values set status_info to None
         """
         # Arrange
         session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
@@ -1084,13 +1085,12 @@ class TestScheduleCoordinatorStatusTransition:
             status_changed_at=datetime.now(tzutc()),
         )
 
-        # Assert - spec must have reason="" so status_info is cleared
+        # Assert
         assert captured_updater is not None
         assert isinstance(captured_updater, SessionStatusBatchUpdater)
-        assert captured_updater.reason == ""
         built = captured_updater.build_values()
         assert "status_info" in built
-        assert built["status_info"] == ""
+        assert built["status_info"] is None
 
 
 # =============================================================================
