@@ -423,6 +423,11 @@ class ImageAdapter(BaseAdapter):
             *self.apply_enum_filter(filter.type, fields.type.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
+            *self.apply_to_many_filter(
+                filter.labels,
+                ImageSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
         ]
         if filter.alias is not None:
             alias_conditions = self.apply_string_filter(

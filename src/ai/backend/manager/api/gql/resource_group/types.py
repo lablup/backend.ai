@@ -12,7 +12,8 @@ import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput as CreateResourceGroupInputDTO,
 )
@@ -99,6 +100,13 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.deployment.types.deployment_options import (
     DeploymentOptionsInfoGQL,
     DeploymentOptionsInputGQL,
+)
+from ai.backend.manager.api.gql.entity_label.types import (
+    EntityLabelConnection,
+    EntityLabelFilterGQL,
+    EntityLabelNestedFilterGQL,
+    EntityLabelOrderByGQL,
+    resolve_entity_labels,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
@@ -597,6 +605,37 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             count=payload.total_count,
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The labels on this resource group.",
+        )
+    )  # type: ignore[misc]
+    async def entity_labels(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: EntityLabelFilterGQL | None = None,
+        order_by: list[EntityLabelOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> EntityLabelConnection | None:
+        return await resolve_entity_labels(
+            info,
+            RuntimeEntityID(ResourceGroupEntityType(), self.entity_id),
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
+
 
 ResourceGroupEdge = Edge[ResourceGroupGQL]
 
@@ -653,6 +692,13 @@ class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     is_active: bool | None = None
     is_public: bool | None = None
     is_default: bool | None = None
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
