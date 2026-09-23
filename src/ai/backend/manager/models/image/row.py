@@ -338,9 +338,9 @@ class ImageRow(CreatedAtMixin, Base):
         }
 
     @staticmethod
-    def _resource_limit_max(value: Decimal | str | None) -> str | None:
+    def _resource_limit_max(value: Decimal) -> str | None:
         # The max of an image resource limit is no longer used.
-        if value is None or (isinstance(value, Decimal) and value.is_infinite()):
+        if value.is_infinite():
             return None
         return str(value)
 
