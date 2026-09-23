@@ -82,8 +82,10 @@ class ResourceLimit:
     max: Decimal | str | None
 
     def to_dict(self) -> dict[str, str | None]:
-        max_value: str | None = None
-        if self.max is not None and not (isinstance(self.max, Decimal) and self.max.is_infinite()):
+        max_value: str | None
+        if self.max is None or (isinstance(self.max, Decimal) and self.max.is_infinite()):
+            max_value = None
+        else:
             max_value = str(self.max)
         return {"key": self.key, "min": str(self.min), "max": max_value}
 
