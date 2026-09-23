@@ -13,7 +13,12 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
+<<<<<<< HEAD
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -130,7 +135,7 @@ def _create_terminating_kernel_data(
 def _create_terminating_session_data(
     session_id: SessionId | None = None,
     kernels: list[TerminatingKernelData] | None = None,
-    status_info: str = "user-requested",
+    status_info: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
 ) -> TerminatingSessionData:
     """Create TerminatingSessionData for termination tests."""
     if kernels is None:

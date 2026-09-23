@@ -6,7 +6,12 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
+<<<<<<< HEAD
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -23,8 +28,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-_RESCHEDULE_REASON = "RESCHEDULED"
 
 
 class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -132,12 +135,12 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         the kernels drop their placement first, then the sessions become PENDING
         so the scheduling pass can pick them up."""
         await self._repository.reset_kernels_to_pending_for_sessions(
-            session_ids, _RESCHEDULE_REASON
+            session_ids, KernelLifecycleEventReason.RESCHEDULED
         )
         requeued = await self._scheduling_controller.mark_sessions_status(
             session_ids,
             SessionStatus.PENDING,
-            reason=_RESCHEDULE_REASON,
+            reason=KernelLifecycleEventReason.RESCHEDULED,
         )
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
         log.info("Requeued {} rescheduling sessions to PENDING", len(requeued))

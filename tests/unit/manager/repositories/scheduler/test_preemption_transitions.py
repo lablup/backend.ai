@@ -18,8 +18,14 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+<<<<<<< HEAD
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -33,7 +39,7 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 
 from .conftest import create_pending_session_with_kernels
 
-_REASON = "PREEMPTED_BY_SCHEDULER"
+_REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
 
 async def _free_allocations(db: ExtendedAsyncSAEngine, session_id: SessionId) -> None:

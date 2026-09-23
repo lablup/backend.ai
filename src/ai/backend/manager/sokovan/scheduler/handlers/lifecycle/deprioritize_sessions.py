@@ -7,7 +7,11 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
+<<<<<<< HEAD
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -135,7 +139,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
                     from_status=session_info.lifecycle.status,
-                    reason="deprioritized-for-rescheduling",
+                    reason=KernelLifecycleEventReason.DEPRIORITIZED_FOR_RESCHEDULING,
                     creation_id=session_info.identity.creation_id,
                     access_key=AccessKey(session_info.metadata.access_key),
                 )

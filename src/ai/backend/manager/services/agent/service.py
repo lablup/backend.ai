@@ -9,8 +9,12 @@ from async_timeout import timeout as _timeout
 from dateutil.tz import tzutc
 
 from ai.backend.common.etcd import AsyncEtcd
+<<<<<<< HEAD
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+=======
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.exception import (
     AgentWatcherResponseError,
     ErrorCode,
@@ -100,8 +104,6 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_RESOURCE_GROUP_CHANGED_REASON = "AGENT_RESOURCE_GROUP_CHANGED"
 
 
 class AgentService:
@@ -197,7 +199,7 @@ class AgentService:
             # container cleanup proceeds asynchronously in the next schedule cycle.
             mark_result = await self._scheduling_controller.mark_sessions_for_termination(
                 conflicting_session_ids,
-                reason=_RESOURCE_GROUP_CHANGED_REASON,
+                reason=KernelLifecycleEventReason.AGENT_RESOURCE_GROUP_CHANGED,
                 forced=False,
             )
             terminating_session_ids = mark_result.terminating_sessions

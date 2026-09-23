@@ -10,8 +10,13 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+<<<<<<< HEAD
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -733,7 +738,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                 access_key=AccessKey(s.session_info.metadata.access_key),
                 creation_id=s.session_info.identity.creation_id,
                 status=s.session_info.lifecycle.status,
-                status_info="user-requested",
+                status_info=KernelLifecycleEventReason.USER_REQUESTED,
                 session_type=s.session_info.identity.session_type,
                 kernels=[
                     TerminatingKernelData(

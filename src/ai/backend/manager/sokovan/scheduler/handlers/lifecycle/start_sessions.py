@@ -6,7 +6,13 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
+<<<<<<< HEAD
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -144,7 +150,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
                     from_status=session_info.lifecycle.status,
-                    reason="triggered-by-scheduler",
+                    reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
                     creation_id=session_info.identity.creation_id,
                     access_key=AccessKey(session_info.metadata.access_key),
                 )

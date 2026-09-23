@@ -8,6 +8,13 @@ All database operations go through the repository pattern.
 import logging
 from uuid import UUID
 
+<<<<<<< HEAD
+=======
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
@@ -135,7 +142,7 @@ class KernelStateEngine:
     async def mark_kernel_terminated(
         self,
         kernel_id: KernelId,
-        reason: str,
+        reason: KernelLifecycleEventReason,
         exit_code: int | None = None,
     ) -> bool:
         """

@@ -6,7 +6,12 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
+<<<<<<< HEAD
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.common.types import PreemptionMode
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -22,8 +27,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-_PREEMPTION_REASON = "PREEMPTED_BY_SCHEDULER"
 
 
 class PreemptSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -100,14 +103,14 @@ class PreemptSessionsLifecycleHandler(SessionLifecycleHandler):
             marked = await self._scheduling_controller.mark_sessions_status(
                 session_ids,
                 SessionStatus.RESCHEDULING,
-                reason=_PREEMPTION_REASON,
+                reason=KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER,
             )
             await self._scheduling_controller.mark_scheduling_needed([ScheduleType.RESCHEDULING])
             log.info("Sent {} preemption victims to rescheduling", len(marked))
         else:
             await self._scheduling_controller.mark_sessions_for_termination(
                 session_ids,
-                reason=_PREEMPTION_REASON,
+                reason=KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER,
                 message="preempt_terminate success",
             )
             log.info("Sent {} preemption victims to termination", len(session_ids))

@@ -6,7 +6,12 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
+<<<<<<< HEAD
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+=======
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+>>>>>>> eeaa891c (fix(BA-8110, BA-8112): pass termination and transition reasons as KernelLifecycleEventReason (#14954))
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
@@ -105,7 +110,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
                     KernelTransitionInfo(
                         kernel_id=kernel_id,
                         from_status=kernel_info.lifecycle.status,
-                        reason="STALE_KERNEL",
+                        reason=KernelLifecycleEventReason.STALE_KERNEL,
                     )
                 )
             else:
