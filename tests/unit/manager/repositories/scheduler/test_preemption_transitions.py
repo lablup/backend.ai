@@ -20,6 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -35,7 +36,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
 
-_REASON = "PREEMPTED_BY_SCHEDULER"
+_REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
 
 async def _free_allocations(db: ExtendedAsyncSAEngine, session_id: SessionId) -> None:

@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.9.0a4",
+    "version": "26.9.0rc1",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -50068,6 +50068,11 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -50078,7 +50083,7 @@
           }
         },
         "parameters": [],
-        "description": "Search the images the named scopes reach."
+        "description": "Search the images the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/aliases/search": {

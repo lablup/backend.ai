@@ -23,7 +23,10 @@ from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -257,7 +260,7 @@ class SchedulerRepository:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
         message: str = "mark_terminating success",
@@ -278,7 +281,7 @@ class SchedulerRepository:
         self,
         session_ids: list[SessionId],
         to_status: SessionStatus,
-        reason: str,
+        reason: KernelLifecycleEventReason,
     ) -> list[SessionId]:
         """
         Move sessions to ``to_status``, skipping the sessions whose current

@@ -81,6 +81,19 @@ class PersonalProjectMemberAdditionError(EntityError, web.HTTPConflict):
         )
 
 
+class ModelStoreProjectLeaveError(EntityError, web.HTTPConflict):
+    """Raised when a write would take a user off a model-store project's roster."""
+
+    error_type = "https://api.backend.ai/probs/model-store-project-leave"
+    error_title = "Model-store project keeps every user of its domain."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )
+
+
 class PersonalProjectDeletionError(EntityError, web.HTTPConflict):
     """Raised when a personal project is deleted or purged on its own, apart from
     the user it belongs to."""

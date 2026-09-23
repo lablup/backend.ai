@@ -8,13 +8,12 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.types import DistributedLockFactory
 
+from .container_registry import ContainerRegistryDependency, ContainerRegistryResources
 from .distributed_lock import DistributedLockFactoryDependency, DistributedLockInput
 from .notification import NotificationCenterDependency
 from .repositories import RepositoriesDependency, RepositoriesInput
-from .services import ServicesContextDependency, ServicesInput
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -55,9 +54,9 @@ class DomainResources:
     """Container for all domain resources."""
 
     notification_center: NotificationCenter
+    container_registry: ContainerRegistryResources
     distributed_lock_factory: DistributedLockFactory
     repositories: Repositories
-    services_ctx: ServicesContext
 
 
 class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
@@ -65,9 +64,9 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
 
     Composes repositories and domain objects at Layer 0+3:
     1. Notification center: HTTP client pool for notifications (no deps)
-    2. Distributed lock factory: Lock backend based on config
-    3. Repositories: All repository instances
-    4. Services context: Service-layer objects for the API layer
+    2. Container registry: HTTP client pool for Harbor quotas (no deps)
+    3. Distributed lock factory: Lock backend based on config
+    4. Repositories: All repository instances
     """
 
     @property
@@ -95,7 +94,10 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
         notification_center_dep = NotificationCenterDependency()
         notification_center = await stack.enter_dependency(notification_center_dep, None)
 
-        # 2. Distributed lock factory (depends on config, db, etcd)
+        # 2. Container registry (no dependencies)
+        container_registry = await stack.enter_dependency(ContainerRegistryDependency(), None)
+
+        # 3. Distributed lock factory (depends on config, db, etcd)
         distributed_lock_dep = DistributedLockFactoryDependency()
         distributed_lock_input = DistributedLockInput(
             config_provider=setup_input.config_provider,
@@ -106,7 +108,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
             distributed_lock_dep, distributed_lock_input
         )
 
-        # 3. Repositories (depends on db, storage_manager, config, valkey clients)
+        # 4. Repositories (depends on db, storage_manager, config, valkey clients)
         repositories_dep = RepositoriesDependency()
         repositories_input = RepositoriesInput(
             db=setup_input.db,
@@ -121,14 +123,9 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
         )
         repositories = await stack.enter_dependency(repositories_dep, repositories_input)
 
-        # 4. Services context (depends on db)
-        services_dep = ServicesContextDependency()
-        services_input = ServicesInput(db=setup_input.db)
-        services_ctx = await stack.enter_dependency(services_dep, services_input)
-
         yield DomainResources(
             notification_center=notification_center,
+            container_registry=container_registry,
             distributed_lock_factory=distributed_lock_factory,
             repositories=repositories,
-            services_ctx=services_ctx,
         )

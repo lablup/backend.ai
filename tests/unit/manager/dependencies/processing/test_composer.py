@@ -59,6 +59,7 @@ def _make_processing_input() -> ProcessingInput:
         agent_cache=MagicMock(),
         notification_center=MagicMock(),
         appproxy_client_pool=MagicMock(),
+        registry_quota_client_pool=MagicMock(),
         prometheus_client=MagicMock(),
         agent_client_pool=MagicMock(),
         stats_monitor=mock_stats_monitor,

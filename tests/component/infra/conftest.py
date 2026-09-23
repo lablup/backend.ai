@@ -32,6 +32,9 @@ from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHand
 from ai.backend.manager.api.rest.resource_group.registry import register_resource_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.container_registry.pool import (
+    ContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -44,10 +47,10 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -81,12 +84,22 @@ from ai.backend.manager.services.user.service import UserService
 
 
 @pytest.fixture()
+def registry_quota_client_pool() -> ContainerRegistryQuotaClientPool:
+    return ContainerRegistryQuotaClientPool()
+
+
+@pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
-    service = ContainerRegistryService(database_engine, repo)
+    service = ContainerRegistryService(
+        database_engine,
+        repo,
+        registry_quota_client_pool,
+    )
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
     )
@@ -229,7 +242,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The handler resolves the caller's domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

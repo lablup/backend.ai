@@ -26,6 +26,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
@@ -116,7 +117,7 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, RelationOpsProvider(engine))),
+            DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
         FakeDeploymentCoordinator(deployment_handlers),
         FakeScheduleCoordinator(lifecycle_handlers),

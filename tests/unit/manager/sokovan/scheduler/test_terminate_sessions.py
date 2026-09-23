@@ -15,6 +15,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.clients.agent.client import AgentClient
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -130,7 +131,7 @@ class TestTerminateSessions:
             access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
-            status_info="USER_REQUESTED",
+            status_info=KernelLifecycleEventReason.USER_REQUESTED,
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
@@ -164,7 +165,7 @@ class TestTerminateSessions:
         mock_agent.destroy_kernel.assert_called_once_with(
             kernel_id,
             session_id,
-            "USER_REQUESTED",
+            KernelLifecycleEventReason.USER_REQUESTED,
             suppress_events=False,
         )
 
@@ -185,7 +186,7 @@ class TestTerminateSessions:
             access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
-            status_info="FORCED_TERMINATION",
+            status_info=KernelLifecycleEventReason.FORCE_TERMINATED,
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
@@ -216,7 +217,7 @@ class TestTerminateSessions:
             mock_agent.destroy_kernel.assert_called_once_with(
                 kernel_ids[i],
                 session_id,
-                "FORCED_TERMINATION",
+                KernelLifecycleEventReason.FORCE_TERMINATED,
                 suppress_events=False,
             )
 
@@ -237,7 +238,7 @@ class TestTerminateSessions:
             access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
-            status_info="TEST_PARTIAL",
+            status_info=KernelLifecycleEventReason.USER_REQUESTED,
             session_type=SessionTypes.INTERACTIVE,
             kernels=[
                 TerminatingKernelData(
@@ -314,7 +315,7 @@ class TestTerminateSessions:
                     access_key=AccessKey(f"key-{i}"),
                     creation_id=f"creation-{i}",
                     status=SessionStatus.TERMINATING,
-                    status_info="BATCH_TERMINATION",
+                    status_info=KernelLifecycleEventReason.USER_REQUESTED,
                     session_type=SessionTypes.INTERACTIVE,
                     kernels=kernels,
                 )
@@ -368,7 +369,7 @@ class TestTerminateSessions:
             access_key=AccessKey("test-key"),
             creation_id="test-creation",
             status=SessionStatus.TERMINATING,
-            status_info="NO_KERNELS",
+            status_info=KernelLifecycleEventReason.USER_REQUESTED,
             session_type=SessionTypes.INTERACTIVE,
             kernels=[],  # No kernels
         )
