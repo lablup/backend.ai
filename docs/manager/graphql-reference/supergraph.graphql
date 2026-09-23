@@ -9634,6 +9634,9 @@ type ImageV2 implements Node
 
   """Added in 26.2.0. Aliases for this image."""
   aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
+
+  """Added in 26.9.0. The labels on this image."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """
@@ -9794,6 +9797,9 @@ input ImageV2Filter
 
   """Added in 26.3.0. Filter by last used datetime (before/after)."""
   lastUsed: DateTimeFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [ImageV2Filter!] = null
   OR: [ImageV2Filter!] = null
   NOT: [ImageV2Filter!] = null
@@ -19416,6 +19422,9 @@ type ResourceGroup implements Node
 
   """Added in 26.9.0. Projects this resource group serves."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """Added in 26.9.0. The labels on this resource group."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -19458,6 +19467,9 @@ input ResourceGroupFilter
   isActive: Boolean = null
   isPublic: Boolean = null
   isDefault: Boolean = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
