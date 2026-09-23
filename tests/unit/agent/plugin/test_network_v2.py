@@ -3,6 +3,7 @@ from typing import cast, override
 import pytest
 
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.network.registry import BackendSpec
 from ai.backend.agent.plugin.network import ContainerNetworkCapability
 from ai.backend.agent.plugin.network_v2 import (
     AbstractNetworkAgentPluginV2,
@@ -98,6 +99,11 @@ class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @override
     async def detach_endpoint(self, kernel: AbstractKernel) -> None:
         return None
+
+    @classmethod
+    @override
+    def create(cls, spec: BackendSpec) -> "_CompleteV2Plugin":
+        return cls({}, {})
 
 
 class _IncompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):

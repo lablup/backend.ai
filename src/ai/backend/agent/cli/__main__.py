@@ -79,7 +79,19 @@ def kernel() -> None:
 @main.command(name="start-privnet")
 @click.pass_obj
 def start_privnet(cli_ctx: CLIContext) -> None:
-    """Start the privileged session-network daemon."""
-    from ai.backend.agent.network.privnet.__main__ import main as privnet_main
+    """Start the privileged session-network daemon.
+
+    The daemon ships with the data-plane backends it serves, so this reports its absence rather
+    than failing on an import: a node with no backend installed has no helper to start either.
+    """
+    try:
+        from ai.backend.agent.network.privnet.__main__ import (  # pants: no-infer-dep
+            main as privnet_main,
+        )
+    except ImportError as e:
+        raise click.ClickException(
+            "the privileged session-network daemon is not installed on this node"
+            f" ({e}); install the cluster-network backend package that provides it"
+        ) from e
 
     privnet_main(cli_ctx.config_path)

@@ -63,6 +63,7 @@ python_distribution(
         },
         "backendai_network_agent_v2": {
             "vxlan": "ai.backend.agent.network.backends.vxlan:VxlanNetworkPlugin",
+            "bridge": "ai.backend.agent.network.backends.bridge:BridgeNetworkPlugin",
         },
     },
     generate_setup=True,

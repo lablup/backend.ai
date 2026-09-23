@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from ai.backend.agent.network.privnet.protocol import (
+from ai.backend.agent.network.helper.protocol import (
     PROTOCOL_VERSION,
     PrivNetOp,
     PrivNetRequest,

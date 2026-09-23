@@ -19,7 +19,7 @@ import dns.rdatatype
 import dns.rrset
 import pytest
 
-from ai.backend.agent.network.privnet.resolver import (
+from ai.backend.agent.network.helper.resolver import (
     ClusterResolver,
     Forwarder,
     make_upstream_forwarder,

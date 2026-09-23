@@ -52,6 +52,7 @@ from ai.backend.agent.network.pair_journal import (
 )
 from ai.backend.agent.network.path_mtu import underlay_mtu
 from ai.backend.agent.network.readiness import conflicting_device
+from ai.backend.agent.network.registry import BackendSpec
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
@@ -1847,6 +1848,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @override
     async def update_plugin_config(self, plugin_config: Any) -> None:
         self.plugin_config = plugin_config
+
+    @classmethod
+    @override
+    def create(cls, spec: BackendSpec) -> VxlanNetworkPlugin:
+        # The ESP pair journal is node-wide state several agents share, so every claim carries
+        # the agent that made it -- see the journal's own owner tags.
+        return cls(
+            {},
+            {},
+            uplink=spec.uplink,
+            local_subnets=spec.local_subnets,
+            journal_owner=spec.agent_id,
+        )
 
     @override
     async def probe_caps(self) -> AgentNetworkCaps:

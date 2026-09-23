@@ -24,16 +24,18 @@ from typing import TYPE_CHECKING, Any, cast, override
 from ai.backend.agent.errors.network import (
     PrivilegedNetworkHelperFailed,
     PrivilegedNetworkHelperUnreachable,
+    ProxyNotLoadable,
 )
 from ai.backend.agent.network.caps import probe_caps
-from ai.backend.agent.network.port_forward import PortForward
-from ai.backend.agent.network.privnet.protocol import (
+from ai.backend.agent.network.helper.protocol import (
     ADVISORY_PREFIX,
     PrivNetOp,
     PrivNetRequest,
     PrivNetResponse,
     ProtocolError,
 )
+from ai.backend.agent.network.port_forward import PortForward
+from ai.backend.agent.network.registry import BackendSpec
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -408,6 +410,15 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
     @override
     async def update_plugin_config(self, plugin_config: Any) -> None:
         self.plugin_config = plugin_config
+
+    @classmethod
+    @override
+    def create(cls, spec: BackendSpec) -> PrivNetBackendProxy:
+        """Never loaded from an entry point: the proxy stands in for whatever the helper runs,
+        and it needs that helper's live client, which no node fact carries."""
+        raise ProxyNotLoadable(
+            "the privileged helper's backend proxy is built with a live client, not discovered"
+        )
 
     @override
     async def probe_caps(self) -> AgentNetworkCaps:

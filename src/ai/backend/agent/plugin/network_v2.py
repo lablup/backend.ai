@@ -9,7 +9,7 @@ interpret it. The Docker provisioner is the one that does today. See BEP-1079 (a
 
 from abc import ABCMeta, abstractmethod
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.plugin.network import (
@@ -25,6 +25,9 @@ from ai.backend.common.network.types import (
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 
+if TYPE_CHECKING:
+    from ai.backend.agent.network.registry import BackendSpec
+
 
 class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, metaclass=ABCMeta):
     """Runtime-neutral cluster-network backend attached on the agent side.
@@ -38,6 +41,19 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
     ``SessionNetworkCoordinator`` owns membership watching and drives ``add_peer`` /
     ``del_peer`` (which must be idempotent). See BEP-1079 (agent plugin).
     """
+
+    @classmethod
+    @abstractmethod
+    def create(cls, spec: "BackendSpec") -> "AbstractNetworkAgentPluginV2[Any]":
+        """Build this backend from the node's own facts.
+
+        The loader calls this rather than the constructor: a backend ships as a plugin, so the
+        core cannot name its signature. What every backend gets is the node's uplink, the
+        node-wide LOCAL block store and the agent whose name goes on its claims (see
+        `ai.backend.agent.network.registry`); anything else it needs it reads from its own
+        plugin config, as any plugin does.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def probe_caps(self) -> AgentNetworkCaps:

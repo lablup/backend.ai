@@ -91,12 +91,12 @@ from ai.backend.agent.network.caps import (
     withdraw_vtep,
 )
 from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.network.helper.client import PrivNetPortForwarder
 from ai.backend.agent.network.port_forward import (
     PortForwarder,
     PortPublisher,
     forwards_for,
 )
-from ai.backend.agent.network.privnet.client import PrivNetPortForwarder
 from ai.backend.agent.network.session_network import SessionNetwork
 from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.plugin.network import (
@@ -2336,7 +2336,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         socket = self._privnet_socket
         if socket is None:
             return None
-        from ai.backend.agent.network.privnet.client import PrivNetClient
+        from ai.backend.agent.network.helper.client import PrivNetClient
 
         return await PrivNetClient(socket).reachable()
 

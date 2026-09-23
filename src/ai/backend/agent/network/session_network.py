@@ -28,6 +28,11 @@ from ai.backend.agent.errors.network import (
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
 from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.network.helper.resolver import (
+    ClusterDNSServer,
+    ClusterResolver,
+    make_upstream_forwarder,
+)
 from ai.backend.agent.network.local_subnet import (
     LocalSubnetAllocator,
     LocalSubnetLayout,
@@ -40,12 +45,8 @@ from ai.backend.agent.network.orchestrator import (
     ContainerdKernelOrchestrator,
     LaunchResult,
 )
-from ai.backend.agent.network.privnet.resolver import (
-    ClusterDNSServer,
-    ClusterResolver,
-    make_upstream_forwarder,
-)
 from ai.backend.agent.network.provisioner import CniProvisioner, ContainerNetworkProvisioner
+from ai.backend.agent.network.registry import BackendSpec, load_backends
 from ai.backend.agent.network.runtime import ExecResult, OciRuntime
 from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.vni_registry import VniRegistry
@@ -1914,9 +1915,7 @@ def build_session_network(
     keeps its own container lifecycle — see ai.backend.agent.docker.session_network. The default
     containerd runtime is then NOT constructed: a Docker node has no containerd to connect to.
     """
-    # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
-    from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
-    from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
+    # Lazy imports: keep this facade module decoupled from the concrete runtime.
     from ai.backend.agent.network.local_subnet import get_local_subnet_allocator
     from ai.backend.agent.network.native_attacher import (
         NativeBridgeAttachRunner,
@@ -1946,7 +1945,7 @@ def build_session_network(
     privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None
     privnet_client: Any = None
     if privnet_socket is not None:
-        from ai.backend.agent.network.privnet.client import (
+        from ai.backend.agent.network.helper.client import (
             PrivNetBackendProxy,
             PrivNetClient,
             PrivNetProvisioner,
@@ -1991,23 +1990,20 @@ def build_session_network(
         # cannot write.
         owned_ipam = get_host_local_ipam(ipam_state_dir)
         if backends is None:
-            backends = {
-                str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
-                    {},
-                    {},
+            # Whatever backends are installed, by the name each registered under. Named here
+            # only by that name -- a backend ships as a plugin, and importing its class would
+            # make the core depend on the package the plugin seam exists to keep out.
+            backends = load_backends(
+                BackendSpec(
                     uplink=uplink,
                     local_subnets=owned_local_subnets,
-                    # Several agents can run the backend in-process on one host, and the ESP pair
-                    # they share is node-wide state. The claim is tagged with the agent id for the
-                    # same reason the LOCAL subnet claim next to it is: so a co-located agent
-                    # replaying the journal can tell whose sessions are whose, and so a restart
-                    # can find and drop the claims its previous life left behind.
-                    journal_owner=agent_id,
-                ),
-                str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin(
-                    {}, {}, uplink=uplink, local_subnets=owned_local_subnets
-                ),
-            }
+                    # Several agents can run a backend in-process on one host, and what they
+                    # claim (the ESP pair journal, the LOCAL block) is node-wide state. Every
+                    # claim carries the agent that made it, so a co-located agent replaying the
+                    # journal can tell whose sessions are whose.
+                    agent_id=agent_id,
+                )
+            )
     return SessionNetwork(
         etcd,
         agent_id=agent_id,

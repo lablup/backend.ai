@@ -538,3 +538,22 @@ class PrivilegedNetworkHelperUnreachable(PrivilegedNetworkHelperFailed):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class ProxyNotLoadable(BackendAIError, web.HTTPInternalServerError):
+    """Raised when something tries to discover the privileged helper's backend proxy.
+
+    It stands in for whatever backend the helper runs and is built with that helper's live
+    client, so the session network constructs it; it is never loaded from an entry point.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/proxy-not-loadable"
+    error_title = "The privileged helper's backend proxy cannot be discovered."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

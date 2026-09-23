@@ -134,7 +134,7 @@ async def _encryption_problems(privnet_socket: str | None) -> list[str]:
     capabilities, so it is run here.
     """
     if privnet_socket is not None:
-        from ai.backend.agent.network.privnet.client import PrivNetClient
+        from ai.backend.agent.network.helper.client import PrivNetClient
 
         return list((await PrivNetClient(privnet_socket).encryption_problems()).values())
     from ai.backend.agent.network.backends import vxlan
@@ -300,7 +300,7 @@ async def probe_readiness(
         # Checking only the local binaries said this node was ready while the thing that would
         # actually do the work was not running -- and the session found out one node at a time,
         # at create time, from a bare connection error.
-        from ai.backend.agent.network.privnet.client import PrivNetClient
+        from ai.backend.agent.network.helper.client import PrivNetClient
 
         client = PrivNetClient(privnet_socket)
         if (unreachable := await client.reachable()) is not None:

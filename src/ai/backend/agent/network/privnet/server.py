@@ -57,6 +57,15 @@ from ai.backend.agent.errors.network import (
     UnusableVtep,
 )
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
+from ai.backend.agent.network.helper.protocol import (
+    ADVISORY_PREFIX,
+    PROTOCOL_VERSION,
+    ForwardEntry,
+    PrivNetOp,
+    PrivNetRequest,
+    PrivNetResponse,
+    ProtocolError,
+)
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.locator import ContainerLocator
 from ai.backend.agent.network.native_attacher import (
@@ -76,15 +85,6 @@ from ai.backend.agent.network.privnet.gossip_runner import (
     EndpointGossip,
 )
 from ai.backend.agent.network.privnet.journal import AttachRecord, PrivNetJournal
-from ai.backend.agent.network.privnet.protocol import (
-    ADVISORY_PREFIX,
-    PROTOCOL_VERSION,
-    ForwardEntry,
-    PrivNetOp,
-    PrivNetRequest,
-    PrivNetResponse,
-    ProtocolError,
-)
 from ai.backend.agent.network.vni_registry import (
     Binding,
     VniConflict,

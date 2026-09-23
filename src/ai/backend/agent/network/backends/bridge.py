@@ -29,6 +29,7 @@ from ai.backend.agent.network.backends.vxlan import (
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
+from ai.backend.agent.network.registry import BackendSpec
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -104,6 +105,11 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @override
     async def update_plugin_config(self, plugin_config: Any) -> None:
         self.plugin_config = plugin_config
+
+    @classmethod
+    @override
+    def create(cls, spec: BackendSpec) -> BridgeNetworkPlugin:
+        return cls({}, {}, uplink=spec.uplink, local_subnets=spec.local_subnets)
 
     @override
     async def probe_caps(self) -> AgentNetworkCaps:

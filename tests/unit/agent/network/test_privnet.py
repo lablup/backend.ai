@@ -24,7 +24,7 @@ from typing import Any, cast, override
 
 import pytest
 
-import ai.backend.agent.network.privnet.client as client_mod
+import ai.backend.agent.network.helper.client as client_mod
 import ai.backend.agent.network.privnet.server as server_mod
 from ai.backend.agent.errors.network import (
     PrivnetAlreadyRunning,
@@ -32,12 +32,7 @@ from ai.backend.agent.errors.network import (
     UnsafePrivnetSocket,
 )
 from ai.backend.agent.network.caps import compute_caps
-from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
-from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
-from ai.backend.agent.network.native_attacher import HostLocalIpam
-from ai.backend.agent.network.pair_journal import PairJournal
-from ai.backend.agent.network.port_forward import is_orphaned
-from ai.backend.agent.network.privnet.client import (
+from ai.backend.agent.network.helper.client import (
     PrivNetBackendProxy,
     PrivNetClient,
     PrivNetClientError,
@@ -45,18 +40,23 @@ from ai.backend.agent.network.privnet.client import (
     PrivNetProvisioner,
     PrivNetUnreachable,
 )
+from ai.backend.agent.network.helper.protocol import (
+    ADVISORY_PREFIX,
+    PrivNetOp,
+    PrivNetRequest,
+    PrivNetResponse,
+)
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
+from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
+from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.agent.network.pair_journal import PairJournal
+from ai.backend.agent.network.port_forward import is_orphaned
 from ai.backend.agent.network.privnet.journal import PrivNetJournal
 from ai.backend.agent.network.privnet.netns import PinnedNetns
 from ai.backend.agent.network.privnet.policy import (
     PolicyViolation,
     validate_network_config,
     validate_overlay_ip,
-)
-from ai.backend.agent.network.privnet.protocol import (
-    ADVISORY_PREFIX,
-    PrivNetOp,
-    PrivNetRequest,
-    PrivNetResponse,
 )
 from ai.backend.agent.network.privnet.server import PrivNetServer
 from ai.backend.agent.network.readiness import Readiness

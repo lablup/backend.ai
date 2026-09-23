@@ -4,8 +4,8 @@ from typing import Any, cast, override
 import pytest
 
 from ai.backend.agent.errors.network import ContainerAttachFailed
+from ai.backend.agent.network.helper.client import PrivNetProvisioner
 from ai.backend.agent.network.orchestrator import ContainerdKernelOrchestrator
-from ai.backend.agent.network.privnet.client import PrivNetProvisioner
 from ai.backend.agent.network.provisioner import (
     CniProvisioner,
     ContainerNetworkProvisioner,
