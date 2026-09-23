@@ -76,7 +76,7 @@ def create_image_data(
         labels=ImageLabelsData(label_data={"ai.backend.role": "compute"}),
         resources=ImageResourcesData(resources_data={}),
         resource_limits=[
-            ResourceLimit(key="cpu", min="1", max="8"),
+            ResourceLimit(key="cpu", min=Decimal("1"), max=Decimal("8")),
         ],
         tags=[ImageTagEntry(key="runtime", value="python")],
         status=status,
@@ -107,7 +107,7 @@ def create_image_data_with_details(
         is_local=False,
         status=ImageStatus.ALIVE,
         resource_limits=[
-            ResourceLimit(key="cpu", min="1", max="8"),
+            ResourceLimit(key="cpu", min=Decimal("1"), max=Decimal("8")),
         ],
         customized=False,
         creator_id=None,

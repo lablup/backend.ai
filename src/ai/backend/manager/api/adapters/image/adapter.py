@@ -542,9 +542,7 @@ class ImageAdapter(BaseAdapter):
         labels = [ImageLabelInfo(key=k, value=v) for k, v in data.labels.label_data.items()]
         tags = [ImageTagInfo(key=e.key, value=e.value) for e in data.tags]
         resource_limits_flat = [
-            ImageResourceLimitInfo(
-                key=resource_limit.key, min=resource_limit.min, max=resource_limit.max
-            )
+            ImageResourceLimitInfo(key=resource_limit.key, **resource_limit.value_to_dict())
             for resource_limit in data.resource_limits
         ]
         accelerators = data.accelerators
@@ -554,8 +552,8 @@ class ImageAdapter(BaseAdapter):
         resource_limits_gql = [
             ImageResourceLimitGQLInfo(
                 key=rl.key,
-                min=rl.min,
-                max=rl.max if rl.max is not None else "Infinity",
+                min=str(rl.min),
+                max=str(rl.max) if rl.max is not None else "Infinity",
             )
             for rl in data.resource_limits
         ]

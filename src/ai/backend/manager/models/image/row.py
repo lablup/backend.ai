@@ -320,7 +320,7 @@ class ImageRow(CreatedAtMixin, Base):
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
             resources={
-                resource_limit.key: {"min": resource_limit.min, "max": resource_limit.max}
+                resource_limit.key: resource_limit.value_to_dict()
                 for resource_limit in image_data.resource_limits
             },
             status=image_data.status,
@@ -491,7 +491,7 @@ class ImageRow(CreatedAtMixin, Base):
             size_bytes=self.size_bytes,
             status=self.status,
             resource_limits=[
-                ResourceLimit(key=str(k), min=str(v.get("min", 0)), max=None)
+                ResourceLimit(key=str(k), min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
