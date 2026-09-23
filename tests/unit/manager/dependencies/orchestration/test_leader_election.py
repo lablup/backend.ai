@@ -54,6 +54,7 @@ class TestLeaderElectionDependency:
             config_provider=mock_config_provider,
             event_producer=mock_event_producer,
             sokovan_orchestrator=mock_orchestrator,
+            valkey_live=MagicMock(),
         )
 
         async with dependency.provide(election_input) as election:
@@ -95,6 +96,7 @@ class TestLeaderElectionDependency:
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
+            valkey_live=MagicMock(),
         )
 
         async with dependency.provide(election_input):
@@ -131,6 +133,7 @@ class TestLeaderElectionDependency:
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
+            valkey_live=MagicMock(),
         )
 
         with pytest.raises(RuntimeError, match="test error"):
@@ -138,3 +141,44 @@ class TestLeaderElectionDependency:
                 raise RuntimeError("test error")
 
         mock_election.stop.assert_awaited_once()
+
+    @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderClient")
+    @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderElection")
+    @patch("ai.backend.manager.dependencies.orchestration.leader_election.LeaderCron")
+    @patch("ai.backend.manager.dependencies.orchestration.leader_election.EventProducerTask")
+    async def test_the_agent_lost_check_runs_under_the_election(
+        self,
+        _mock_event_producer_task: MagicMock,
+        mock_leader_cron_class: MagicMock,
+        mock_election_class: MagicMock,
+        mock_leader_client_class: MagicMock,
+    ) -> None:
+        """It reads cluster-wide state and emits an event per lost agent.
+
+        Anywhere but the leader, that is one duplicate event per worker.
+        """
+        mock_leader_client_class.create = AsyncMock(return_value=AsyncMock())
+        mock_election_class.return_value = AsyncMock()
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.create_task_specs.return_value = []
+
+        mock_config_provider = MagicMock()
+        mock_config_provider.config.reservoir = None
+
+        dependency = LeaderElectionDependency()
+        election_input = LeaderElectionInput(
+            valkey_profile_target=MagicMock(),
+            pidx=0,
+            config_provider=mock_config_provider,
+            event_producer=MagicMock(),
+            sokovan_orchestrator=mock_orchestrator,
+            valkey_live=MagicMock(),
+        )
+
+        async with dependency.provide(election_input):
+            registered = mock_leader_cron_class.call_args.kwargs["tasks"]
+
+        assert [t.name for t in registered if t.name == "agent_lost_checker"] == [
+            "agent_lost_checker"
+        ]

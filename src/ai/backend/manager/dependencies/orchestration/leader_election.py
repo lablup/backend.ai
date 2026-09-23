@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
@@ -20,6 +21,7 @@ from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+from ai.backend.manager.tasks.agent_lost_checker import AgentLostCheckerTask
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -33,6 +35,7 @@ class LeaderElectionInput:
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
     sokovan_orchestrator: SokovanOrchestrator
+    valkey_live: ValkeyLiveClient
 
 
 class LeaderElectionDependency(
@@ -106,6 +109,16 @@ class LeaderElectionDependency(
         leader_tasks: list[PeriodicTask] = [
             EventProducerTask(spec, setup_input.event_producer) for spec in task_specs
         ]
+
+        # Detecting a lost agent reads cluster-wide state and emits an event per agent,
+        # so running it anywhere but the leader multiplies those events by the worker count.
+        leader_tasks.append(
+            AgentLostCheckerTask(
+                setup_input.config_provider,
+                setup_input.valkey_live,
+                setup_input.event_producer,
+            )
+        )
 
         # Register tasks with the election system
         leader_cron = LeaderCron(tasks=leader_tasks)

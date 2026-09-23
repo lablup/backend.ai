@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
@@ -55,6 +56,7 @@ class OrchestrationInput:
     distributed_lock_factory: DistributedLockFactory
     valkey_profile_target: ValkeyProfileTarget
     valkey_schedule: ValkeyScheduleClient
+    valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     pidx: int
     # Sokovan-specific
@@ -168,6 +170,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,
             sokovan_orchestrator=sokovan_orchestrator,
+            valkey_live=setup_input.valkey_live,
         )
         leader_election = await stack.enter_dependency(
             leader_dep,
