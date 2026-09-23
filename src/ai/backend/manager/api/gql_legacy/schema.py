@@ -1242,6 +1242,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     available_services = PaginatedConnectionField(
         AvailableServiceConnection,
         description="Added in 25.8.0.",
+        deprecation_reason="Deprecated since 26.9.0.",
     )
     service_config = graphene.Field(
         ServiceConfigNode,
@@ -3151,6 +3152,22 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> AuditLogSchema:
         return AvailableServiceNode()
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_available_services(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[AvailableServiceNode]:
+        return AvailableServiceNode.get_connection()
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
