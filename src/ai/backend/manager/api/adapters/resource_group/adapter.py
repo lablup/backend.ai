@@ -418,6 +418,11 @@ class ResourceGroupAdapter(BaseAdapter):
             *self.apply_bool_filter(filter_.is_active, fields.is_active.filter),
             *self.apply_bool_filter(filter_.is_public, fields.is_public.filter),
             *self.apply_bool_filter(filter_.is_default, fields.is_default.filter),
+            *self.apply_to_many_filter(
+                filter_.labels,
+                ResourceGroupSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
         ]
         if filter_.AND:
             for sub in filter_.AND:
