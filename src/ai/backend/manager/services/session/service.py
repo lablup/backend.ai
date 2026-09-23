@@ -77,7 +77,7 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
+from ai.backend.manager.data.session.types import SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import (
@@ -816,7 +816,7 @@ class SessionService:
         # Mark sessions for termination
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             session_ids,
-            reason=reason.value,
+            reason=reason,
             forced=forced,
         )
 
@@ -842,7 +842,7 @@ class SessionService:
             else KernelLifecycleEventReason.USER_REQUESTED
         )
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-            action.session_ids, reason=reason.value, forced=action.forced
+            action.session_ids, reason=reason, forced=action.forced
         )
         # The controller answers in four buckets; the bulk shape answers per session,
         # so the state each one ended in becomes that session's value.
@@ -1257,8 +1257,6 @@ class SessionService:
             compute_session = await self._session_repository.update_session_name(
                 SessionId(action.session_id), new_name
             )
-            if compute_session.status != SessionStatus.RUNNING:
-                raise InvalidAPIParameters("Can't change name of not running session")
         except ValueError as e:
             if "already exists" in str(e):
                 raise InvalidAPIParameters(str(e)) from e

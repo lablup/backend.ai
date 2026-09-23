@@ -22,7 +22,7 @@ from ai.backend.manager.models.resource_group.purgers import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -42,14 +42,12 @@ domain_repository_resilience = Resilience(
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
     _db_source: DomainDBSource
-    _v2_ops: RelationOpsProvider
+    _v2_ops: DomainOpsProvider
 
-    def __init__(
-        self, db: ExtendedAsyncSAEngine, relation_ops_provider: RelationOpsProvider
-    ) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, domain_ops_provider: DomainOpsProvider) -> None:
         self._db = db
         self._db_source = DomainDBSource(db)
-        self._v2_ops = relation_ops_provider
+        self._v2_ops = domain_ops_provider
 
     @domain_repository_resilience.apply()
     async def purge_domain(self, domain_id: DomainID, domain_name: str) -> DomainData:
@@ -62,18 +60,19 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
+    async def create_domain(self, creator: DomainCreator) -> DomainData:
+        """Register a domain with the model-store project it is registered with."""
+        async with self._v2_ops.write_ops() as w:
+            return (await w.create_domain(creator)).domain
+
+    @domain_repository_resilience.apply()
     async def create_domain_node(
         self, creator: DomainCreator, resource_group_ids: list[ResourceGroupID] | None = None
     ) -> DomainData:
-        """Register a domain and the resource groups it may schedule on."""
+        """Register a domain, the model-store project it is registered with, and the
+        resource groups it may schedule on."""
         async with self._v2_ops.write_ops() as w:
-            data = await w.create_role_managed_entity(creator)
-            if resource_group_ids:
-                await w.create_relations(
-                    ResourceGroupForDomainRelationCreator(),
-                    [(data.id, sgroup_id) for sgroup_id in resource_group_ids],
-                )
-            return data
+            return (await w.create_domain(creator, resource_group_ids)).domain
 
     @domain_repository_resilience.apply()
     async def update_domain_node(

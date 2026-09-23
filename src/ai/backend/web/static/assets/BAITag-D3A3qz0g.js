@@ -1,2 +1,0 @@
-import{j as v,fz as p,gp as x,g as j,q as m}from"./index-Dd8bt51s.js";const d=({color:g,icon:n,closable:b,onClose:t,children:a,className:i,style:f,onClick:r,variant:u,...s})=>{if(b){const o=typeof a=="string"||typeof a=="number"?String(a):"";return v.jsx(p,{...s,className:i,color:x(g),icon:n,label:o,isLabelHidden:o==="",endContent:o===""?a:void 0,onRemove:e=>t==null?void 0:t(e),onClick:r?e=>r(e):void 0})}return v.jsx(j,{...s,className:i,style:f,variant:m(g),icon:n,label:a,onClick:r})};export{d as B};
-//# sourceMappingURL=BAITag-D3A3qz0g.js.map

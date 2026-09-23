@@ -89,9 +89,8 @@ action = CreateDomainAction(
 result = await processors.domain.create_domain.run(action)
 ```
 
-The action wires straight to the generic role-managed create, so the domain row and its
-preset roles are all it writes. The model-store project is created by the caller as a
-separate `CreateProjectAction`.
+The action writes the domain row, its preset roles, and the model-store project the
+domain is registered with, in one transaction.
 
 ### Modifying a Domain
 

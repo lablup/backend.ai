@@ -24,9 +24,11 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionRoutingInfo,
+    SessionStatus,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import (
@@ -262,6 +264,8 @@ class SessionDBSource:
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
                 allow_stale=False,
             )
+            if session_row.status != SessionStatus.RUNNING:
+                raise InvalidAPIParameters("Can't change name of not running session")
             if session_row.access_key is not None:
                 # The name is unique among the live sessions of the target session's owner.
                 duplicate = await db_sess.scalar(

@@ -1569,7 +1569,7 @@ async def service_discovery_ctx(
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
-        ServiceMetadata(
+        ServiceMetadata.for_endpoint(
             display_name=f"agent-{local_config.agent_default.defaulted_id}",  # defaults to instance id
             service_group="agent",
             version=VERSION,

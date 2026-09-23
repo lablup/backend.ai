@@ -8,6 +8,9 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 
 @dataclass
 class CreateRegistryQuotaAction(ContainerRegistryAction):
+    """Deprecated: authorized only by the API-layer gates of its callers.
+    Add a scope-gated action and service method instead of extending this one."""
+
     scope_id: ProjectScope
     quota: int
 

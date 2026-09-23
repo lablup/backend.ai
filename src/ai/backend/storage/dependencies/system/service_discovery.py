@@ -93,7 +93,7 @@ class ServiceDiscoveryProvider(
         sd_loop = ServiceDiscoveryLoop(
             sd_type,
             service_discovery,
-            ServiceMetadata(
+            ServiceMetadata.for_endpoint(
                 display_name=f"storage-{local_config.storage_proxy.node_id}",
                 service_group="storage-proxy",
                 version=__version__,

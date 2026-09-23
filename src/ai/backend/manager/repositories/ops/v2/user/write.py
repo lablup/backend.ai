@@ -128,10 +128,12 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
         project_ids: Collection[ProjectID],
     ) -> None:
         """Put the user on each project's roster — the domain's model-store projects
-        always included, ``project_ids`` narrowed to projects that exist in the domain,
+        joined on top, ``project_ids`` narrowed to projects that exist in the domain,
         and personal projects left out."""
         domain_name = await self._domain_name(domain_id)
-        for project_id in await self._member_project_ids(domain_name, project_ids):
+        target = await self._member_project_ids(domain_name, project_ids)
+        target |= await self._model_store_project_ids(domain_name)
+        for project_id in sorted(target, key=str):
             await self._join(project_id, user_id)
 
     async def replace_user_projects(
@@ -140,8 +142,8 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
         domain_name: str,
         project_ids: Collection[ProjectID],
     ) -> None:
-        """Set the user's projects to ``project_ids``, the domain's model-store projects
-        always included.
+        """Set the user's projects to ``project_ids``, refusing a request that drops a
+        model-store project the user is on.
 
         Only the projects entering or leaving the set are touched, so an unchanged
         membership keeps its rows. Personal projects stand outside: none is joined and
@@ -149,7 +151,9 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
         """
         target = await self._member_project_ids(domain_name, project_ids)
         joined = await self._joined_project_ids(user_id)
-        for project_id in sorted(joined - target, key=str):
+        leaving = sorted(joined - target, key=str)
+        await self._refuse_model_store_leaves(leaving)
+        for project_id in leaving:
             await self._leave(project_id, user_id)
         for project_id in sorted(target - joined, key=str):
             await self._join(project_id, user_id)
@@ -227,15 +231,29 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
         domain_name: str,
         project_ids: Collection[ProjectID],
     ) -> set[ProjectID]:
-        """``project_ids`` narrowed to the domain's real projects, plus the domain's
-        model-store projects that every user joins. A personal project is never among
-        them: it takes no member beyond the user it was created with."""
+        """``project_ids`` narrowed to the domain's real projects. A personal project is
+        never among them: it takes no member beyond the user it was created with."""
         stmt = sa.select(ProjectRow.id).where(
             ProjectRow.domain_name == domain_name,
             ProjectRow.type != ProjectType.PERSONAL,
-            sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
+            ProjectRow.id.in_(project_ids),
         )
         return {ProjectID(row) for row in (await self._sess.scalars(stmt)).all()}
+
+    async def _model_store_project_ids(self, domain_name: str) -> set[ProjectID]:
+        """The domain's model-store projects, whose roster holds every user of it."""
+        stmt = sa.select(ProjectRow.id).where(
+            ProjectRow.domain_name == domain_name,
+            ProjectRow.type == ProjectType.MODEL_STORE,
+        )
+        return {ProjectID(row) for row in (await self._sess.scalars(stmt)).all()}
+
+    async def _refuse_model_store_leaves(self, project_ids: Collection[ProjectID]) -> None:
+        """Refuse the write when any project being left is a model-store one. Answering
+        ``ok`` to a request that keeps the membership would leave the caller no way to
+        tell what happened."""
+        for project_id in project_ids:
+            await self._refuse_model_store_leave(project_id)
 
     async def _joined_project_ids(self, user_id: UserID) -> set[ProjectID]:
         """The projects the user is on the roster of, personal ones left out."""

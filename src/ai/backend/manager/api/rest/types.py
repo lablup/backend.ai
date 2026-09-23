@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.agent.repository import AgentRepository
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
-    from ai.backend.manager.service.base import ServicesContext
     from ai.backend.manager.services.processors import Processors
 
 type WebRequestHandler = Callable[
@@ -74,7 +73,6 @@ class GQLContextDeps:
     valkey_schedule: ValkeyScheduleClient
     network_plugin_ctx: NetworkPluginContext
     background_task_manager: BackgroundTaskManager
-    services_ctx: ServicesContext
     storage_manager: StorageSessionManager
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost

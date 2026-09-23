@@ -1,6 +1,10 @@
 [GLOBAL]
 dynamic_ui = false
 colors = true
+# CI reads a remote cache and splits its work across sharded jobs, so no single run
+# holds the graph a local repo-wide goal does. Keep the upstream default here rather
+# than inherit the higher local ceiling, which a runner has less room for.
+pantsd_max_memory_usage = "4GiB"
 
 [python-bootstrap]
 search_path = ["<PATH>"]

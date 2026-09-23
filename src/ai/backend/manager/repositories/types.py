@@ -13,6 +13,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
 )
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
@@ -28,6 +29,7 @@ class RepositoryArgs:
     db: ExtendedAsyncSAEngine
     v2_ops_provider: V2DBOpsProvider
     relation_ops_provider: RelationOpsProvider
+    domain_ops_provider: DomainOpsProvider
     reconcile_ops_provider: ReconcileOpsProvider
     artifact_registry_ops_provider: ArtifactRegistryOpsProvider
     replica_group_ops_provider: ReplicaGroupOpsProvider
