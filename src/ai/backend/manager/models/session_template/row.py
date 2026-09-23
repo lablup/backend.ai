@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
@@ -12,17 +11,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.session_template.types import TemplateType
 from ai.backend.manager.models.base import GUID, Base, EnumType
 
-__all__: Sequence[str] = (
-    "TemplateType",
-    "SessionTemplateRow",
-)
-
-
-class TemplateType(enum.StrEnum):
-    TASK = "task"
-    CLUSTER = "cluster"
+__all__: Sequence[str] = ("SessionTemplateRow",)
 
 
 class SessionTemplateRow(Base):
