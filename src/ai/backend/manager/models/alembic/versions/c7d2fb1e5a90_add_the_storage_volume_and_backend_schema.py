@@ -97,7 +97,7 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "service_storage_backends",
+        "storage_backend_service_reports",
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_backend_id", GUID(), nullable=False),
         sa.Column("status", sa.String(length=64), nullable=False),
@@ -106,18 +106,18 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint(
             "service_catalog_id",
             "storage_backend_id",
-            name=op.f("pk_service_storage_backends"),
+            name=op.f("pk_storage_backend_service_reports"),
         ),
         sa.ForeignKeyConstraint(
             ["service_catalog_id"],
             ["service_catalog.id"],
-            name=op.f("fk_service_storage_backends_service_catalog_id_service_catalog"),
+            name="fk_storage_backend_service_reports_service_catalog_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["storage_backend_id"],
             ["storage_backends.id"],
-            name="fk_service_storage_backends_storage_backend_id",
+            name="fk_storage_backend_service_reports_storage_backend_id",
             ondelete="RESTRICT",
         ),
     )
@@ -147,7 +147,7 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "service_storage_volumes",
+        "storage_volume_service_holdings",
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_volume_id", GUID(), nullable=False),
         sa.Column("status", sa.String(length=64), nullable=False),
@@ -156,24 +156,24 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint(
             "service_catalog_id",
             "storage_volume_id",
-            name=op.f("pk_service_storage_volumes"),
+            name=op.f("pk_storage_volume_service_holdings"),
         ),
         sa.ForeignKeyConstraint(
             ["service_catalog_id"],
             ["service_catalog.id"],
-            name=op.f("fk_service_storage_volumes_service_catalog_id_service_catalog"),
+            name="fk_storage_volume_service_holdings_service_catalog_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["storage_volume_id"],
             ["storage_volumes.id"],
-            name=op.f("fk_service_storage_volumes_storage_volume_id_storage_volumes"),
+            name="fk_storage_volume_service_holdings_storage_volume_id",
             ondelete="RESTRICT",
         ),
     )
 
     op.create_table(
-        "resource_group_storage_volumes",
+        "resource_group_volume_offers",
         sa.Column("resource_group_id", GUID(), nullable=False),
         sa.Column("storage_volume_id", GUID(), nullable=False),
         sa.Column("enabled", sa.Boolean(), server_default=sa.true(), nullable=False),
@@ -182,25 +182,25 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint(
             "resource_group_id",
             "storage_volume_id",
-            name=op.f("pk_resource_group_storage_volumes"),
+            name=op.f("pk_resource_group_volume_offers"),
         ),
         sa.ForeignKeyConstraint(
             ["resource_group_id"],
             ["scaling_groups.id"],
-            name="fk_rg_storage_volumes_resource_group_id",
+            name="fk_resource_group_volume_offers_resource_group_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["storage_volume_id"],
             ["storage_volumes.id"],
-            name="fk_rg_storage_volumes_storage_volume_id",
+            name="fk_resource_group_volume_offers_storage_volume_id",
             ondelete="CASCADE",
         ),
     )
 
     op.create_index(
-        "uq_rg_storage_volumes_is_default",
-        "resource_group_storage_volumes",
+        "uq_resource_group_volume_offers_is_default",
+        "resource_group_volume_offers",
         ["resource_group_id"],
         unique=True,
         postgresql_where=sa.text("is_default"),
@@ -235,9 +235,9 @@ def downgrade() -> None:
         op.f("fk_vfolders_storage_volume_id_storage_volumes"), "vfolders", type_="foreignkey"
     )
     op.drop_column("vfolders", "storage_volume_id")
-    op.drop_table("resource_group_storage_volumes")
-    op.drop_table("service_storage_volumes")
+    op.drop_table("resource_group_volume_offers")
+    op.drop_table("storage_volume_service_holdings")
     op.drop_table("storage_volumes")
-    op.drop_table("service_storage_backends")
+    op.drop_table("storage_backend_service_reports")
     op.drop_table("storage_backends")
     op.drop_table("storage_backend_types")
