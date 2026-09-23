@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EduAppLauncher-Ca-R0Ovi.js","assets/index-Bg9dLa8r.js","assets/index-GUcqLVIX.css"])))=>i.map(i=>d[i]);
+import{j as s,eK as p,l as c,i,hT as u,b_ as l,d_ as d}from"./index-Bg9dLa8r.js";const x=l.lazy(()=>d(()=>import("./EduAppLauncher-Ca-R0Ovi.js"),__vite__mapDeps([0,1,2]))),_=({sToken:a,extraParams:e})=>s.jsxs(s.Fragment,{children:[s.jsx(p,{}),s.jsx(c.Suspense,{fallback:null,children:s.jsx(m,{sToken:a,extraParams:e})})]}),m=a=>{"use memo";const e=i.c(4),{sToken:n,extraParams:r}=a,o=u();let t;return e[0]!==o||e[1]!==r||e[2]!==n?(t=s.jsx(x,{apiEndpoint:o,active:!0,sToken:n,extraParams:r}),e[0]=o,e[1]=r,e[2]=n,e[3]=t):t=e[3],t};export{_ as default};
+//# sourceMappingURL=EduAppLauncherPage-BdOfw015.js.map

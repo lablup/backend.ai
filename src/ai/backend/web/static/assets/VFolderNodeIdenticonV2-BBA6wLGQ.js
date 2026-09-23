@@ -1,0 +1,2 @@
+import{r as s,j as o,h2 as r}from"./index-Bg9dLa8r.js";const n={argumentDefinitions:[],kind:"Fragment",metadata:null,name:"VFolderNodeIdenticonV2Fragment",selections:[{alias:null,args:null,kind:"ScalarField",name:"id",storageKey:null}],type:"VFolder",abstractKey:null};n.hash="eed0916f633b4f27f9770a3c1fa7fe86";const d=({vfolderNodeIdenticonFrgmt:a,style:t})=>{const e=s.useFragment(n,a);return o.jsx(r,{seed:e==null?void 0:e.id,style:t})};export{d as V};
+//# sourceMappingURL=VFolderNodeIdenticonV2-BBA6wLGQ.js.map
