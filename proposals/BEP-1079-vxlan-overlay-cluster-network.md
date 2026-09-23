@@ -182,6 +182,10 @@ and an operator can pin a backend with `forced_backend`.
 | enroot / singularity | Not supported | Planned |
 | Kubernetes | Out of scope | Out of scope |
 
+Kubernetes is out of scope because a pod's network is the cluster's to provide, not this agent's:
+the CNI chain that attaches a pod runs before its container does, and the addresses come from the
+cluster's own IPAM. Meeting a Kubernetes-provided network is its own proposal.
+
 Published runtime identity and boot identity fence stale capability advertisements. Older agents
 that publish no identity remain compatible with the Swarm path, but fail closed on the CNI path.
 
