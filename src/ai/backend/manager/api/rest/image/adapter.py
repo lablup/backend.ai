@@ -5,8 +5,12 @@ Converts request DTOs to repository query conditions and orders.
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 from decimal import Decimal
 
+=======
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+>>>>>>> 3ea47eb54 (fix(BA-8129): build ImageRow resources as min/max mappings from resource limits (#14978))
 from ai.backend.common.dto.manager.image import (
     ImageFilter,
     ImageOrder,
@@ -34,12 +38,6 @@ from ai.backend.manager.repositories.base import (
 class ImageAdapter(BaseFilterAdapter):
     """Adapter for converting image request DTOs to repository queries and response DTOs."""
 
-    @staticmethod
-    def _convert_max(value: Decimal | str) -> Decimal | None:
-        if isinstance(value, str):
-            value = Decimal(value)
-        return None if value.is_infinite() else value
-
     def convert_to_dto(self, data: ImageData) -> ImageDTO:
         """Convert internal ImageData to response ImageDTO."""
         return ImageDTO(
@@ -56,8 +54,8 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=k, value=v) for k, v in data.labels.label_data.items()],
             tags=[ImageTagEntryDTO(key=t.key, value=t.value) for t in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
-                for rl in data.resource_limits
+                ImageResourceLimitDTO.model_validate(resource_limit.to_dict())
+                for resource_limit in data.resource_limits
             ],
             accelerators=data.accelerators if data.accelerators else "*",
             config_digest=data.config_digest,
@@ -81,8 +79,8 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=kv.key, value=kv.value) for kv in data.labels],
             tags=[ImageTagEntryDTO(key=kv.key, value=kv.value) for kv in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
-                for rl in data.resource_limits
+                ImageResourceLimitDTO.model_validate(resource_limit.to_dict())
+                for resource_limit in data.resource_limits
             ],
             accelerators=",".join(data.supported_accelerators)
             if data.supported_accelerators
