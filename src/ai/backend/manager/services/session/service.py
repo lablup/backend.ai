@@ -66,11 +66,6 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-<<<<<<< HEAD
-from ai.backend.manager.data.session.types import SessionStatus
-=======
-from ai.backend.manager.data.session.types import SessionTerminationStatus
->>>>>>> 52d2709aa (fix(BA-8120): check the session status before a rename is committed (#14973))
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
     InternalServerError,

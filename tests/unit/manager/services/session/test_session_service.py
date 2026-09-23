@@ -15,7 +15,6 @@ from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
@@ -1003,27 +1002,6 @@ class TestRenameSession:
         mock_session_repository.update_session_name.assert_called_once_with(
             "test-session", "new-session-name", sample_access_key
         )
-
-    async def test_not_running_session(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        sample_session_data: SessionData,
-        sample_access_key: AccessKey,
-    ) -> None:
-        """Test renaming non-running session raises error"""
-        mock_session = MagicMock()
-        mock_session.status = SessionStatus.PENDING  # Not running
-        mock_session_repository.update_session_name = AsyncMock(return_value=mock_session)
-
-        action = RenameSessionAction(
-            session_name="test-session",
-            owner_access_key=sample_access_key,
-            new_name="new-session-name",
-        )
-
-        with pytest.raises(InvalidAPIParameters):
-            await session_service.rename_session(action)
 
 
 class TestResolveSessionName:

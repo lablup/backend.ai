@@ -214,7 +214,6 @@ class SessionDBSource:
         new_name: str,
         owner_access_key: AccessKey,
     ) -> SessionRow:
-<<<<<<< HEAD
         async def _update(db_session: AsyncSession) -> SessionRow:
             # Check if new name already exists for this owner
             try:
@@ -223,27 +222,6 @@ class SessionDBSource:
                     new_name,
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.NONE,
-=======
-        async with self._db.begin_session() as db_sess:
-            session_row = await self._session_by_id(
-                db_sess,
-                session_id,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                allow_stale=False,
-            )
-            if session_row.status != SessionStatus.RUNNING:
-                raise InvalidAPIParameters("Can't change name of not running session")
-            if session_row.access_key is not None:
-                # The name is unique among the live sessions of the target session's owner.
-                duplicate = await db_sess.scalar(
-                    sa.select(SessionRow.id)
-                    .where(
-                        (SessionRow.name == new_name)
-                        & (SessionRow.access_key == session_row.access_key)
-                        & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
-                    )
-                    .limit(1)
->>>>>>> 52d2709aa (fix(BA-8120): check the session status before a rename is committed (#14973))
                 )
                 raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
             except SessionNotFound:
@@ -256,6 +234,8 @@ class SessionDBSource:
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
             )
+            if session_row.status != SessionStatus.RUNNING:
+                raise InvalidAPIParameters("Can't change name of not running session")
 
             # Update session name
             session_row.name = new_name
