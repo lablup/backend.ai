@@ -65,7 +65,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
-from ai.backend.manager.models.rbac import ScopeType
+from ai.backend.manager.models.rbac import ScopeType, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
@@ -114,7 +114,7 @@ from .base import (
     extract_object_uuid,
     generate_sql_info_for_gql_connection,
 )
-from .gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
@@ -669,13 +669,21 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(
         cls,
         info: graphene.ResolveInfo,
-        id: ResolvedGlobalID,
+        id: str,
+    ) -> Self | None:
+        _, image_id = AsyncNode.resolve_global_id(info, id)
+        return await cls.get_node_by_id(info, image_id, SystemScope())
+
+    @classmethod
+    async def get_node_by_id(
+        cls,
+        info: graphene.ResolveInfo,
+        image_id: str,
         scope_id: ScopeType,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
     ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
-        _, image_id = id
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
             client_ctx = ClientContext(

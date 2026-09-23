@@ -2010,7 +2010,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> ImageNode | None:
         if scope_id is None:
             scope_id = SystemScope()
-        return await ImageNode.get_node(info, id, scope_id, permission)
+        _, image_id = id
+        return await ImageNode.get_node_by_id(info, image_id, scope_id, permission)
 
     @staticmethod
     async def resolve_image_nodes(
