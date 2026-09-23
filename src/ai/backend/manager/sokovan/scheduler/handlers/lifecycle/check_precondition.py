@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -148,7 +149,7 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
             transition_info = SessionTransitionInfo(
                 session_id=session_info.identity.id,
                 from_status=from_status,
-                reason="passed-preconditions",
+                reason=KernelLifecycleEventReason.PASSED_PRECONDITIONS,
                 creation_id=session_info.identity.creation_id,
                 access_key=AccessKey(session_info.metadata.access_key),
             )

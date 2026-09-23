@@ -22,6 +22,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     UpdateRoutesItem,
 )
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -247,7 +248,7 @@ class RouteExecutor:
         with RouteRecorderContext.shared_phase("terminate_sessions"):
             with RouteRecorderContext.shared_step("mark_sessions_terminating"):
                 await self._scheduling_controller.mark_sessions_for_termination(
-                    target_session_ids, reason="ROUTE_TERMINATION"
+                    target_session_ids, reason=KernelLifecycleEventReason.ROUTE_TERMINATION
                 )
 
         return RouteExecutionResult(

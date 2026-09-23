@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -120,7 +121,8 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             )
             # All sessions are skipped when no scheduling data available
             result.skipped.extend(
-                self._to_transition_info(session, "no-scheduling-data") for session in sessions
+                self._to_transition_info(session, message="no-scheduling-data")
+                for session in sessions
             )
             return result
 
@@ -142,22 +144,34 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         for session in sessions:
             session_id = session.session_info.identity.id
             if session_id in scheduled_ids:
-                result.successes.append(self._to_transition_info(session, "triggered-by-scheduler"))
+                result.successes.append(
+                    self._to_transition_info(
+                        session, reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER
+                    )
+                )
             elif session_id in failure_map:
-                reason = failure_map[session_id].msg or "scheduling-failed"
-                result.failures.append(self._to_transition_info(session, reason))
+                message = failure_map[session_id].msg or "scheduling-failed"
+                result.failures.append(self._to_transition_info(session, message=message))
             else:
-                result.skipped.append(self._to_transition_info(session, "not-scheduled-this-cycle"))
+                result.skipped.append(
+                    self._to_transition_info(session, message="not-scheduled-this-cycle")
+                )
 
         return result
 
     @staticmethod
-    def _to_transition_info(session: SessionWithKernels, reason: str) -> SessionTransitionInfo:
+    def _to_transition_info(
+        session: SessionWithKernels,
+        *,
+        reason: KernelLifecycleEventReason | None = None,
+        message: str | None = None,
+    ) -> SessionTransitionInfo:
         info = session.session_info
         return SessionTransitionInfo(
             session_id=info.identity.id,
             from_status=info.lifecycle.status,
             reason=reason,
+            message=message,
             creation_id=info.identity.creation_id,
             access_key=AccessKey(info.metadata.access_key),
         )

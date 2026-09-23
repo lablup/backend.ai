@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -484,7 +485,7 @@ def session_transition_info_pending() -> SessionTransitionInfo:
     return SessionTransitionInfo(
         session_id=SessionId(uuid4()),
         from_status=SessionStatus.PENDING,
-        reason="test-reason",
+        reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
         creation_id=str(uuid4()),
         access_key=AccessKey("test-key"),
     )
@@ -496,7 +497,7 @@ def session_transition_info_preparing() -> SessionTransitionInfo:
     return SessionTransitionInfo(
         session_id=SessionId(uuid4()),
         from_status=SessionStatus.PREPARING,
-        reason="test-reason",
+        reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
         creation_id=str(uuid4()),
         access_key=AccessKey("test-key"),
     )
@@ -509,21 +510,21 @@ def failure_sessions_for_classification() -> list[SessionTransitionInfo]:
         SessionTransitionInfo(
             session_id=SessionId(uuid4()),
             from_status=SessionStatus.PREPARING,
-            reason="failure-1",
+            message="failure-1",
             creation_id=str(uuid4()),
             access_key=AccessKey("test-key"),
         ),
         SessionTransitionInfo(
             session_id=SessionId(uuid4()),
             from_status=SessionStatus.PREPARING,
-            reason="failure-2",
+            message="failure-2",
             creation_id=str(uuid4()),
             access_key=AccessKey("test-key"),
         ),
         SessionTransitionInfo(
             session_id=SessionId(uuid4()),
             from_status=SessionStatus.PREPARING,
-            reason="failure-3",
+            message="failure-3",
             creation_id=str(uuid4()),
             access_key=AccessKey("test-key"),
         ),
@@ -538,7 +539,7 @@ def session_execution_result_success() -> SessionExecutionResult:
             SessionTransitionInfo(
                 session_id=SessionId(uuid4()),
                 from_status=SessionStatus.PREPARING,
-                reason="scheduled",
+                reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
                 creation_id=str(uuid4()),
                 access_key=AccessKey("test-key"),
             ),
@@ -556,7 +557,7 @@ def session_execution_result_with_failures() -> SessionExecutionResult:
             SessionTransitionInfo(
                 session_id=SessionId(uuid4()),
                 from_status=SessionStatus.PREPARING,
-                reason="scheduled",
+                reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
                 creation_id=str(uuid4()),
                 access_key=AccessKey("test-key"),
             ),
@@ -565,7 +566,7 @@ def session_execution_result_with_failures() -> SessionExecutionResult:
             SessionTransitionInfo(
                 session_id=SessionId(uuid4()),
                 from_status=SessionStatus.PREPARING,
-                reason="failed",
+                message="failed",
                 creation_id=str(uuid4()),
                 access_key=AccessKey("test-key"),
             ),
@@ -584,7 +585,7 @@ def session_execution_result_with_skipped() -> SessionExecutionResult:
             SessionTransitionInfo(
                 session_id=SessionId(uuid4()),
                 from_status=SessionStatus.PENDING,
-                reason="skipped-due-to-priority",
+                message="skipped-due-to-priority",
                 creation_id=str(uuid4()),
                 access_key=AccessKey("test-key"),
             ),

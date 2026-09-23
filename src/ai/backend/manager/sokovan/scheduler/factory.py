@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -297,7 +298,7 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             target_kernel_statuses=list(KernelStatus.pre_prepared_statuses()),
             kernel_match_type=KernelMatchType.NOT_ANY,
             success_status=SessionStatus.PREPARED,
-            reason="triggered-by-scheduler",
+            reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
         ),
         # Promote to RUNNING when no kernel is in pre-running states
         # (allows partial failure - some kernels may be TERMINATED)
@@ -307,7 +308,7 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             target_kernel_statuses=list(KernelStatus.pre_running_statuses()),
             kernel_match_type=KernelMatchType.NOT_ANY,
             success_status=SessionStatus.RUNNING,
-            reason="triggered-by-scheduler",
+            reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
         ),
         # Promote to TERMINATED when all kernels are in terminal states
         ScheduleType.CHECK_TERMINATING_PROGRESS: PromotionSpec(
@@ -316,7 +317,7 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             target_kernel_statuses=list(KernelStatus.terminal_statuses()),
             kernel_match_type=KernelMatchType.ALL,
             success_status=SessionStatus.TERMINATED,
-            reason="triggered-by-scheduler",
+            reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
         ),
         # Detect abnormal termination when ANY kernel is TERMINATED or CANCELLED
         # Covers all active session states where kernels can be terminated
@@ -335,7 +336,7 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             target_kernel_statuses=[KernelStatus.TERMINATED, KernelStatus.CANCELLED],
             kernel_match_type=KernelMatchType.ANY,
             success_status=SessionStatus.TERMINATING,
-            reason="ABNORMAL_TERMINATION",
+            reason=KernelLifecycleEventReason.ABNORMAL_TERMINATION,
         ),
     }
 

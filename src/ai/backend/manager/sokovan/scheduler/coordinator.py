@@ -17,6 +17,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
@@ -690,7 +691,7 @@ class ScheduleCoordinator:
             for failure in result.failures:
                 await self._kernel_state_engine.mark_kernel_terminated(
                     failure.kernel_id,
-                    failure.reason or "kernel_handler_failure",
+                    failure.reason or KernelLifecycleEventReason.KERNEL_HANDLER_FAILURE,
                 )
             log.debug(
                 "{}: Terminated {} kernels",
@@ -1082,7 +1083,11 @@ class ScheduleCoordinator:
                     session_id=session_info.session_id,
                     creation_id=session_info.creation_id,
                     status_transition=str(to_status),
-                    reason=session_info.reason or "triggered-by-scheduler",
+                    reason=(
+                        session_info.reason
+                        or session_info.message
+                        or KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER
+                    ),
                 )
             )
 
@@ -1302,7 +1307,6 @@ class ScheduleCoordinator:
                 spec=SessionStatusBatchUpdaterSpec(
                     to_status=transition.session,
                     status_changed_at=status_changed_at,
-                    reason="" if transition.session == SessionStatus.RUNNING else None,
                 ),
                 conditions=[SessionConditions.by_ids(session_ids)],
             )
@@ -1377,7 +1381,7 @@ class ScheduleCoordinator:
 
         reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
             session_ids,
-            reason="EXCEEDED_MAX_RETRIES",
+            reason=KernelLifecycleEventReason.EXCEEDED_MAX_RETRIES,
         )
         log.debug(
             "{}: Reset {} kernels to PENDING for {} sessions",
@@ -1414,7 +1418,11 @@ class ScheduleCoordinator:
                 session_id=info.session_id,
                 phase=handler_name,
                 result=scheduling_result,
-                message=info.reason or f"{handler_name} {scheduling_result.value.lower()}",
+                message=(
+                    info.message
+                    or info.reason
+                    or f"{handler_name} {scheduling_result.value.lower()}"
+                ),
                 from_status=info.from_status,
                 to_status=info.from_status,  # No status change
                 error_code=info.error_code,

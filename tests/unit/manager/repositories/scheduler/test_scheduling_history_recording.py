@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -715,7 +716,7 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.result == str(SchedulingResult.SUCCESS)
             assert history_record.from_status == str(SessionStatus.PENDING)
             assert history_record.to_status == str(SessionStatus.CANCELLED)
-            assert history_record.message == "USER_REQUESTED"
+            assert history_record.message == KernelLifecycleEventReason.USER_REQUESTED
 
     async def test_force_terminate_creates_scheduling_history(
         self,
