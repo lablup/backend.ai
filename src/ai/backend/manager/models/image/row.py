@@ -339,9 +339,7 @@ class ImageRow(CreatedAtMixin, Base):
 
     @staticmethod
     def _resource_limit_max(value: Decimal | str | None) -> str | None:
-        # The max of an image resource limit is no longer used; ImageNode reports Infinity for
-        # every slot whatever the row holds. Infinity becomes null only because the column
-        # schema that ImageRow.resources checks accepts null or a string, not a Decimal.
+        # The max of an image resource limit is no longer used.
         if value is None or (isinstance(value, Decimal) and value.is_infinite()):
             return None
         return str(value)
