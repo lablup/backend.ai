@@ -330,8 +330,11 @@ class ImageRow(CreatedAtMixin, Base):
         cls, resource_limits: Sequence[ResourceLimit]
     ) -> dict[str, dict[str, str | None]]:
         return {
-            rl.key: {"min": str(rl.min), "max": cls._resource_limit_max(rl.max)}
-            for rl in resource_limits
+            resource_limit.key: {
+                "min": str(resource_limit.min),
+                "max": cls._resource_limit_max(resource_limit.max),
+            }
+            for resource_limit in resource_limits
         }
 
     @staticmethod
