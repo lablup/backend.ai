@@ -92,6 +92,7 @@ from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.storage_backend.row import StorageBackendRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.storage_volume.row import StorageVolumeRow
 from ai.backend.manager.models.user.row import UserRow
@@ -164,6 +165,7 @@ _ROWS: Final = (
     SessionIdleCheckRow,
     SessionRow,
     SessionTemplateRow,
+    StorageBackendRow,
     StorageNamespaceRow,
     StorageVolumeRow,
     UserResourcePolicyRow,

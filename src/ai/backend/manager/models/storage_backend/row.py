@@ -23,8 +23,8 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = (
-    "ServiceStorageBackendRow",
     "StorageBackendRow",
+    "StorageBackendServiceReportRow",
     "StorageBackendTypeRow",
 )
 
@@ -59,7 +59,7 @@ class StorageBackendRow(LifecycleTimestampsMixin, Base):
     """A storage appliance a service can reach.
 
     Carries no status: only the services that hold its volumes can reach it, each over
-    its own network path, so the observation lives on `service_storage_backends`. How the
+    its own network path, so the observation lives on `storage_backend_service_reports`. How the
     appliance is reached is the service's own configuration and is not stored here.
     """
 
@@ -87,15 +87,19 @@ class StorageBackendRow(LifecycleTimestampsMixin, Base):
     )
 
 
-class ServiceStorageBackendRow(LifecycleTimestampsMixin, Base):
+class StorageBackendServiceReportRow(LifecycleTimestampsMixin, Base):
     """A storage backend as one service reports it."""
 
-    __tablename__ = "service_storage_backends"
+    __tablename__ = "storage_backend_service_reports"
 
     service_catalog_id: Mapped[ServiceCatalogID] = mapped_column(
         "service_catalog_id",
         GUID(ServiceCatalogID),
-        sa.ForeignKey("service_catalog.id", ondelete="CASCADE"),
+        sa.ForeignKey(
+            "service_catalog.id",
+            ondelete="CASCADE",
+            name="fk_storage_backend_service_reports_service_catalog_id",
+        ),
         primary_key=True,
     )
     storage_backend_id: Mapped[StorageBackendID] = mapped_column(
@@ -104,7 +108,7 @@ class ServiceStorageBackendRow(LifecycleTimestampsMixin, Base):
         sa.ForeignKey(
             "storage_backends.id",
             ondelete="RESTRICT",
-            name="fk_service_storage_backends_storage_backend_id",
+            name="fk_storage_backend_service_reports_storage_backend_id",
         ),
         primary_key=True,
     )
