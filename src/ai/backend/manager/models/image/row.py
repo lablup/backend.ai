@@ -4,7 +4,7 @@ import enum
 import functools
 import logging
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -123,13 +123,6 @@ def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[An
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
-
-
-def _column_resource_max(value: Decimal | str | None) -> str | None:
-    # A ResourceLimit carries "no max" as None or Decimal("Infinity"); the column stores null.
-    if value is None or (isinstance(value, Decimal) and value.is_infinite()):
-        return None
-    return str(value)
 
 
 class ImageRow(CreatedAtMixin, Base):
@@ -326,14 +319,27 @@ class ImageRow(CreatedAtMixin, Base):
             type=image_data.type,
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
-            resources={
-                rl.key: {"min": str(rl.min), "max": _column_resource_max(rl.max)}
-                for rl in image_data.resource_limits
-            },
+            resources=cls._resources_from_limits(image_data.resource_limits),
             status=image_data.status,
         )
         image_row.id = image_data.id
         return image_row
+
+    @classmethod
+    def _resources_from_limits(
+        cls, resource_limits: Sequence[ResourceLimit]
+    ) -> dict[str, dict[str, str | None]]:
+        return {
+            rl.key: {"min": str(rl.min), "max": cls._resource_limit_max(rl.max)}
+            for rl in resource_limits
+        }
+
+    @staticmethod
+    def _resource_limit_max(value: Decimal | str | None) -> str | None:
+        # A ResourceLimit carries "no max" as None or Decimal("Infinity"); the column stores null.
+        if value is None or (isinstance(value, Decimal) and value.is_infinite()):
+            return None
+        return str(value)
 
     @classmethod
     def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:
