@@ -237,10 +237,19 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         id: str,
         permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
     ) -> Self | None:
+        _, domain_name = AsyncNode.resolve_global_id(info, id)
+        return await cls.get_node_by_name(info, domain_name, permission)
+
+    @classmethod
+    async def get_node_by_name(
+        cls,
+        info: graphene.ResolveInfo,
+        domain_name: str,
+        permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
+    ) -> Self | None:
         from ai.backend.manager.models.domain import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
-        _, domain_name = AsyncNode.resolve_global_id(info, id)
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
         async with graph_ctx.db.begin_readonly_session() as db_session:
