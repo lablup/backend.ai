@@ -332,7 +332,6 @@ class ImageRow(CreatedAtMixin, Base):
         return {
             resource_limit.key: {
                 "min": str(resource_limit.min),
-                # The max of an image resource limit is no longer used.
                 "max": None if resource_limit.max.is_infinite() else str(resource_limit.max),
             }
             for resource_limit in resource_limits
