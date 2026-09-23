@@ -358,8 +358,6 @@ class RenameSessionRequest(BaseRequestModel):
     """POST ``/{session_name}/rename``"""
 
     session_name: str = Field(
-        min_length=1,
-        max_length=64,
         validation_alias=AliasChoices("session_name", "name", "clientSessionToken"),
     )
 
