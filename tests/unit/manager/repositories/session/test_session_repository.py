@@ -30,6 +30,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session_template.types import TemplateType
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -48,7 +49,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.aggregates import batch_load_session_allocations
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
+from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
