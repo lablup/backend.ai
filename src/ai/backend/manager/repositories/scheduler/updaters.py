@@ -43,6 +43,7 @@ class SessionStatusBatchUpdaterSpec(BatchUpdaterSpec[SessionRow]):
 
         if self.to_status == SessionStatus.RUNNING:
             values["starts_at"] = self.status_changed_at
+            values["status_info"] = None
         elif self.to_status == SessionStatus.TERMINATED:
             values["terminated_at"] = self.status_changed_at
 

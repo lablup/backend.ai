@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.session.types import KernelMatchType
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -104,4 +105,4 @@ class PromotionSpec:
     target_kernel_statuses: list[KernelStatus]
     kernel_match_type: KernelMatchType
     success_status: SessionStatus
-    reason: str
+    reason: KernelLifecycleEventReason

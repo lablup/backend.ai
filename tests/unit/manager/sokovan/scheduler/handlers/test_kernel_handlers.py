@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.sokovan.scheduler.handlers.kernel.sweep_stale_kernels import (
@@ -88,7 +89,7 @@ class TestSweepStaleKernelsKernelHandler:
         assert len(result.failures) == 1
         assert len(result.successes) == len(running_kernels_multiple) - 1
         assert result.failures[0].kernel_id == dead_kernel_id
-        assert result.failures[0].reason == "STALE_KERNEL"
+        assert result.failures[0].reason == KernelLifecycleEventReason.STALE_KERNEL
 
     async def test_multiple_stale_kernels_all_marked_as_failures(
         self,
@@ -115,7 +116,7 @@ class TestSweepStaleKernelsKernelHandler:
 
         # Verify all failure reasons
         for failure in result.failures:
-            assert failure.reason == "STALE_KERNEL"
+            assert failure.reason == KernelLifecycleEventReason.STALE_KERNEL
 
     async def test_empty_kernel_list_returns_immediately(
         self,
@@ -184,7 +185,7 @@ class TestSweepStaleKernelsKernelHandler:
         assert len(result.failures) == 1
         assert len(result.successes) == 0
         assert result.failures[0].kernel_id == dead_kernel_id
-        assert result.failures[0].reason == "STALE_KERNEL"
+        assert result.failures[0].reason == KernelLifecycleEventReason.STALE_KERNEL
         assert result.failures[0].from_status == KernelStatus.RUNNING
 
     async def test_terminator_exception_propagates(

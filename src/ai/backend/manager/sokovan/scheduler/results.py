@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -54,7 +55,8 @@ class SessionTransitionInfo:
 
     session_id: SessionId
     from_status: SessionStatus
-    reason: str | None = None
+    reason: KernelLifecycleEventReason | None = None
+    message: str | None = None
     error_code: str | None = None
     creation_id: str | None = None
     access_key: AccessKey | None = None
@@ -138,7 +140,7 @@ class KernelTransitionInfo:
 
     kernel_id: KernelId
     from_status: KernelStatus
-    reason: str | None = None
+    reason: KernelLifecycleEventReason | None = None
 
 
 @dataclass

@@ -167,7 +167,7 @@ class TestScheduleSessionsLifecycleHandler:
 
         # Verify all sessions are skipped with appropriate reason
         for skipped in result.skipped:
-            assert skipped.reason == "not-scheduled-this-cycle"
+            assert skipped.message == "not-scheduled-this-cycle"
 
     async def test_failed_sessions_returned_as_failures(
         self,
@@ -204,7 +204,7 @@ class TestScheduleSessionsLifecycleHandler:
         assert len(result.skipped) == 0
         assert len(result.failures) == len(pending_sessions_multiple)
         for failure in result.failures:
-            assert failure.reason == "no suitable agent"
+            assert failure.message == "no suitable agent"
 
     async def test_mixed_results_categorized_correctly(
         self,
@@ -241,12 +241,12 @@ class TestScheduleSessionsLifecycleHandler:
             scheduled_session.session_info.identity.id
         ]
         assert [f.session_id for f in result.failures] == [failed_session.session_info.identity.id]
-        assert result.failures[0].reason == "resource quota exceeded"
+        assert result.failures[0].message == "resource quota exceeded"
         assert {s.session_id for s in result.skipped} == {
             session.session_info.identity.id for session in rest
         }
         for skipped in result.skipped:
-            assert skipped.reason == "not-scheduled-this-cycle"
+            assert skipped.message == "not-scheduled-this-cycle"
 
     async def test_empty_session_list_returns_empty_result(
         self,
@@ -298,7 +298,7 @@ class TestScheduleSessionsLifecycleHandler:
 
         # Verify reason for skip
         for skipped in result.skipped:
-            assert skipped.reason == "no-scheduling-data"
+            assert skipped.message == "no-scheduling-data"
 
         # Verify provisioner was not called
         mock_provisioner.schedule_scaling_group.assert_not_awaited()

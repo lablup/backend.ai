@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -127,7 +128,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
                     from_status=session_info.lifecycle.status,
-                    reason="deprioritized-for-rescheduling",
+                    reason=KernelLifecycleEventReason.DEPRIORITIZED_FOR_RESCHEDULING,
                     creation_id=session_info.identity.creation_id,
                     access_key=AccessKey(session_info.metadata.access_key),
                 )

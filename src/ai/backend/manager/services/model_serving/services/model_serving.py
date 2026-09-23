@@ -528,7 +528,7 @@ class ModelServingService:
                         if status == SessionStatus.RUNNING:
                             await self._scheduling_controller.mark_sessions_for_termination(
                                 [session_id],
-                                reason="DRY_RUN_COMPLETE",
+                                reason=KernelLifecycleEventReason.DRY_RUN_COMPLETE,
                             )
 
                         # Exit loop on terminal states
@@ -712,7 +712,7 @@ class ModelServingService:
         if route_row.session_row:
             await self._scheduling_controller.mark_sessions_for_termination(
                 [route_row.session_row.id],
-                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN.value,
+                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 forced=False,
             )
 

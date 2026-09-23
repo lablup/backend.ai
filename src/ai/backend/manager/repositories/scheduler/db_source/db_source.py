@@ -29,6 +29,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
@@ -850,7 +851,7 @@ class ScheduleDBSource:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
     ) -> MarkTerminatingResult:
@@ -1237,7 +1238,10 @@ class ScheduleDBSource:
                         else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
-                        status_info=session_row.status_info or "UNKNOWN",
+                        status_info=(
+                            KernelLifecycleEventReason.from_value(session_row.status_info)
+                            or KernelLifecycleEventReason.UNKNOWN
+                        ),
                         session_type=session_row.session_type,
                         kernels=kernels,
                     )

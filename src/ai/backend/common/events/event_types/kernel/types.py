@@ -33,6 +33,20 @@ class KernelLifecycleEventReason(enum.StrEnum):
     USER_PURGED = "user-purged"
     NOT_FOUND_IN_MANAGER = "not-found-in-manager"
     CONTAINER_NOT_FOUND = "container-not-found"
+    ROUTE_TERMINATION = "route-termination"
+    DRY_RUN_COMPLETE = "dry-run-complete"
+    PREEMPTED_BY_SCHEDULER = "preempted-by-scheduler"
+    AGENT_RESOURCE_GROUP_CHANGED = "agent-resource-group-changed"
+    STALE_KERNEL = "stale-kernel"
+    EXCEEDED_MAX_RETRIES = "exceeded-max-retries"
+    ABNORMAL_TERMINATION = "abnormal-termination"
+    RESCHEDULED = "rescheduled"
+    TRIGGERED_BY_SCHEDULER = "triggered-by-scheduler"
+    PASSED_PRECONDITIONS = "passed-preconditions"
+    DEPRIORITIZED_FOR_RESCHEDULING = "deprioritized-for-rescheduling"
+    PREEMPTION_RESERVATION = "preemption-reservation"
+    PREEMPTED_BY_RESERVATION = "preempted-by-reservation"
+    KERNEL_HANDLER_FAILURE = "kernel-handler-failure"
 
     @classmethod
     def from_value(cls, value: str | None) -> Self | None:

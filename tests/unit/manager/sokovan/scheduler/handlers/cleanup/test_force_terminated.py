@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -67,7 +68,7 @@ def _make_terminating_session_data(session_id: SessionId) -> TerminatingSessionD
         access_key=AccessKey("test-access-key"),
         creation_id="test-creation-id",
         status=SessionStatus.TERMINATED,
-        status_info="FORCE_TERMINATED",
+        status_info=KernelLifecycleEventReason.FORCE_TERMINATED,
         session_type=SessionTypes.INTERACTIVE,
         kernels=[
             TerminatingKernelData(

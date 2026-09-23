@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -121,7 +122,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
                     SessionTransitionInfo(
                         session_id=timed_out.session_id,
                         from_status=session_data.session_info.lifecycle.status,
-                        reason="PENDING_TIMEOUT_EXCEEDED",
+                        reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                         creation_id=timed_out.creation_id,
                         access_key=timed_out.access_key,
                     )
