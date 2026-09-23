@@ -46,6 +46,7 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.minilang.ordering import (
     OrderDirection,
     OrderingColumn,
@@ -1029,10 +1030,12 @@ def _apply_cursor_pagination(
     _, cursor_row_id_str = AsyncNode.resolve_global_id(info, cursor_id)
 
     cursor_row_id: UUID | str
-    try:
-        cursor_row_id = uuid.UUID(cursor_row_id_str)
-    except (ValueError, AttributeError):
-        # Fall back to string if not a valid UUID (for other ID types)
+    if isinstance(id_column.type, GUID):
+        try:
+            cursor_row_id = uuid.UUID(cursor_row_id_str)
+        except (ValueError, AttributeError, TypeError) as e:
+            raise InvalidAPIParameters(f"Invalid cursor: {cursor_id}") from e
+    else:
         cursor_row_id = cursor_row_id_str
 
     def subq_to_condition(
@@ -1234,6 +1237,10 @@ def generate_sql_info_for_gql_connection(
             connection_args.requested_page_size,
         )
     else:
+        if offset < 0:
+            raise InvalidAPIParameters("Argument 'offset' must be a non-negative integer.")
+        if first is not None and first < 0:
+            raise InvalidAPIParameters("Argument 'first' must be a non-negative integer.")
         page_size = first if first is not None else DEFAULT_PAGE_SIZE
         stmt, count_stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
