@@ -32,7 +32,9 @@ class ImageAdapter(BaseFilterAdapter):
     """Adapter for converting image request DTOs to repository queries and response DTOs."""
 
     @staticmethod
-    def _convert_max(value: Decimal | str) -> Decimal | None:
+    def _convert_max(value: Decimal | str | None) -> Decimal | None:
+        if value is None:
+            return None
         if isinstance(value, str):
             value = Decimal(value)
         return None if value.is_infinite() else value
