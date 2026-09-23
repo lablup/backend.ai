@@ -23,7 +23,10 @@ from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.health.handler import HealthHandler
 from ai.backend.manager.api.rest.internal.health.handler import InternalHealthHandler
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
+from ai.backend.manager.api.rest.shutdown import ShutdownState
 from ai.backend.manager.dto.context import RequestCtx
+from ai.backend.manager.errors.common import ManagerDraining
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -89,6 +92,7 @@ def mock_health_probe(healthy_connectivity: ConnectivityCheckResponse) -> MagicM
     """Mocked HealthProbe returning healthy connectivity by default."""
     probe = MagicMock(spec=HealthProbe)
     probe.get_connectivity_status = AsyncMock(return_value=healthy_connectivity)
+    probe.get_readiness_status = AsyncMock(return_value=healthy_connectivity)
     return probe
 
 
@@ -102,7 +106,7 @@ class TestPublicHealthHandler:
 
     @pytest.fixture
     def handler(self, mock_health_probe: MagicMock) -> HealthHandler:
-        return HealthHandler(health_probe=mock_health_probe)
+        return HealthHandler(health_probe=mock_health_probe, shutdown_state=ShutdownState())
 
     async def test_returns_200_with_status_ok(
         self,
@@ -164,7 +168,7 @@ class TestInternalHealthHandler:
 
     @pytest.fixture
     def handler(self, mock_health_probe: MagicMock) -> InternalHealthHandler:
-        return InternalHealthHandler(health_probe=mock_health_probe)
+        return InternalHealthHandler(health_probe=mock_health_probe, shutdown_state=ShutdownState())
 
     async def test_returns_200_with_connectivity_field(
         self,
@@ -201,7 +205,9 @@ class TestInternalHealthHandler:
     ) -> None:
         """Verify status=degraded when HealthProbe reports an unhealthy component."""
         mock_health_probe.get_connectivity_status = AsyncMock(return_value=degraded_connectivity)
-        handler = InternalHealthHandler(health_probe=mock_health_probe)
+        handler = InternalHealthHandler(
+            health_probe=mock_health_probe, shutdown_state=ShutdownState()
+        )
 
         response = await handler.hello(mock_request_ctx)
 
@@ -260,3 +266,73 @@ class TestInternalHealthHandler:
         assert len(checks) == 1
         assert checks[0]["component_id"] == "postgres"
         assert checks[0]["is_healthy"] is True
+
+
+@pytest.mark.parametrize("handler_type", [HealthHandler, InternalHealthHandler])
+class TestReadiness:
+    async def test_draining_returns_unavailable_before_dependency_probe(
+        self,
+        handler_type: type[HealthHandler] | type[InternalHealthHandler],
+        mock_health_probe: MagicMock,
+        mock_request_ctx: MagicMock,
+    ) -> None:
+        shutdown_state = ShutdownState()
+        handler = handler_type(health_probe=mock_health_probe, shutdown_state=shutdown_state)
+        shutdown_state.draining = True
+        with pytest.raises(ManagerDraining) as exc_info:
+            await handler.readyz(mock_request_ctx)
+        assert exc_info.value.status == 503
+        assert exc_info.value.content_type == "application/problem+json"
+        mock_health_probe.get_readiness_status.assert_not_awaited()
+
+    async def test_dependency_failure_returns_unavailable(
+        self,
+        handler_type: type[HealthHandler] | type[InternalHealthHandler],
+        mock_health_probe: MagicMock,
+        mock_request_ctx: MagicMock,
+        degraded_connectivity: ConnectivityCheckResponse,
+    ) -> None:
+        mock_health_probe.get_readiness_status.return_value = degraded_connectivity
+        handler = handler_type(health_probe=mock_health_probe, shutdown_state=ShutdownState())
+        response = await handler.readyz(mock_request_ctx)
+        assert response.status == 503
+
+
+class TestShutdownState:
+    async def test_drain_preserves_protocol_upgrade(self, mock_request: MagicMock) -> None:
+        response = web.StreamResponse(status=101, headers={"Connection": "upgrade"})
+        await ShutdownState(draining=True).on_response_prepare(mock_request, response)
+        assert response.headers["Connection"] == "upgrade"
+
+    @pytest.mark.parametrize("draining", [True, False])
+    async def test_response_closes_connection_only_during_drain(
+        self, mock_request: MagicMock, draining: bool
+    ) -> None:
+        response = web.Response(text="ok")
+        state = ShutdownState(draining=draining)
+        await state.on_response_prepare(mock_request, response)
+        assert response.status == 200
+        assert response.text == "ok"
+        if draining:
+            assert response.headers["Connection"] == "close"
+            assert response.keep_alive is False
+        else:
+            assert "Connection" not in response.headers
+
+
+class TestDrainingErrorResponse:
+    async def test_debug_mode_returns_503_without_reporting_shutdown_as_error(
+        self, mock_request: MagicMock
+    ) -> None:
+        config_provider = MagicMock()
+        config_provider.config.debug.enabled = True
+        error_monitor = AsyncMock()
+        middleware = build_exception_middleware(
+            error_monitor=error_monitor,
+            stats_monitor=AsyncMock(),
+            config_provider=config_provider,
+        )
+        response = await middleware(mock_request, AsyncMock(side_effect=ManagerDraining()))
+        assert response.status == 503
+        assert response.content_type == "application/problem+json"
+        error_monitor.capture_exception.assert_not_awaited()

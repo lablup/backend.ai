@@ -61430,7 +61430,7 @@
           }
         },
         "parameters": [],
-        "description": "Readiness probe — 200 / 503 based on readiness-tier health, empty body."
+        "description": "Readiness probe; draining returns a 503 problem response."
       }
     },
     "/container-registries/": {
