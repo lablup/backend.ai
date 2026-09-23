@@ -74,7 +74,7 @@ class ServiceDiscoveryDependency(
         sd_loop = ServiceDiscoveryLoop(
             sd_type,
             sd,
-            ServiceMetadata(
+            ServiceMetadata.for_endpoint(
                 display_name=f"manager-{config.manager.id}",
                 service_group="manager",
                 version=__version__,
