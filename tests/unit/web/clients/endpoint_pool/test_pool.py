@@ -9,14 +9,14 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.web.clients.endpoint_pool import (
-    EndpointPoolSpec,
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import (
     EndpointSelectionPolicy,
-    HealthyEndpointPool,
     LeastConnectionsStrategy,
     RoundRobinStrategy,
     build_endpoint_selection_strategy,
 )
+from ai.backend.common.endpoint_pool.types import EndpointPoolSpec
 from ai.backend.web.errors import ManagerConnectionUnavailable
 
 
@@ -91,6 +91,7 @@ async def _drive_to_unhealthy(pool: HealthyEndpointPool, endpoint: str, *, attem
 class TestAcquire:
     async def test_round_robin_distributes_among_healthy(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2", "http://m3"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -112,6 +113,7 @@ class TestAcquire:
 
     async def test_acquire_yields_endpoint_only(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -123,6 +125,7 @@ class TestAcquire:
 
     async def test_acquire_raises_when_no_healthy_endpoint(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(failure_threshold=1),
             strategy=RoundRobinStrategy(),
@@ -137,6 +140,7 @@ class TestAcquire:
     async def test_least_connections_picks_idle_endpoint(self) -> None:
         strategy = LeastConnectionsStrategy()
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2", "http://m3"],
             spec=_make_spec(),
             strategy=strategy,
@@ -153,6 +157,7 @@ class TestAcquire:
 class TestAcquireSticky:
     async def test_returns_requested_endpoint_when_healthy(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -164,6 +169,7 @@ class TestAcquireSticky:
 
     async def test_raises_for_unknown_endpoint(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -177,6 +183,7 @@ class TestAcquireSticky:
     async def test_keeps_least_connections_counter_consistent(self) -> None:
         strategy = LeastConnectionsStrategy()
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=strategy,
@@ -191,6 +198,7 @@ class TestAcquireSticky:
 class TestOutcomeRecording:
     async def test_connection_error_marks_unhealthy_after_threshold(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(failure_threshold=2),
             strategy=RoundRobinStrategy(),
@@ -208,6 +216,7 @@ class TestOutcomeRecording:
 
     async def test_timeout_error_counts_as_connection_failure(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(failure_threshold=1),
             strategy=RoundRobinStrategy(),
@@ -221,6 +230,7 @@ class TestOutcomeRecording:
 
     async def test_business_exception_does_not_count_as_failure(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(failure_threshold=1),
             strategy=RoundRobinStrategy(),
@@ -234,6 +244,7 @@ class TestOutcomeRecording:
 
     async def test_clean_exit_resets_failure_counter(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(failure_threshold=3),
             strategy=RoundRobinStrategy(),
@@ -255,6 +266,7 @@ class TestOutcomeRecording:
 
     async def test_recovery_after_unhealthy(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(failure_threshold=1),
             strategy=RoundRobinStrategy(),
@@ -274,6 +286,7 @@ class TestOutcomeRecording:
 class TestHealthState:
     async def test_record_for_unknown_endpoint_through_sticky_is_503(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -286,6 +299,7 @@ class TestHealthState:
 
     async def test_all_endpoints_lists_configured_endpoints(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -298,6 +312,7 @@ class TestHealthState:
 class TestProbeLoop:
     async def test_probe_failure_eventually_marks_unhealthy(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(
                 health_check_interval=0.01,
@@ -316,6 +331,7 @@ class TestProbeLoop:
 
     async def test_probe_5xx_counts_as_failure(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(
                 health_check_interval=0.01,
@@ -334,6 +350,7 @@ class TestProbeLoop:
 
     async def test_probe_success_keeps_healthy(self) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(
                 health_check_interval=0.01,
@@ -357,6 +374,7 @@ class TestLifecycle:
             return session
 
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -377,6 +395,7 @@ class TestPolicyInjection:
         self, policy: EndpointSelectionPolicy
     ) -> None:
         pool = HealthyEndpointPool(
+            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=build_endpoint_selection_strategy(policy),

@@ -41,11 +41,10 @@ from http import HTTPStatus
 import aiohttp
 from aiotools import cancel_and_wait
 
+from ai.backend.common.endpoint_pool.strategy import EndpointSelectionStrategy
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointEntry, EndpointPoolSpec
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.web.errors import ManagerConnectionUnavailable
-
-from .strategy import EndpointSelectionStrategy
-from .types import AcquiredEndpoint, EndpointEntry, EndpointPoolSpec
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -78,6 +77,7 @@ class _CachedEntry:
 
 
 class HealthyEndpointPool:
+    _unavailable_error_factory: Callable[[str], BackendAIError]
     _entries: dict[str, _CachedEntry]
     _spec: EndpointPoolSpec
     _strategy: EndpointSelectionStrategy
@@ -88,10 +88,12 @@ class HealthyEndpointPool:
         self,
         *,
         endpoints: Sequence[str],
+        unavailable_error_factory: Callable[[str], BackendAIError],
         spec: EndpointPoolSpec,
         strategy: EndpointSelectionStrategy,
         probe_session_factory: Callable[[str], aiohttp.ClientSession],
     ) -> None:
+        self._unavailable_error_factory = unavailable_error_factory
         self._spec = spec
         self._strategy = strategy
         self._entries = {
@@ -125,7 +127,7 @@ class HealthyEndpointPool:
         resets the failure counter while the endpoint is healthy. Only a
         successful probe restores an unhealthy endpoint.
 
-        Raises :class:`ManagerConnectionUnavailable` when no endpoint is
+        Raises the caller-provided exception when no endpoint is
         currently healthy.
         """
         async with self._lock:
@@ -133,7 +135,7 @@ class HealthyEndpointPool:
                 cached.entry for cached in self._entries.values() if cached.is_healthy
             ]
         if not healthy_entries:
-            raise ManagerConnectionUnavailable(
+            raise self._unavailable_error_factory(
                 "no healthy endpoint is available",
             )
         async with self._strategy.acquire(healthy_entries) as chosen_entry:
@@ -152,7 +154,7 @@ class HealthyEndpointPool:
         """
         cached = self._entries.get(endpoint)
         if cached is None or not cached.is_healthy:
-            raise ManagerConnectionUnavailable(
+            raise self._unavailable_error_factory(
                 f"endpoint {endpoint!r} is not healthy",
             )
         async with self._strategy.acquire([cached.entry]) as chosen_entry:

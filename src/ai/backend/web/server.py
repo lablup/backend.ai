@@ -62,6 +62,9 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import build_endpoint_selection_strategy
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointPoolSpec
 from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -86,17 +89,12 @@ from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
 )
-from ai.backend.web.clients.endpoint_pool import (
-    AcquiredEndpoint,
-    EndpointPoolSpec,
-    HealthyEndpointPool,
-    build_endpoint_selection_strategy,
-)
 from ai.backend.web.clients.manager_pool import (
     ManagerEndpointsHealthChecker,
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.errors import ManagerConnectionUnavailable
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
@@ -885,6 +883,7 @@ async def manager_pool_ctx(
         )
 
     pool = HealthyEndpointPool(
+        unavailable_error_factory=ManagerConnectionUnavailable,
         endpoints=[str(endpoint) for endpoint in config.api.endpoint],
         spec=EndpointPoolSpec(
             probe_path=config.api.health_check_probe_path,
@@ -928,6 +927,7 @@ async def apollo_router_pool_ctx(
         )
 
     pool = HealthyEndpointPool(
+        unavailable_error_factory=ManagerConnectionUnavailable,
         endpoints=list(config.apollo_router.endpoints),
         spec=EndpointPoolSpec(
             probe_path=config.apollo_router.health_check_probe_path,
