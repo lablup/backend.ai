@@ -15,15 +15,18 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
+    from ai.backend.manager.api.rest.shutdown import ShutdownState
 
 
-def build_internal_api_routes(*, health_probe: HealthProbe) -> list[RouteRegistry]:
+def build_internal_api_routes(
+    *, health_probe: HealthProbe, shutdown_state: ShutdownState
+) -> list[RouteRegistry]:
     """Build the internal API module tree and return all root-level registries.
 
     This is the composition root for the internal address: all handlers are
     constructed here and passed to pure routing registrar functions.
     """
-    handler = InternalHealthHandler(health_probe=health_probe)
+    handler = InternalHealthHandler(health_probe=health_probe, shutdown_state=shutdown_state)
     return [
         register_internal_health_routes(handler),
     ]

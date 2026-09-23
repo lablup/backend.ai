@@ -64,6 +64,7 @@ from .api.rest.middleware import (
 )
 from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
 from .api.rest.routing import RouteRegistry
+from .api.rest.shutdown import ShutdownState
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .data.manager_status.types import ManagerStatus
@@ -73,6 +74,7 @@ from .plugin.webapp import WebappPluginContext
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
+SHUTDOWN_CLEANUP_MARGIN: Final = 10.0
 
 
 @asynccontextmanager
@@ -214,7 +216,9 @@ def build_prometheus_service_discovery_handler(
     return _handler
 
 
-def build_internal_app(dep_resources: DependencyResources) -> web.Application:
+def build_internal_app(
+    dep_resources: DependencyResources, shutdown_state: ShutdownState
+) -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
@@ -224,7 +228,9 @@ def build_internal_app(dep_resources: DependencyResources) -> web.Application:
         build_prometheus_service_discovery_handler(dep_resources.system.service_discovery),
     )
     root_reg = RouteRegistry.create("", {})
-    for sub in build_internal_api_routes(health_probe=dep_resources.system.health_probe):
+    for sub in build_internal_api_routes(
+        health_probe=dep_resources.system.health_probe, shutdown_state=shutdown_state
+    ):
         root_reg.add_subregistry(sub)
     _mount_registry_tree(app, root_reg)
     return app
@@ -247,6 +253,7 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
     loop.set_debug(boostrap_config.debug.asyncio)
     manager_init_stack = AsyncExitStack()
+    shutdown_state = ShutdownState()
 
     @asynccontextmanager
     async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
@@ -283,11 +290,22 @@ async def server_main(
         dep_resources: DependencyResources,
     ) -> AsyncGenerator[None]:
         config_provider = dep_resources.bootstrap.config_provider
+        shutdown_config = boostrap_config.manager
 
-        runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        root_app.on_response_prepare.append(shutdown_state.on_response_prepare)
+        runner = web.AppRunner(
+            root_app,
+            keepalive_timeout=30.0,
+            shutdown_timeout=shutdown_config.shutdown_grace_period,
+        )
 
-        internal_app = build_internal_app(dep_resources)
-        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
+        internal_app = build_internal_app(dep_resources, shutdown_state)
+        internal_app.on_response_prepare.append(shutdown_state.on_response_prepare)
+        internal_runner = web.AppRunner(
+            internal_app,
+            keepalive_timeout=30.0,
+            shutdown_timeout=shutdown_config.shutdown_grace_period,
+        )
 
         ssl_ctx = None
         if config_provider.config.manager.ssl_enabled:
@@ -296,36 +314,51 @@ async def server_main(
                 str(config_provider.config.manager.ssl_cert),
                 config_provider.config.manager.ssl_privkey,
             )
-        await runner.setup()  # The cleanup context initialization happens here.
-        await internal_runner.setup()
-        service_addr = config_provider.config.manager.service_addr
-        internal_addr = config_provider.config.manager.internal_addr
-        site = web.TCPSite(
-            runner,
-            service_addr.host,
-            service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=ssl_ctx,
-        )
-        internal_site = web.TCPSite(
-            internal_runner,
-            internal_addr.host,
-            internal_addr.port,
-            backlog=1024,
-            reuse_port=True,
-        )
-        await site.start()
-        await internal_site.start()
-        log.info(
-            "started handling API requests at {}",
-            service_addr,
-        )
-
+        started = False
         try:
+            await runner.setup()  # The cleanup context initialization happens here.
+            await internal_runner.setup()
+            service_addr = config_provider.config.manager.service_addr
+            internal_addr = config_provider.config.manager.internal_addr
+            site = web.TCPSite(
+                runner,
+                service_addr.host,
+                service_addr.port,
+                backlog=1024,
+                reuse_port=True,
+                ssl_context=ssl_ctx,
+            )
+            internal_site = web.TCPSite(
+                internal_runner,
+                internal_addr.host,
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
+            await site.start()
+            await internal_site.start()
+            log.info(
+                "started handling API requests at {}",
+                service_addr,
+            )
+            started = True
             yield
         finally:
-            await runner.cleanup()
+            try:
+                if started:
+                    shutdown_state.draining = True
+                    log.info(
+                        "Draining API requests for {} seconds",
+                        shutdown_config.shutdown_drain_period,
+                    )
+                    await asyncio.sleep(shutdown_config.shutdown_drain_period)
+            finally:
+                results = await asyncio.gather(
+                    runner.cleanup(), internal_runner.cleanup(), return_exceptions=True
+                )
+                for result in results:
+                    if isinstance(result, BaseException):
+                        raise result
 
     await manager_init_stack.__aenter__()
     try:
@@ -387,7 +420,7 @@ async def server_main(
         # Must happen before runner.setup() which freezes the application router.
         from .api.rest.setup import setup_api
 
-        setup_api(root_app, dep_resources, pidx)
+        setup_api(root_app, dep_resources, pidx, shutdown_state=shutdown_state)
 
         # Manager status check
         config_provider = dep_resources.bootstrap.config_provider
@@ -550,7 +583,11 @@ def main(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
                         args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
-                        wait_timeout=5.0,
+                        wait_timeout=(
+                            bootstrap_cfg.manager.shutdown_drain_period
+                            + bootstrap_cfg.manager.shutdown_grace_period
+                            + SHUTDOWN_CLEANUP_MARGIN
+                        ),
                         runner=runner,
                     )
                 finally:

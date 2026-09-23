@@ -8,6 +8,7 @@ from .app import _mount_registry_tree
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.shutdown import ShutdownState
     from ai.backend.manager.dependencies import DependencyResources
 
 
@@ -15,6 +16,8 @@ def setup_api(
     root_app: web.Application,
     dep_resources: DependencyResources,
     pidx: int,
+    *,
+    shutdown_state: ShutdownState,
 ) -> None:
     """Build the full API module tree and mount it on *root_app*.
 
@@ -75,6 +78,7 @@ def setup_api(
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
         health_probe=r.system.health_probe,
+        shutdown_state=shutdown_state,
         pidx=pidx,
     ):
         root_registry.add_subregistry(sub)

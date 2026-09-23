@@ -16,6 +16,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
     InternalServerError,
+    ManagerDraining,
     MethodNotAllowed,
     URLNotFound,
 )
@@ -81,6 +82,11 @@ def build_exception_middleware(
             if len(ex.args) == 1:
                 raise InvalidAPIParameters(ex.args[0]) from ex
             raise InvalidAPIParameters() from ex
+        except ManagerDraining as ex:
+            await stats_monitor.report_metric(
+                INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
+            )
+            return web.Response(status=ex.status, body=ex.body, headers=ex.headers)
         except BackendAIError as ex:
             if ex.status_code // 100 == 4:
                 log.warning(

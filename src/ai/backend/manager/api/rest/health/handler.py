@@ -1,4 +1,4 @@
-"""Public health check handler — status-only liveness / readiness probes."""
+"""Public health check handler — liveness / readiness probes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING
 from aiohttp import web
 
 from ai.backend.manager import __version__
+from ai.backend.manager.api.rest.shutdown import ShutdownState
 from ai.backend.manager.dto.context import RequestCtx
+from ai.backend.manager.errors.common import ManagerDraining
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
@@ -20,13 +22,15 @@ class HealthHandler:
     ``/health`` returns a minimal liveness payload (version only — never the
     internal connectivity matrix, which would leak deployment topology).
     ``/livez`` and ``/readyz`` are status-only K8s-style probes that mirror
-    the internal liveness / readiness checks but omit the response body.
+    the internal liveness / readiness checks but omit the response body except for draining errors.
     """
 
     _health_probe: HealthProbe
+    _shutdown_state: ShutdownState
 
-    def __init__(self, *, health_probe: HealthProbe) -> None:
+    def __init__(self, *, health_probe: HealthProbe, shutdown_state: ShutdownState) -> None:
         self._health_probe = health_probe
+        self._shutdown_state = shutdown_state
 
     async def hello(self, request_ctx: RequestCtx) -> web.Response:
         """Simple liveness probe — returns 200 OK with version."""
@@ -42,8 +46,10 @@ class HealthHandler:
         )
 
     async def readyz(self, request_ctx: RequestCtx) -> web.Response:
-        """Readiness probe — 200 / 503 based on readiness-tier health, empty body."""
+        """Readiness probe; draining returns a 503 problem response."""
         request_ctx.request["do_not_print_access_log"] = True
+        if self._shutdown_state.draining:
+            raise ManagerDraining()
         connectivity = await self._health_probe.get_readiness_status()
         return web.Response(
             status=HTTPStatus.OK if connectivity.overall_healthy else HTTPStatus.SERVICE_UNAVAILABLE
