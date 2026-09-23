@@ -50068,6 +50068,11 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -50078,7 +50083,7 @@
           }
         },
         "parameters": [],
-        "description": "Search the images the named scopes reach."
+        "description": "Search the images the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/aliases/search": {
