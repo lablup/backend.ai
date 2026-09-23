@@ -47,8 +47,7 @@ class ImageAdapter(BaseFilterAdapter):
             resource_limits=[
                 ImageResourceLimitDTO.model_validate({
                     "key": resource_limit.key,
-                    "min": resource_limit.min,
-                    "max": resource_limit.max_str,
+                    **resource_limit.value_to_dict(),
                 })
                 for resource_limit in data.resource_limits
             ],
@@ -76,8 +75,7 @@ class ImageAdapter(BaseFilterAdapter):
             resource_limits=[
                 ImageResourceLimitDTO.model_validate({
                     "key": resource_limit.key,
-                    "min": resource_limit.min,
-                    "max": resource_limit.max_str,
+                    **resource_limit.value_to_dict(),
                 })
                 for resource_limit in data.resource_limits
             ],

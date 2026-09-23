@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Any, NamedTuple, override
+from typing import Any, NamedTuple, TypedDict, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
@@ -75,17 +75,22 @@ class ImageTagEntry:
     value: str
 
 
+class ResourceLimitValueDict(TypedDict):
+    min: str
+    max: str | None
+
+
 @dataclass
 class ResourceLimit:
     key: str
     min: Decimal
     max: Decimal | str | None
 
-    @property
-    def max_str(self) -> str | None:
-        if self.max is None or (isinstance(self.max, Decimal) and self.max.is_infinite()):
-            return None
-        return str(self.max)
+    def value_to_dict(self) -> ResourceLimitValueDict:
+        max_value: str | None = None
+        if self.max is not None and not (isinstance(self.max, Decimal) and self.max.is_infinite()):
+            max_value = str(self.max)
+        return {"min": str(self.min), "max": max_value}
 
 
 @dataclass

@@ -320,7 +320,7 @@ class ImageRow(CreatedAtMixin, Base):
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
             resources={
-                resource_limit.key: {"min": str(resource_limit.min), "max": resource_limit.max_str}
+                resource_limit.key: resource_limit.value_to_dict()
                 for resource_limit in image_data.resource_limits
             },
             status=image_data.status,
