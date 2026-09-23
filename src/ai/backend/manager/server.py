@@ -176,12 +176,27 @@ def build_prometheus_service_discovery_handler(
     async def _handler(_request: web.Request) -> web.Response:
         services = await service_discovery.discover()
         resp = []
+        # Every worker of a multi-process component registers itself, but they all share
+        # one listening socket, so their endpoints carry the same address. Metrics are
+        # collected in prometheus_client's multi-process mode, where any scrape of that
+        # address already returns the sum across the workers on that host. Emitting a
+        # target per registration therefore makes Prometheus scrape the same totals once
+        # per worker, and every `sum()` over them comes out that many times too large
+        # (observed: raising `num-proc` from 1 to 4 tripled the reported request rate
+        # while the real traffic held steady).
+        #
+        # One target per address is what the exposition actually describes. ``service_id``
+        # is dropped with the duplicates, since no single worker's id speaks for the host.
+        seen_addresses: set[str] = set()
         for service in services:
+            address = f"{service.endpoint.prometheus_address}"
+            if address in seen_addresses:
+                continue
+            seen_addresses.add(address)
             resp.append({
-                "targets": [f"{service.endpoint.prometheus_address}"],
+                "targets": [address],
                 "labels": {
                     **service.labels,
-                    "service_id": service.id,
                     "service_group": service.service_group,
                     "display_name": service.display_name,
                     "version": service.version,
