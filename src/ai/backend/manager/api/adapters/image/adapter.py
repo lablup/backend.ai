@@ -604,7 +604,7 @@ class ImageAdapter(BaseAdapter):
             metadata=ImageMetadataInfoDTO(
                 digest=data.config_digest,
                 size_bytes=data.size_bytes,
-                size_v2=str(data.size_bytes),
+                size_v2=data.size_bytes,
                 created_at=data.created_at,
                 last_used_at=data.last_used_at,
                 tags=tags,

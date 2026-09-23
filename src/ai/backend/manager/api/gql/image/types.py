@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
+    BigInt,
     DateTimeFilter,
     IntFilter,
     OrderDirection,
@@ -224,10 +225,10 @@ class ImageV2MetadataInfoGQL:
         description="Image size in bytes.",
         deprecation_reason="Use sizeV2; this field cannot carry sizes over 2 GiB.",
     )
-    size_v2: str | None = gql_added_field(
+    size_v2: BigInt | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Image size in bytes as a decimal string (e.g., '12826359723').",
+            description="Image size in bytes.",
         ),
     )
     created_at: datetime | None = gql_field(
