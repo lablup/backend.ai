@@ -1265,7 +1265,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     available_services = PaginatedConnectionField(
         AvailableServiceConnection,
         description="Added in 25.8.0.",
-        deprecation_reason="Deprecated since 26.9.0. Use `available_service` instead.",
+        deprecation_reason="Deprecated since 26.9.0.",
     )
     service_config = graphene.Field(
         ServiceConfigNode,
