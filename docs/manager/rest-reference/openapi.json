@@ -12847,6 +12847,18 @@
             "default": null,
             "description": "Filter by last used datetime (before/after)."
           },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the labels on the entity"
+          },
           "AND": {
             "anyOf": [
               {
@@ -22414,6 +22426,18 @@
             "default": null,
             "description": "Filter by whether the resource group is the default one.",
             "title": "Is Default"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the labels on the entity"
           },
           "AND": {
             "anyOf": [
