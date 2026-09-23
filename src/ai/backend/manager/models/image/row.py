@@ -125,6 +125,13 @@ def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[An
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
+def _column_resource_max(value: Decimal | str | None) -> str | None:
+    # A ResourceLimit carries "no max" as None or Decimal("Infinity"); the column stores null.
+    if value is None or (isinstance(value, Decimal) and value.is_infinite()):
+        return None
+    return str(value)
+
+
 class ImageRow(CreatedAtMixin, Base):
     __tablename__ = "images"
     __table_args__ = (
@@ -319,7 +326,10 @@ class ImageRow(CreatedAtMixin, Base):
             type=image_data.type,
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
-            resources={rl.key: {rl.min, rl.max} for rl in image_data.resource_limits},
+            resources={
+                rl.key: {"min": str(rl.min), "max": _column_resource_max(rl.max)}
+                for rl in image_data.resource_limits
+            },
             status=image_data.status,
         )
         image_row.id = image_data.id
