@@ -19,9 +19,11 @@ from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
     SessionRoutingInfo,
+    SessionStatus,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import (
@@ -232,6 +234,8 @@ class SessionDBSource:
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
             )
+            if session_row.status != SessionStatus.RUNNING:
+                raise InvalidAPIParameters("Can't change name of not running session")
 
             # Update session name
             session_row.name = new_name

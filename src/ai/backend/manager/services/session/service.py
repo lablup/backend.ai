@@ -66,7 +66,6 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
     InternalServerError,
@@ -1290,8 +1289,6 @@ class SessionService:
             compute_session = await self._session_repository.update_session_name(
                 session_name, new_name, owner_access_key
             )
-            if compute_session.status != SessionStatus.RUNNING:
-                raise InvalidAPIParameters("Can't change name of not running session")
         except ValueError as e:
             if "already exists" in str(e):
                 raise InvalidAPIParameters(str(e)) from e
