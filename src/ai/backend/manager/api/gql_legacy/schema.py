@@ -1413,10 +1413,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        id: str,
+        id: ResolvedGlobalID,
         permission: DomainPermission,
     ) -> DomainNode | None:
-        return await DomainNode.get_node(info, id, permission)
+        _, domain_name = id
+        return await DomainNode.get_node_by_name(info, domain_name, permission)
 
     @staticmethod
     async def resolve_domain_nodes(
