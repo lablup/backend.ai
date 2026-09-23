@@ -4,7 +4,7 @@ import enum
 import functools
 import logging
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -319,23 +319,14 @@ class ImageRow(CreatedAtMixin, Base):
             type=image_data.type,
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
-            resources=cls._resources_from_limits(image_data.resource_limits),
+            resources={
+                resource_limit.key: resource_limit.to_dict()
+                for resource_limit in image_data.resource_limits
+            },
             status=image_data.status,
         )
         image_row.id = image_data.id
         return image_row
-
-    @classmethod
-    def _resources_from_limits(
-        cls, resource_limits: Sequence[ResourceLimit]
-    ) -> dict[str, dict[str, str | None]]:
-        return {
-            resource_limit.key: {
-                "min": str(resource_limit.min),
-                "max": None if resource_limit.max.is_infinite() else str(resource_limit.max),
-            }
-            for resource_limit in resource_limits
-        }
 
     @classmethod
     def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:

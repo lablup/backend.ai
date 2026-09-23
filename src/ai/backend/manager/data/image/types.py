@@ -81,6 +81,12 @@ class ResourceLimit:
     min: Decimal
     max: Decimal
 
+    def to_dict(self) -> dict[str, str | None]:
+        return {
+            "min": str(self.min),
+            "max": None if self.max.is_infinite() else str(self.max),
+        }
+
 
 @dataclass
 class ImageData(EntityData):
