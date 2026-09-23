@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import override
+from typing import Any, override
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
@@ -150,8 +150,9 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
     """Derived: the endpoint rows as JSON, aggregated by the searcher's subquery."""
 
     @staticmethod
-    def _endpoint_from_json(endpoint: ServiceCatalogEndpointRowJson) -> ServiceCatalogEndpointData:
+    def _endpoint_from_json(raw: dict[str, Any]) -> ServiceCatalogEndpointData:
         """One element of ``ServiceCatalogRow.endpoint_rows``, keyed by column name."""
+        endpoint = ServiceCatalogEndpointRowJson.model_validate(raw)
         return ServiceCatalogEndpointData(
             id=ServiceCatalogID(endpoint.id),
             service_id=ServiceCatalogID(endpoint.service_id),
