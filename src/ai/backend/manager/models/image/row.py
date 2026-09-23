@@ -573,15 +573,11 @@ class ImageRow(Base):  # type: ignore[misc]
 
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
-<<<<<<< HEAD
-        image_row = ImageRow(
-=======
         resources: dict[str, dict[str, str | None]] = {}
         for resource_limit in image_data.resource_limits:
             limit = resource_limit.to_dict()
             resources[resource_limit.key] = {"min": limit["min"], "max": limit["max"]}
         image_row = cls(
->>>>>>> 3ea47eb54 (fix(BA-8129): build ImageRow resources as min/max mappings from resource limits (#14978))
             name=image_data.name,
             project=image_data.project,
             image=image_data.name,

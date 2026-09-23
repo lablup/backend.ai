@@ -5,12 +5,6 @@ Converts request DTOs to repository query conditions and orders.
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-from decimal import Decimal
-
-=======
-from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
->>>>>>> 3ea47eb54 (fix(BA-8129): build ImageRow resources as min/max mappings from resource limits (#14978))
 from ai.backend.common.dto.manager.image import (
     ImageFilter,
     ImageOrder,
