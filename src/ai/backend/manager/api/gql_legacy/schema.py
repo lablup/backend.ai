@@ -3190,6 +3190,22 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_available_services(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[AvailableServiceNode]:
+        return AvailableServiceNode.get_connection()
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_service_config(
         root: Any,
         info: graphene.ResolveInfo,
