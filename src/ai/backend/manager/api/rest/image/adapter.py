@@ -5,8 +5,6 @@ Converts request DTOs to repository query conditions and orders.
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.image import (
     ImageFilter,
@@ -31,14 +29,6 @@ from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapte
 class ImageAdapter(BaseFilterAdapter):
     """Adapter for converting image request DTOs to repository queries and response DTOs."""
 
-    @staticmethod
-    def _convert_max(value: Decimal | str | None) -> Decimal | None:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            value = Decimal(value)
-        return None if value.is_infinite() else value
-
     def convert_to_dto(self, data: ImageData) -> ImageDTO:
         """Convert internal ImageData to response ImageDTO."""
         return ImageDTO(
@@ -55,7 +45,7 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=k, value=v) for k, v in data.labels.label_data.items()],
             tags=[ImageTagEntryDTO(key=t.key, value=t.value) for t in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
+                ImageResourceLimitDTO.model_validate({"key": rl.key, **rl.to_dict()})
                 for rl in data.resource_limits
             ],
             accelerators=data.accelerators if data.accelerators else "*",
@@ -80,7 +70,7 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=kv.key, value=kv.value) for kv in data.labels],
             tags=[ImageTagEntryDTO(key=kv.key, value=kv.value) for kv in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
+                ImageResourceLimitDTO.model_validate({"key": rl.key, **rl.to_dict()})
                 for rl in data.resource_limits
             ],
             accelerators=",".join(data.supported_accelerators)
