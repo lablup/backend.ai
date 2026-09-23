@@ -220,7 +220,16 @@ class ImageV2IdentityInfoGQL:
 )
 class ImageV2MetadataInfoGQL:
     digest: str | None = gql_field(description="Config digest (image hash) for verification.")
-    size_bytes: int = gql_field(description="Image size in bytes.")
+    size_bytes: int = gql_field(
+        description="Image size in bytes.",
+        deprecation_reason="Use sizeV2; this field cannot carry sizes over 2 GiB.",
+    )
+    size_v2: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Image size in bytes as a decimal string (e.g., '12826359723').",
+        ),
+    )
     created_at: datetime | None = gql_field(
         description="Timestamp when the image was created/registered."
     )
