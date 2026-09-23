@@ -332,17 +332,11 @@ class ImageRow(CreatedAtMixin, Base):
         return {
             resource_limit.key: {
                 "min": str(resource_limit.min),
-                "max": cls._resource_limit_max(resource_limit.max),
+                # The max of an image resource limit is no longer used.
+                "max": None if resource_limit.max.is_infinite() else str(resource_limit.max),
             }
             for resource_limit in resource_limits
         }
-
-    @staticmethod
-    def _resource_limit_max(value: Decimal) -> str | None:
-        # The max of an image resource limit is no longer used.
-        if value.is_infinite():
-            return None
-        return str(value)
 
     @classmethod
     def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:
