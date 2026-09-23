@@ -24,7 +24,7 @@ from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.health.handler import HealthHandler
 from ai.backend.manager.api.rest.internal.health.handler import InternalHealthHandler
 from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
-from ai.backend.manager.api.rest.shutdown import ShutdownState
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.common import ManagerDraining
 
@@ -106,7 +106,7 @@ class TestPublicHealthHandler:
 
     @pytest.fixture
     def handler(self, mock_health_probe: MagicMock) -> HealthHandler:
-        return HealthHandler(health_probe=mock_health_probe, shutdown_state=ShutdownState())
+        return HealthHandler(health_probe=mock_health_probe, drain_notifier=ServerDrainNotifier())
 
     async def test_returns_200_with_status_ok(
         self,
@@ -168,7 +168,9 @@ class TestInternalHealthHandler:
 
     @pytest.fixture
     def handler(self, mock_health_probe: MagicMock) -> InternalHealthHandler:
-        return InternalHealthHandler(health_probe=mock_health_probe, shutdown_state=ShutdownState())
+        return InternalHealthHandler(
+            health_probe=mock_health_probe, drain_notifier=ServerDrainNotifier()
+        )
 
     async def test_returns_200_with_connectivity_field(
         self,
@@ -206,7 +208,7 @@ class TestInternalHealthHandler:
         """Verify status=degraded when HealthProbe reports an unhealthy component."""
         mock_health_probe.get_connectivity_status = AsyncMock(return_value=degraded_connectivity)
         handler = InternalHealthHandler(
-            health_probe=mock_health_probe, shutdown_state=ShutdownState()
+            health_probe=mock_health_probe, drain_notifier=ServerDrainNotifier()
         )
 
         response = await handler.hello(mock_request_ctx)
@@ -276,9 +278,13 @@ class TestReadiness:
         mock_health_probe: MagicMock,
         mock_request_ctx: MagicMock,
     ) -> None:
-        shutdown_state = ShutdownState()
-        handler = handler_type(health_probe=mock_health_probe, shutdown_state=shutdown_state)
-        shutdown_state.draining = True
+        drain_notifier = ServerDrainNotifier()
+        handler = handler_type(health_probe=mock_health_probe, drain_notifier=drain_notifier)
+        response = await handler.readyz(mock_request_ctx)
+        assert response.status == 200
+        mock_health_probe.get_readiness_status.reset_mock()
+
+        drain_notifier.notify_draining()
         with pytest.raises(ManagerDraining) as exc_info:
             await handler.readyz(mock_request_ctx)
         assert exc_info.value.status == 503
@@ -293,15 +299,17 @@ class TestReadiness:
         degraded_connectivity: ConnectivityCheckResponse,
     ) -> None:
         mock_health_probe.get_readiness_status.return_value = degraded_connectivity
-        handler = handler_type(health_probe=mock_health_probe, shutdown_state=ShutdownState())
+        handler = handler_type(health_probe=mock_health_probe, drain_notifier=ServerDrainNotifier())
         response = await handler.readyz(mock_request_ctx)
         assert response.status == 503
 
 
-class TestShutdownState:
+class TestServerDrainNotifier:
     async def test_drain_preserves_protocol_upgrade(self, mock_request: MagicMock) -> None:
         response = web.StreamResponse(status=101, headers={"Connection": "upgrade"})
-        await ShutdownState(draining=True).on_response_prepare(mock_request, response)
+        notifier = ServerDrainNotifier()
+        notifier.notify_draining()
+        await notifier.on_response_prepare(mock_request, response)
         assert response.headers["Connection"] == "upgrade"
 
     @pytest.mark.parametrize("draining", [True, False])
@@ -309,8 +317,10 @@ class TestShutdownState:
         self, mock_request: MagicMock, draining: bool
     ) -> None:
         response = web.Response(text="ok")
-        state = ShutdownState(draining=draining)
-        await state.on_response_prepare(mock_request, response)
+        notifier = ServerDrainNotifier()
+        if draining:
+            notifier.notify_draining()
+        await notifier.on_response_prepare(mock_request, response)
         assert response.status == 200
         assert response.text == "ok"
         if draining:

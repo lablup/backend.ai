@@ -13,7 +13,7 @@ from ai.backend.common.dto.internal.health import (
     HealthStatus,
 )
 from ai.backend.manager import __version__
-from ai.backend.manager.api.rest.shutdown import ShutdownState
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.common import ManagerDraining
 
@@ -53,11 +53,11 @@ def _build_probe_response(connectivity: ConnectivityCheckResponse) -> web.Respon
 
 class InternalHealthHandler:
     _health_probe: HealthProbe
-    _shutdown_state: ShutdownState
+    _drain_notifier: ServerDrainNotifier
 
-    def __init__(self, *, health_probe: HealthProbe, shutdown_state: ShutdownState) -> None:
+    def __init__(self, *, health_probe: HealthProbe, drain_notifier: ServerDrainNotifier) -> None:
         self._health_probe = health_probe
-        self._shutdown_state = shutdown_state
+        self._drain_notifier = drain_notifier
 
     async def hello(self, request_ctx: RequestCtx) -> web.Response:
         """Aggregated health (union of liveness and readiness)."""
@@ -74,7 +74,7 @@ class InternalHealthHandler:
     async def readyz(self, request_ctx: RequestCtx) -> web.Response:
         """Readiness probe — reports only readiness-registered checkers."""
         request_ctx.request["do_not_print_access_log"] = True
-        if self._shutdown_state.draining:
+        if self._drain_notifier.is_draining:
             raise ManagerDraining()
         connectivity = await self._health_probe.get_readiness_status()
         return _build_probe_response(connectivity)

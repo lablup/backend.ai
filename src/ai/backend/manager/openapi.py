@@ -22,7 +22,7 @@ from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.shutdown import ShutdownState
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.api.rest.tree import build_api_routes
 from ai.backend.manager.data.common.sentinel import Undefined, undefined
 from ai.backend.manager.data.manager_status.types import ManagerStatus
@@ -607,7 +607,7 @@ async def generate() -> dict[str, Any]:
         root_app=web.Application(),
         stream_cleanup_handler=stub,
         health_probe=stub,
-        shutdown_state=ShutdownState(),
+        drain_notifier=ServerDrainNotifier(),
         pidx=0,
     ):
         root_registry.add_subregistry(sub)

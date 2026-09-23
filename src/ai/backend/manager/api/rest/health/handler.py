@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from aiohttp import web
 
 from ai.backend.manager import __version__
-from ai.backend.manager.api.rest.shutdown import ShutdownState
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.common import ManagerDraining
 
@@ -26,11 +26,11 @@ class HealthHandler:
     """
 
     _health_probe: HealthProbe
-    _shutdown_state: ShutdownState
+    _drain_notifier: ServerDrainNotifier
 
-    def __init__(self, *, health_probe: HealthProbe, shutdown_state: ShutdownState) -> None:
+    def __init__(self, *, health_probe: HealthProbe, drain_notifier: ServerDrainNotifier) -> None:
         self._health_probe = health_probe
-        self._shutdown_state = shutdown_state
+        self._drain_notifier = drain_notifier
 
     async def hello(self, request_ctx: RequestCtx) -> web.Response:
         """Simple liveness probe — returns 200 OK with version."""
@@ -48,7 +48,7 @@ class HealthHandler:
     async def readyz(self, request_ctx: RequestCtx) -> web.Response:
         """Readiness probe; draining returns a 503 problem response."""
         request_ctx.request["do_not_print_access_log"] = True
-        if self._shutdown_state.draining:
+        if self._drain_notifier.is_draining:
             raise ManagerDraining()
         connectivity = await self._health_probe.get_readiness_status()
         return web.Response(

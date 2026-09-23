@@ -64,7 +64,7 @@ from .api.rest.middleware import (
 )
 from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
 from .api.rest.routing import RouteRegistry
-from .api.rest.shutdown import ShutdownState
+from .api.rest.shutdown import ServerDrainNotifier
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .data.manager_status.types import ManagerStatus
@@ -217,7 +217,7 @@ def build_prometheus_service_discovery_handler(
 
 
 def build_internal_app(
-    dep_resources: DependencyResources, shutdown_state: ShutdownState
+    dep_resources: DependencyResources, drain_notifier: ServerDrainNotifier
 ) -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
@@ -229,7 +229,7 @@ def build_internal_app(
     )
     root_reg = RouteRegistry.create("", {})
     for sub in build_internal_api_routes(
-        health_probe=dep_resources.system.health_probe, shutdown_state=shutdown_state
+        health_probe=dep_resources.system.health_probe, drain_notifier=drain_notifier
     ):
         root_reg.add_subregistry(sub)
     _mount_registry_tree(app, root_reg)
@@ -253,7 +253,7 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
     loop.set_debug(boostrap_config.debug.asyncio)
     manager_init_stack = AsyncExitStack()
-    shutdown_state = ShutdownState()
+    drain_notifier = ServerDrainNotifier()
 
     @asynccontextmanager
     async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
@@ -292,15 +292,15 @@ async def server_main(
         config_provider = dep_resources.bootstrap.config_provider
         shutdown_config = boostrap_config.manager
 
-        root_app.on_response_prepare.append(shutdown_state.on_response_prepare)
+        root_app.on_response_prepare.append(drain_notifier.on_response_prepare)
         runner = web.AppRunner(
             root_app,
             keepalive_timeout=30.0,
             shutdown_timeout=shutdown_config.shutdown_grace_period,
         )
 
-        internal_app = build_internal_app(dep_resources, shutdown_state)
-        internal_app.on_response_prepare.append(shutdown_state.on_response_prepare)
+        internal_app = build_internal_app(dep_resources, drain_notifier)
+        internal_app.on_response_prepare.append(drain_notifier.on_response_prepare)
         internal_runner = web.AppRunner(
             internal_app,
             keepalive_timeout=30.0,
@@ -346,7 +346,7 @@ async def server_main(
         finally:
             try:
                 if started:
-                    shutdown_state.draining = True
+                    drain_notifier.notify_draining()
                     log.info(
                         "Draining API requests for {} seconds",
                         shutdown_config.shutdown_drain_period,
@@ -420,7 +420,7 @@ async def server_main(
         # Must happen before runner.setup() which freezes the application router.
         from .api.rest.setup import setup_api
 
-        setup_api(root_app, dep_resources, pidx, shutdown_state=shutdown_state)
+        setup_api(root_app, dep_resources, pidx, drain_notifier=drain_notifier)
 
         # Manager status check
         config_provider = dep_resources.bootstrap.config_provider
