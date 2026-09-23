@@ -2,20 +2,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
-from typing import Any, Final, cast
+from typing import Any, Final
 
-import trafaret as t
-
-from ai.backend.common import validators as tx
 from ai.backend.common.json import load_json
-from ai.backend.common.types import SessionTypes
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.session_template.types import TemplateType
-from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.data.session_template.types import (
+    ClusterTemplate,
+    TaskTemplate,
+    TemplateType,
+)
 from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
-from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.vfolder import verify_vfolder_name
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 
 from .actions.create_cluster_template import (
@@ -62,100 +58,6 @@ from .actions.update_task_template import (
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_task_template_v1 = t.Dict({
-    tx.AliasedKey(["api_version", "apiVersion"]): t.String,
-    t.Key("kind"): t.Enum("taskTemplate", "task_template"),
-    t.Key("metadata"): t.Dict({
-        t.Key("name"): t.String,
-        t.Key("tag", default=None): t.Null | t.String,
-    }),
-    t.Key("spec"): t.Dict({
-        tx.AliasedKey(["type", "session_type", "sessionType"], default="interactive")
-        >> "session_type": tx.Enum(SessionTypes),
-        t.Key("kernel"): t.Dict({
-            t.Key("image"): t.String,
-            t.Key("architecture", default="x86_64"): t.Null | t.String,
-            t.Key("environ", default={}): t.Null | t.Mapping(t.String, t.String),
-            t.Key("run", default=None): t.Null
-            | t.Dict({
-                t.Key("bootstrap", default=None): t.Null | t.String,
-                tx.AliasedKey(["startup", "startup_command", "startupCommand"], default=None)
-                >> "startup_command": t.Null | t.String,
-            }),
-            t.Key("git", default=None): t.Null
-            | t.Dict({
-                t.Key("repository"): t.String,
-                t.Key("commit", default=None): t.Null | t.String,
-                t.Key("branch", default=None): t.Null | t.String,
-                t.Key("credential", default=None): t.Null
-                | t.Dict({
-                    t.Key("username"): t.String,
-                    t.Key("password"): t.String,
-                }),
-                tx.AliasedKey(["destination_dir", "destinationDir"], default=None)
-                >> "dest_dir": t.Null | t.String,
-            }),
-        }),
-        t.Key("scaling_group", default=None): t.Null | t.String,
-        t.Key("mounts", default={}): t.Null | t.Mapping(t.String, t.Any),
-        t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["agent_list", "agentList"], default=None) >> "agent_list": t.Null
-        | t.List(t.String),
-    }),
-}).allow_extra("*")
-
-
-def _check_task_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
-    data = _task_template_v1.check(raw_data)
-    if mounts := data["spec"].get("mounts"):
-        for p in mounts.values():
-            if p is None:
-                continue
-            p = p.removeprefix("/home/work/")
-            if not verify_vfolder_name(p):
-                raise InvalidArgument(f"Path {p} is reserved for internal operations.")
-    return cast(Mapping[str, Any], data)
-
-
-_cluster_template_v1 = t.Dict({
-    tx.AliasedKey(["api_version", "apiVersion"]): t.String,
-    t.Key("kind"): t.Enum("clusterTemplate", "cluster_template"),
-    t.Key("mode"): t.Enum("single-node", "multi-node"),
-    t.Key("metadata"): t.Dict({
-        t.Key("name"): t.String,
-    }),
-    t.Key("spec"): t.Dict({
-        t.Key("environ", default={}): t.Null | t.Mapping(t.String, t.String),
-        t.Key("mounts", default={}): t.Null | t.Mapping(t.String, t.Any),
-        t.Key("nodes"): t.List(
-            t.Dict({
-                t.Key("role"): t.String,
-                tx.AliasedKey(["session_template", "sessionTemplate"]): tx.UUID,
-                t.Key("replicas", default=1): t.Int,
-            })
-        ),
-    }),
-}).allow_extra("*")
-
-
-def _check_cluster_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
-    data = _cluster_template_v1.check(raw_data)
-    defined_roles: list[str] = []
-    for node in data["spec"]["nodes"]:
-        node["session_template"] = str(node["session_template"])
-        if node["role"] in defined_roles:
-            raise InvalidArgument("Each role can only be defined once")
-        if node["role"] == DEFAULT_ROLE and node["replicas"] != 1:
-            raise InvalidArgument(
-                f"One and only one {DEFAULT_ROLE} node must be created per cluster",
-            )
-        defined_roles.append(node["role"])
-    if DEFAULT_ROLE not in defined_roles:
-        raise InvalidArgument(
-            f"One and only one {DEFAULT_ROLE} node must be created per cluster",
-        )
-    return cast(Mapping[str, Any], data)
-
 
 class TemplateService:
     _repository: TemplateRepository
@@ -182,7 +84,7 @@ class TemplateService:
 
         items: list[dict[str, Any]] = []
         for item_input in action.items:
-            template_data = _check_task_template(item_input.template)
+            template_data = TaskTemplate.check(item_input.template)
             template_id = uuid.uuid4().hex
             name = (
                 item_input.name
@@ -249,7 +151,7 @@ class TemplateService:
         )
 
         for item_input in action.items:
-            template_data = _check_task_template(item_input.template)
+            template_data = TaskTemplate.check(item_input.template)
             name = (
                 item_input.name
                 if item_input.name is not None
@@ -297,7 +199,7 @@ class TemplateService:
             owner_access_key=action.owner_access_key,
         )
 
-        template_data = _check_cluster_template(action.template_data)
+        template_data = ClusterTemplate.check(action.template_data)
         name = template_data["metadata"]["name"]
         template_id = await self._repository.create_cluster_template(
             action.domain_name,
@@ -340,7 +242,7 @@ class TemplateService:
         exists = await self._repository.cluster_template_exists(str(action.template_id))
         if not exists:
             raise SessionTemplateNotFound
-        template_data = _check_cluster_template(action.template_data)
+        template_data = ClusterTemplate.check(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
             str(action.template_id), template_data, name
