@@ -1042,12 +1042,15 @@ async def rename_file(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "rename_file", params)
         ctx: RootContext = request.app["ctx"]
         volume = ctx.volume_pool.get_volume_by_name(params["volume"])
+        # with_name() lets ".." through, which would move the entry to its parent.
+        if params["new_name"] == "..":
+            raise InvalidAPIParameters(f"Invalid new name: {params['new_name']!r}")
+        try:
+            dst_relpath = params["relpath"].with_name(params["new_name"])
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid new name: {params['new_name']!r}") from e
         with handle_fs_errors(volume, params["vfid"]):
-            await volume.move_file(
-                params["vfid"],
-                params["relpath"],
-                params["relpath"].with_name(params["new_name"]),
-            )
+            await volume.move_file(params["vfid"], params["relpath"], dst_relpath)
         return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
