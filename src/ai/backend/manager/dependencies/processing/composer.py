@@ -83,7 +83,6 @@ from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import SMTPTriggerPolicy
 
-from .agent_lost_checker import AgentLostCheckerDependency, AgentLostCheckerInput
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
 from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
@@ -354,14 +353,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         # Step 5: Start lifecycle background tasks
-        await stack.enter_dependency(
-            AgentLostCheckerDependency(),
-            AgentLostCheckerInput(
-                config_provider=setup_input.config_provider,
-                valkey_live=setup_input.valkey_live,
-                event_producer=setup_input.event_producer,
-            ),
-        )
         await stack.enter_dependency(
             StatsReporterDependency(),
             StatsReporterInput(
