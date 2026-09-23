@@ -143,7 +143,7 @@ class SessionEventHandler:
         reason = event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT
         await self._scheduling_controller.mark_sessions_for_termination(
             [event.session_id],
-            reason=reason.value,
+            reason=reason,
             forced=False,
         )
 
@@ -186,7 +186,7 @@ class SessionEventHandler:
                 reason = _reason
         await self._scheduling_controller.mark_sessions_for_termination(
             [event.session_id],
-            reason=reason.value,
+            reason=reason,
             forced=False,
         )
 

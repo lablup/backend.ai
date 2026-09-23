@@ -816,7 +816,7 @@ class SessionService:
         # Mark sessions for termination
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             session_ids,
-            reason=reason.value,
+            reason=reason,
             forced=forced,
         )
 
@@ -842,7 +842,7 @@ class SessionService:
             else KernelLifecycleEventReason.USER_REQUESTED
         )
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-            action.session_ids, reason=reason.value, forced=action.forced
+            action.session_ids, reason=reason, forced=action.forced
         )
         # The controller answers in four buckets; the bulk shape answers per session,
         # so the state each one ended in becomes that session's value.

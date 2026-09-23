@@ -241,7 +241,7 @@ class UserService:
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
             await self._scheduling_controller.mark_sessions_for_termination(
                 [session.id for session in active_sessions],
-                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                reason=KernelLifecycleEventReason.USER_PURGED,
                 forced=True,
             )
 

@@ -36,7 +36,10 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
-from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
@@ -1162,7 +1165,7 @@ class ScheduleDBSource:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
         message: str = "mark_terminating success",
@@ -1213,7 +1216,7 @@ class ScheduleDBSource:
         self,
         session_ids: list[SessionId],
         to_status: SessionStatus,
-        reason: str,
+        reason: KernelLifecycleEventReason,
     ) -> list[SessionId]:
         """
         Move sessions to ``to_status`` and record the transition in the
@@ -1772,7 +1775,10 @@ class ScheduleDBSource:
                         else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
-                        status_info=session_row.status_info or "UNKNOWN",
+                        status_info=(
+                            KernelLifecycleEventReason.from_value(session_row.status_info)
+                            or KernelLifecycleEventReason.UNKNOWN
+                        ),
                         session_type=session_row.session_type,
                         kernels=kernels,
                     )

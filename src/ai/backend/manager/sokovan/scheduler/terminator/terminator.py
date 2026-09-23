@@ -10,6 +10,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
@@ -161,7 +162,7 @@ class SessionTerminator:
         agent_id: AgentId,
         kernel_id: KernelId,
         session_id: SessionId,
-        reason: str,
+        reason: KernelLifecycleEventReason,
         occupied_slots: ResourceSlot,
     ) -> KernelTerminationResult:
         """
