@@ -232,7 +232,8 @@ class HealthyEndpointPool:
                             cached.is_healthy = False
                             cached.unhealthy_since = time.perf_counter()
                             log.info(
-                                "Endpoint {} is not ready (probe HTTP 503)", cached.entry.endpoint
+                                "endpoint is not ready (probe HTTP 503)",
+                                endpoint_url=cached.entry.endpoint,
                             )
                         return
                     # Only 2xx is treated as a healthy probe. 4xx (path
