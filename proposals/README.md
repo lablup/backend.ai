@@ -98,7 +98,7 @@ BEP numbers start from 1000.
 | [1025](BEP-1025-server-side-csv-export.md) | Server-Side CSV Export API | HyeokJin Kim | Implemented |
 | [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Implemented |
 | 1027 | Docker Relay in Compute Sessions | Joongi Kim | Draft |
-| [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Draft |
+| [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Rejected |
 | [1029](BEP-1029-sokovan-observer-handler.md) | Sokovan ObserverHandler Pattern | HyeokJin Kim | Implemented |
 | [1030](BEP-1030-sokovan-scheduler-status-transition.md) | Sokovan Scheduler Status Transition Design | HyeokJin Kim | Implemented |
 | [1031](BEP-1031-graphql-field-metadata.md) | GraphQL API Field Metadata Extension | HyeokJin Kim | Draft |
