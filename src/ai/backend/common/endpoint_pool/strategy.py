@@ -27,7 +27,7 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import override
 
-from .types import EndpointEntry
+from ai.backend.common.endpoint_pool.types import EndpointEntry
 
 
 class EndpointSelectionPolicy(enum.StrEnum):

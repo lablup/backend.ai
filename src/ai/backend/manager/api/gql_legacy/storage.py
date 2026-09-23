@@ -10,7 +10,6 @@ import graphene
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import (
-    AUTH_TOKEN_HDR,
     VolumeInfo,
 )
 
@@ -116,24 +115,14 @@ class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
         id: str,
     ) -> StorageVolume:
         proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(id)
-        try:
-            proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError as e:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}") from e
-        async with proxy_info.session.request(
-            "GET",
-            proxy_info.manager_api_url / "volumes",
-            raise_for_status=True,
-            headers={AUTH_TOKEN_HDR: proxy_info.secret},
-        ) as resp:
-            reply = await resp.json()
-            for volume_data in reply["volumes"]:
-                if volume_data["name"] == volume_name:
-                    return cls.from_info(proxy_name, volume_data)
-            else:
-                raise ValueError(
-                    f"no such volume in the storage proxy {proxy_name!r}: {volume_name!r}",
-                )
+        client = ctx.storage_manager.get_manager_facing_client(proxy_name)
+        reply = await client.get_volumes()
+        for volume_data in reply["volumes"]:
+            if volume_data["name"] == volume_name:
+                return cls.from_info(proxy_name, volume_data)
+        raise ValueError(
+            f"no such volume in the storage proxy {proxy_name!r}: {volume_name!r}",
+        )
 
 
 class StorageVolumeList(graphene.ObjectType):  # type: ignore[misc]

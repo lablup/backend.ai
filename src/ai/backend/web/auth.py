@@ -9,11 +9,11 @@ from multidict import CIMultiDict
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.jwt.signer import JWTSigner
 from ai.backend.common.jwt.types import JWTUserContext
 from ai.backend.common.types import AccessKey
 from ai.backend.common.web.session import get_session
-from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from . import user_agent

@@ -9,6 +9,7 @@ import aiohttp
 import yarl
 from aiohttp import ClientTimeout
 
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,
@@ -38,18 +39,18 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class StorageProxyClientArgs:
-    endpoint: yarl.URL
+    endpoint_pool: HealthyEndpointPool
     secret: str
 
 
 class StorageProxyHTTPClient:
     _client_session: aiohttp.ClientSession
-    _endpoint: yarl.URL
+    _endpoint_pool: HealthyEndpointPool
     _secret: str
 
     def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs) -> None:
         self._client_session = client_session
-        self._endpoint = args.endpoint
+        self._endpoint_pool = args.endpoint_pool
         self._secret = args.secret
 
     def _handle_vfolder_failure(self, status_code: HTTPStatus) -> None:
@@ -149,23 +150,24 @@ class StorageProxyHTTPClient:
             AUTH_TOKEN_HDR: self._secret,
         }
         try:
-            async with self._client_session.request(
-                method,
-                self._endpoint / url,
-                headers=headers,
-                json=body,
-                params=params,
-                timeout=request_timeout,
-            ) as client_resp:
-                if client_resp.status // 100 == 2:
-                    yield client_resp
-                    return
-                await self._handle_exceptional_response(client_resp)
+            async with self._endpoint_pool.acquire() as acquired:
+                async with self._client_session.request(
+                    method,
+                    yarl.URL(acquired.endpoint) / url,
+                    headers=headers,
+                    json=body,
+                    params=params,
+                    timeout=request_timeout,
+                ) as client_resp:
+                    if client_resp.status // 100 == 2:
+                        yield client_resp
+                        return
+                    await self._handle_exceptional_response(client_resp)
         except TimeoutError as e:
             raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
             ) from e
-        except aiohttp.ClientConnectionError as e:
+        except (aiohttp.ClientConnectionError, OSError) as e:
             raise StorageProxyConnectionError(
                 extra_msg="Failed to connect to storage proxy",
             ) from e

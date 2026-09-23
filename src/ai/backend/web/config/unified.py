@@ -23,6 +23,7 @@ from ai.backend.common.configs import (
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.endpoint_pool.strategy import EndpointSelectionPolicy
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
     CompositeType,
@@ -33,7 +34,6 @@ from ai.backend.common.typed_validators import (
     CommaSeparatedStrList,
 )
 from ai.backend.logging.config import LoggingConfig
-from ai.backend.web.clients.endpoint_pool import EndpointSelectionPolicy
 
 
 class ServiceMode(enum.StrEnum):

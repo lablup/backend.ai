@@ -5,16 +5,17 @@ import itertools
 import logging
 from collections.abc import Iterable, Mapping
 from contextvars import ContextVar
-from typing import (
-    Final,
-    TypedDict,
-)
+from functools import partial
+from typing import TypedDict
 
 import aiohttp
 import attrs
 import yarl
 
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import RoundRobinStrategy
+from ai.backend.common.endpoint_pool.types import EndpointPoolSpec
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.base import (
     StorageProxyClientArgs,
@@ -29,13 +30,11 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
 from ai.backend.manager.config.unified import VolumesConfig
 from ai.backend.manager.defs import is_noop_host
 from ai.backend.manager.errors.storage import (
+    StorageProxyConnectionError,
     StorageProxyNotFound,
 )
 
 _ctx_volumes_cache: ContextVar[list[tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
-
-
-AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -52,14 +51,13 @@ class VolumeInfo(TypedDict):
 @attrs.define(auto_attribs=True, slots=True, frozen=True)
 class StorageProxyInfo:
     session: aiohttp.ClientSession
-    secret: str
-    client_api_url: yarl.URL
-    manager_api_url: yarl.URL
+    endpoint_pool: HealthyEndpointPool
     sftp_resource_groups: list[str]
 
 
 class StorageSessionManager:
-    _proxies: Mapping[str, StorageProxyInfo]
+    config: VolumesConfig
+    _proxies: dict[str, StorageProxyInfo]
     _exposed_volume_info: list[str]
     _manager_facing_clients: Mapping[str, StorageProxyManagerFacingClient]
     _client_facing_clients: Mapping[str, StorageProxyClientFacingInfo]
@@ -73,17 +71,39 @@ class StorageSessionManager:
             session = aiohttp.ClientSession(connector=connector)
             self._proxies[proxy_name] = StorageProxyInfo(
                 session=session,
-                secret=proxy_config.secret,
-                client_api_url=yarl.URL(proxy_config.client_api),
-                manager_api_url=yarl.URL(proxy_config.manager_api),
+                endpoint_pool=HealthyEndpointPool(
+                    endpoints=proxy_config.manager_api,
+                    spec=EndpointPoolSpec(
+                        probe_path="/readyz",
+                        health_check_interval=10.0,
+                        failure_threshold=1,
+                        recovery_timeout=60.0,
+                        probe_timeout=2.0,
+                    ),
+                    strategy=RoundRobinStrategy(),
+                    probe_session_factory=partial(
+                        self._create_probe_session, ssl_verify=proxy_config.ssl_verify
+                    ),
+                    unavailable_error_factory=partial(self._unavailable_error, proxy_name),
+                ),
                 sftp_resource_groups=proxy_config.sftp_resource_groups or [],
             )
         self._manager_facing_clients = self._setup_manager_facing_clients(storage_config)
         self._client_facing_clients = self._setup_client_facing_clients(storage_config)
 
-    @classmethod
+    @staticmethod
+    def _create_probe_session(endpoint: str, *, ssl_verify: bool) -> aiohttp.ClientSession:
+        return aiohttp.ClientSession(
+            base_url=yarl.URL(endpoint).origin(),
+            connector=aiohttp.TCPConnector(ssl=ssl_verify),
+        )
+
+    @staticmethod
+    def _unavailable_error(proxy_name: str, reason: str) -> StorageProxyConnectionError:
+        return StorageProxyConnectionError(extra_msg=f"Storage proxy {proxy_name!r}: {reason}")
+
     def _setup_manager_facing_clients(
-        cls,
+        self,
         storage_config: VolumesConfig,
     ) -> Mapping[str, StorageProxyManagerFacingClient]:
         manager_facing_clients = {}
@@ -91,13 +111,11 @@ class StorageSessionManager:
             if proxy_name in manager_facing_clients:
                 log.error("Storage proxy {} is already registered.", proxy_name)
                 continue
-            connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
-            session = aiohttp.ClientSession(connector=connector)
             manager_facing_clients[proxy_name] = StorageProxyManagerFacingClient(
                 StorageProxyHTTPClient(
-                    session,
+                    self._proxies[proxy_name].session,
                     StorageProxyClientArgs(
-                        endpoint=yarl.URL(proxy_config.manager_api),
+                        endpoint_pool=self._proxies[proxy_name].endpoint_pool,
                         secret=proxy_config.secret,
                     ),
                 ),
@@ -138,6 +156,7 @@ class StorageSessionManager:
     async def aclose(self) -> None:
         close_aws = []
         for proxy_info in self._proxies.values():
+            close_aws.append(proxy_info.endpoint_pool.close())
             close_aws.append(proxy_info.session.close())
         await asyncio.gather(*close_aws, return_exceptions=True)
 

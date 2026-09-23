@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
 
 import pytest
-from aiohttp import ClientTimeout, web
+from aiohttp import ClientSession, ClientTimeout, web
 from aiohttp.test_utils import TestClient
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import RoundRobinStrategy
+from ai.backend.common.endpoint_pool.types import EndpointPoolSpec
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
@@ -19,7 +22,7 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
-from ai.backend.manager.errors.storage import StorageProxyTimeoutError
+from ai.backend.manager.errors.storage import StorageProxyConnectionError, StorageProxyTimeoutError
 
 type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
 type StorageProxyClientFactory = Callable[
@@ -28,10 +31,12 @@ type StorageProxyClientFactory = Callable[
 
 
 @pytest.fixture
-def storage_proxy_client_factory(
+async def storage_proxy_client_factory(
     aiohttp_client: Any,  # pytest-aiohttp plugin fixture
-) -> StorageProxyClientFactory:
+) -> AsyncIterator[StorageProxyClientFactory]:
     """Factory fixture to create StorageProxyHTTPClient with a mock handler."""
+
+    pools: list[HealthyEndpointPool] = []
 
     async def _factory(
         endpoint_path: str,
@@ -41,15 +46,27 @@ def storage_proxy_client_factory(
         app.router.add_get(f"/{endpoint_path}", handler)
         client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
 
+        pool = HealthyEndpointPool(
+            endpoints=[str(client.make_url("/"))],
+            spec=EndpointPoolSpec("/readyz", 3600, 1, 60, 2),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=lambda endpoint: ClientSession(base_url=endpoint),
+            unavailable_error_factory=StorageProxyConnectionError,
+        )
+        pools.append(pool)
         return StorageProxyHTTPClient(
             client_session=client.session,
             args=StorageProxyClientArgs(
-                endpoint=client.make_url("/"),
+                endpoint_pool=pool,
                 secret="test-secret",
             ),
         )
 
-    return _factory
+    try:
+        yield _factory
+    finally:
+        for pool in pools:
+            await pool.close()
 
 
 class TestStorageProxyClient:

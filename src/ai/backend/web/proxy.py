@@ -17,10 +17,11 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 from ai.backend.web.errors import (
     InvalidAPIConfigurationError,

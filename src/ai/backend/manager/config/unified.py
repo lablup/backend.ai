@@ -3018,14 +3018,17 @@ class VolumeProxyConfig(BaseConfigSchema):
         ),
     ]
     manager_api: Annotated[
-        str,
+        CommaSeparatedStrList,
         Field(
             validation_alias=AliasChoices("manager_api", "manager-api"),
             serialization_alias="manager_api",
         ),
         BackendAIConfigMeta(
             description=(
-                "Manager-facing API endpoint URL of the storage proxy. This internal URL is used "
+                "Manager-facing API endpoint URL(s) of storage proxy instances mounting the same storage. "
+                "Accepts a single URL or comma-separated URLs, for example "
+                "http://a:6022,http://b:6022. Each request selects a healthy instance using "
+                "its /readyz endpoint; failed requests are not retried. These internal URLs are used "
                 "by the manager to perform administrative operations like creating/deleting folders, "
                 "managing quotas, and checking storage status. Should only be accessible from "
                 "the manager's network."
@@ -3101,6 +3104,14 @@ class VolumeProxyConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+
+    @field_validator("manager_api")
+    @classmethod
+    def validate_manager_api(cls, endpoints: CommaSeparatedStrList) -> CommaSeparatedStrList:
+        normalized = [endpoint.strip() for endpoint in endpoints]
+        if not normalized or any(not endpoint for endpoint in normalized):
+            raise ValueError("manager_api must contain non-empty endpoint URLs")
+        return CommaSeparatedStrList(list(dict.fromkeys(normalized)))
 
 
 class VolumesConfig(BaseConfigSchema):
