@@ -257,7 +257,9 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             status=data.image.status,
             resource_limits=[
                 ResourceLimit(
-                    key=resource_limit.key, min=resource_limit.min, max=resource_limit.max
+                    key=resource_limit.key,
+                    min=resource_limit.min,
+                    max=resource_limit.max if resource_limit.max is not None else "Infinity",
                 )
                 for resource_limit in data.image.resource_limits
             ],

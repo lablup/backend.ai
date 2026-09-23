@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import override
 
 import sqlalchemy as sa
@@ -137,8 +136,8 @@ class _ImageOwnFields(RowDataConverter[ImageRow, ImageData]):
             resource_limits=[
                 ResourceLimit(
                     key=str(key),
-                    min=spec.get("min", Decimal(0)),
-                    max=spec.get("max", Decimal("Infinity")),
+                    min=str(spec.get("min", 0)),
+                    max=spec.get("max"),
                 )
                 for key, spec in resources.items()
             ],
