@@ -21,9 +21,9 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = (
-    "ResourceGroupStorageVolumeRow",
-    "ServiceStorageVolumeRow",
+    "ResourceGroupVolumeOfferRow",
     "StorageVolumeRow",
+    "StorageVolumeServiceHoldingRow",
 )
 
 
@@ -69,24 +69,32 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
     )
 
 
-class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
+class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
     """A storage volume as one service holds it.
 
     The status is what the service's volume implementation derives from its mounts.
     """
 
-    __tablename__ = "service_storage_volumes"
+    __tablename__ = "storage_volume_service_holdings"
 
     service_catalog_id: Mapped[ServiceCatalogID] = mapped_column(
         "service_catalog_id",
         GUID(ServiceCatalogID),
-        sa.ForeignKey("service_catalog.id", ondelete="CASCADE"),
+        sa.ForeignKey(
+            "service_catalog.id",
+            ondelete="CASCADE",
+            name="fk_storage_volume_service_holdings_service_catalog_id",
+        ),
         primary_key=True,
     )
     storage_volume_id: Mapped[StorageVolumeID] = mapped_column(
         "storage_volume_id",
         GUID(StorageVolumeID),
-        sa.ForeignKey("storage_volumes.id", ondelete="RESTRICT"),
+        sa.ForeignKey(
+            "storage_volumes.id",
+            ondelete="RESTRICT",
+            name="fk_storage_volume_service_holdings_storage_volume_id",
+        ),
         primary_key=True,
     )
     status: Mapped[ServiceStorageStatus] = mapped_column(
@@ -98,10 +106,10 @@ class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
     )
 
 
-class ResourceGroupStorageVolumeRow(LifecycleTimestampsMixin, Base):
+class ResourceGroupVolumeOfferRow(LifecycleTimestampsMixin, Base):
     """A storage volume offered to a resource group."""
 
-    __tablename__ = "resource_group_storage_volumes"
+    __tablename__ = "resource_group_volume_offers"
 
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
@@ -109,7 +117,7 @@ class ResourceGroupStorageVolumeRow(LifecycleTimestampsMixin, Base):
         sa.ForeignKey(
             "scaling_groups.id",
             ondelete="CASCADE",
-            name="fk_rg_storage_volumes_resource_group_id",
+            name="fk_resource_group_volume_offers_resource_group_id",
         ),
         primary_key=True,
     )
@@ -119,7 +127,7 @@ class ResourceGroupStorageVolumeRow(LifecycleTimestampsMixin, Base):
         sa.ForeignKey(
             "storage_volumes.id",
             ondelete="CASCADE",
-            name="fk_rg_storage_volumes_storage_volume_id",
+            name="fk_resource_group_volume_offers_storage_volume_id",
         ),
         primary_key=True,
     )
@@ -133,7 +141,7 @@ class ResourceGroupStorageVolumeRow(LifecycleTimestampsMixin, Base):
 
     __table_args__ = (
         sa.Index(
-            "uq_rg_storage_volumes_is_default",
+            "uq_resource_group_volume_offers_is_default",
             "resource_group_id",
             unique=True,
             postgresql_where=sa.text("is_default"),
