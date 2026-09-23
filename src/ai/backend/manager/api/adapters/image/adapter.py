@@ -542,7 +542,8 @@ class ImageAdapter(BaseAdapter):
         labels = [ImageLabelInfo(key=k, value=v) for k, v in data.labels.label_data.items()]
         tags = [ImageTagInfo(key=e.key, value=e.value) for e in data.tags]
         resource_limits_flat = [
-            ImageResourceLimitInfo(key=rl.key, **rl.value_to_dict()) for rl in data.resource_limits
+            ImageResourceLimitInfo(key=resource_limit.key, **resource_limit.value_to_dict())
+            for resource_limit in data.resource_limits
         ]
         accelerators = data.accelerators
         accelerator_list = (
