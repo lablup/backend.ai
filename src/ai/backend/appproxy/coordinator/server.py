@@ -740,7 +740,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
-        ServiceMetadata(
+        ServiceMetadata.for_endpoint(
             display_name=f"appproxy-coordinator-{root_ctx.local_config.proxy_coordinator.id}",
             service_group="appproxy-coordinator",
             version=__version__,
