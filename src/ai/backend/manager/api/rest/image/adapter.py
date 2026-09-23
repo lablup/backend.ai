@@ -45,10 +45,7 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=k, value=v) for k, v in data.labels.label_data.items()],
             tags=[ImageTagEntryDTO(key=t.key, value=t.value) for t in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO.model_validate({
-                    "key": resource_limit.key,
-                    **resource_limit.value_to_dict(),
-                })
+                ImageResourceLimitDTO.model_validate(resource_limit.to_dict())
                 for resource_limit in data.resource_limits
             ],
             accelerators=data.accelerators if data.accelerators else "*",
@@ -73,10 +70,7 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=kv.key, value=kv.value) for kv in data.labels],
             tags=[ImageTagEntryDTO(key=kv.key, value=kv.value) for kv in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO.model_validate({
-                    "key": resource_limit.key,
-                    **resource_limit.value_to_dict(),
-                })
+                ImageResourceLimitDTO.model_validate(resource_limit.to_dict())
                 for resource_limit in data.resource_limits
             ],
             accelerators=",".join(data.supported_accelerators)

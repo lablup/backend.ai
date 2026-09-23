@@ -305,6 +305,9 @@ class ImageRow(CreatedAtMixin, Base):
 
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
+        resource_limits = [
+            resource_limit.to_dict() for resource_limit in image_data.resource_limits
+        ]
         image_row = cls(
             name=image_data.name,
             project=image_data.project,
@@ -320,8 +323,8 @@ class ImageRow(CreatedAtMixin, Base):
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
             resources={
-                resource_limit.key: resource_limit.value_to_dict()
-                for resource_limit in image_data.resource_limits
+                resource_limit["key"]: {"min": resource_limit["min"], "max": resource_limit["max"]}
+                for resource_limit in resource_limits
             },
             status=image_data.status,
         )

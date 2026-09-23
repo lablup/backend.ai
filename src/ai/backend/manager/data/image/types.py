@@ -75,7 +75,8 @@ class ImageTagEntry:
     value: str
 
 
-class ResourceLimitValueDict(TypedDict):
+class ResourceLimitDict(TypedDict):
+    key: str
     min: str
     max: str | None
 
@@ -86,11 +87,11 @@ class ResourceLimit:
     min: Decimal
     max: Decimal | str | None
 
-    def value_to_dict(self) -> ResourceLimitValueDict:
+    def to_dict(self) -> ResourceLimitDict:
         max_value: str | None = None
         if self.max is not None and not (isinstance(self.max, Decimal) and self.max.is_infinite()):
             max_value = str(self.max)
-        return {"min": str(self.min), "max": max_value}
+        return {"key": self.key, "min": str(self.min), "max": max_value}
 
 
 @dataclass
