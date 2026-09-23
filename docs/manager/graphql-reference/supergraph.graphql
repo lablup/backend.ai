@@ -2412,6 +2412,7 @@ to support integers outside the range of a signed 32-bit integer.
 """
 scalar BigInt
   @join__type(graph: GRAPHENE)
+  @join__type(graph: STRAWBERRY)
 
 """
 Added in 26.4.2. Binary size with both raw bytes and human-readable format.
@@ -9843,10 +9844,8 @@ type ImageV2MetadataInfo
   """Image size in bytes."""
   sizeBytes: Int! @deprecated(reason: "Use sizeV2; this field cannot carry sizes over 2 GiB.")
 
-  """
-  Added in 26.9.0. Image size in bytes as a decimal string (e.g., '12826359723').
-  """
-  sizeV2: String
+  """Added in 26.9.0. Image size in bytes."""
+  sizeV2: BigInt
 
   """Timestamp when the image was created/registered."""
   createdAt: DateTime
@@ -26690,10 +26689,8 @@ type VFolderFileEntryV2
   """File size in bytes."""
   size: Int! @deprecated(reason: "Use sizeV2; this field cannot carry sizes over 2 GiB.")
 
-  """
-  Added in 26.9.0. File size in bytes as a decimal string (e.g., '3221225472').
-  """
-  sizeV2: String
+  """Added in 26.9.0. File size in bytes."""
+  sizeV2: BigInt
 
   """POSIX file permission mode."""
   mode: Int!
