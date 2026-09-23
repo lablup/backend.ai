@@ -74,11 +74,11 @@ class StorageSessionManager:
                 endpoint_pool=HealthyEndpointPool(
                     endpoints=proxy_config.manager_api,
                     spec=EndpointPoolSpec(
-                        probe_path="/readyz",
-                        health_check_interval=10.0,
-                        failure_threshold=1,
-                        recovery_timeout=60.0,
-                        probe_timeout=2.0,
+                        probe_path=proxy_config.health_check_probe_path,
+                        health_check_interval=proxy_config.health_check_interval,
+                        failure_threshold=proxy_config.health_check_failure_threshold,
+                        recovery_timeout=proxy_config.health_check_recovery_timeout,
+                        probe_timeout=proxy_config.health_check_probe_timeout,
                     ),
                     strategy=RoundRobinStrategy(),
                     probe_session_factory=partial(

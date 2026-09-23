@@ -27,14 +27,17 @@ class StorageScenario:
 
 @pytest.fixture
 async def storage_scenario(request: pytest.FixtureRequest) -> AsyncIterator[StorageScenario]:
-    endpoints = getattr(request, "param", "http://a:6022,http://b:6022")
+    overrides = getattr(request, "param", {})
+    if isinstance(overrides, str):
+        overrides = {"manager_api": overrides}
     config = VolumesConfig.model_validate({
         "proxies": {
             "shared": {
-                "manager_api": endpoints,
+                "manager_api": "http://a:6022,http://b:6022",
                 "client_api": "http://client:6021",
                 "secret": "test-secret",
                 "ssl_verify": False,
+                **overrides,
             }
         },
     })
@@ -90,32 +93,44 @@ class TestStorageSessionManager:
         assert args.kwargs["headers"] == {"X-BackendAI-Storage-Auth-Token": "test-secret"}
         assert storage_scenario.manager.get_client_api_url("shared") == URL("http://client:6021")
 
+    @pytest.mark.parametrize(
+        "storage_scenario", [{}, {"health_check_failure_threshold": 1}], indirect=True
+    )
     async def test_failure_is_not_retried_and_next_calls_use_peer(
         self,
         storage_scenario: StorageScenario,
     ) -> None:
         storage_scenario.failures["http://a:6022"] = aiohttp.ClientConnectionError()
         client = storage_scenario.manager.get_manager_facing_client("shared")
-        with pytest.raises(StorageProxyConnectionError):
+        threshold = storage_scenario.manager.config.proxies["shared"].health_check_failure_threshold
+        for attempt in range(threshold):
+            with pytest.raises(StorageProxyConnectionError):
+                await client.create_folder("volume", "folder")
+            assert storage_scenario.session.request.call_count == 2 * attempt + 1
             await client.create_folder("volume", "folder")
-        assert storage_scenario.session.request.call_count == 1
-        await client.create_folder("volume", "folder")
         assert await client.list_files("volume", "folder", ".") == {"volumes": [], "items": []}
         assert [call.args[1].host for call in storage_scenario.session.request.call_args_list] == [
             "a",
             "b",
-            "b",
-        ]
+        ] * threshold + ["b"]
 
+    @pytest.mark.parametrize(
+        "storage_scenario", [{}, {"health_check_probe_path": "/custom-readyz"}], indirect=True
+    )
     async def test_probe_failure_and_recovery(self, storage_scenario: StorageScenario) -> None:
         pool = storage_scenario.manager._proxies["shared"].endpoint_pool
         probe = storage_scenario.probes["http://a:6022"]
         probe.get.return_value.__aenter__.return_value.status = 503
+        for _ in range(2):
+            await pool._check_all_health()
+            assert pool.is_healthy("http://a:6022")
         await pool._check_all_health()
         client = storage_scenario.manager.get_manager_facing_client("shared")
         await client.get_volumes()
         assert storage_scenario.session.request.call_args.args[1].host == "b"
-        probe.get.assert_called_with("/readyz")
+        probe.get.assert_called_with(
+            storage_scenario.manager.config.proxies["shared"].health_check_probe_path
+        )
         probe.get.return_value.__aenter__.return_value.status = 200
         await pool._check_all_health()
         await client.get_volumes()
@@ -124,7 +139,8 @@ class TestStorageSessionManager:
     async def test_all_unhealthy_names_proxy(self, storage_scenario: StorageScenario) -> None:
         for probe in storage_scenario.probes.values():
             probe.get.return_value.__aenter__.return_value.status = 503
-        await storage_scenario.manager._proxies["shared"].endpoint_pool._check_all_health()
+        for _ in range(3):
+            await storage_scenario.manager._proxies["shared"].endpoint_pool._check_all_health()
         with pytest.raises(StorageProxyConnectionError, match="shared"):
             await storage_scenario.manager.get_manager_facing_client("shared").get_volumes()
         storage_scenario.session.request.assert_not_called()
