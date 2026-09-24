@@ -6,22 +6,23 @@ from typing import (
     override,
 )
 
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.types import CapacityUsage
-from ai.backend.storage.volumes.abc import (
-    CAP_VFOLDER,
-)
 from ai.backend.storage.volumes.vfs import BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class BaseHammerspaceVolume(BaseVolume):
-    name: ClassVar[str] = "hammerspace-base"
+    name: ClassVar[StorageBackendType] = StorageBackendType("hammerspace-base")
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER])
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:

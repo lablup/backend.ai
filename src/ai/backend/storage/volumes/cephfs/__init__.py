@@ -3,19 +3,20 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import CapacityUsage, QuotaConfig, QuotaUsage, TreeUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_SIZE,
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
@@ -137,7 +138,7 @@ class CephFSOpModel(BaseFSOpModel):
 
 
 class CephFSVolume(BaseVolume):
-    name = "cephfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType("cephfs")
     loop: asyncio.AbstractEventLoop
     registry: dict[str, int]
     project_id_pool: list[int]
@@ -162,8 +163,12 @@ class CephFSVolume(BaseVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SIZE])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.FAST_SIZE,
+        ])
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:

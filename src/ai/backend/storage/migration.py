@@ -21,6 +21,7 @@ import yarl
 
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -38,7 +39,7 @@ from .config.unified import StorageProxyUnifiedConfig
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .context_types import ArtifactVerifierContext
 from .types import VFolderID
-from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
+from .volumes.abc import AbstractVolume
 from .volumes.backends import DEFAULT_BACKENDS
 from .volumes.pool import VolumePool
 
@@ -116,7 +117,9 @@ async def upgrade_2_to_3(
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
     log.info("upgrading {} ...", volume.mount_path)
     volume_id = os.fsdecode(volume.mount_path)
-    scan_folder_size = force_scan_folder_size or (CAP_FAST_SIZE in await volume.get_capabilities())
+    scan_folder_size = force_scan_folder_size or (
+        StorageBackendCapability.FAST_SIZE in await volume.get_capabilities()
+    )
 
     def scan_vfolders(root: Path, *, depth: int = 0) -> Iterator[Path]:
         for p in root.iterdir():
@@ -348,7 +351,7 @@ async def check_and_upgrade(
     is_flag=True,
     help=(
         "Also scan size of the folder residing in FSOp solution without fast folder size scan"
-        " (CAP_FAST_SIZE) capability."
+        " (StorageBackendCapability.FAST_SIZE) capability."
         "WARNING: Enabling this option can slow down whole total migration process a lot!"
     ),
 )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import override
 from unittest.mock import MagicMock
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.dependencies import (
     DependencyComposer,
     DependencyProvider,
@@ -64,7 +65,7 @@ class TestPluginsComposer:
 
     async def test_plugin_volume_class_is_registered(self) -> None:
         class CustomVolume(BaseVolume):
-            name = "custom"
+            name = StorageBackendType("custom")
 
         plugin = MagicMock(spec=AbstractStoragePlugin)
         plugin.get_volume_class.return_value = CustomVolume
@@ -76,7 +77,7 @@ class TestPluginsComposer:
 
     async def test_plugin_overrides_default_backend(self) -> None:
         class OverridingVolume(BaseVolume):
-            name = "vfs"
+            name = StorageBackendType("vfs")
 
         plugin = MagicMock(spec=AbstractStoragePlugin)
         plugin.get_volume_class.return_value = OverridingVolume
