@@ -6,11 +6,13 @@ import json
 from decimal import Decimal
 from typing import Any
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,
@@ -53,15 +55,16 @@ USER_RESOURCE_POLICY_JOIN = JoinDef(
 )
 
 # Project JOINs (1:N, causes duplication)
-ASSOC_GROUP_USER_JOIN = JoinDef(
-    table=AssocGroupUserRow.__table__,
-    condition=UserRow.uuid == AssocGroupUserRow.user_id,
+PROJECT_MEMBERSHIP = user_scope_membership_query(ProjectEntityType()).subquery("project_membership")
+PROJECT_MEMBERSHIP_JOIN = JoinDef(
+    table=PROJECT_MEMBERSHIP,
+    condition=UserRow.uuid == PROJECT_MEMBERSHIP.c.user_id,
 )
 PROJECT_JOIN = JoinDef(
     table=ProjectRow.__table__,
-    condition=AssocGroupUserRow.group_id == ProjectRow.id,
+    condition=PROJECT_MEMBERSHIP.c.scope_id == ProjectRow.id,
 )
-PROJECT_JOINS = (ASSOC_GROUP_USER_JOIN, PROJECT_JOIN)
+PROJECT_JOINS = (PROJECT_MEMBERSHIP_JOIN, PROJECT_JOIN)
 
 # Default Keypair JOIN (N:1, no duplication)
 DEFAULT_KEYPAIR_JOIN = JoinDef(
