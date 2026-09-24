@@ -9567,7 +9567,9 @@ enum ImageStatus
   PURGE_ERROR @join__enumValue(graph: GRAPHENE)
 }
 
-"""Added in 25.12.0."""
+"""
+Added in 25.12.0. `SERVICE` is deprecated since 26.9.0: the scan never writes it, and it is removed in the next release.
+"""
 enum ImageType
   @join__type(graph: GRAPHENE)
 {
@@ -9990,7 +9992,7 @@ enum ImageV2Type
 {
   COMPUTE @join__enumValue(graph: STRAWBERRY)
   SYSTEM @join__enumValue(graph: STRAWBERRY)
-  SERVICE @join__enumValue(graph: STRAWBERRY)
+  SERVICE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. The scan never writes this type, so no image is ever one. It is removed in the next release.")
 }
 
 """
