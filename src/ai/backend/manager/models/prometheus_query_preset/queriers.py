@@ -13,7 +13,7 @@ from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQuer
 from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
     PrometheusQueryPresetSearchableFields,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -34,6 +34,24 @@ class PrometheusQueryPresetQuerier(
     @override
     def entity_id_value(self) -> PrometheusQueryPresetID:
         return self.preset_id
+
+    @override
+    def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
+        return PrometheusQueryPresetSearchableFields.own.to_data(row)
+
+
+class BulkPrometheusQueryPresetQuerier(
+    BulkEntityQuerier[PrometheusQueryPresetRow, PrometheusQueryPresetData]
+):
+    """The prometheus query presets the caller named."""
+
+    @override
+    def row_class(self) -> type[PrometheusQueryPresetRow]:
+        return PrometheusQueryPresetRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return PrometheusQueryPresetRow.id
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:

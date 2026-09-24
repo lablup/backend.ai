@@ -655,7 +655,7 @@ Then
 
 #### [presets-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
 
-존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다
+존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치에는 거부가 담긴다
 
 Given
 
@@ -680,7 +680,7 @@ When
 
 Then
 
-- 요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다
+- 요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 거부가 담긴다
   - len(items) = 3
   - items[0].id: 무시함 — 데이터베이스가 만든다
   - items[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
@@ -712,7 +712,7 @@ Then
   - items[1].ui_option = None
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
-  - items[2] = None
+  - 거부: NotEnoughPermission
 
 #### [reading-a-preset-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
 
