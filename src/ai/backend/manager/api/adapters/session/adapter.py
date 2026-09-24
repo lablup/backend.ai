@@ -569,20 +569,29 @@ class SessionAdapter(BaseAdapter):
 
     async def batch_resource_allocation_by_kernel(
         self, kernel_ids: Sequence[KernelID]
-    ) -> list[ResourceAllocationGQLDTO]:
+    ) -> list[ResourceAllocationGQLDTO | Exception]:
         """Batch-aggregate resource_allocations per kernel for DataLoader use.
 
-        Returns one DTO per input kernel id, in the same order.
+        Returns one DTO per input kernel id, in the same order. A kernel whose session
+        the caller may not read answers with its denial; a kernel matching no row
+        answers with the empty allocation.
         """
         if not kernel_ids:
             return []
-        action_result = await self._session.batch_get_kernel_resource_allocation.run(
-            BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
-        )
-        return [
-            self._aggregate_to_allocation_dto(action_result.data.get(KernelId(kid)))
-            for kid in kernel_ids
-        ]
+        try:
+            result = await self._session.batch_get_kernel_resource_allocation.run(
+                BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
+            )
+        except NotFoundError:
+            return [self._aggregate_to_allocation_dto(None) for _ in kernel_ids]
+        answers: list[ResourceAllocationGQLDTO | Exception] = []
+        for kernel_id in kernel_ids:
+            error = self.batch_load_failure(result.errors.get(kernel_id))
+            if error is not None:
+                answers.append(error)
+                continue
+            answers.append(self._aggregate_to_allocation_dto(result.successes.get(kernel_id)))
+        return answers
 
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
         """Convert session data to nodes, batch-loading their slot allocations."""
@@ -601,10 +610,12 @@ class SessionAdapter(BaseAdapter):
         allocations = await self.batch_resource_allocation_by_kernel([
             KernelID(item.id) for item in data
         ])
-        return [
-            self._kernel_info_to_node(item, allocation)
-            for item, allocation in zip(data, allocations, strict=True)
-        ]
+        nodes: list[KernelNode] = []
+        for item, allocation in zip(data, allocations, strict=True):
+            if isinstance(allocation, Exception):
+                raise allocation
+            nodes.append(self._kernel_info_to_node(item, allocation))
+        return nodes
 
     # -------------------------------------------------------------------------
     # Session search
