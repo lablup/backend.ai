@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -61,6 +62,9 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import (
     FairShareRepository,
@@ -69,6 +73,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
@@ -111,6 +116,9 @@ class TestFairShareRepository:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -258,8 +266,7 @@ class TestFairShareRepository:
             db_sess.add(user)
             await db_sess.flush()
 
-            # Associate user with project
-            db_sess.add(AssocGroupUserRow(group_id=test_project_id, user_id=user_uuid))
+            await VirtualEntitySeeder().enroll_user_in_project(db_sess, test_project_id, user_uuid)
             await db_sess.commit()
 
         return user_uuid
@@ -531,6 +538,57 @@ class TestFairShareRepository:
 
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
+
+    async def test_get_user_fair_share_without_record_returns_default(
+        self,
+        fair_share_repository: FairShareRepository,
+        test_scaling_group: str,
+        test_domain: DomainFixtureData,
+        test_project_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        """A project member without a record gets the resource group's defaults."""
+        result = await fair_share_repository.get_user_fair_share(
+            resource_group_id=RESOURCE_GROUP_ID,
+            project_id=test_project_id,
+            user_uuid=test_user_uuid,
+        )
+
+        assert result.user_uuid == test_user_uuid
+        assert result.domain_name == test_domain.domain_name
+        assert result.data.use_default is True
+
+    async def test_get_user_fair_share_ignores_legacy_membership(
+        self,
+        fair_share_repository: FairShareRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group: str,
+        test_project_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        """A membership written only to the legacy table does not count."""
+        other_project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            project = await db_sess.get_one(ProjectRow, test_project_id)
+            db_sess.add(
+                ProjectRow(
+                    id=other_project_id,
+                    name=f"test-project-{other_project_id.hex[:8]}",
+                    domain_name=project.domain_name,
+                    description="Project with a legacy membership only",
+                    resource_policy=project.resource_policy,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(AssocGroupUserRow(group_id=other_project_id, user_id=test_user_uuid))
+            await db_sess.commit()
+
+        with pytest.raises(UserNotFound):
+            await fair_share_repository.get_user_fair_share(
+                resource_group_id=RESOURCE_GROUP_ID,
+                project_id=other_project_id,
+                user_uuid=test_user_uuid,
+            )
 
     # ==================== Upsert Without Resource Group Tests ====================
 

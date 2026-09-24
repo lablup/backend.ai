@@ -1217,8 +1217,13 @@ class TestSearchUserFairSharesEntityBased:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_name: str,
         project_id: uuid.UUID,
+        legacy_membership_only: bool = False,
     ) -> uuid.UUID:
-        """Helper to create a user associated with domain and project."""
+        """Helper to create a user in the domain and a member of the project.
+
+        With ``legacy_membership_only``, the membership is written to
+        ``association_groups_users`` alone and not to the entity graph.
+        """
         user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             domain_id = (
@@ -1282,7 +1287,10 @@ class TestSearchUserFairSharesEntityBased:
             )
             await db_sess.flush()
 
-            db_sess.add(AssocGroupUserRow(group_id=project_id, user_id=user_uuid))
+            if legacy_membership_only:
+                db_sess.add(AssocGroupUserRow(group_id=project_id, user_id=user_uuid))
+            else:
+                await VirtualEntitySeeder().enroll_user_in_project(db_sess, project_id, user_uuid)
             await db_sess.commit()
         return user_uuid
 
@@ -1320,6 +1328,18 @@ class TestSearchUserFairSharesEntityBased:
     ) -> uuid.UUID:
         """Create a user without fair share record."""
         return await self._create_user(db_with_cleanup, domain_name, project_id)
+
+    @pytest.fixture
+    async def user_with_legacy_membership_only(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_name: str,
+        project_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """Create a user whose project membership exists only in the legacy table."""
+        return await self._create_user(
+            db_with_cleanup, domain_name, project_id, legacy_membership_only=True
+        )
 
     # ==================== Scope Validation Tests ====================
 
@@ -1445,6 +1465,32 @@ class TestSearchUserFairSharesEntityBased:
         assert result_users[user_without_record].data.use_default is True
         assert result_users[user_without_record].data.metadata is None
 
+    async def test_excludes_user_with_legacy_membership_only(
+        self,
+        fair_share_repository: FairShareRepository,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_without_record: uuid.UUID,
+        user_with_legacy_membership_only: uuid.UUID,
+    ) -> None:
+        """Project members are read from the entity graph, not from the legacy table."""
+
+        scope = UserFairShareTarget(
+            resource_group_id=RESOURCE_GROUP_ID,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert [item.user_uuid for item in result.items] == [user_without_record]
+
     # ==================== RG-Context Filter Regression Tests ====================
 
     async def test_rg_filter_by_user_uuid_includes_entity_without_record(
@@ -1459,7 +1505,7 @@ class TestSearchUserFairSharesEntityBased:
 
         Regression: Non-RG conditions reference UserFairShareRow.user_uuid (LEFT JOIN'd),
         which is NULL for entities without records. RG conditions reference
-        AssocGroupUserRow.user_id (INNER JOIN'd), which is never NULL.
+        UserRow.uuid (INNER JOIN'd), which is never NULL.
         """
         scope = UserFairShareTarget(
             resource_group_id=RESOURCE_GROUP_ID,
