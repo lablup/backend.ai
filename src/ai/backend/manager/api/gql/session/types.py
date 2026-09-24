@@ -74,6 +74,9 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionRuntimeInfoGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
+    TerminateSessionsFailureInfo as TerminateSessionsFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload as TerminateSessionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
@@ -1057,6 +1060,19 @@ class EnqueueSessionPayloadGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Why one session was not acted on.",
+    ),
+    model=TerminateSessionsFailureInfoDTO,
+    name="TerminateSessionsFailureInfo",
+)
+class TerminateSessionsFailureInfoGQL:
+    session_id: ID = gql_field(description="Session the failure applies to.")
+    message: str = gql_field(description="Why the session was not acted on.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload returned after terminating sessions.",
     ),
@@ -1068,6 +1084,12 @@ class TerminateSessionsPayloadGQL:
     terminating: list[ID] = gql_field(description="Sessions marked TERMINATING.")
     force_terminated: list[ID] = gql_field(description="Sessions force-terminated.")
     skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")
+    failed: list[TerminateSessionsFailureInfoGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Sessions the caller was refused.",
+        ),
+    )
 
 
 @gql_pydantic_input(

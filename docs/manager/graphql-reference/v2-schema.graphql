@@ -10165,7 +10165,7 @@ type Mutation {
   enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload
 
   """
-  Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  Added in 26.4.4. Terminate one or more sessions by ID. Permission is checked per session; a session the caller is refused is reported under `failed` and the rest go on.
   """
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
 
@@ -17359,6 +17359,15 @@ type SyncReplicaPayload {
   success: Boolean!
 }
 
+"""Added in 26.9.0. Why one session was not acted on."""
+type TerminateSessionsFailureInfo {
+  """Session the failure applies to."""
+  sessionId: ID!
+
+  """Why the session was not acted on."""
+  message: String!
+}
+
 """Added in 26.4.2. Payload returned after terminating sessions."""
 type TerminateSessionsPayload {
   """Sessions cancelled from PENDING."""
@@ -17372,6 +17381,9 @@ type TerminateSessionsPayload {
 
   """Sessions already terminated or not found."""
   skipped: [ID!]!
+
+  """Added in 26.9.0. Sessions the caller was refused."""
+  failed: [TerminateSessionsFailureInfo!]!
 }
 
 """Added in 26.4.2. Text input UI config."""
