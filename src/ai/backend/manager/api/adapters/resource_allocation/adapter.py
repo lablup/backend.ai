@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -42,6 +44,8 @@ from ai.backend.manager.data.resource_allocation.types import (
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
@@ -70,25 +74,30 @@ from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
 from ai.backend.manager.services.user.processors import UserProcessors
 
 
+@dataclass
+class ResourceAllocationAdapterArgs:
+    session: SessionProcessors
+    domain: DomainProcessors
+    user: UserProcessors
+    resource_group: ResourceGroupProcessors
+    config_provider: ManagerConfigProvider | None
+
+
 class ResourceAllocationAdapter(BaseAdapter):
     """Adapter for resource allocation operations."""
 
     _session: SessionProcessors
     _domain: DomainProcessors
     _user: UserProcessors
+    _resource_group: ResourceGroupProcessors
     _config_provider: ManagerConfigProvider | None
 
-    def __init__(
-        self,
-        session: SessionProcessors,
-        domain: DomainProcessors,
-        user: UserProcessors,
-        config_provider: ManagerConfigProvider | None,
-    ) -> None:
-        self._session = session
-        self._domain = domain
-        self._user = user
-        self._config_provider = config_provider
+    def __init__(self, args: ResourceAllocationAdapterArgs) -> None:
+        self._session = args.session
+        self._domain = args.domain
+        self._user = args.user
+        self._resource_group = args.resource_group
+        self._config_provider = args.config_provider
 
     def _visibility_settings(self) -> tuple[bool, bool]:
         """Return (group_resource_visibility, hide_agents) from config."""
@@ -235,12 +244,16 @@ class ResourceAllocationAdapter(BaseAdapter):
 
     async def resource_group_usage(
         self,
-        rg_name: str,
+        resource_group_name: ResourceGroupName,
     ) -> ResourceGroupResourceAllocationPayload:
         """Get resource group usage."""
+        resource_group = await self._resource_group.lookup.run(
+            LookupResourceGroupAction(name=resource_group_name)
+        )
         result = await self._session.resource_allocation.get_resource_group_usage.run(
             GetResourceGroupUsageAction(
-                rg_name=rg_name,
+                resource_group_id=resource_group.entity_id(),
+                resource_group_name=resource_group_name,
             )
         )
         return ResourceGroupResourceAllocationPayload(

@@ -343,6 +343,9 @@ from ai.backend.manager.services.session.actions.lookup_kernel_field_owner impor
     LookupKernelFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.actions.get_resource_group_usage import (
+    GetResourceGroupUsageAction,
+)
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
@@ -850,6 +853,31 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
     assert recorded[BulkGetReservoirRegistriesAction] == (
         ArtifactRegistryEntityType(),
         ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_resource_group_usage_read_is_checked_on_the_named_group() -> None:
+    """A resource group's usage is read on that group, not superadmin-only."""
+    registry = _ops_registry()
+    resource_group_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    ResourceAllocationProcessors(
+        resource_group_groups.group(GroupMeta(UserEntityType())),
+        resource_group_groups.group(GroupMeta(ProjectEntityType())),
+        resource_group_groups.group(GroupMeta(DomainEntityType())),
+        resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
+        resource_group_groups.group(GroupMeta(SessionEntityType())),
+        resource_group_groups.group(GroupMeta(ResourcePresetEntityType())),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[GetResourceGroupUsageAction] == (
+        ResourceGroupEntityType(),
+        ActionKind.SINGLE_ENTITY,
         ActionGate.PERMISSION,
     )
 

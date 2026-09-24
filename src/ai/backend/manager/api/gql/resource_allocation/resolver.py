@@ -6,6 +6,7 @@ from uuid import UUID
 
 from strawberry import Info
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -83,7 +84,7 @@ async def resource_group_resource_allocation_v2(
     resource_group_name: str,
 ) -> ResourceGroupResourceAllocationPayloadGQL | None:
     payload = await info.context.adapters.resource_allocation.resource_group_usage(
-        rg_name=resource_group_name,
+        resource_group_name=ResourceGroupName(resource_group_name),
     )
     return ResourceGroupResourceAllocationPayloadGQL.from_pydantic(payload)
 

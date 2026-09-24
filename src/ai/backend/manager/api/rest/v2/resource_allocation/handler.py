@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     AdminEffectiveResourceAllocationInput,
     CheckPresetAvailabilityInput,
@@ -73,7 +74,7 @@ class V2ResourceAllocationHandler:
     ) -> APIResponse:
         """Get resource group usage."""
         result = await self._adapter.resource_group_usage(
-            rg_name=path.parsed.name,
+            resource_group_name=ResourceGroupName(path.parsed.name),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

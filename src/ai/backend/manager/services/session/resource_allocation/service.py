@@ -99,7 +99,7 @@ class ResourceAllocationService:
     ) -> GetResourceGroupUsageActionResult:
         """Get resource group usage."""
         usage = await self._resource_allocation_repository.get_resource_group_usage(
-            rg_name=action.rg_name,
+            rg_name=action.resource_group_name,
         )
         return GetResourceGroupUsageActionResult(usage=usage)
 
