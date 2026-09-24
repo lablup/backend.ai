@@ -202,7 +202,14 @@ _queryorder_colmap: ColumnMapType = {
 }
 
 ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.4.0.")
-ImageTypeEnum = graphene.Enum.from_enum(ImageType, description="Added in 25.12.0.")
+ImageTypeEnum = graphene.Enum.from_enum(
+    ImageType,
+    description=(
+        "Added in 25.12.0."
+        " `SERVICE` is deprecated since 26.9.0: the scan never writes it, and it is"
+        " removed in the next release."
+    ),
+)
 
 
 class Image(graphene.ObjectType):  # type: ignore[misc]
