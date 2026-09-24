@@ -111,6 +111,7 @@ __all__ = (
     "GetGlobalOpsAction",
     "OwnedFieldGetOpsAction",
     "BulkGetOwnedFieldOpsAction",
+    "PartialBulkGetOwnedFieldOpsAction",
     "EntityPartialBulkGetOpsAction",
     "PartialBulkGetEntityOpsAction",
 )
@@ -735,6 +736,21 @@ class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: 
     Bulk-shaped like :class:`BulkScopedSearchOpsAction` and for the same reason — the
     owners are named rather than being a scope — while the answer is one row per owner
     instead of a page.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class PartialBulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    BasePartialBulkAction, OwnedFieldGetOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """The row each named entity designates, answered for each owner on its own.
+
+    Partial like :class:`PartialBulkGetEntityOpsAction`: a denied owner is one item, and
+    an owner designating nothing is ``nothing`` — whether it exists is not this read's to say.
     """
 
     @override

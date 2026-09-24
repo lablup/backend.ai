@@ -39,7 +39,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
     RefusingGlobalActionValidator,
 )
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
@@ -66,6 +66,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import ScalingState
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.specs.searcher import SearcherResult
@@ -73,6 +74,10 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
 DENIED_TOKEN = DeploymentTokenID(uuid4())
+WITH_POLICY = DeploymentID(uuid4())
+WITHOUT_POLICY = DeploymentID(uuid4())
+DENIED_DEPLOYMENT = DeploymentID(uuid4())
+ABSENT_DEPLOYMENT = DeploymentID(uuid4())
 
 
 class TestRevisionDataToDTO:
@@ -435,30 +440,78 @@ class TestFieldBatchLoads:
         assert await deployment_adapter.batch_load_auto_scaling_rules_by_ids([]) == []
         processors.deployment.bulk_get_auto_scaling_rules.run.assert_not_awaited()
 
-    async def test_policies_answer_per_deployment(self) -> None:
-        deployment_id = DeploymentID(uuid4())
-        policy = DeploymentPolicyData(
+
+class TestPolicyBatchLoad:
+    """The policy DataLoader answers per deployment, each checked on its own."""
+
+    @pytest.fixture
+    def policy(self) -> DeploymentPolicyData:
+        return DeploymentPolicyData(
             id=uuid4(),
-            endpoint=deployment_id,
+            endpoint=WITH_POLICY,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this deployment")
+
+    @pytest.fixture
+    def adapter(
+        self, policy: DeploymentPolicyData, denial: GenericForbidden
+    ) -> tuple[DeploymentAdapter, MagicMock]:
         processors = MagicMock()
         processors.deployment.bulk_get_deployment_policies.run = AsyncMock(
-            return_value=OwnedFieldsOpsResult(designated={deployment_id: policy})
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[DeploymentPolicyData].succeeded(WITH_POLICY, policy),
+                    PartialBulkEntityResult[DeploymentPolicyData].nothing(WITHOUT_POLICY),
+                    PartialBulkEntityResult[DeploymentPolicyData].denied(DENIED_DEPLOYMENT, denial),
+                    PartialBulkEntityResult[DeploymentPolicyData].failed(
+                        ABSENT_DEPLOYMENT,
+                        EntityNotFoundError(entity_type=DeploymentEntityType()),
+                    ),
+                ]
+            )
         )
-        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
-        without_policy = DeploymentID(uuid4())
+        return DeploymentAdapter(processors.deployment, MagicMock()), processors
+
+    async def test_policies_answer_per_deployment(
+        self,
+        adapter: tuple[DeploymentAdapter, MagicMock],
+        policy: DeploymentPolicyData,
+        denial: GenericForbidden,
+    ) -> None:
+        deployment_adapter, processors = adapter
 
         nodes = await deployment_adapter.batch_load_policies_by_endpoint_ids([
-            deployment_id,
-            without_policy,
+            WITH_POLICY,
+            WITHOUT_POLICY,
+            DENIED_DEPLOYMENT,
+            ABSENT_DEPLOYMENT,
         ])
 
-        node, none = nodes
-        assert node is not None and node.id == policy.id
+        node, none, refused, missing = nodes
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == policy.id
         assert none is None
+        assert refused is denial
+        assert missing is None
         action = processors.deployment.bulk_get_deployment_policies.run.await_args.args[0]
-        assert list(action.owner_ids()) == [deployment_id, DeploymentID(without_policy)]
+        assert list(action.owner_ids()) == [
+            WITH_POLICY,
+            WITHOUT_POLICY,
+            DENIED_DEPLOYMENT,
+            ABSENT_DEPLOYMENT,
+        ]
+
+    async def test_no_deployment_ids_read_no_policy(
+        self, adapter: tuple[DeploymentAdapter, MagicMock]
+    ) -> None:
+        deployment_adapter, processors = adapter
+
+        assert await deployment_adapter.batch_load_policies_by_endpoint_ids([]) == []
+        processors.deployment.bulk_get_deployment_policies.run.assert_not_awaited()

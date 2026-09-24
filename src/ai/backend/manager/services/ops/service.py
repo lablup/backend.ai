@@ -66,6 +66,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalSearchOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
+    PartialBulkGetOwnedFieldOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
@@ -99,6 +100,7 @@ __all__ = (
     "GetService",
     "PartialBulkGetService",
     "BulkOwnedFieldGetService",
+    "PartialBulkOwnedFieldGetService",
     "LookupService",
     "BulkFieldOwnerLookupService",
     "FieldKeyLookupService",
@@ -199,6 +201,33 @@ class BulkOwnedFieldGetService[TFieldData: FieldData]:
     ) -> OwnedFieldsOpsResult[Any, TFieldData]:
         designated = await self._repository.owned_fields(action.to_querier(), action.owner_ids())
         return OwnedFieldsOpsResult(designated=designated)
+
+
+class PartialBulkOwnedFieldGetService[TFieldData: FieldData]:
+    """Reads the row each named entity designates, answering for each owner.
+
+    The owners the caller may not read are gone from the action by the time this
+    runs; an owner designating nothing is an empty item, not a failed one.
+    """
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: PartialBulkGetOwnedFieldOpsAction[Any, Any, TFieldData]
+    ) -> PartialBulkResult[TFieldData]:
+        owner_ids = action.owner_ids()
+        designated = await self._repository.owned_fields(action.to_querier(), owner_ids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[TFieldData].succeeded(owner_id, designated[owner_id])
+                if owner_id in designated
+                else PartialBulkEntityResult[TFieldData].nothing(owner_id)
+                for owner_id in owner_ids
+            ]
+        )
 
 
 class PartialBulkGetService[TData]:

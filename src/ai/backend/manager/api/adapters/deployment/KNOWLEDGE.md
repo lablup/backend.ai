@@ -1,9 +1,9 @@
 ---
 name: deployment-adapter-scenarios
 type: reference
-description: what the deployment adapter guarantees, as scenarios; the deployment's own calls and its revisions are written here, the other field rows are not yet
+description: what the deployment adapter guarantees, as scenarios; the deployment's own calls, its revisions and the batch read of its policies are written here, the other field rows are not yet
 scope: src/ai/backend/manager/api/adapters/deployment
-keywords: [deployment, scenario, adapter, rbac, project, revision]
+keywords: [deployment, scenario, adapter, rbac, project, revision, policy]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
@@ -245,17 +245,41 @@ id와 볼 수 없는 id를 한 가지로 거부한다. 모든 검사를 지나�
 자원 슬롯 훑기는 리비전 하나를 가리키는데도 전역 역할이 지킨다. 그 리비전을 읽을 수 있는
 사람이 슬롯은 못 본다는 뜻이라, 짝을 두어 못박는다.
 
+## 배포 정책
+
+배포 정책은 deployment가 소유하는 행이다. 한 deployment에 많아야 하나 있고, 자기 스코프가
+없어 소유 deployment의 읽기 권한으로 열린다. 정책 자체에 걸리는 권한은 없다.
+
+### 여럿을 한 번에 읽기
+
+다른 자리가 가리키는 deployment들의 정책을 deployment id 목록으로 한 번에 읽는다. 답은 id마다
+한 자리씩 입력 순서대로 오고, 호출 전체가 거부되지는 않는다. 자리마다 그 deployment 읽기와
+같은 기준으로 따로 판정한다.
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 읽기 권한을 받은 사용자가 자기 배포의 정책을 읽는다 | 정책이 딸린 deployment 하나, 읽기 권한 있음 | 그 deployment id 하나 | 그 정책 |
+| 권한 없이 자기 배포의 정책을 읽는다 | 정책이 딸린 deployment 하나, 권한 없음 | 그 deployment id 하나 | 그 자리는 권한 부족 거부 |
+| 정책이 없는 배포의 정책을 읽는다 | 정책이 딸리지 않은 deployment 하나, 읽기 권한 있음 | 그 deployment id 하나 | 그 자리는 빈 값 |
+| 읽을 수 있는 배포, 읽을 수 없는 배포, 없는 id를 함께 읽는다 | 두 프로젝트에 정책이 딸린 deployment가 하나씩, 한쪽 프로젝트에만 읽기 권한 있음 | 권한 있는 쪽, 없는 쪽, 없는 id 순 | 순서대로 그 정책, 권한 부족 거부, 권한 부족 거부 |
+| 슈퍼관리자가 남의 배포와 없는 id를 함께 읽는다 | 다른 사람이 만든, 정책이 딸린 deployment 하나, 행위자는 슈퍼관리자 | 그 deployment id와 없는 id | 그 정책, 없는 id 자리는 빈 값 |
+| 빈 목록으로 읽는다 | 권한 없음 | 빈 id 목록 | 빈 목록 |
+
+슈퍼관리자가 아닌 사용자에게는 없는 id도 권한 부족으로 거부된다. 위 읽기 절의 없는 id 줄과
+같다. 빈 값은 둘이다 — 슈퍼관리자가 댄 없는 id와, 누구에게나 정책이 딸리지 않은 deployment.
+둘 다 거부가 아니다.
+
 ## 아직 적지 않은 것
 
 어느 시나리오도 부르지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 낸다.
 
-deployment가 소유하는 행의 호출은 필드마다 절을 따로 둘 때 적는다. 리비전은 위에 있다.
+deployment가 소유하는 행의 호출은 필드마다 절을 따로 둘 때 적는다. 리비전과 배포 정책의
+일괄 읽기는 위에 있다.
 
 - 복제본과 경로: `get_replica`, `search_replicas`, `admin_search_replicas`, `search_routes`,
   `update_route_traffic`, `batch_load_replicas_by_ids`, `batch_load_routes_by_ids`
 - 접근 토큰: `create_access_token`, `get_access_token`, `delete_access_token`,
   `search_access_tokens`, `bulk_delete_access_tokens`, `batch_load_access_tokens_by_ids`
-- 배포 정책: `get_policy`, `upsert_policy`, `search_policies`,
-  `batch_load_policies_by_endpoint_ids`
+- 배포 정책: `get_policy`, `upsert_policy`, `search_policies`
 - 자동 확장 규칙: `create_rule`, `get_rule`, `update_rule`, `delete_rule`, `search_rules`,
   `bulk_delete_rules`, `batch_load_auto_scaling_rules_by_ids`

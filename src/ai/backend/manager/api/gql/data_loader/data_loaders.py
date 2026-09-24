@@ -958,13 +958,18 @@ class DataLoaders:
     ) -> DataLoader[DeploymentID, DeploymentPolicyGQL | None]:
         adapter = self._adapters.deployment
 
-        async def load_fn(ids: list[DeploymentID]) -> list[DeploymentPolicyGQL | None]:
+        async def load_fn(
+            ids: list[DeploymentID],
+        ) -> list[DeploymentPolicyGQL | Exception | None]:
             from ai.backend.manager.api.gql.deployment.types.policy import (  # pants: no-infer-dep
                 DeploymentPolicyGQL as DP,
             )
 
             dtos = await adapter.batch_load_policies_by_endpoint_ids(ids)
-            return [DP.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else DP.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

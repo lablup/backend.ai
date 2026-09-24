@@ -17,6 +17,7 @@ from ai.backend.manager.actions.types import (
     ActionKind,
 )
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import (
     AtomicEntityResultJudge,
     BulkActionProcessor,
@@ -58,6 +59,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateFieldOpsAction,
     GlobalSearcherOpsAction,
     OperationScopeOpsAction,
+    PartialBulkGetOwnedFieldOpsAction,
     UpsertFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
@@ -90,6 +92,7 @@ from ai.backend.manager.services.ops.service import (
     FieldPurgeService,
     FieldUpsertService,
     GlobalSearcherService,
+    PartialBulkOwnedFieldGetService,
     RestoreService,
     SearchFieldsService,
     UpdateService,
@@ -219,6 +222,25 @@ class FieldGroup[TFieldData: FieldData]:
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.atomic_bulk, *validators),
+        )
+
+    def partial_bulk_get_owned_field_ops[TAction: PartialBulkGetOwnedFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, TFieldData]:
+        """The one row each entity the caller named designates, one permission check per owner.
+
+        The partial counterpart of :meth:`atomic_bulk_get_ops`: an owner the caller may
+        not read is one denied item beside the rows of the others, not a refused run.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return PartialBulkActionProcessor(
+            PartialBulkOwnedFieldGetService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def global_scope[TAction: BaseGlobalAction, TResult](

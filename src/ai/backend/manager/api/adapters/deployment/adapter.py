@@ -1642,22 +1642,25 @@ class DeploymentAdapter(BaseAdapter):
     async def batch_load_policies_by_endpoint_ids(
         self,
         endpoint_ids: Sequence[DeploymentID],
-    ) -> list[DeploymentPolicyNode | None]:
+    ) -> list[DeploymentPolicyNode | Exception | None]:
         """Batch load deployment policies by deployment ID for DataLoader use.
 
-        Each deployment carries at most one policy; every named deployment is checked.
+        One answer per deployment in the given order: the policy, ``None`` for a
+        deployment carrying none or an id matching no row, and the denial for one the
+        caller may not read.
         """
         if not endpoint_ids:
             return []
-        ids = [DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
-        result = await self._deployment.bulk_get_deployment_policies.run(
-            BulkGetDeploymentPoliciesAction(deployment_ids=ids)
+        policy_result = await self._deployment.bulk_get_deployment_policies.run(
+            BulkGetDeploymentPoliciesAction(
+                deployment_ids=[DeploymentID(endpoint_id) for endpoint_id in endpoint_ids]
+            )
         )
         return [
-            self._policy_data_to_dto(policy)
-            if (policy := result.designated.get(deployment_id)) is not None
-            else None
-            for deployment_id in ids
+            self._policy_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in policy_result.items
         ]
 
     # ------------------------------------------------------------------

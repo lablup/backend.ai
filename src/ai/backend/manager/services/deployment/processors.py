@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleFieldType
-from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionFieldType
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenFieldType
@@ -25,7 +24,6 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
-    OwnedFieldsOpsResult,
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
@@ -353,8 +351,8 @@ class DeploymentProcessors:
     bulk_get_auto_scaling_rules: PartialBulkFieldActionProcessor[
         BulkGetAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
     ]
-    bulk_get_deployment_policies: BulkActionProcessor[
-        BulkGetDeploymentPoliciesAction, OwnedFieldsOpsResult[DeploymentID, DeploymentPolicyData]
+    bulk_get_deployment_policies: PartialBulkActionProcessor[
+        BulkGetDeploymentPoliciesAction, DeploymentPolicyData
     ]
 
     global_search_replicas: GlobalActionProcessor[
@@ -425,7 +423,7 @@ class DeploymentProcessors:
         self.bulk_get_auto_scaling_rules = auto_scaling_rules.partial_bulk_get_ops(
             BulkGetAutoScalingRulesAction
         )
-        self.bulk_get_deployment_policies = policies.atomic_bulk_get_ops(
+        self.bulk_get_deployment_policies = policies.partial_bulk_get_owned_field_ops(
             BulkGetDeploymentPoliciesAction
         )
         self.lookup_auto_scaling_rule_deployment = group.key_owner_lookup_ops(
