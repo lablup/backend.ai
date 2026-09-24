@@ -95,6 +95,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import BigInt
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -271,7 +272,16 @@ class DownloadSessionInputGQL(PydanticInputMixin[DownloadInputDTO]):
 class FileEntryNodeGQL(PydanticOutputMixin[FileEntryNodeDTO]):
     name: str = gql_field(description="File or directory name.")
     type: str = gql_field(description="Entry type (FILE, DIRECTORY, SYMLINK).")
-    size: int = gql_field(description="File size in bytes.")
+    size: int = gql_field(
+        description="File size in bytes.",
+        deprecation_reason="Use sizeV2; this field cannot carry sizes over 2 GiB.",
+    )
+    size_v2: BigInt | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="File size in bytes.",
+        ),
+    )
     mode: int = gql_field(description="POSIX file permission mode.")
     created_at: str = gql_field(description="Creation timestamp.")
     updated_at: str = gql_field(description="Last modification timestamp.")

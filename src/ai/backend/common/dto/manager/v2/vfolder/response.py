@@ -138,6 +138,7 @@ class FileEntryNode(BaseResponseModel):
     name: str = Field(description="File or directory name")
     type: FileEntryType = Field(description="Entry type")
     size: int = Field(description="File size in bytes")
+    size_v2: int | None = Field(default=None, description="File size in bytes")
     mode: int = Field(description="POSIX file permission mode (e.g., 33188 for 0o100644)")
     created_at: str = Field(description="Creation timestamp")
     updated_at: str = Field(description="Last modification timestamp")

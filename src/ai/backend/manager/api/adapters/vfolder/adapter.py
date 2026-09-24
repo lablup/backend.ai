@@ -776,6 +776,7 @@ class VFolderAdapter(BaseAdapter):
                     name=f.name,
                     type=FileEntryType(f.type),
                     size=f.size,
+                    size_v2=f.size,
                     mode=int(f.mode),
                     created_at=str(f.created),
                     updated_at=str(f.modified),
