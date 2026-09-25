@@ -78,44 +78,6 @@ class AppConfigDefinitionConditions:
 
         return inner
 
-    # --- cursor (created_at-based) pagination ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigDefinitionRow.created_at)
-                .where(AppConfigDefinitionRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigDefinitionRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigDefinitionRow.created_at)
-                .where(AppConfigDefinitionRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigDefinitionRow.created_at > subquery
-
-        return inner
-
     # --- created_at datetime filters ---
 
     @staticmethod

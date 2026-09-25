@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Callable
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
@@ -25,13 +24,13 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
 )
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.artifact.service import ArtifactService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryEventHandler:
-    _processors_factory: Callable[[], Processors]
+    _artifact_service: ArtifactService
     _artifact_repository: ArtifactRepository
     _artifact_registry_repository: ArtifactRegistryRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
@@ -42,7 +41,7 @@ class ArtifactRegistryEventHandler:
 
     def __init__(
         self,
-        processors_factory: Callable[[], Processors],
+        artifact_service: ArtifactService,
         artifact_repository: ArtifactRepository,
         artifact_registry_repository: ArtifactRegistryRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
@@ -51,7 +50,7 @@ class ArtifactRegistryEventHandler:
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
     ) -> None:
-        self._processors_factory = processors_factory
+        self._artifact_service = artifact_service
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
@@ -63,7 +62,6 @@ class ArtifactRegistryEventHandler:
     async def handle_artifact_registry_scan(
         self, _context: None, _source: AgentId, _event: DoScanReservoirRegistryEvent
     ) -> None:
-        processors = self._processors_factory()
         registries = await self._artifact_registry_repository.list_artifact_registry_data()
 
         for registry in registries:
@@ -71,7 +69,8 @@ class ArtifactRegistryEventHandler:
                 continue
 
             try:
-                await processors.artifact.scan.run(
+                # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.
+                await self._artifact_service.scan(
                     ScanArtifactsAction(
                         registry_id=registry.registry_id,
                         # TODO: Support other artifact types in the future

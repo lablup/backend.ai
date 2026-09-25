@@ -11,6 +11,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.data.image.types import ImageData, ImageType
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -87,4 +88,4 @@ class ImageUpdater(DataUpdater[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return row.to_dataclass()
+        return ImageSearchableFields.own.to_data(row)

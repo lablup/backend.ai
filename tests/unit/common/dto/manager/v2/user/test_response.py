@@ -30,6 +30,7 @@ def make_user_node(user_id: uuid.UUID | None = None) -> UserNode:
     now = datetime.now(tz=UTC)
     return UserNode(
         id=user_id,
+        entity_id=user_id,
         basic_info=UserBasicInfo(
             username="testuser",
             email="test@example.com",

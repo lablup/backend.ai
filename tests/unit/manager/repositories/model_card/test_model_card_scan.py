@@ -1,12 +1,12 @@
-"""Tests for ModelCardDBSource scan upsert + search_available_presets.
+"""Tests for ModelCardDBSource scan upsert + the preset availability declaration.
 
 Verifies:
 - bulk_upsert_scan populates model_card_resource_requirements (the bug fix
   for the scan path that was previously dropping min_resource entirely).
 - Re-running scan with the same specs is idempotent — child rows must not
   duplicate.
-- search_available_presets correctly filters presets by min_resource once
-  the requirements table is populated (relational division).
+- the preset side's `usage.model_cards` declaration filters presets by
+  min_resource once the requirements table is populated (relational division).
 """
 
 from __future__ import annotations
@@ -20,16 +20,24 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    SearchDeploymentRevisionPresetsInput,
-)
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.scopes import (
+    PublicDeploymentPresetTarget,
+)
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
+from ai.backend.manager.models.deployment_revision_preset.searchers import (
+    DeploymentPresetSearcher,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -51,6 +59,8 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -76,7 +86,7 @@ class TestModelCardScanResourceRequirements:
     Background: ModelCardScanUpserter previously skipped `min_resource`
     in build_insert_values/build_update_values, leaving the
     model_card_resource_requirements table empty even after a full scan.
-    That caused search_available_presets's relational division to be
+    That caused the preset availability division to be
     vacuously true and return every preset regardless of resource needs.
     """
 
@@ -209,6 +219,7 @@ class TestModelCardScanResourceRequirements:
                 resource_policy=test_user_resource_policy.name,
             )
             db_sess.add(user)
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user.uuid))
             await db_sess.flush()
         return user
 
@@ -257,11 +268,18 @@ class TestModelCardScanResourceRequirements:
         return vfolder
 
     @pytest.fixture
-    def db_source(
+    def ops_provider(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> V2DBOpsProvider:
+        return V2DBOpsProvider(db_with_cleanup)
+
+    @pytest.fixture
+    def db_source(
+        self,
+        ops_provider: V2DBOpsProvider,
     ) -> ModelCardDBSource:
-        return ModelCardDBSource(V2DBOpsProvider(db_with_cleanup))
+        return ModelCardDBSource(ops_provider)
 
     def _build_scan_spec(
         self,
@@ -336,6 +354,57 @@ class TestModelCardScanResourceRequirements:
         assert {(r.slot_name, r.min_quantity) for r in rows} == {
             ("cpu", Decimal("2")),
             ("mem", Decimal("4096")),
+        }
+
+    async def _owners(
+        self, db: ExtendedAsyncSAEngine, card_id: uuid.UUID
+    ) -> set[tuple[str, uuid.UUID]]:
+        """The (entity type, entity id) of every other entity holding an own edge to the card."""
+        scope = VirtualEntityRow.__table__.alias("scope")
+        node = VirtualEntityRow.__table__.alias("node")
+        async with db.begin_readonly_session() as sess:
+            rows = (
+                await sess.execute(
+                    sa.select(scope.c.entity_type, scope.c.entity_id)
+                    .select_from(EntityMembershipRow)
+                    .join(scope, scope.c.id == EntityMembershipRow.virtual_entity_id)
+                    .join(node, node.c.id == EntityMembershipRow.member_entity_id)
+                    .where(
+                        node.c.entity_id == card_id,
+                        scope.c.id != node.c.id,
+                        EntityMembershipRow.capped.is_(False),
+                    )
+                )
+            ).all()
+        return {(str(entity_type), entity_id) for entity_type, entity_id in rows}
+
+    async def test_scan_joins_the_project_and_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        test_domain: DomainRow,
+        test_user: UserRow,
+        test_group: ProjectRow,
+        test_vfolder: VFolderRow,
+    ) -> None:
+        spec = self._build_scan_spec(
+            name="scan-card-owned-by-both",
+            test_domain=test_domain,
+            test_user=test_user,
+            test_group=test_group,
+            test_vfolder=test_vfolder,
+            min_resource=[],
+        )
+
+        await db_source.bulk_upsert_scan([spec], existing_names=set())
+
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            card_id = (
+                await sess.execute(sa.select(ModelCardRow.id).where(ModelCardRow.name == spec.name))
+            ).scalar_one()
+        assert await self._owners(db_with_cleanup, card_id) == {
+            ("project", test_group.id),
+            ("user", test_user.uuid),
         }
 
     async def test_scan_is_idempotent(
@@ -436,10 +505,11 @@ class TestModelCardScanResourceRequirements:
             ("mem", Decimal("8192")),
         }
 
-    async def test_search_available_presets_filters_by_min_resource(
+    async def test_available_presets_filter_by_min_resource(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ModelCardDBSource,
+        ops_provider: V2DBOpsProvider,
         test_domain: DomainRow,
         test_user: UserRow,
         test_group: ProjectRow,
@@ -500,10 +570,15 @@ class TestModelCardScanResourceRequirements:
             await sess.flush()
             big_id = big.id
 
-        result = await db_source.search_available_presets(
-            card_id,
-            SearchDeploymentRevisionPresetsInput(),
-        )
+        linked = DeploymentPresetSearchableFields.linked.usage
+        async with ops_provider.read_ops() as r:
+            result = await r.scoped_search(
+                ScopedSearcher(
+                    scopes=[PublicDeploymentPresetTarget()],
+                    used_by=[linked.model_cards.used_by(ModelCardID(card_id))],
+                    searcher=DeploymentPresetSearcher(pagination=NoPagination()),
+                )
+            )
 
         returned_ids = {item.id for item in result.items}
         assert big_id in returned_ids
@@ -511,3 +586,87 @@ class TestModelCardScanResourceRequirements:
             f"Expected only the satisfying preset, got {len(returned_ids)}: "
             "the relational-division filter regressed."
         )
+
+    async def test_available_presets_keep_every_preset_for_a_card_requiring_nothing(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        ops_provider: V2DBOpsProvider,
+        test_domain: DomainRow,
+        test_user: UserRow,
+        test_group: ProjectRow,
+        test_vfolder: VFolderRow,
+    ) -> None:
+        # A card declaring no minimum is satisfied by every preset. A declaration
+        # asking for one satisfied requirement instead of none unsatisfied would
+        # answer with nothing here.
+        spec = self._build_scan_spec(
+            name="scan-no-minimum-card",
+            test_domain=test_domain,
+            test_user=test_user,
+            test_group=test_group,
+            test_vfolder=test_vfolder,
+            min_resource=[],
+        )
+        await db_source.bulk_upsert_scan([spec], existing_names=set())
+
+        async with db_with_cleanup.begin_session() as sess:
+            card_id = (
+                await sess.execute(sa.select(ModelCardRow.id).where(ModelCardRow.name == spec.name))
+            ).scalar_one()
+
+            tiny = DeploymentRevisionPresetRow(
+                id=uuid.uuid4(),
+                runtime_variant=uuid.uuid4(),
+                name="tiny",
+                rank=1,
+                image_id=uuid.uuid4(),
+            )
+            sess.add(tiny)
+            await sess.flush()
+            sess.add(
+                PresetResourceSlotRow(preset_id=tiny.id, slot_name="cpu", quantity=Decimal("1"))
+            )
+            await sess.flush()
+            tiny_id = tiny.id
+
+        linked = DeploymentPresetSearchableFields.linked.usage
+        async with ops_provider.read_ops() as r:
+            result = await r.scoped_search(
+                ScopedSearcher(
+                    scopes=[PublicDeploymentPresetTarget()],
+                    used_by=[linked.model_cards.used_by(ModelCardID(card_id))],
+                    searcher=DeploymentPresetSearcher(pagination=NoPagination()),
+                )
+            )
+
+        assert tiny_id in {item.id for item in result.items}
+
+    async def test_available_presets_answer_with_nothing_for_an_unknown_card(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        ops_provider: V2DBOpsProvider,
+    ) -> None:
+        # The card is joined in, so an id naming no row keeps no preset.
+        async with db_with_cleanup.begin_session() as sess:
+            preset = DeploymentRevisionPresetRow(
+                id=uuid.uuid4(),
+                runtime_variant=uuid.uuid4(),
+                name="orphan-check",
+                rank=1,
+                image_id=uuid.uuid4(),
+            )
+            sess.add(preset)
+            await sess.flush()
+
+        linked = DeploymentPresetSearchableFields.linked.usage
+        async with ops_provider.read_ops() as r:
+            result = await r.scoped_search(
+                ScopedSearcher(
+                    scopes=[PublicDeploymentPresetTarget()],
+                    used_by=[linked.model_cards.used_by(ModelCardID(uuid.uuid4()))],
+                    searcher=DeploymentPresetSearcher(pagination=NoPagination()),
+                )
+            )
+
+        assert result.items == []

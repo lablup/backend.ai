@@ -46,10 +46,10 @@ from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -67,7 +67,7 @@ async def database(
             RuntimeVariantPresetRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ async def _add_preset(
     database: ExtendedAsyncSAEngine, variant_id: RuntimeVariantID, name: str
 ) -> RuntimeVariantPresetData:
     ops: OpsRepository[RuntimeVariantPresetData] = OpsRepository(V2DBOpsProvider(database))
-    return await ops.create_global_entity(
+    return await ops.create_entity(
         RuntimeVariantPresetCreator(
             runtime_variant_id=variant_id,
             name=name,

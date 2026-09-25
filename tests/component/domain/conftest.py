@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
     CreateDomainResponse,
@@ -31,10 +30,9 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.project.processors import ProjectProcessors
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
@@ -43,27 +41,18 @@ DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 def domain_processors(
     database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
 ) -> DomainProcessors:
-    repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+    repo = DomainRepository(database_engine, DomainOpsProvider(database_engine))
     service = DomainService(repo)
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
-
-
-@pytest.fixture()
-def project_processors(processor_registry: ProcessorRegistry[Any]) -> ProjectProcessors:
-    """Only the ops-backed create is exercised here, so the service is a stub."""
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), MagicMock())
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     domain_processors: DomainProcessors,
-    project_processors: ProjectProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for domain-domain tests."""
-    domain_registry = register_domain_routes(
-        DomainHandler(domain=domain_processors, project=project_processors), route_deps
-    )
+    domain_registry = register_domain_routes(DomainHandler(domain=domain_processors), route_deps)
     return [
         register_admin_routes(
             AdminHandler(

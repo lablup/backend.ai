@@ -45,6 +45,8 @@ __all__ = (
     "DeploymentOrderField",
     "DeploymentPolicyInfo",
     "DeploymentStrategy",
+    "DeploymentUsage",
+    "DeploymentUses",
     "DeploymentStrategyInfoDTO",
     "DeploymentStrategySpecInfo",
     "EndpointLifecycle",
@@ -94,6 +96,12 @@ class DeploymentOrderField(StrEnum):
     PROJECT = "project"
     RESOURCE_GROUP = "resource_group"
     TAG = "tag"
+    ENTITY_ID = "entity_id"
+    DESIRED_REPLICAS = "desired_replicas"
+    SCALING_STATE = "scaling_state"
+    CREATED_USER_ID = "created_user_id"
+    OPEN_TO_PUBLIC = "open_to_public"
+    ENDPOINT_URL = "endpoint_url"
 
 
 class RevisionOrderField(StrEnum):
@@ -104,6 +112,15 @@ class RevisionOrderField(StrEnum):
     RESOURCE_GROUP = "resource_group"
     CLUSTER_MODE = "cluster_mode"
     RUNTIME_VARIANT_NAME = "runtime_variant_name"
+    FIELD_ID = "field_id"
+    DEPLOYMENT_ID = "deployment_id"
+    IMAGE_ID = "image_id"
+    MODEL_VFOLDER_ID = "model_vfolder_id"
+    MODEL_MOUNT_DESTINATION = "model_mount_destination"
+    VFOLDER_SUBPATH = "vfolder_subpath"
+    MODEL_DEFINITION_PATH = "model_definition_path"
+    CLUSTER_SIZE = "cluster_size"
+    REVISION_PRESET_ID = "revision_preset_id"
 
 
 class RouteOrderField(StrEnum):
@@ -191,12 +208,25 @@ class AccessTokenOrderField(StrEnum):
     """Fields available for ordering access tokens."""
 
     CREATED_AT = "created_at"
+    FIELD_ID = "field_id"
+    EXPIRES_AT = "expires_at"
 
 
 class AutoScalingRuleOrderField(StrEnum):
     """Fields available for ordering auto-scaling rules."""
 
     CREATED_AT = "created_at"
+    FIELD_ID = "field_id"
+    METRIC_SOURCE = "metric_source"
+    METRIC_NAME = "metric_name"
+    MIN_THRESHOLD = "min_threshold"
+    MAX_THRESHOLD = "max_threshold"
+    STEP_SIZE = "step_size"
+    TIME_WINDOW = "time_window"
+    MIN_REPLICAS = "min_replicas"
+    MAX_REPLICAS = "max_replicas"
+    PROMETHEUS_QUERY_PRESET_ID = "prometheus_query_preset_id"
+    LAST_TRIGGERED_AT = "last_triggered_at"
 
 
 class ReplicaOrderField(StrEnum):
@@ -204,6 +234,12 @@ class ReplicaOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     ID = "id"
+    DEPLOYMENT_ID = "deployment_id"
+    SESSION_ID = "session_id"
+    REVISION_ID = "revision_id"
+    STATUS = "status"
+    TRAFFIC_STATUS = "traffic_status"
+    HEALTH_STATUS = "health_status"
 
 
 class EnvironmentVariableEntryInfoDTO(BaseResponseModel):
@@ -461,6 +497,46 @@ class DeploymentStrategyInfoDTO(BaseResponseModel):
     """
 
     type: DeploymentStrategy
+
+
+class DeploymentUses(BaseRequestModel):
+    """Entities the deployment uses, whose ids narrow the result."""
+
+    resource_group: list[UUID] | None = Field(
+        default=None, description="Resource groups the deployment runs in"
+    )
+    image: list[UUID] | None = Field(
+        default=None,
+        description="Images the deployment's live replica group names in its current revision",
+    )
+    vfolder: list[UUID] | None = Field(
+        default=None,
+        description=(
+            "VFolders the deployment's live replica group names as the model of its current "
+            "revision"
+        ),
+    )
+    session: list[UUID] | None = Field(
+        default=None, description="Sessions the deployment's route rows serve as their replicas"
+    )
+    runtime_variant: list[UUID] | None = Field(
+        default=None, description="Runtime variants the deployment's revisions name"
+    )
+    deployment_preset: list[UUID] | None = Field(
+        default=None, description="Presets the deployment's revisions name"
+    )
+
+
+class DeploymentUsage(BaseRequestModel):
+    """Uses narrowing the deployments read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Deployments the caller cannot
+    read are left out even when a listed entity is tied to them.
+    """
+
+    uses: DeploymentUses | None = Field(
+        default=None, description="Entities the deployment uses, whose ids narrow the result"
+    )
 
 
 class DeploymentScope(BaseRequestModel):

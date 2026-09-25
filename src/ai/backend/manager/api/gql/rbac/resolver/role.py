@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
 import strawberry
 from strawberry import Info
@@ -40,13 +41,14 @@ from ai.backend.manager.api.gql.rbac.types import (
     RoleFilter,
     RoleGQL,
     RoleOrderBy,
+    RoleUsageGQL,
     UpdateRoleInput,
 )
 from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
-    RegisteredRoleScopeItem,
+from ai.backend.manager.models.rbac_models.role.scopes import (
+    ScopedRoleTarget,
 )
 
 # ==================== Query Resolvers ====================
@@ -71,6 +73,16 @@ async def admin_role(
 )  # type: ignore[misc]
 async def admin_roles(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        RoleUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; roles the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: RoleFilter | None = None,
     order_by: list[RoleOrderBy] | None = None,
     before: str | None = None,
@@ -83,6 +95,7 @@ async def admin_roles(
     check_admin_only()
     result = await info.context.adapters.rbac.admin_search_roles_gql(
         SearchRolesInput(
+            usage=usage.to_pydantic() if usage is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -229,6 +242,16 @@ async def my_roles(
 )  # type: ignore[misc]
 async def my_roles_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        RoleUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; roles the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: RoleFilter | None = None,
     order_by: list[RoleOrderBy] | None = None,
     before: str | None = None,
@@ -240,6 +263,7 @@ async def my_roles_v2(
 ) -> RoleConnection | None:
     result = await info.context.adapters.rbac.my_search_roles(
         SearchRolesInput(
+            usage=usage.to_pydantic() if usage is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -275,6 +299,16 @@ async def my_roles_v2(
 async def project_roles(
     info: Info[StrawberryGQLContext],
     project_id: uuid.UUID,
+    usage: Annotated[
+        RoleUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; roles the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: RoleFilter | None = None,
     order_by: list[RoleOrderBy] | None = None,
     before: str | None = None,
@@ -285,8 +319,9 @@ async def project_roles(
     offset: int | None = None,
 ) -> RoleConnection | None:
     result = await info.context.adapters.rbac.search_roles_in_scope(
-        [RegisteredRoleScopeItem(scope=ProjectID(project_id))],
+        [ScopedRoleTarget(scope=ProjectID(project_id))],
         SearchRolesInput(
+            usage=usage.to_pydantic() if usage is not None else None,
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,

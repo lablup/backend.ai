@@ -56,8 +56,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     BulkGetOwnedFieldOpsAction,
     BulkScopedSearchOpsAction,
     CreateFieldOpsAction,
+    GlobalSearcherOpsAction,
     OperationScopeOpsAction,
-    SearchGlobalOpsAction,
     UpsertFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
@@ -89,7 +89,7 @@ from ai.backend.manager.services.ops.service import (
     FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
-    GlobalSearchService,
+    GlobalSearcherService,
     RestoreService,
     SearchFieldsService,
     UpdateService,
@@ -229,7 +229,7 @@ class FieldGroup[TFieldData: FieldData]:
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, TResult]:
-        """Run a service over this field kind system-wide, behind the SUPERADMIN gate."""
+        """Run a service over this field kind system-wide, behind the global gate."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.CUSTOM)
         return GlobalActionProcessor(
             func,
@@ -237,19 +237,19 @@ class FieldGroup[TFieldData: FieldData]:
             validators=(*self._deps.validators.global_scope, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
         validators: Sequence[GlobalActionValidator] = (),
         monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TFieldData]]:
-        """A read across every row of this field type, behind the SUPERADMIN gate.
+        """A read across every row of this field type, behind the global gate.
 
         For one owner's rows use :meth:`search_ops`; this one names no owner."""
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
+            GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

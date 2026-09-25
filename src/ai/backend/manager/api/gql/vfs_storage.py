@@ -30,9 +30,11 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     VFSStorageNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_mutation,
@@ -58,6 +60,12 @@ from .types import StrawberryGQLContext
 )
 class VFSStorage(PydanticNodeMixin[VFSStorageNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the VFS storage.",
+        ),
+    )
     name: str
     host: str
     base_path: str

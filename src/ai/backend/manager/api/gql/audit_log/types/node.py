@@ -54,6 +54,12 @@ class AuditLogStatusGQL(StrEnum):
 )
 class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the audit log entry (UUID).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the audit log record.",
+        ),
+    )
 
     action_id: UUID = gql_field(description="UUID of the action that generated this log.")
     entity_type: str | None = gql_field(

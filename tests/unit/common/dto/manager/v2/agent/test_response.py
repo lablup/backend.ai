@@ -43,9 +43,11 @@ def _make_network_info() -> AgentNetworkInfo:
 
 
 def _make_agent_node(agent_id: str = "agent-001") -> AgentNode:
+    agent_uuid = AgentUUID(uuid.uuid4())
     return AgentNode(
         id=agent_id,
-        uuid=AgentUUID(uuid.uuid4()),
+        entity_id=agent_uuid,
+        uuid=agent_uuid,
         resource_info=_make_resource_info(),
         status_info=_make_status_info(),
         system_info=_make_system_info(),

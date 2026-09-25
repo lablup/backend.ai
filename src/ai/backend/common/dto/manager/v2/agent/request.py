@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentOrderField,
     AgentStatusFilter,
+    AgentUsage,
     ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
@@ -151,6 +152,13 @@ class UpdateAgentResourceGroupInput(UpdateAgentResourceGroupBody):
 class AdminSearchAgentsInput(BaseRequestModel):
     """Input for admin-scoped paginated agent search with cursor and offset pagination."""
 
+    usage: AgentUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "agents the caller cannot read are left out."
+        ),
+    )
     filter: AgentFilter | None = None
     order: list[AgentOrder] | None = None
     # Cursor pagination

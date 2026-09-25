@@ -198,6 +198,7 @@ def build_api_routes(
     )
     resource_handler = ResourceHandler(
         resource_preset=processors.resource_preset,
+        resource_group=processors.resource_group,
         agent=processors.agent,
         project=processors.project,
         user=processors.user,
@@ -242,7 +243,7 @@ def build_api_routes(
     vfs_storage_handler = VFSStorageHandler(vfs_storage=processors.vfs_storage)
 
     # Admin sub-registries
-    domain_handler = DomainHandler(domain=processors.domain, project=processors.project)
+    domain_handler = DomainHandler(domain=processors.domain)
     user_handler = UserHandler(
         user=processors.user, domain=processors.domain, config_provider=config_provider
     )

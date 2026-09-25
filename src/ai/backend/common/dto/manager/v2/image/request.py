@@ -10,10 +10,26 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    EnumFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.tristate.unset import UNSET, Unset
 
-from .types import ImageOrderField, ImageScope, ImageStatusType, OrderDirection
+from .types import (
+    ImageAliasOrderField,
+    ImageOrderField,
+    ImageScope,
+    ImageStatusType,
+    ImageTypeEnum,
+    ImageUsage,
+    OrderDirection,
+)
 
 __all__ = (
     "AdminSearchImageAliasesInput",
@@ -32,9 +48,12 @@ __all__ = (
     "ImageOrderByInputDTO",
     "ImageScopeInputDTO",
     "ImageStatusFilterInputDTO",
+    "ImageTypeFilterInputDTO",
+    "ImageUsage",
     "PurgeImageInput",
     "RescanImagesInput",
     "ScopedSearchImagesInput",
+    "SearchImageAliasesInput",
     "SearchImagesInput",
     "UpdateImageInput",
     "UUIDFilter",
@@ -53,21 +72,12 @@ class ImageScopeInputDTO(BaseRequestModel):
     image_id: UUID = Field(description="UUID of the image to scope the query to.")
 
 
-class ImageStatusFilterInputDTO(BaseRequestModel):
+class ImageStatusFilterInputDTO(EnumFilter[ImageStatusType]):
     """Filter for image status."""
 
-    equals: ImageStatusType | None = Field(
-        default=None, description="Matches images with this exact status."
-    )
-    in_: list[ImageStatusType] | None = Field(
-        default=None, description="Matches images whose status is in this list."
-    )
-    not_equals: ImageStatusType | None = Field(
-        default=None, description="Excludes images with this exact status."
-    )
-    not_in: list[ImageStatusType] | None = Field(
-        default=None, description="Excludes images whose status is in this list."
-    )
+
+class ImageTypeFilterInputDTO(EnumFilter[ImageTypeEnum]):
+    """Filter for the image type category."""
 
 
 class ImageAliasNestedFilterInputDTO(BaseRequestModel):
@@ -86,11 +96,36 @@ class ImageFilterInputDTO(BaseRequestModel):
     registry_id: UUIDFilter | None = Field(
         default=None, description="Filter by container registry ID."
     )
+    image: StringFilter | None = Field(
+        default=None, description="Filter by namespace/path within the registry."
+    )
+    registry: StringFilter | None = Field(default=None, description="Filter by registry hostname.")
+    project: StringFilter | None = Field(
+        default=None, description="Filter by project (namespace) within the registry."
+    )
+    tag: StringFilter | None = Field(default=None, description="Filter by image tag.")
+    config_digest: StringFilter | None = Field(
+        default=None, description="Filter by image config digest."
+    )
+    accelerators: StringFilter | None = Field(
+        default=None, description="Filter by accelerator requirement string."
+    )
+    size_bytes: IntFilter | None = Field(default=None, description="Filter by image size in bytes.")
+    is_local: bool | None = Field(default=None, description="Filter by local-only status.")
+    type: ImageTypeFilterInputDTO | None = Field(
+        default=None, description="Filter by image type category."
+    )
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by creation datetime (before/after)."
+    )
     alias: ImageAliasNestedFilterInputDTO | None = Field(
         default=None, description="Filter by nested alias conditions."
     )
     last_used: DateTimeFilter | None = Field(
         default=None, description="Filter by last used datetime (before/after)."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[ImageFilterInputDTO] | None = Field(
         default=None, description="Combine with AND logic."
@@ -114,6 +149,7 @@ class ImageAliasFilterInputDTO(BaseRequestModel):
 
     alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
     image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by alias row ID.")
     AND: list[ImageAliasFilterInputDTO] | None = Field(
         default=None, description="Combine with AND logic."
     )
@@ -129,7 +165,7 @@ ImageAliasFilterInputDTO.model_rebuild()
 class ImageAliasOrderByInputDTO(BaseRequestModel):
     """Order specification for image alias queries."""
 
-    field: str = Field(description="Field to order by.")
+    field: ImageAliasOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
@@ -152,7 +188,9 @@ class SearchImagesInput(BaseRequestModel):
 
     filter: ImageFilter | None = Field(default=None, description="Filter conditions")
     order: list[ImageOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
@@ -205,6 +243,13 @@ class PurgeImageInput(BaseRequestModel):
 class AdminSearchImagesInput(BaseRequestModel):
     """Input for admin search of images with cursor and offset pagination."""
 
+    usage: ImageUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
+        ),
+    )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."
@@ -221,6 +266,13 @@ class ScopedSearchImagesInput(BaseRequestModel):
     """Input for searching the images the named scopes reach."""
 
     scope: ImageScope = Field(description="Scope (OR across all items).")
+    usage: ImageUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
+        ),
+    )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."
@@ -235,6 +287,21 @@ class ScopedSearchImagesInput(BaseRequestModel):
 
 class AdminSearchImageAliasesInput(BaseRequestModel):
     """Input for admin search of image aliases with cursor and offset pagination."""
+
+    filter: ImageAliasFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageAliasOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class SearchImageAliasesInput(BaseRequestModel):
+    """Input for searching the aliases of one image with cursor and offset pagination."""
 
     filter: ImageAliasFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageAliasOrderByInputDTO] | None = Field(

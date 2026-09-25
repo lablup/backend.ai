@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, assert_never
 from uuid import UUID
 
 from ai.backend.common.config import (
@@ -13,7 +13,9 @@ from ai.backend.common.config import (
     PresetModelServiceConfig,
     PreStartAction,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -45,17 +47,23 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
+    DeploymentRevisionPresetUsage,
     PresetModelConfigInfoDTO,
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
+    AllocatedResourceSlotOrder,
     SearchAllocatedResourceSlotsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode,
     SearchAllocatedResourceSlotsPayload,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AllocatedResourceSlotOrderField,
+    OrderDirection,
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.tristate.unset import Unset
@@ -68,32 +76,32 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.deployment_revision_preset.conditions import (
-    DeploymentRevisionPresetConditions,
-)
 from ai.backend.manager.models.deployment_revision_preset.creators import (
     DeploymentPresetCreator,
     PresetResourceSlotCreator,
 )
-from ai.backend.manager.models.deployment_revision_preset.orders import (
-    DeploymentRevisionPresetOrders,
-)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.scopes import (
+    PublicDeploymentPresetTarget,
+)
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
     DeploymentPresetSearcher,
     PresetResourceSlotSearcher,
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
-from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
-from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
-    ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-    ALLOCATED_SLOT_PRESET_TIEBREAKER,
-    resolve_allocated_slot_preset_order,
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    PresetResourceSlotSearchableFields,
+    ResourceSlotTypeSearchableFields,
 )
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
     BulkGetDeploymentPresetsAction,
 )
@@ -106,8 +114,8 @@ from ai.backend.manager.services.deployment_revision_preset.actions.get import (
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
 )
-from ai.backend.manager.services.deployment_revision_preset.actions.search import (
-    GlobalSearchDeploymentPresetsAction,
+from ai.backend.manager.services.deployment_revision_preset.actions.scoped_search import (
+    ScopedSearchDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.search_resource_slots import (
     SearchPresetResourceSlotsAction,
@@ -123,21 +131,15 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentRevisionPresetOrders.created_at(ascending=False),
-        backward_order=DeploymentRevisionPresetOrders.created_at(ascending=True),
-        forward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_forward,
-        backward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_backward,
-        tiebreaker_order=DeploymentRevisionPresetRow.id.asc(),
+        forward_order=DeploymentPresetSearchableFields.own.created_at.order.apply(ascending=False),
+        cursor_column=DeploymentRevisionPresetRow.id,
     )
 
 
 def _preset_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-        backward_order=ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
-        forward_condition_factory=PresetResourceSlotConditions.by_cursor_forward,
-        backward_condition_factory=PresetResourceSlotConditions.by_cursor_backward,
-        tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
+        forward_order=ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending=True),
+        cursor_column=PresetResourceSlotRow.id,
     )
 
 
@@ -224,6 +226,30 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: SearchDeploymentRevisionPresetsInput,
     ) -> SearchDeploymentRevisionPresetsPayload:
+        return await self._search_in_public(input, self._usage(input.usage))
+
+    async def available_presets(
+        self,
+        model_card_id: ModelCardID,
+        input: SearchDeploymentRevisionPresetsInput,
+    ) -> SearchDeploymentRevisionPresetsPayload:
+        """The presets meeting every minimum the card requires.
+
+        The card narrows the search as a use, so the caller has to be able to read it.
+        """
+        return await self._search_in_public(
+            input,
+            [
+                *self._usage(input.usage),
+                DeploymentPresetSearchableFields.linked.usage.model_cards.used_by(model_card_id),
+            ],
+        )
+
+    async def _search_in_public(
+        self,
+        input: SearchDeploymentRevisionPresetsInput,
+        used_by: list[UsedBy],
+    ) -> SearchDeploymentRevisionPresetsPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         searcher = self._build_searcher(
@@ -238,8 +264,14 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._deployment_revision_preset.global_search.run(
-            GlobalSearchDeploymentPresetsAction(searcher=searcher)
+        result = await self._deployment_revision_preset.scoped_search.run(
+            ScopedSearchDeploymentPresetsAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicDeploymentPresetTarget()],
+                    used_by=used_by,
+                    searcher=searcher,
+                )
+            )
         )
         return SearchDeploymentRevisionPresetsPayload(
             items=[self._data_to_node(d) for d in result.items],
@@ -379,7 +411,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         searcher = self._build_preset_resource_slot_searcher(input)
         action_result = await self._deployment_revision_preset.search_resource_slots.run(
             SearchPresetResourceSlotsAction(
-                preset_id=DeploymentPresetID(preset_id),
+                preset_ids=[DeploymentPresetID(preset_id)],
                 searcher=searcher,
             )
         )
@@ -401,9 +433,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if input.filter:
             conditions.extend(self._convert_allocated_slot_filter(input.filter))
         orders: list[QueryOrder] = (
-            [resolve_allocated_slot_preset_order(o.field, o.direction) for o in input.order]
-            if input.order
-            else []
+            self._convert_allocated_slot_orders(input.order) if input.order else []
         )
         return self._build_searcher(
             PresetResourceSlotSearcher,
@@ -418,22 +448,34 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             offset=input.offset,
         )
 
+    @staticmethod
+    def _convert_allocated_slot_orders(
+        orders: list[AllocatedResourceSlotOrder],
+    ) -> list[QueryOrder]:
+        fields = PresetResourceSlotSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AllocatedResourceSlotOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.QUANTITY:
+                    converted.append(fields.quantity.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.RANK:
+                    # The searcher joins the slot catalog, so its own rank order applies.
+                    converted.append(
+                        ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending)
+                    )
+                case _:
+                    assert_never(o.field)
+        return converted
+
     def _convert_allocated_slot_filter(
         self,
         filter_: AllocatedResourceSlotFilter,
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.slot_name is not None:
-            cond = self.convert_string_filter(
-                filter_.slot_name,
-                contains_factory=PresetResourceSlotConditions.by_slot_name_contains,
-                equals_factory=PresetResourceSlotConditions.by_slot_name_equals,
-                starts_with_factory=PresetResourceSlotConditions.by_slot_name_starts_with,
-                ends_with_factory=PresetResourceSlotConditions.by_slot_name_ends_with,
-                in_factory=PresetResourceSlotConditions.by_slot_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = PresetResourceSlotSearchableFields.own
+        conditions = [*self.apply_string_filter(filter_.slot_name, fields.slot_name.filter)]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_allocated_slot_filter(sub))
@@ -445,35 +487,23 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conds))
         return conditions
 
+    def _usage(self, usage: DeploymentRevisionPresetUsage | None) -> list[UsedBy]:
+        """The uses the request named, each of which the caller must be able to read."""
+        if usage is None or usage.used_by is None:
+            return []
+        linked = DeploymentPresetSearchableFields.linked.usage
+        return [
+            linked.deployments.used_by(DeploymentID(entity_id))
+            for entity_id in usage.used_by.deployment or ()
+        ]
+
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.id is not None:
-            cond = self.convert_uuid_filter(
-                filter_.id,
-                equals_factory=DeploymentRevisionPresetConditions.by_id_equals,
-                in_factory=DeploymentRevisionPresetConditions.by_id_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.runtime_variant_id is not None:
-            cond = self.convert_uuid_filter(
-                filter_.runtime_variant_id,
-                equals_factory=DeploymentRevisionPresetConditions.by_runtime_variant_id_equals,
-                in_factory=DeploymentRevisionPresetConditions.by_runtime_variant_id_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=DeploymentRevisionPresetConditions.by_name_contains,
-                equals_factory=DeploymentRevisionPresetConditions.by_name_equals,
-                starts_with_factory=DeploymentRevisionPresetConditions.by_name_starts_with,
-                ends_with_factory=DeploymentRevisionPresetConditions.by_name_ends_with,
-                in_factory=DeploymentRevisionPresetConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
+        fields = DeploymentPresetSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter_.id, fields.id.filter),
+            *self.apply_uuid_filter(filter_.runtime_variant_id, fields.runtime_variant_id.filter),
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -492,16 +522,17 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:
+        fields = DeploymentPresetSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction.value == "ASC"
             match order.field:
                 case DeploymentRevisionPresetOrderField.NAME:
-                    result.append(DeploymentRevisionPresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case DeploymentRevisionPresetOrderField.RANK:
-                    result.append(DeploymentRevisionPresetOrders.rank(ascending))
+                    result.append(fields.rank.order.apply(ascending))
                 case DeploymentRevisionPresetOrderField.CREATED_AT:
-                    result.append(DeploymentRevisionPresetOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
         return result
 
     @staticmethod
@@ -583,6 +614,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         ]
         return DeploymentRevisionPresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             runtime_variant_id=data.runtime_variant_id,
             name=data.name,
             description=data.description,

@@ -13,6 +13,9 @@ from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.searchable_fields import (
+    VFSStorageSearchableFields,
+)
 from ai.backend.manager.types import OptionalState
 
 
@@ -51,4 +54,4 @@ class VFSStorageUpdater(DataUpdater[VFSStorageRow, VFSStorageData]):
 
     @override
     def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return row.to_dataclass()
+        return VFSStorageSearchableFields.own.to_data(row)

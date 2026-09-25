@@ -8,12 +8,13 @@ from enum import StrEnum
 from uuid import UUID
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType, EntityType
 from ai.backend.common.data.permission.types import (
     Permission,
     RoleSource,
     RoleStatus,
 )
+from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
@@ -118,26 +119,21 @@ class RoleStatusFilter(BaseRequestModel):
     not_in: list[str] | None = None
 
 
-class PermissionBitFilter(BaseRequestModel):
+class PermissionBitFilter(EnumFilter[PermissionBitDTO]):
     """Filter for a permission-bit column over ``PermissionBitDTO``."""
-
-    equals: PermissionBitDTO | None = None
-    in_: list[PermissionBitDTO] | None = None
-    not_equals: PermissionBitDTO | None = None
-    not_in: list[PermissionBitDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):
     """Scope reference for associating an entity with a scope."""
 
-    scope_type: EntityType
+    scope_type: DeclaredEntityType
     scope_id: str
 
 
 class EntityTypeScope(BaseRequestModel):
     """A typed (entity type, id) pair naming one entity."""
 
-    entity_type: EntityType
+    entity_type: DeclaredEntityType
     entity_id: str
 
 

@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardResourceRequirementData
-from ai.backend.manager.models.model_card.scopes import ModelCardResourceRequirementOperationScope
+from ai.backend.manager.models.model_card.scopes import ModelCardResourceRequirementTarget
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
 )
@@ -43,8 +43,7 @@ class ScopedSearchModelCardResourceRequirementsAction(
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
         return [
-            ModelCardResourceRequirementOperationScope(model_card_id=card_id)
-            for card_id in self.card_ids
+            ModelCardResourceRequirementTarget(model_card_id=card_id) for card_id in self.card_ids
         ]
 
     @override

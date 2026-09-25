@@ -10,8 +10,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import ResourceGroupConflict
@@ -21,7 +19,6 @@ from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     ResourceGroupData,
     ResourceGroupDriverConfig,
-    ResourceGroupListResult,
     ResourceGroupMetadata,
     ResourceGroupNetworkConfig,
     ResourceGroupSchedulerConfig,
@@ -37,17 +34,13 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.resource_group import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.scopes import UserResourceGroupTarget
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import check_resource_group
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
     GetWsproxyVersionAction,
-)
-from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
-    SearchResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.update import (
     UpdateResourceGroupAction,
@@ -145,166 +138,6 @@ class TestScalingGroupService:
             scheduler_opts=scheduler_opts,
             use_host_network=True,
         )
-
-    async def test_search_scaling_groups_with_default_querier(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-        sample_scaling_group: ResourceGroupData,
-    ) -> None:
-        """Test searching scaling groups with default querier"""
-        mock_repository.search_resource_groups = AsyncMock(
-            return_value=ResourceGroupListResult(
-                items=[sample_scaling_group],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchResourceGroupsAction(querier=querier)
-        result = await resource_group_service.search_resource_groups(action)
-
-        assert result.resource_groups == [sample_scaling_group]
-        assert result.total_count == 1
-        mock_repository.search_resource_groups.assert_called_once_with(querier=querier)
-
-    async def test_search_scaling_groups_with_querier(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-        sample_scaling_group: ResourceGroupData,
-    ) -> None:
-        """Test searching scaling groups with querier"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        mock_repository.search_resource_groups = AsyncMock(
-            return_value=ResourceGroupListResult(
-                items=[sample_scaling_group],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchResourceGroupsAction(querier=querier)
-        result = await resource_group_service.search_resource_groups(action)
-
-        assert result.resource_groups == [sample_scaling_group]
-        assert result.total_count == 1
-        mock_repository.search_resource_groups.assert_called_once_with(querier=querier)
-
-    async def test_search_scaling_groups_with_multiple_results(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test searching scaling groups with multiple results"""
-        resource_groups = [
-            ResourceGroupData(
-                id=ResourceGroupID(uuid.uuid4()),
-                name=f"sgroup-{i}",
-                status=ResourceGroupStatus(
-                    is_active=True,
-                    is_public=True,
-                    is_default=False,
-                ),
-                metadata=ResourceGroupMetadata(
-                    description=f"Scaling group {i}",
-                    created_at=datetime.now(tz=UTC),
-                ),
-                network=ResourceGroupNetworkConfig(
-                    wsproxy_addr="",
-                    wsproxy_api_token="",
-                    use_host_network=False,
-                ),
-                driver=ResourceGroupDriverConfig(
-                    name="static",
-                    options={},
-                ),
-                scheduler=ResourceGroupSchedulerConfig(
-                    name=SchedulerType.FIFO,
-                    options=ResourceGroupSchedulerOptions(
-                        allowed_session_types=[
-                            SessionTypes.INTERACTIVE,
-                            SessionTypes.BATCH,
-                            SessionTypes.INFERENCE,
-                        ],
-                        pending_timeout=timedelta(seconds=0),
-                        config={},
-                        agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
-                        agent_selector_config={},
-                        allow_fractional_resource_fragmentation=True,
-                        route_cleanup_target_statuses=["unhealthy"],
-                    ),
-                ),
-                fair_share_spec=FairShareResourceGroupSpec(
-                    half_life_days=7,
-                    lookback_days=28,
-                    decay_unit_days=1,
-                    default_weight=Decimal("1.0"),
-                    resource_weights=ResourceSlot(),
-                ),
-                default_deployment_options=DeploymentOptions(),
-                default_session_options=DefaultSessionOptions(),
-            )
-            for i in range(3)
-        ]
-
-        mock_repository.search_resource_groups = AsyncMock(
-            return_value=ResourceGroupListResult(
-                items=resource_groups,
-                total_count=3,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchResourceGroupsAction(querier=querier)
-        result = await resource_group_service.search_resource_groups(action)
-
-        assert len(result.resource_groups) == 3
-        assert result.total_count == 3
-        assert result.resource_groups == resource_groups
-
-    async def test_search_scaling_groups_with_empty_result(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test searching scaling groups with empty result"""
-        mock_repository.search_resource_groups = AsyncMock(
-            return_value=ResourceGroupListResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchResourceGroupsAction(querier=querier)
-        result = await resource_group_service.search_resource_groups(action)
-
-        assert result.resource_groups == []
-        assert result.total_count == 0
 
     # Create Tests
 
@@ -502,7 +335,9 @@ class TestGetWsproxyVersion:
         sample_sgroup_with_wsproxy: ResourceGroupData,
     ) -> None:
         """Accessible scaling group returns wsproxy version string."""
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[sample_sgroup_with_wsproxy])
+        mock_repository.list_active_resource_groups = AsyncMock(
+            return_value=[sample_sgroup_with_wsproxy]
+        )
         mock_client = AsyncMock()
         mock_status = MagicMock()
         mock_status.api_version = "v2.0.0"
@@ -511,9 +346,7 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         result = await resource_group_service.get_wsproxy_version(action)
@@ -529,13 +362,11 @@ class TestGetWsproxyVersion:
         mock_repository: MagicMock,
     ) -> None:
         """Non-allowed scaling group raises ResourceGroupNotFound."""
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[])
+        mock_repository.list_active_resource_groups = AsyncMock(return_value=[])
 
         action = GetWsproxyVersionAction(
             resource_group_name="nonexistent-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         with pytest.raises(ResourceGroupNotFound):
@@ -564,13 +395,11 @@ class TestGetWsproxyVersion:
             default_deployment_options=DeploymentOptions(),
             default_session_options=DefaultSessionOptions(),
         )
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[no_wsproxy])
+        mock_repository.list_active_resource_groups = AsyncMock(return_value=[no_wsproxy])
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         result = await resource_group_service.get_wsproxy_version(action)
@@ -585,9 +414,7 @@ class TestGetWsproxyVersion:
 
         action = GetWsproxyVersionAction(
             resource_group_name="gpu-group",
-            domain_id=DomainID(uuid.uuid4()),
-            project_ids=[ProjectID(uuid.uuid4())],
-            user_id=UserID(uuid.uuid4()),
+            targets=[UserResourceGroupTarget(user_id=UserID(uuid.uuid4()))],
         )
 
         with pytest.raises(ObjectNotFound):

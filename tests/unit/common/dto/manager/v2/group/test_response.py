@@ -29,6 +29,7 @@ def make_project_node(project_id: uuid.UUID | None = None) -> ProjectNode:
     now = datetime.now(tz=UTC)
     return ProjectNode(
         id=project_id,
+        entity_id=project_id,
         basic_info=ProjectBasicInfo(
             name="test-project",
             description="Test project",

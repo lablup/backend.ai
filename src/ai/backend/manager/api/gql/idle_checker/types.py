@@ -216,6 +216,12 @@ class IdleCheckerGQL(PydanticNodeMixin[IdleCheckerNode]):
     id: NodeID[str] = gql_field(
         description="Relay global node identifier backed by the idle checker's UUID."
     )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the idle checker.",
+        ),
+    )
     name: str = gql_field(description="Idle checker name.")
     description: str | None = gql_field(description="Optional description.")
     checker_type: IdleCheckerTypeGQL = gql_field(description="Checker implementation type.")

@@ -8,11 +8,12 @@ from typing import Any, override
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionData, SessionEntityData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.utils import sql_json_merge
@@ -82,9 +83,10 @@ class SessionStatusBatchUpdater(DataBatchUpdater[SessionRow, SessionEntityData])
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        conditions = [SessionConditions.by_ids(self.session_ids)]
+        fields = SessionSearchableFields.own
+        conditions = [fields.id.filter.in_(UUIDInMatchSpec(values=self.session_ids, negated=False))]
         if self.except_statuses:
-            conditions.append(SessionConditions.by_status_not_in(self.except_statuses))
+            conditions.append(fields.status.filter.not_in(self.except_statuses))
         return conditions
 
     @property
@@ -107,6 +109,7 @@ class SessionStatusBatchUpdater(DataBatchUpdater[SessionRow, SessionEntityData])
 
         if self.to_status == SessionStatus.RUNNING:
             values["starts_at"] = self.status_changed_at
+            values["status_info"] = None
         elif self.to_status == SessionStatus.TERMINATED:
             values["terminated_at"] = self.status_changed_at
         elif self.to_status == SessionStatus.PENDING:
@@ -117,4 +120,4 @@ class SessionStatusBatchUpdater(DataBatchUpdater[SessionRow, SessionEntityData])
 
     @override
     def to_data(self, row: SessionRow) -> SessionEntityData:
-        return row.to_entity_data()
+        return SessionSearchableFields.own.to_data(row)

@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigDefinitionNode",
@@ -21,6 +22,9 @@ class AppConfigDefinitionNode(BaseResponseModel):
     """Node model representing a registered app config definition."""
 
     id: UUID = Field(description="App config definition UUID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the app config definition. Added in {NEXT_RELEASE_VERSION}.",
+    )
     config_name: str = Field(description="Registered config name.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")

@@ -36,8 +36,8 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
-from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
-    SuperAdminActionValidator,
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -68,10 +68,8 @@ from ai.backend.manager.data.model_serving.types import ScalingState
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.services.deployment.actions.scoped_search import (
-    ScopedSearchDeploymentsActionResult,
-)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
 DENIED_TOKEN = DeploymentTokenID(uuid4())
@@ -148,11 +146,11 @@ class _RecordingScopeValidator(ScopeActionValidator):
 
 
 class TestDeploymentSearchGates:
-    """my/project searches are answered by the scope gate, not the superadmin gate.
+    """my/project searches are answered by the scope gate, not the global one.
 
-    The processors come from the production wiring with the global gate kept as is and
-    the scope gate replaced by a recorder, so a regular user's search passing proves it
-    left the global (superadmin) path and names the scope it is answered for.
+    The processors come from the production wiring with the global gate replaced by a
+    refusal and the scope gate by a recorder, so a regular user's search passing proves
+    it left the global path and names the scope it is answered for.
     """
 
     @pytest.fixture
@@ -173,22 +171,27 @@ class TestDeploymentSearchGates:
 
     @pytest.fixture
     def adapter(self, scope_gate: _RecordingScopeValidator) -> DeploymentAdapter:
+        read_ops = MagicMock()
+        read_ops.scoped_search = AsyncMock(
+            return_value=SearcherResult(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        )
+        ops_provider = MagicMock()
+        ops_provider.read_ops.return_value.__aenter__ = AsyncMock(return_value=read_ops)
+        ops_provider.read_ops.return_value.__aexit__ = AsyncMock(return_value=False)
+        repository: OpsRepository[Any] = OpsRepository(ops_provider)
         registry: ProcessorRegistry[Any] = ProcessorRegistry(
             ProcessorDependencies(
                 monitors=ActionMonitors(),
                 validators=ActionValidators(
                     scope=[scope_gate],
-                    global_scope=[SuperAdminActionValidator()],
+                    global_scope=[RefusingGlobalActionValidator()],
                 ),
-                repository=OpsRepository(MagicMock()),
+                repository=repository,
             )
         )
         service = MagicMock()
-        service.scoped_search_deployments = AsyncMock(
-            return_value=ScopedSearchDeploymentsActionResult(
-                data=[], total_count=0, has_next_page=False, has_previous_page=False
-            )
-        )
         processors = MagicMock()
         processors.deployment = DeploymentProcessors(
             registry.group(GroupMeta(DeploymentEntityType())), service

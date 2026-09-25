@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
+    ProjectDomainFilter,
     ProjectOrderField,
     ProjectScope,
     ProjectType,
@@ -55,20 +56,30 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.project.conditions import ProjectConditions
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.orders import ProjectOrders
+from ai.backend.manager.models.project.deprecated_search import (
+    DeprecatedProjectConditions,
+    DeprecatedProjectOrders,
+)
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.scopes import (
+    DomainProjectTarget,
+    ProjectTarget,
+    UserProjectTarget,
+)
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.project.updaters import (
     ProjectRestoreUpdater,
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
@@ -77,10 +88,7 @@ from ai.backend.manager.services.project.actions.delete_project import DeletePro
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
-    DomainProjectScopeItem,
-    ProjectScopeItem,
     ScopedSearchProjectsAction,
-    UserProjectScopeItem,
 )
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
@@ -100,15 +108,8 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectOrders.created_at(ascending=False),
-    backward_order=ProjectOrders.created_at(ascending=True),
-    forward_condition_factory=lambda cursor_id: ProjectConditions.by_cursor_forward(
-        UUID(cursor_id)
-    ),
-    backward_condition_factory=lambda cursor_id: ProjectConditions.by_cursor_backward(
-        UUID(cursor_id)
-    ),
-    tiebreaker_order=ProjectRow.id.asc(),
+    forward_order=ProjectSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=ProjectRow.id,
 )
 
 
@@ -182,7 +183,7 @@ class ProjectAdapter(BaseAdapter):
         )
 
         result = await self._project.global_search.run(
-            GlobalSearchProjectsAction(searcher=searcher)
+            GlobalSearchProjectsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchGroupsPayload(
@@ -290,7 +291,11 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                items=[DomainProjectScopeItem(domain_id=domain_id)], searcher=searcher
+                searcher=ScopedSearcher(
+                    scopes=[DomainProjectTarget(domain_id=domain_id)],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
 
@@ -301,15 +306,13 @@ class ProjectAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    def _scope_items(self, scope: ProjectScope) -> list[ProjectScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[ProjectScopeItem] = [
-            DomainProjectScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: ProjectScope) -> list[ProjectTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[ProjectTarget] = [
+            DomainProjectTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            UserProjectScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
-        )
-        return items
+        targets.extend(UserProjectTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return targets
 
     async def scoped_search(
         self,
@@ -331,7 +334,11 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project.scoped_search.run(
-            ScopedSearchProjectsAction(items=self._scope_items(input.scope), searcher=searcher)
+            ScopedSearchProjectsAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope), used_by=(), searcher=searcher
+                )
+            )
         )
         return AdminSearchGroupsPayload(
             items=[self._group_data_to_node(item) for item in result.items],
@@ -363,7 +370,9 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                items=[UserProjectScopeItem(user_id=user_id)], searcher=searcher
+                searcher=ScopedSearcher(
+                    scopes=[UserProjectTarget(user_id=user_id)], used_by=(), searcher=searcher
+                )
             )
         )
 
@@ -402,46 +411,20 @@ class ProjectAdapter(BaseAdapter):
         return [UserAdapter._user_data_to_node(user, keys.get(UserID(user.id))) for user in users]
 
     def _convert_group_filter(self, filter: ProjectFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.id is not None:
-            condition = self._convert_id_filter(filter.id)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.name is not None:
-            condition = self._convert_name_filter(filter.name)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.domain_name is not None:
-            condition = self._convert_domain_name_filter(filter.domain_name)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.type is not None:
-            conditions.extend(self._convert_type_filter(filter.type))
-
-        if filter.is_active is not None:
-            conditions.append(ProjectConditions.by_is_active(filter.is_active))
-
-        if filter.created_at is not None:
-            condition = self._convert_created_at_filter(filter.created_at)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.modified_at is not None:
-            condition = self._convert_modified_at_filter(filter.modified_at)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.domain is not None:
-            conditions.extend(
-                self._convert_domain_nested_filter(filter.domain.name, filter.domain.is_active)
-            )
-
-        if filter.user is not None:
-            conditions.extend(self._convert_user_nested_filter(filter.user))
+        fields = ProjectSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(filter.domain_name, fields.domain_name.filter),
+            *self.apply_string_filter(filter.description, fields.description.filter),
+            *self.apply_string_filter(filter.integration_name, fields.integration_name.filter),
+            *self._convert_type_filter(filter.type),
+            *self.apply_bool_filter(filter.is_active, fields.is_active.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.modified_at, fields.modified_at.filter),
+            *self._convert_domain_nested_filter(filter.domain),
+            *self._convert_user_nested_filter(filter.user),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -463,137 +446,100 @@ class ProjectAdapter(BaseAdapter):
 
         return conditions
 
-    def _convert_id_filter(self, uuid_filter: UUIDFilter) -> QueryCondition | None:
-        return self.convert_uuid_filter(
-            uuid_filter,
-            equals_factory=ProjectConditions.by_id_equals,
-            in_factory=ProjectConditions.by_id_in,
-        )
-
-    def _convert_name_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ProjectConditions.by_name_contains,
-            equals_factory=ProjectConditions.by_name_equals,
-            starts_with_factory=ProjectConditions.by_name_starts_with,
-            ends_with_factory=ProjectConditions.by_name_ends_with,
-            in_factory=ProjectConditions.by_name_in,
-        )
-
-    def _convert_domain_name_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ProjectConditions.by_domain_name_contains,
-            equals_factory=ProjectConditions.by_domain_name_equals,
-            starts_with_factory=ProjectConditions.by_domain_name_starts_with,
-            ends_with_factory=ProjectConditions.by_domain_name_ends_with,
-            in_factory=ProjectConditions.by_domain_name_in,
-        )
-
-    @staticmethod
-    def _convert_type_filter(type_filter: ProjectTypeFilter) -> list[QueryCondition]:
+    def _convert_type_filter(self, type_filter: ProjectTypeFilter | None) -> list[QueryCondition]:
+        if type_filter is None:
+            return []
         conditions: list[QueryCondition] = []
+        type_conditions = ProjectSearchableFields.own.type.filter
         if type_filter.equals is not None:
-            conditions.append(
-                ProjectConditions.by_type_equals(DataProjectType(type_filter.equals.value))
-            )
+            conditions.append(type_conditions.equals(DataProjectType(type_filter.equals.value)))
         if type_filter.in_ is not None:
             conditions.append(
-                ProjectConditions.by_type_in([DataProjectType(t.value) for t in type_filter.in_])
+                type_conditions.in_([DataProjectType(t.value) for t in type_filter.in_])
             )
         if type_filter.not_equals is not None:
             conditions.append(
-                negate_conditions([
-                    ProjectConditions.by_type_equals(DataProjectType(type_filter.not_equals.value))
-                ])
+                type_conditions.not_equals(DataProjectType(type_filter.not_equals.value))
             )
         if type_filter.not_in is not None:
             conditions.append(
-                negate_conditions([
-                    ProjectConditions.by_type_in([
-                        DataProjectType(t.value) for t in type_filter.not_in
-                    ])
-                ])
+                type_conditions.not_in([DataProjectType(t.value) for t in type_filter.not_in])
             )
         return conditions
 
-    @staticmethod
-    def _convert_created_at_filter(dt_filter: DateTimeFilter) -> QueryCondition | None:
-        return dt_filter.build_query_condition(
-            before_factory=ProjectConditions.by_created_at_before,
-            after_factory=ProjectConditions.by_created_at_after,
-            equals_factory=ProjectConditions.by_created_at_equals,
-        )
-
-    @staticmethod
-    def _convert_modified_at_filter(dt_filter: DateTimeFilter) -> QueryCondition | None:
-        return dt_filter.build_query_condition(
-            before_factory=ProjectConditions.by_modified_at_before,
-            after_factory=ProjectConditions.by_modified_at_after,
-            equals_factory=ProjectConditions.by_modified_at_equals,
-        )
-
-    @staticmethod
     def _convert_domain_nested_filter(
-        name_filter: StringFilter | None,
-        is_active: bool | None,
+        self, domain_filter: ProjectDomainFilter | None
     ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if name_filter is not None:
-            condition = name_filter.build_query_condition(
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if is_active is not None:
-            raw_conditions.append(DomainConditions.by_is_active(is_active))
+        """The domain conditions, gathered into one EXISTS on the holding domain row."""
+        if domain_filter is None:
+            return []
+        fields = DomainSearchableFields.own
+        raw_conditions = [
+            *self.apply_string_filter(domain_filter.name, fields.name.filter),
+            *self.apply_bool_filter(domain_filter.is_active, fields.is_active.filter),
+        ]
         if not raw_conditions:
             return []
-        return [ProjectConditions.exists_domain_combined(raw_conditions)]
+        return [DeprecatedProjectConditions.exists_domain_combined(raw_conditions)]
 
-    @staticmethod
-    def _convert_user_nested_filter(user_filter: ProjectUserFilter) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if user_filter.id is not None:
-            condition = user_filter.id.build_query_condition(
-                equals_factory=ProjectConditions.by_user_id_equals,
-                in_factory=ProjectConditions.by_user_id_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.username is not None:
-            condition = user_filter.username.build_query_condition(
-                contains_factory=ProjectConditions.by_user_username_contains,
-                equals_factory=ProjectConditions.by_user_username_equals,
-                starts_with_factory=ProjectConditions.by_user_username_starts_with,
-                ends_with_factory=ProjectConditions.by_user_username_ends_with,
-                in_factory=ProjectConditions.by_user_username_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.email is not None:
-            condition = user_filter.email.build_query_condition(
-                contains_factory=ProjectConditions.by_user_email_contains,
-                equals_factory=ProjectConditions.by_user_email_equals,
-                starts_with_factory=ProjectConditions.by_user_email_starts_with,
-                ends_with_factory=ProjectConditions.by_user_email_ends_with,
-                in_factory=ProjectConditions.by_user_email_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.is_active is not None:
-            raw_conditions.append(ProjectConditions.by_user_is_active(user_filter.is_active))
-        if not raw_conditions:
+    def _convert_user_nested_filter(
+        self, user_filter: ProjectUserFilter | None
+    ) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one enrolled member."""
+        if user_filter is None:
             return []
-        return [ProjectConditions.exists_user_combined(raw_conditions)]
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(user_filter.id, fields.uuid.filter),
+            *self.apply_string_filter(user_filter.username, fields.username.filter),
+            *self.apply_string_filter(user_filter.email, fields.email.filter),
+            *self._convert_member_active_filter(user_filter.is_active),
+        ]
+        if not conditions:
+            return []
+        return [DeprecatedProjectConditions.exists_user_combined(conditions)]
 
-    @staticmethod
-    def _convert_orders(order: list[ProjectOrder]) -> list[QueryOrder]:
-        return [_resolve_order(o.field, o.direction) for o in order]
+    def _convert_member_active_filter(self, is_active: bool | None) -> list[QueryCondition]:
+        """Active means the member's account status is ACTIVE."""
+        if is_active is None:
+            return []
+        status = UserSearchableFields.own.status.filter
+        if is_active:
+            return [status.equals(UserStatus.ACTIVE)]
+        return [status.not_equals(UserStatus.ACTIVE)]
+
+    def _convert_orders(self, order: list[ProjectOrder]) -> list[QueryOrder]:
+        return [self._convert_order(o) for o in order]
+
+    def _convert_order(self, order: ProjectOrder) -> QueryOrder:
+        """The query order one requested order field names."""
+        fields = ProjectSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ProjectOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case ProjectOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case ProjectOrderField.MODIFIED_AT:
+                return fields.modified_at.order.apply(ascending)
+            case ProjectOrderField.IS_ACTIVE:
+                return fields.is_active.order.apply(ascending)
+            case ProjectOrderField.TYPE:
+                return fields.type.order.apply(ascending)
+            case ProjectOrderField.DOMAIN_NAME:
+                return fields.domain_name.order.apply(ascending)
+            case ProjectOrderField.ID:
+                return fields.id.order.apply(ascending)
+            case ProjectOrderField.DESCRIPTION:
+                return fields.description.order.apply(ascending)
+            case ProjectOrderField.INTEGRATION_NAME:
+                return fields.integration_name.order.apply(ascending)
+            case ProjectOrderField.USER_USERNAME:
+                return DeprecatedProjectOrders.by_user_username(ascending)
+            case ProjectOrderField.USER_EMAIL:
+                return DeprecatedProjectOrders.by_user_email(ascending)
+            case _:
+                assert_never(order.field)
 
     @staticmethod
     def _group_data_to_node(data: ProjectData) -> ProjectNode:
@@ -608,6 +554,7 @@ class ProjectAdapter(BaseAdapter):
 
         return ProjectNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=ProjectBasicInfo(
                 name=data.name,
                 description=data.description,
@@ -627,25 +574,3 @@ class ProjectAdapter(BaseAdapter):
                 modified_at=data.modified_at,
             ),
         )
-
-
-def _resolve_order(field: ProjectOrderField, direction: OrderDirection) -> QueryOrder:
-    """Resolve a ProjectOrderField + OrderDirection pair to a QueryOrder."""
-    ascending = direction == OrderDirection.ASC
-    match field:
-        case ProjectOrderField.NAME:
-            return ProjectOrders.name(ascending)
-        case ProjectOrderField.CREATED_AT:
-            return ProjectOrders.created_at(ascending)
-        case ProjectOrderField.MODIFIED_AT:
-            return ProjectOrders.modified_at(ascending)
-        case ProjectOrderField.IS_ACTIVE:
-            return ProjectOrders.is_active(ascending)
-        case ProjectOrderField.TYPE:
-            return ProjectOrders.type(ascending)
-        case ProjectOrderField.DOMAIN_NAME:
-            return ProjectOrders.by_domain_name(ascending)
-        case ProjectOrderField.USER_USERNAME:
-            return ProjectOrders.by_user_username(ascending)
-        case ProjectOrderField.USER_EMAIL:
-            return ProjectOrders.by_user_email(ascending)

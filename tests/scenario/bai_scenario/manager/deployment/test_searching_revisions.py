@@ -1,7 +1,5 @@
-"""리비전 훑기 — 한 배포 안을 훑는 문은 그 배포의 읽기 권한이, 나머지 둘은 역할이 지킨다.
-
-자원 슬롯 훑기는 리비전 하나를 가리키는데도 역할이 지킨다. 그 리비전을 읽을 수 있는
-사람이 슬롯은 못 본다는 뜻이라 짝을 둔다.
+"""리비전 훑기 — 한 배포 안을 훑는 문과 리비전 하나의 자원 슬롯을 훑는 문은 그 배포의
+읽기 권한이, 전체 리비전을 훑는 문은 역할이 지킨다.
 """
 
 from __future__ import annotations
@@ -29,6 +27,7 @@ from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import RevisionOperationScope
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -281,46 +280,18 @@ class AReadGrantDoesNotOpenTheGlobalDoor(
 
 
 @dataclass(frozen=True)
-class TheSuperadminCountsARevisionsSlots(
+class TheGrantedUserCountsARevisionsSlots(
     Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-counts-every-slot-a-revision-allocates"
+        return "a-user-granted-read-counts-every-slot-a-revision-allocates"
 
     @override
     def describe(self) -> str:
         return (
-            "슬롯 둘을 잡은 리비전의 슬롯을 슈퍼관리자가 훑으면, 둘을 모두 센다. "
-            "이 문은 역할이 지킨다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
-        return ADeploymentToRevise(role=UserRole.SUPERADMIN, revisions=1)
-
-    @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Slots]:
-        return SearchingTheSlots()
-
-    @override
-    def then(self) -> Then[RevisionsAndACaller, Slots]:
-        return EveryRevisionSlotIsCounted()
-
-
-@dataclass(frozen=True)
-class AReadGrantDoesNotOpenTheSlots(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-read-may-not-search-a-revisions-slots"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 그 리비전의 슬롯을 훑으면, "
-            "역할로 거부된다. 리비전은 읽어도 슬롯은 못 본다"
+            "슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 "
+            "훑으면, 둘을 모두 센다"
         )
 
     @override
@@ -333,7 +304,35 @@ class AReadGrantDoesNotOpenTheSlots(
 
     @override
     def then(self) -> Then[RevisionsAndACaller, Slots]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return EveryRevisionSlotIsCounted()
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotSearchTheSlots(
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-search-a-revisions-slots"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, "
+            "리비전을 찾을 수 없다는 답으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+        return ADeploymentToRevise(revisions=1)
+
+    @override
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Slots]:
+        return SearchingTheSlots()
+
+    @override
+    def then(self) -> Then[RevisionsAndACaller, Slots]:
+        return TheCallIsRefused(GenericBadRequest)
 
 
 SCENARIOS: list[SearchingStep] = [
@@ -346,8 +345,8 @@ SCENARIOS: list[SearchingStep] = [
 ]
 
 SLOT_SCENARIOS: list[SlotStep] = [
-    TheSuperadminCountsARevisionsSlots(),
-    AReadGrantDoesNotOpenTheSlots(),
+    TheGrantedUserCountsARevisionsSlots(),
+    AUserGrantedNothingMayNotSearchTheSlots(),
 ]
 
 

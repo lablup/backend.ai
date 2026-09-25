@@ -37,11 +37,16 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -53,6 +58,7 @@ from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
@@ -61,11 +67,16 @@ DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 
 
 @pytest.fixture()
-def config_registry(database_engine: ExtendedAsyncSAEngine) -> ProcessorRegistry[Any]:
+def config_registry(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorRegistry[Any]:
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )
@@ -82,7 +93,7 @@ def server_module_registries(
     v2_ops = V2DBOpsProvider(database_engine)
     domain = DomainProcessors(
         config_registry.group(GroupMeta(DomainEntityType())),
-        DomainService(DomainRepository(database_engine, v2_ops)),
+        DomainService(DomainRepository(database_engine, DomainOpsProvider(database_engine))),
     )
     project = ProjectProcessors(
         config_registry.group(GroupMeta(ProjectEntityType())),
@@ -92,7 +103,12 @@ def server_module_registries(
             MagicMock(),
             MagicMock(
                 repository=ProjectRepository(
-                    database_engine, v2_ops, MagicMock(), MagicMock(), MagicMock()
+                    database_engine,
+                    v2_ops,
+                    ResourcePolicyOpsProvider(database_engine),
+                    MagicMock(),
+                    MagicMock(),
+                    MagicMock(),
                 )
             ),
         ),
@@ -107,6 +123,7 @@ def server_module_registries(
                 database_engine,
                 v2_ops,
                 ShareOpsProvider(database_engine),
+                ResourcePolicyOpsProvider(database_engine),
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ),
             MagicMock(),

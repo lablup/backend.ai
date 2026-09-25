@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from ai.backend.common.data.filter_specs import StringInMatchSpec
 from ai.backend.common.dto.manager.scheduling_history import (
     DeploymentHistoryDTO,
     DeploymentHistoryFilter,
@@ -33,16 +34,18 @@ from ai.backend.manager.data.session.types import (
     SubStepResult,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.scheduling_history.conditions import (
-    DeploymentHistoryConditions,
-    RouteHistoryConditions,
-    SessionSchedulingHistoryConditions,
+from ai.backend.manager.models.scheduling_history.deprecated_search import (
+    DeprecatedDeploymentHistoryConditions,
+    DeprecatedRouteHistoryConditions,
+    DeprecatedSessionSchedulingHistoryConditions,
 )
-from ai.backend.manager.models.scheduling_history.orders import (
-    DeploymentHistoryOrders,
-    RouteHistoryOrders,
-    SessionSchedulingHistoryOrders,
+from ai.backend.manager.models.scheduling_history.searchable_fields import (
+    DeploymentHistorySearchableFields,
+    RouteHistorySearchableFields,
+    SessionSchedulingHistorySearchableFields,
 )
+from ai.backend.manager.models.specs.conditions.enum import EnumConditions
+from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -65,79 +68,29 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_session_filter(self, filter: SessionHistoryFilter) -> list[QueryCondition]:
         """Convert session history filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter.session_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.session_id,
-                equals_factory=SessionSchedulingHistoryConditions.by_session_id_filter,
-                in_factory=SessionSchedulingHistoryConditions.by_session_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=SessionSchedulingHistoryConditions.by_phase_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
-                in_factory=SessionSchedulingHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.from_status is not None and len(filter.from_status) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_from_statuses(filter.from_status)
-            )
-
-        if filter.to_status is not None and len(filter.to_status) > 0:
-            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(filter.to_status))
-
-        if filter.result is not None and len(filter.result) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_results([
-                    self._convert_result_type(r) for r in filter.result
-                ])
-            )
-
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=SessionSchedulingHistoryConditions.by_error_code_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
-                in_factory=SessionSchedulingHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=SessionSchedulingHistoryConditions.by_message_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
-                in_factory=SessionSchedulingHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = SessionSchedulingHistorySearchableFields.own
+        return [
+            *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._result_in(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(
+                filter.message, DeprecatedSessionSchedulingHistoryConditions.message
+            ),
+        ]
 
     def _convert_session_order(self, order: SessionHistoryOrder) -> QueryOrder:
         """Convert session history order specification to query order."""
+        fields = SessionSchedulingHistorySearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
             case SessionHistoryOrderField.CREATED_AT:
-                return SessionSchedulingHistoryOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case SessionHistoryOrderField.UPDATED_AT:
-                return SessionSchedulingHistoryOrders.updated_at(ascending=ascending)
+                return fields.updated_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -174,77 +127,29 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_deployment_filter(self, filter: DeploymentHistoryFilter) -> list[QueryCondition]:
         """Convert deployment history filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter.deployment_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.deployment_id,
-                equals_factory=DeploymentHistoryConditions.by_deployment_id_filter,
-                in_factory=DeploymentHistoryConditions.by_deployment_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=DeploymentHistoryConditions.by_phase_contains,
-                equals_factory=DeploymentHistoryConditions.by_phase_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
-                in_factory=DeploymentHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.from_status is not None and len(filter.from_status) > 0:
-            conditions.append(DeploymentHistoryConditions.by_from_statuses(filter.from_status))
-
-        if filter.to_status is not None and len(filter.to_status) > 0:
-            conditions.append(DeploymentHistoryConditions.by_to_statuses(filter.to_status))
-
-        if filter.result is not None and len(filter.result) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_results([
-                    self._convert_result_type(r) for r in filter.result
-                ])
-            )
-
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=DeploymentHistoryConditions.by_error_code_contains,
-                equals_factory=DeploymentHistoryConditions.by_error_code_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
-                in_factory=DeploymentHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=DeploymentHistoryConditions.by_message_contains,
-                equals_factory=DeploymentHistoryConditions.by_message_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
-                in_factory=DeploymentHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = DeploymentHistorySearchableFields.own
+        return [
+            *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._result_in(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(
+                filter.message, DeprecatedDeploymentHistoryConditions.message
+            ),
+        ]
 
     def _convert_deployment_order(self, order: DeploymentHistoryOrder) -> QueryOrder:
         """Convert deployment history order specification to query order."""
+        fields = DeploymentHistorySearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
             case DeploymentHistoryOrderField.CREATED_AT:
-                return DeploymentHistoryOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case DeploymentHistoryOrderField.UPDATED_AT:
-                return DeploymentHistoryOrders.updated_at(ascending=ascending)
+                return fields.updated_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -279,88 +184,53 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
 
     def _convert_route_filter(self, filter: RouteHistoryFilter) -> list[QueryCondition]:
         """Convert route history filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter.route_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.route_id,
-                equals_factory=RouteHistoryConditions.by_route_id_filter,
-                in_factory=RouteHistoryConditions.by_route_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.deployment_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.deployment_id,
-                equals_factory=RouteHistoryConditions.by_deployment_id_filter,
-                in_factory=RouteHistoryConditions.by_deployment_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.phase is not None:
-            condition = self.convert_string_filter(
-                filter.phase,
-                contains_factory=RouteHistoryConditions.by_phase_contains,
-                equals_factory=RouteHistoryConditions.by_phase_equals,
-                starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
-                in_factory=RouteHistoryConditions.by_phase_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.from_status is not None and len(filter.from_status) > 0:
-            conditions.append(RouteHistoryConditions.by_from_statuses(filter.from_status))
-
-        if filter.to_status is not None and len(filter.to_status) > 0:
-            conditions.append(RouteHistoryConditions.by_to_statuses(filter.to_status))
-
-        if filter.result is not None and len(filter.result) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_results([
-                    self._convert_result_type(r) for r in filter.result
-                ])
-            )
-
-        if filter.error_code is not None:
-            condition = self.convert_string_filter(
-                filter.error_code,
-                contains_factory=RouteHistoryConditions.by_error_code_contains,
-                equals_factory=RouteHistoryConditions.by_error_code_equals,
-                starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
-                in_factory=RouteHistoryConditions.by_error_code_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.message is not None:
-            condition = self.convert_string_filter(
-                filter.message,
-                contains_factory=RouteHistoryConditions.by_message_contains,
-                equals_factory=RouteHistoryConditions.by_message_equals,
-                starts_with_factory=RouteHistoryConditions.by_message_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_message_ends_with,
-                in_factory=RouteHistoryConditions.by_message_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = RouteHistorySearchableFields.own
+        return [
+            *self.apply_uuid_filter(filter.route_id, fields.route_id.filter),
+            *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
+            *self.apply_string_filter(filter.phase, fields.phase.filter),
+            *self._status_in(filter.from_status, fields.from_status.filter),
+            *self._status_in(filter.to_status, fields.to_status.filter),
+            *self._result_in(filter.result, fields.result.filter),
+            *self.apply_string_filter(filter.error_code, fields.error_code.filter),
+            *self.apply_string_filter(filter.message, DeprecatedRouteHistoryConditions.message),
+        ]
 
     def _convert_route_order(self, order: RouteHistoryOrder) -> QueryOrder:
         """Convert route history order specification to query order."""
+        fields = RouteHistorySearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
             case RouteHistoryOrderField.CREATED_AT:
-                return RouteHistoryOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case RouteHistoryOrderField.UPDATED_AT:
-                return RouteHistoryOrders.updated_at(ascending=ascending)
+                return fields.updated_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
+
+    @staticmethod
+    def _status_in(
+        statuses: list[str] | None, conditions: StringConditions
+    ) -> list[QueryCondition]:
+        """Narrow a status column to the values the request listed."""
+        if not statuses:
+            return []
+        return [
+            conditions.in_(
+                StringInMatchSpec(values=statuses, case_insensitive=False, negated=False)
+            )
+        ]
+
+    def _result_in(
+        self,
+        results: list[SchedulingResultType] | None,
+        conditions: EnumConditions[SchedulingResult],
+    ) -> list[QueryCondition]:
+        """Narrow the result column to the values the request listed."""
+        if not results:
+            return []
+        return [conditions.in_([self._convert_result_type(r) for r in results])]
 
     def convert_route_history_to_dto(self, data: RouteHistoryData) -> RouteHistoryDTO:
         """Convert RouteHistoryData to DTO."""

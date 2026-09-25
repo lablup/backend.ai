@@ -22,12 +22,14 @@ import jinja2.sandbox
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -109,14 +111,15 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
     async def create_role_managed_global_entity[TRow: Base, TData](
         self, creator: RoleManagedGlobalEntityCreator[TRow, TData]
     ) -> TData:
-        """Insert one role-managed entity row created in no scope, additionally
-        provisioning the roles the scope type's active presets call for — the spec's
-        ``template_value`` feeds the presets' name templates."""
+        """Insert one role-managed entity row created in the `global` scope,
+        additionally provisioning the roles the scope type's active presets call for —
+        the spec's ``template_value`` feeds the presets' name templates."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
         await self._provision([entity])
         await self._create_preset_roles({entity: creator.template_value(row)})
+        await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
         return creator.to_data(row)
 
     async def create_role_managed_entity[TRow: Base, TData](
@@ -150,7 +153,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
     async def atomic_create_role_managed_global_entities[TRow: Base, TData](
         self, creators: Sequence[RoleManagedGlobalEntityCreator[TRow, TData]]
     ) -> list[TData]:
-        """Insert role-managed rows created in no scope atomically, provisioning each
+        """Insert role-managed rows created in the `global` scope atomically, provisioning each
         row's scope and preset roles as :meth:`create_role_managed_global_entity` does
         for one."""
         if not creators:
@@ -163,6 +166,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             entity: creator.template_value(row)
             for creator, row, entity in zip(creators, rows, entities, strict=True)
         })
+        for entity in entities:
+            await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def atomic_create_role_managed_entities[TRow: Base, TData](
@@ -368,7 +373,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
     async def _preset_role_specs(
         self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
     ) -> list[_PresetRoleSpec]:
-        """The roles the active presets matching the scopes' types call for."""
+        """The roles the active presets matching the scopes' types call for. A preset
+        with a scope id calls for a role in that scope alone."""
         entities = list(entity_values)
         if not entities:
             return []
@@ -414,6 +420,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             )
             for entity in entities
             for preset in presets_by_scope_type[entity.entity_type()]
+            if preset.scope_id is None or preset.scope_id == entity
         ]
 
     def _preset_role_name(

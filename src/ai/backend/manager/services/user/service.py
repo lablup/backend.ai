@@ -67,16 +67,12 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
-    AdminSearchKeypairsAction,
-    AdminSearchKeypairsActionResult,
     GetKeypairAction,
     GetKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     PurgeKeypairAction,
     PurgeKeypairActionResult,
-    SearchMyKeypairsAction,
-    SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
     UpdateKeypairAction,
@@ -245,7 +241,7 @@ class UserService:
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
             await self._scheduling_controller.mark_sessions_for_termination(
                 [session.id for session in active_sessions],
-                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                reason=KernelLifecycleEventReason.USER_PURGED,
                 forced=True,
             )
 
@@ -325,15 +321,6 @@ class UserService:
         )
         return SwitchDefaultAccessKeyActionResult(success=True)
 
-    async def search_my_keypairs(
-        self, action: SearchMyKeypairsAction
-    ) -> SearchMyKeypairsActionResult:
-        """Search keypairs owned by the current user."""
-        result = await self._user_repository.search_my_keypairs(
-            scope=action.scope(), querier=action.querier
-        )
-        return SearchMyKeypairsActionResult(result=result)
-
     async def admin_create_keypair(
         self, action: AdminCreateKeypairAction
     ) -> AdminCreateKeypairActionResult:
@@ -342,13 +329,6 @@ class UserService:
             user_id=action.user_id, creator=action.creator
         )
         return AdminCreateKeypairActionResult(generated_data=generated)
-
-    async def admin_search_keypairs(
-        self, action: AdminSearchKeypairsAction
-    ) -> AdminSearchKeypairsActionResult:
-        """Admin search all keypairs."""
-        result = await self._user_repository.admin_search_keypairs(querier=action.querier)
-        return AdminSearchKeypairsActionResult(result=result)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 

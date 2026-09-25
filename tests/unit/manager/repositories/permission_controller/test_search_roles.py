@@ -1,5 +1,5 @@
 """
-Tests for PermissionControllerRepository.search_roles() functionality.
+Tests for the global role search through ``OpsRepository.global_search``.
 Tests the repository layer with real database operations.
 """
 
@@ -15,7 +15,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -23,6 +24,8 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -34,27 +37,36 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.conditions import (
-    AssignedUserConditions,
-)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
-from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
+from ai.backend.manager.models.rbac_models.role.deprecated_search import (
+    DeprecatedRoleConditions,
+)
+from ai.backend.manager.models.rbac_models.role.searchable_fields import (
+    RoleSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.role_preset.searchers import RolePresetSearcher
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
@@ -100,8 +112,8 @@ class TestSearchRoles:
     def repository(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionControllerRepository:
-        return PermissionControllerRepository(db_with_rbac_tables)
+    ) -> OpsRepository[RoleData]:
+        return OpsRepository[RoleData](V2DBOpsProvider(db_with_rbac_tables))
 
     @pytest.fixture
     async def created_roles(
@@ -142,13 +154,13 @@ class TestSearchRoles:
 
     async def test_search_roles_with_name_filter(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         created_roles: list[CreatedRole],
     ) -> None:
         """Name ends-with filter should match all roles ending with '-role'."""
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[
-                RoleConditions.by_name_ends_with(
+                RoleSearchableFields.own.name.filter.ends_with(
                     StringMatchSpec(value="-role", case_insensitive=False, negated=False)
                 ),
             ],
@@ -156,22 +168,22 @@ class TestSearchRoles:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert result.total_count == len(created_roles)
 
     async def test_search_roles_ordered_by_name(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         created_roles: list[CreatedRole],
     ) -> None:
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[],
-            orders=[RoleOrders.name(ascending=True)],
+            orders=[RoleSearchableFields.own.name.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         names = [item.name for item in result.items]
         expected_names = sorted([r.role_name for r in created_roles])
@@ -179,17 +191,17 @@ class TestSearchRoles:
 
     async def test_search_roles_ordered_by_created_at(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         created_roles: list[CreatedRole],
     ) -> None:
         """Roles created sequentially should be ordered by created_at."""
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[],
-            orders=[RoleOrders.created_at(ascending=True)],
+            orders=[RoleSearchableFields.own.created_at.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         role_ids = [item.id for item in result.items]
         expected_role_ids = [r.role_id for r in sorted(created_roles, key=lambda r: r.created_at)]
@@ -276,17 +288,17 @@ class TestSearchRoles:
 
     async def test_by_assigned_user_id_returns_only_assigned_roles(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         roles_assigned_to_users: tuple[uuid.UUID, uuid.UUID, list[CreatedRole]],
     ) -> None:
-        """``RoleConditions.by_assigned_user_id`` should restrict results
-        to roles assigned to the given user via the correlated EXISTS subquery."""
+        """The deprecated assignment filter should restrict results to the roles
+        assigned to the given user via the correlated EXISTS subquery."""
         assigned_user_id, _, created_roles = roles_assigned_to_users
 
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[
-                RoleConditions.by_assigned_user_id([
-                    AssignedUserConditions.by_user_id_equals(
+                DeprecatedRoleConditions.exists_assignment_combined([
+                    RoleAssignmentSearchableFields.own.user_id.filter.equals(
                         UUIDEqualMatchSpec(value=assigned_user_id, negated=False)
                     )
                 ]),
@@ -295,23 +307,23 @@ class TestSearchRoles:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert result.total_count == 1
         assert [item.id for item in result.items] == [created_roles[0].role_id]
 
     async def test_by_assigned_user_id_returns_empty_for_unassigned_user(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         roles_assigned_to_users: tuple[uuid.UUID, uuid.UUID, list[CreatedRole]],
     ) -> None:
         """A user with no assignments should yield no roles."""
         _, unassigned_user_id, _ = roles_assigned_to_users
 
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[
-                RoleConditions.by_assigned_user_id([
-                    AssignedUserConditions.by_user_id_equals(
+                DeprecatedRoleConditions.exists_assignment_combined([
+                    RoleAssignmentSearchableFields.own.user_id.filter.equals(
                         UUIDEqualMatchSpec(value=unassigned_user_id, negated=False)
                     )
                 ]),
@@ -320,7 +332,7 @@ class TestSearchRoles:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert result.total_count == 0
         assert result.items == []
@@ -363,30 +375,140 @@ class TestSearchRoles:
 
     async def test_by_mapped_scope_returns_roles_in_scope(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         roles_mapped_to_scope: tuple[str, list[CreatedRole]],
     ) -> None:
-        """``RoleConditions.by_mapped_scope`` should restrict results to the roles of
-        the given scope."""
+        """The scope columns should restrict results to the roles of the given scope."""
         project_scope_id, created_roles = roles_mapped_to_scope
 
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[
-                RoleConditions.by_mapped_scope([
-                    RoleConditions.by_scope_type_equals(ProjectEntityType()),
-                    RoleConditions.by_scope_id_equals(
-                        UUIDEqualMatchSpec(value=uuid.UUID(project_scope_id), negated=False)
-                    ),
-                ]),
+                RoleSearchableFields.own.scope_type.filter.equals(
+                    StringMatchSpec(
+                        value=str(ProjectEntityType()), case_insensitive=False, negated=False
+                    )
+                ),
+                RoleSearchableFields.own.scope_id.filter.equals(
+                    UUIDEqualMatchSpec(value=uuid.UUID(project_scope_id), negated=False)
+                ),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert result.total_count == 1
         assert [item.id for item in result.items] == [created_roles[0].role_id]
+
+
+class TestSearchRolesUsingRolePreset:
+    """The preset a role was instantiated from narrows the read to that preset's roles."""
+
+    @pytest.fixture
+    async def db_with_rbac_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                RolePresetRow,
+                RoleRow,
+                VirtualEntityRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[RoleData]:
+        return OpsRepository[RoleData](V2DBOpsProvider(db_with_rbac_tables))
+
+    @pytest.fixture
+    async def roles_of_two_presets(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> tuple[RolePresetID, uuid.UUID, uuid.UUID]:
+        """One role under the first preset, one under the second, one under neither."""
+        scope_id = uuid.uuid4()
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=scope_id))
+            presets = [
+                RolePresetRow(name=name, scope_type=ProjectEntityType())
+                for name in ("preset-a", "preset-b")
+            ]
+            db_sess.add_all(presets)
+            await db_sess.flush()
+            roles = [
+                RoleRow(
+                    name=name,
+                    description=name,
+                    scope_type=ProjectEntityType(),
+                    scope_id=scope_id,
+                    role_preset_id=preset_id,
+                )
+                for name, preset_id in (
+                    ("role-of-a", presets[0].id),
+                    ("role-of-b", presets[1].id),
+                    ("role-of-none", None),
+                )
+            ]
+            db_sess.add_all(roles)
+            await db_sess.flush()
+            return presets[0].id, roles[0].id, roles[1].id
+
+    @pytest.fixture
+    def preset_repository(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[RolePresetData]:
+        return OpsRepository[RolePresetData](V2DBOpsProvider(db_with_rbac_tables))
+
+    async def test_used_by_returns_only_the_role_s_preset(
+        self,
+        preset_repository: OpsRepository[RolePresetData],
+        roles_of_two_presets: tuple[RolePresetID, uuid.UUID, uuid.UUID],
+    ) -> None:
+        preset_id, role_of_preset, _ = roles_of_two_presets
+
+        result = await preset_repository.global_search(
+            GlobalSearcher(
+                used_by=[
+                    RolePresetSearchableFields.linked.usage.roles.used_by(RoleID(role_of_preset))
+                ],
+                searcher=RolePresetSearcher(
+                    conditions=[], orders=[], pagination=OffsetPagination(limit=10, offset=0)
+                ),
+            )
+        )
+
+        assert [item.id for item in result.items] == [preset_id]
+        assert result.total_count == 1
+
+    async def test_uses_returns_only_the_preset_s_roles(
+        self,
+        repository: OpsRepository[RoleData],
+        roles_of_two_presets: tuple[RolePresetID, uuid.UUID, uuid.UUID],
+    ) -> None:
+        preset_id, role_of_preset, _ = roles_of_two_presets
+        searcher = RoleSearcher(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await repository.global_search(
+            GlobalSearcher(
+                used_by=[RoleSearchableFields.linked.usage.role_presets.uses(preset_id)],
+                searcher=searcher,
+            )
+        )
+
+        assert [item.id for item in result.items] == [role_of_preset]
+        assert result.total_count == 1
 
 
 class TestSearchRolesTotalCountNotInflated:
@@ -416,8 +538,8 @@ class TestSearchRolesTotalCountNotInflated:
     def repository(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-    ) -> PermissionControllerRepository:
-        return PermissionControllerRepository(db_with_rbac_tables)
+    ) -> OpsRepository[RoleData]:
+        return OpsRepository[RoleData](V2DBOpsProvider(db_with_rbac_tables))
 
     @pytest.fixture
     async def roles_with_permissions(
@@ -480,37 +602,37 @@ class TestSearchRolesTotalCountNotInflated:
 
     async def test_total_count_not_inflated_with_offset_pagination(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         roles_with_permissions: list[CreatedRole],
     ) -> None:
         """BA-5749: offset pagination total_count must equal distinct role count, not JOIN-inflated count."""
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[],
-            orders=[RoleOrders.name(ascending=True)],
+            orders=[RoleSearchableFields.own.name.order.apply(ascending=True)],
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert len(result.items) == 2
         assert result.total_count == 2
 
     async def test_total_count_not_inflated_with_cursor_pagination(
         self,
-        repository: PermissionControllerRepository,
+        repository: OpsRepository[RoleData],
         roles_with_permissions: list[CreatedRole],
     ) -> None:
         """BA-5749: cursor pagination total_count must equal distinct role count, not JOIN-inflated count."""
-        querier = BatchQuerier(
+        searcher = RoleSearcher(
             conditions=[],
             orders=[],
             pagination=CursorForwardPagination(
                 first=10,
-                cursor_order=RoleOrders.created_at(ascending=True),
+                cursor_order=RoleSearchableFields.own.created_at.order.apply(ascending=True),
             ),
         )
 
-        result = await repository.search_roles(querier)
+        result = await repository.global_search(GlobalSearcher(used_by=(), searcher=searcher))
 
         assert len(result.items) == 2
         assert result.total_count == 2

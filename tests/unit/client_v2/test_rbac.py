@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     RevokeRoleRequest,
     RoleFilter,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -34,7 +33,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     RevokeRoleResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -322,30 +320,6 @@ class TestScopeTypes:
         assert method == "GET"
         assert url.endswith("/admin/rbac/scope-types")
         assert body is None
-
-
-class TestSearchScopes:
-    async def test_search_scopes(self) -> None:
-        resp = _json_response({
-            "items": [
-                {
-                    "scope_type": "domain",
-                    "scope_id": "default",
-                    "name": "default",
-                }
-            ],
-            "pagination": {"total": 1, "offset": 0, "limit": 100},
-        })
-        mock_session = _make_request_session(resp)
-        rc = _make_rbac_client(mock_session)
-
-        result = await rc.search_scopes("domain", SearchScopesRequest())
-
-        assert isinstance(result, SearchScopesResponse)
-        assert len(result.items) == 1
-        method, url, body = _last_request_call(mock_session)
-        assert method == "POST"
-        assert url.endswith("/admin/rbac/scopes/domain/search")
 
 
 class TestEntityTypes:

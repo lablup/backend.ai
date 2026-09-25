@@ -28,6 +28,7 @@ class TestAppConfigAllowListGQL:
         updated = datetime(2026, 1, 2, 12, 0, 0, tzinfo=UTC)
         node = AppConfigAllowListNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
             rank=200,

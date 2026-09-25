@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Collection
 
-import sqlalchemy as sa
-
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import BackendAIError, DomainNotFound
@@ -16,10 +14,15 @@ from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupForDomainRelationCreator,
+)
+from ai.backend.manager.models.resource_group.purgers import (
+    ResourceGroupForDomainRelationPurger,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -39,12 +42,12 @@ domain_repository_resilience = Resilience(
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
     _db_source: DomainDBSource
-    _v2_ops: V2DBOpsProvider
+    _v2_ops: DomainOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, domain_ops_provider: DomainOpsProvider) -> None:
         self._db = db
         self._db_source = DomainDBSource(db)
-        self._v2_ops = v2_ops_provider
+        self._v2_ops = domain_ops_provider
 
     @domain_repository_resilience.apply()
     async def purge_domain(self, domain_id: DomainID, domain_name: str) -> DomainData:
@@ -57,26 +60,19 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
+    async def create_domain(self, creator: DomainCreator) -> DomainData:
+        """Register a domain with the model-store project it is registered with."""
+        async with self._v2_ops.write_ops() as w:
+            return (await w.create_domain(creator)).domain
+
+    @domain_repository_resilience.apply()
     async def create_domain_node(
         self, creator: DomainCreator, resource_group_ids: list[ResourceGroupID] | None = None
     ) -> DomainData:
-        """Register a domain and the resource groups it may schedule on.
-
-        The associations are written separately: an association row belongs to neither
-        side of the pair, so the v2 ops layer has no primitive that writes one.
-        """
+        """Register a domain, the model-store project it is registered with, and the
+        resource groups it may schedule on."""
         async with self._v2_ops.write_ops() as w:
-            data = await w.create_role_managed_global_entity(creator)
-        if resource_group_ids:
-            async with self._db.begin_session() as session:
-                await session.execute(
-                    sa.insert(ResourceGroupForDomainRow),
-                    [
-                        {"resource_group_id": sgroup_id, "domain_id": data.id}
-                        for sgroup_id in resource_group_ids
-                    ],
-                )
-        return data
+            return (await w.create_domain(creator, resource_group_ids)).domain
 
     @domain_repository_resilience.apply()
     async def update_domain_node(
@@ -87,28 +83,17 @@ class DomainRepository:
         sgroup_ids_to_remove: Collection[ResourceGroupID] | None = None,
     ) -> DomainData:
         """Edit a domain and the resource groups it may schedule on."""
-        if sgroup_ids_to_add or sgroup_ids_to_remove:
-            async with self._db.begin_session() as session:
-                if sgroup_ids_to_add:
-                    await session.execute(
-                        sa.insert(ResourceGroupForDomainRow),
-                        [
-                            {"resource_group_id": sgroup_id, "domain_id": domain_id}
-                            for sgroup_id in sgroup_ids_to_add
-                        ],
-                    )
-                if sgroup_ids_to_remove:
-                    await session.execute(
-                        sa.delete(ResourceGroupForDomainRow).where(
-                            (ResourceGroupForDomainRow.domain_id == domain_id)
-                            & (
-                                ResourceGroupForDomainRow.resource_group_id.in_(
-                                    sgroup_ids_to_remove
-                                )
-                            )
-                        ),
-                    )
         async with self._v2_ops.write_ops() as w:
+            if sgroup_ids_to_add:
+                await w.create_relations(
+                    ResourceGroupForDomainRelationCreator(),
+                    [(domain_id, sgroup_id) for sgroup_id in sgroup_ids_to_add],
+                )
+            if sgroup_ids_to_remove:
+                await w.purge_relations(
+                    ResourceGroupForDomainRelationPurger(),
+                    [(domain_id, sgroup_id) for sgroup_id in sgroup_ids_to_remove],
+                )
             data = await w.update_data(updater)
             if data is None:
                 raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")

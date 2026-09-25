@@ -2030,6 +2030,45 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
+#### [a-user-granted-nothing-may-not-search-a-revisions-slots](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+
+아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, 리비전을 찾을 수 없다는 답으로 거부된다
+
+Given
+
+- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_revision_resource_slots — user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
 #### [a-user-granted-read-counts-every-revision-of-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
 
 리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, 셋을 모두 센다
@@ -2078,9 +2117,9 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-#### [a-user-granted-read-may-not-search-a-revisions-slots](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [a-user-granted-read-counts-every-slot-a-revision-allocates](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
 
-배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 그 리비전의 슬롯을 훑으면, 역할로 거부된다. 리비전은 읽어도 슬롯은 못 본다
+슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 훑으면, 둘을 모두 센다
 
 Given
 
@@ -2117,8 +2156,11 @@ When
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 리비전이 잡은 슬롯이 모두 세어진다
+  - items = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
 
 #### [a-user-granted-read-may-not-search-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
 
@@ -2304,48 +2346,6 @@ Then
   - items.id: 센 리비전들와 같다
   - items.revision_number = [1, 1, 2]
   - total_count = 3
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [the-superadmin-counts-every-slot-a-revision-allocates](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
-
-슬롯 둘을 잡은 리비전의 슬롯을 슈퍼관리자가 훑으면, 둘을 모두 센다. 이 문은 역할이 지킨다
-
-Given
-
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
-
-When
-
-- DeploymentAdapter.search_revision_resource_slots — user-1이 deployment-1의 첫 리비전의 슬롯을 조회
-
-Then
-
-- 리비전이 잡은 슬롯이 모두 세어진다
-  - items = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
-  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 

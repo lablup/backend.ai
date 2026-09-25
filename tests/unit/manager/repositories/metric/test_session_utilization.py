@@ -25,6 +25,7 @@ from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetListResult,
 )
 from ai.backend.manager.repositories.metric.repository import MetricRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
     PrometheusQueryPresetDBSource,
 )
@@ -119,6 +120,7 @@ class TestSessionUtilizationMetrics:
                 db=MagicMock(),
                 prometheus_client=prometheus_client,
                 default_timewindow="30s",
+                v2_ops_provider=MagicMock(spec=V2DBOpsProvider),
             )
 
     async def test_queries_stored_preset_with_spec_labels(

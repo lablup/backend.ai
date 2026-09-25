@@ -32,16 +32,22 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerSearchableFields,
+)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 from ai.backend.manager.models.user.row import UserRow
 
 
 @dataclass
-class IdleCheckerCreator(GlobalEntityCreator[IdleCheckerRow, IdleCheckerData]):
+class IdleCheckerCreator(
+    CreatedInGlobal[IdleCheckerRow], EntityCreator[IdleCheckerRow, IdleCheckerData]
+):
     """Creator for an idle checker definition in the global catalog."""
 
     name: str
@@ -70,7 +76,7 @@ class IdleCheckerCreator(GlobalEntityCreator[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return row.to_data()
+        return IdleCheckerSearchableFields.own.to_data(row)
 
 
 @dataclass

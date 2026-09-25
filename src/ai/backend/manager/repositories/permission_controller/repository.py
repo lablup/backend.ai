@@ -3,11 +3,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.domain import DomainEntityType
-from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -15,7 +12,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
-    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
@@ -25,24 +21,24 @@ from ai.backend.manager.data.permission.role import (
     BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
-    RoleListResult,
     RoleRevocationResult,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.types import (
-    ScopeListResult,
-)
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
+from ai.backend.manager.models.rbac_models.role.searchable_fields import (
+    RoleSearchableFields,
+)
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 from .db_source.db_source import PermissionDBSource
 
@@ -126,7 +122,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
         result = await self._db_source.assign_role(data)
-        return result.to_data()
+        return RoleAssignmentSearchableFields.own.to_assignment_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -140,7 +136,9 @@ class PermissionControllerRepository:
         granted_by: UserID | None = None,
     ) -> BulkRoleAssignmentResultData:
         rows = await self._db_source.bulk_assign_role(role_id, user_ids, granted_by)
-        return BulkRoleAssignmentResultData(successes=[row.to_data() for row in rows])
+        return BulkRoleAssignmentResultData(
+            successes=[RoleAssignmentSearchableFields.own.to_assignment_data(row) for row in rows]
+        )
 
     @permission_controller_repository_resilience.apply()
     async def bulk_revoke_role(
@@ -151,39 +149,13 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> RoleData | None:
         result = await self._db_source.get_role(role_id)
-        return result.to_data() if result else None
-
-    @permission_controller_repository_resilience.apply()
-    async def search_roles(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleListResult:
-        """Searches roles with pagination and filtering."""
-        return await self._db_source.search_roles(querier=querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_roles_in_scope(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> RoleListResult:
-        """Search the roles the named scopes reach, combined with OR."""
-        return await self._db_source.search_roles_in_scope(querier=querier, scopes=scopes)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
-        return await self._db_source.search_permissions(querier=querier, scope=scope)
+        return RoleSearchableFields.own.to_data(result) if result else None
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
         """Get role with all permission details (without users)."""
         result = await self._db_source.get_role_with_permissions(role_id)
-        return result.to_detail_data_without_users()
+        return RoleSearchableFields.own.to_detail_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def search_role_assignments_in_global(
@@ -203,30 +175,3 @@ class PermissionControllerRepository:
         return await self._db_source.search_role_assignments_in_scope(
             scopes=scopes, searcher=searcher
         )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_scopes(
-        self,
-        scope_type: EntityType,
-        querier: BatchQuerier,
-    ) -> ScopeListResult:
-        """Search scopes of the given type.
-
-        Args:
-            scope_type: The entity type of scope to search.
-            querier: BatchQuerier with conditions, orders, and pagination.
-
-        Returns:
-            ScopeListResult with matching scopes.
-        """
-        match scope_type:
-            case DomainEntityType():
-                return await self._db_source.search_domain_scopes(querier)
-            case ProjectEntityType():
-                return await self._db_source.search_project_scopes(querier)
-            case UserEntityType():
-                return await self._db_source.search_user_scopes(querier)
-            case _:
-                raise NotImplementedError(
-                    "This function will be deprecated and new repository functions will be implemented for each scope"
-                )

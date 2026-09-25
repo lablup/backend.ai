@@ -1,42 +1,20 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyEntityType,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyOperationScope
-from ai.backend.manager.models.resource_policy.searchers import (
-    KeyPairResourcePolicySearcher,
-)
-from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass(frozen=True)
-class KeypairResourcePolicyScopeItem(ScopeItem):
-    """The keypair resource policies of one user."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return UserKeypairResourcePolicyOperationScope(user_id=self.user_id)
-
-
-@dataclass
 class SearchKeypairResourcePoliciesAction(
-    OperationScopeOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+    ScopedSearchOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
     """Page through the keypair resource policies the named scopes reach, combined
     with OR.
@@ -44,27 +22,12 @@ class SearchKeypairResourcePoliciesAction(
     Which users those are, is the caller's business: the scopes are an argument.
     """
 
-    items: Sequence[KeypairResourcePolicyScopeItem]
-    searcher: KeyPairResourcePolicySearcher
-
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
         return KeyPairResourcePolicyEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
-
-    @override
-    def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
-
-    @override
     @classmethod
     def action_name(cls) -> str:
         return "search_keypair_resource_policies"
-
-    @override
-    def to_searcher(self) -> KeyPairResourcePolicySearcher:
-        return self.searcher

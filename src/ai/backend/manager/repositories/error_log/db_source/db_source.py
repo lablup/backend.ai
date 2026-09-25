@@ -10,13 +10,9 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogListResult
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -38,42 +34,16 @@ error_log_db_source_resilience = Resilience(
 )
 
 
+# `association_groups_users` is no longer written; project membership lives in the
+# entity graph. Moving the reads below changes which users answer, so they are left
+# to a follow-up.
+
+
 class ErrorLogDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    @error_log_db_source_resilience.apply()
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> ErrorLogListResult:
-        """Search error logs with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            ErrorLogListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ErrorLogRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.ErrorLogRow.to_dataclass() for row in result.rows]
-
-            return ErrorLogListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     @error_log_db_source_resilience.apply()
     async def list_logs(

@@ -12,6 +12,9 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     ResourceSlotEntryData,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -50,7 +53,7 @@ class DeploymentPresetPurger(
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return row.to_data()
+        return DeploymentPresetSearchableFields.own.to_data(row)
 
 
 class PresetResourceSlotBatchPurger(

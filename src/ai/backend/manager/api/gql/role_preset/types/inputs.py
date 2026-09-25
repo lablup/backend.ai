@@ -28,6 +28,13 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     UpdateRolePresetInput as UpdateRolePresetInputDTO,
 )
+from ai.backend.common.dto.manager.v2.role_preset.types import (
+    RolePresetUsage as RolePresetUsageDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.types import (
+    RolePresetUsedBy as RolePresetUsedByDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -35,6 +42,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 from ai.backend.manager.api.gql.rbac.types import PermissionBitGQL
+from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
 
 
 @gql_pydantic_input(
@@ -47,6 +55,13 @@ from ai.backend.manager.api.gql.rbac.types import PermissionBitGQL
 class RolePermissionPresetEntryInputGQL(PydanticInputMixin[RolePermissionPresetEntryDTO]):
     entity_type: str = gql_field(description="Entity type the permission applies to.")
     permission: PermissionBitGQL = gql_field(description="The operation bit the entry grants.")
+    operation: OperationTypeGQL | None = gql_field(
+        description="Operation granted by the permission.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
+        ),
+    )
 
 
 @gql_pydantic_input(
@@ -151,3 +166,37 @@ class BulkRemoveRolePermissionPresetsInputGQL(
     PydanticInputMixin[BulkRemoveRolePermissionPresetsInputDTO]
 ):
     permission_preset_ids: list[ID] = gql_field(description="Permission entry row IDs to delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities whose use of a role preset narrows the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RolePresetUsedBy",
+)
+class RolePresetUsedByGQL(PydanticInputMixin[RolePresetUsedByDTO]):
+    """The entities whose use of a role preset narrows the read."""
+
+    role: list[ID] | None = gql_field(
+        default=None, description="Roles instantiated from the preset."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing a role preset query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only presets the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RolePresetUsage",
+)
+class RolePresetUsageGQL(PydanticInputMixin[RolePresetUsageDTO]):
+    """The uses that narrow a role preset read."""
+
+    used_by: RolePresetUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the preset narrows the read."
+    )

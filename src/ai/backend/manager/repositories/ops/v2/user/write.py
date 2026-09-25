@@ -19,9 +19,11 @@ from typing import ClassVar
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DomainNotFound
@@ -33,6 +35,9 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.resource_policy.write import (
+    V2ResourcePolicyWriteOps,
+)
 from ai.backend.manager.repositories.ops.v2.roster.write import V2RosterWriteOps
 
 
@@ -57,7 +62,7 @@ class FullUserCreatorResult:
     personal_project: ProjectData
 
 
-class V2UserWriteOps(V2RosterWriteOps):
+class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
     """The roster write ops plus provisioning a user."""
 
     # groups.name is a slug of at most 64 characters; the tail is reserved for the
@@ -80,8 +85,9 @@ class V2UserWriteOps(V2RosterWriteOps):
 
     async def create_user(self, creation: FullUserCreator) -> FullUserCreatorResult:
         """Provision a user: the row, its virtual entity, the domain that owns and
-        governs it, the roles its scope's and its domain's presets call for, the keypair
-        it authorizes with, and the personal project it alone belongs to."""
+        governs it, the roles its scope's, its domain's and the public scope's presets
+        call for, the keypair it authorizes with, and the personal project it alone
+        belongs to."""
         domain_id = creation.user.domain_id
         # The user is created in its domain, so the domain has to be in the graph
         # first: one created before the graph, or by a data migration, has no node yet.
@@ -90,9 +96,13 @@ class V2UserWriteOps(V2RosterWriteOps):
         # the spec is created in, so it owns and governs the user.
         user = await self.create_role_managed_entity(creation.user)
         user_id = UserID(user.id)
-        await self._grant_auto_assign_roles([user_id, domain_id], user_id)
+        await self._grant_auto_assign_roles(
+            [user_id, domain_id, global_entity_id(GlobalEntityName.PUBLIC)], user_id
+        )
         keypair = await self._create_default_keypair(user, creation)
         personal_project = await self._create_personal_project(user_id, user.username, domain_id)
+        await self.restate_user_resource_policy_share(user_id)
+        await self.restate_keypair_resource_policy_share(user_id)
         return FullUserCreatorResult(user=user, keypair=keypair, personal_project=personal_project)
 
     async def _create_default_keypair(
@@ -118,10 +128,12 @@ class V2UserWriteOps(V2RosterWriteOps):
         project_ids: Collection[ProjectID],
     ) -> None:
         """Put the user on each project's roster — the domain's model-store projects
-        always included, ``project_ids`` narrowed to projects that exist in the domain,
+        joined on top, ``project_ids`` narrowed to projects that exist in the domain,
         and personal projects left out."""
         domain_name = await self._domain_name(domain_id)
-        for project_id in await self._member_project_ids(domain_name, project_ids):
+        target = await self._member_project_ids(domain_name, project_ids)
+        target |= await self._model_store_project_ids(domain_name)
+        for project_id in sorted(target, key=str):
             await self._join(project_id, user_id)
 
     async def replace_user_projects(
@@ -130,8 +142,8 @@ class V2UserWriteOps(V2RosterWriteOps):
         domain_name: str,
         project_ids: Collection[ProjectID],
     ) -> None:
-        """Set the user's projects to ``project_ids``, the domain's model-store projects
-        always included.
+        """Set the user's projects to ``project_ids``, refusing a request that drops a
+        model-store project the user is on.
 
         Only the projects entering or leaving the set are touched, so an unchanged
         membership keeps its rows. Personal projects stand outside: none is joined and
@@ -139,7 +151,9 @@ class V2UserWriteOps(V2RosterWriteOps):
         """
         target = await self._member_project_ids(domain_name, project_ids)
         joined = await self._joined_project_ids(user_id)
-        for project_id in sorted(joined - target, key=str):
+        leaving = sorted(joined - target, key=str)
+        await self._refuse_model_store_leaves(leaving)
+        for project_id in leaving:
             await self._leave(project_id, user_id)
         for project_id in sorted(target - joined, key=str):
             await self._join(project_id, user_id)
@@ -163,6 +177,7 @@ class V2UserWriteOps(V2RosterWriteOps):
             )
         )
         await self._join(ProjectID(project.id), user_id)
+        await self.restate_project_resource_policy_share(ProjectID(project.id))
         return project
 
     async def _domain_name(self, domain_id: DomainID) -> str:
@@ -216,15 +231,29 @@ class V2UserWriteOps(V2RosterWriteOps):
         domain_name: str,
         project_ids: Collection[ProjectID],
     ) -> set[ProjectID]:
-        """``project_ids`` narrowed to the domain's real projects, plus the domain's
-        model-store projects that every user joins. A personal project is never among
-        them: it takes no member beyond the user it was created with."""
+        """``project_ids`` narrowed to the domain's real projects. A personal project is
+        never among them: it takes no member beyond the user it was created with."""
         stmt = sa.select(ProjectRow.id).where(
             ProjectRow.domain_name == domain_name,
             ProjectRow.type != ProjectType.PERSONAL,
-            sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
+            ProjectRow.id.in_(project_ids),
         )
         return {ProjectID(row) for row in (await self._sess.scalars(stmt)).all()}
+
+    async def _model_store_project_ids(self, domain_name: str) -> set[ProjectID]:
+        """The domain's model-store projects, whose roster holds every user of it."""
+        stmt = sa.select(ProjectRow.id).where(
+            ProjectRow.domain_name == domain_name,
+            ProjectRow.type == ProjectType.MODEL_STORE,
+        )
+        return {ProjectID(row) for row in (await self._sess.scalars(stmt)).all()}
+
+    async def _refuse_model_store_leaves(self, project_ids: Collection[ProjectID]) -> None:
+        """Refuse the write when any project being left is a model-store one. Answering
+        ``ok`` to a request that keeps the membership would leave the caller no way to
+        tell what happened."""
+        for project_id in project_ids:
+            await self._refuse_model_store_leave(project_id)
 
     async def _joined_project_ids(self, user_id: UserID) -> set[ProjectID]:
         """The projects the user is on the roster of, personal ones left out."""

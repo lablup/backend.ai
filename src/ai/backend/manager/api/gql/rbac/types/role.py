@@ -60,6 +60,12 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleOrderBy as RoleOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleUsage as RoleUsageDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleUses as RoleUsesDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -85,6 +91,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
+    RoleNode,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleSourceDTO,
@@ -114,8 +121,8 @@ from ai.backend.manager.api.gql.rbac.types.scope import (
     ScopeInputGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
-    RoleRoleAssignmentScopeItem,
+from ai.backend.manager.models.rbac_models.user_role.scopes import (
+    RoleRoleAssignmentTarget,
 )
 
 if TYPE_CHECKING:
@@ -130,6 +137,7 @@ if TYPE_CHECKING:
         PermissionFilter,
         PermissionNestedFilterGQL,
         PermissionOrderBy,
+        RolePermissionNestedFilterGQL,
     )
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2GQL
@@ -160,8 +168,14 @@ class RoleOrderField(StrEnum):
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="RBAC role."), name="Role")
-class RoleGQL(PydanticNodeMixin[Any]):
+class RoleGQL(PydanticNodeMixin[RoleNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the role.",
+        ),
+    )
     name: str
     description: str | None
     source: RoleSourceGQL
@@ -322,7 +336,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         offset: int | None = None,
     ) -> RoleAssignmentConnection | None:
         result = await info.context.adapters.rbac.search_role_assignments_in_scope(
-            [RoleRoleAssignmentScopeItem(role_id=RoleID(UUID(self.id)))],
+            [RoleRoleAssignmentTarget(role_id=RoleID(UUID(self.id)))],
             SearchRoleAssignmentsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
@@ -514,7 +528,6 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        # Superadmin-only through the global search; removed together with this deprecated node.
         results = await info.context.data_loaders.role_assignment_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
@@ -638,6 +651,40 @@ class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterD
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities a role uses, whose ids narrow the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RoleUses",
+)
+class RoleUsesGQL(PydanticInputMixin[RoleUsesDTO]):
+    """The entities a role uses, whose ids narrow the read."""
+
+    role_preset: list[UUID] | None = gql_field(
+        default=None, description="Role presets the roles were instantiated from."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing a role query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only roles the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RoleUsage",
+)
+class RoleUsageGQL(PydanticInputMixin[RoleUsageDTO]):
+    """The uses that narrow a role read."""
+
+    uses: RoleUsesGQL | None = gql_field(
+        default=None, description="Entities the role uses, whose ids narrow the read."
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
     name="RoleFilter",
 )
@@ -645,22 +692,26 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
-    assigned_user: RoleUserNestedFilterGQL | None = None
+    assigned_user: RoleUserNestedFilterGQL | None = gql_field(
+        default=None,
+        description="Filter roles by the users holding them.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter reaching the rows that join"
+            " a role to a user cannot check whether the caller may read that user. Search"
+            " roles within that user's scope instead."
+        ),
+    )
     mapped_scope: RoleMappedScopeNestedFilterGQL | None = None
-    permission: (
+    permissions: (
         Annotated[
-            PermissionNestedFilterGQL,
+            RolePermissionNestedFilterGQL,
             strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
         ]
         | None
     ) = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Filter roles by the permissions they carry. For listing roles only —"
-                " a role carrying a bit does not mean the caller holds it. Use"
-                " `myScopePermissions` to decide what the caller may do."
-            ),
+            description="Filter by conditions on the role's permission entries.",
         ),
         default=None,
     )
@@ -681,21 +732,17 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
-    mapped_scope: RoleMappedScopeNestedFilterGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Filter assignments by the scope their role is registered in. For listing"
-                " assignments only — a role registered in a scope does not mean the caller"
-                " holds anything there. Use `myScopePermissions` to decide."
-            ),
-        ),
-        default=None,
-    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+_ASSIGNMENT_ROLE_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on the role an assignment names, or"
+    " on what that role carries, cannot check whether the caller may read it. Search roles"
+    " first and narrow by `roleId`."
+)
 
 
 @gql_pydantic_input(
@@ -704,14 +751,22 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
 )
 class RoleAssignmentFilter(PydanticInputMixin[RoleAssignmentFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
-    role: RoleAssignmentRoleNestedFilterGQL | None = None
+    role: RoleAssignmentRoleNestedFilterGQL | None = gql_field(
+        default=None,
+        description="Filter assignments by the role they name.",
+        deprecation_reason=_ASSIGNMENT_ROLE_DEPRECATION,
+    )
     permission: (
         Annotated[
             PermissionNestedFilterGQL,
             strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
         ]
         | None
-    ) = None
+    ) = gql_field(
+        default=None,
+        description="Filter assignments by the permissions their role carries.",
+        deprecation_reason=_ASSIGNMENT_ROLE_DEPRECATION,
+    )
     username: StringFilter | None = None
     email: StringFilter | None = None
 

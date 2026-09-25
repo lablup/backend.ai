@@ -37,7 +37,7 @@ from ai.backend.manager.dto.domain_request import (
 )
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
-from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
@@ -45,13 +45,11 @@ from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
-from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 
 from .adapter import DomainAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.domain.processors import DomainProcessors
-    from ai.backend.manager.services.project.processors import ProjectProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -59,9 +57,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DomainHandler:
     """Domain API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, domain: DomainProcessors, project: ProjectProcessors) -> None:
+    def __init__(self, *, domain: DomainProcessors) -> None:
         self._domain = domain
-        self._project = project
         self._adapter = DomainAdapter()
 
     # ------------------------------------------------------------------
@@ -88,14 +85,6 @@ class DomainHandler:
         )
         action_result = await self._domain.create_domain.run(CreateDomainAction(creator=creator))
         domain_data = action_result.data
-        await self._project.create_project.run(
-            CreateProjectAction(
-                domain_id=domain_data.id,
-                creator=ProjectCreator.model_store(
-                    domain_id=domain_data.id, domain_name=domain_data.name
-                ),
-            )
-        )
 
         resp = CreateDomainResponse(domain=self._adapter.convert_to_dto(domain_data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
@@ -129,7 +118,7 @@ class DomainHandler:
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._domain.global_search.run(
-            GlobalSearchDomainsAction(searcher=searcher)
+            GlobalSearchDomainsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         resp = SearchDomainsResponse(

@@ -5,7 +5,9 @@ Removes ``permissions.scope_type`` / ``permissions.scope_id`` with the indexes a
 unique constraint over them, and keys the rows on ``(role_id, entity_type, permission)``.
 
 A row naming a scope other than its role's would lose that scope silently, so the
-migration counts those first and stops when it finds any.
+migration counts those first and stops when it finds any. A folder share granted the
+invitee's role rows scoped to the folder; those are dropped before the count, since the
+share is carried from ``vfolder_permissions`` later in the chain.
 
 Create Date: 2026-09-09
 
@@ -31,7 +33,22 @@ WHERE p.scope_type IS DISTINCT FROM r.scope_type
    OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text);"""
 
 
-def _refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None:
+def drop_folder_share_grants(conn: sa.engine.Connection) -> None:
+    """Drop the rows a folder share granted: scoped to the folder, on a role sitting in
+    another scope."""
+    conn.execute(
+        sa.text("""
+            DELETE FROM permissions p
+            USING roles r
+            WHERE r.id = p.role_id
+              AND p.scope_type = 'vfolder'
+              AND (p.scope_type IS DISTINCT FROM r.scope_type
+                   OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text))
+        """)
+    )
+
+
+def refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None:
     """Stop when a permission row names a scope other than the one its role sits in.
 
     Dropping the columns would take that scope with them, so the rows are counted while
@@ -58,7 +75,8 @@ def _refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    _refuse_rows_disagreeing_with_their_role(conn)
+    drop_folder_share_grants(conn)
+    refuse_rows_disagreeing_with_their_role(conn)
     op.drop_constraint("uq_permissions_role_scope_entity_permission", "permissions", type_="unique")
     op.drop_index("ix_permissions_role_scope", table_name="permissions")
     op.drop_index("ix_permissions_scope_entity", table_name="permissions")

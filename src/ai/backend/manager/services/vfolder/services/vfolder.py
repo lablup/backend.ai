@@ -75,8 +75,8 @@ from ai.backend.manager.models.vfolder.creators import (
     VFolderBaseCreator,
 )
 from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
@@ -102,10 +102,6 @@ from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
-)
-from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    GlobalBatchLoadVFoldersAction,
-    GlobalBatchLoadVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
     BulkLoadVFolderMountLevelsAction,
@@ -157,8 +153,6 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GlobalGetVolumePerfMetricActionResult,
     GlobalListAllHostsAction,
     GlobalListAllHostsActionResult,
-    GlobalListAllowedTypesAction,
-    GlobalListAllowedTypesActionResult,
     GlobalListMountsAction,
     GlobalListMountsActionResult,
     GlobalMountHostAction,
@@ -166,6 +160,8 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GlobalUmountHostAction,
     GlobalUmountHostActionResult,
     MountResultData,
+    PublicListAllowedTypesAction,
+    PublicListAllowedTypesActionResult,
     SearchHostsAction,
     SearchHostsActionResult,
     UpdateQuotaAction,
@@ -232,16 +228,6 @@ class VFolderService:
         self._background_task_manager = background_task_manager
         self._valkey_stat_client = valkey_stat_client
         self._own_check = own_check
-
-    async def batch_load_by_ids(
-        self, action: GlobalBatchLoadVFoldersAction
-    ) -> GlobalBatchLoadVFoldersActionResult:
-        """Batch fetch vfolders by IDs for cross-entity reference resolution.
-
-        Audit log records this as ``vfolder.GET`` (not as a search).
-        """
-        data = await self._vfolder_repository.batch_load_by_ids(action.ids)
-        return GlobalBatchLoadVFoldersActionResult(data=data)
 
     async def bulk_load_permissions(
         self, action: BulkLoadVFolderPermissionsAction
@@ -499,7 +485,7 @@ class VFolderService:
 
         # Check for duplicate vfolder names
         duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
-            UserVFolderOperationScope(user_id=UserID(action.requester_user_uuid)),
+            UserVFolderTarget(user_id=UserID(action.requester_user_uuid)),
             action.target_name,
         )
 
@@ -646,13 +632,13 @@ class VFolderService:
                 await response.write_eof()
         return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder_data)
 
-    async def list_allowed_types(
-        self, action: GlobalListAllowedTypesAction
-    ) -> GlobalListAllowedTypesActionResult:
+    async def public_list_allowed_types(
+        self, action: PublicListAllowedTypesAction
+    ) -> PublicListAllowedTypesActionResult:
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
-        return GlobalListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
+        return PublicListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
 
     async def list_all_hosts(
         self, action: GlobalListAllHostsAction
@@ -1151,8 +1137,8 @@ class VFolderService:
         else:
             user_id = UserID(action.user_uuid)
             project_ids = await self._vfolder_repository.get_joined_project_ids(user_id)
-            scopes: list[OperationScope] = [UserVFolderOperationScope(user_id=user_id)]
-            scopes.extend(ProjectVFolderOperationScope(project_id=pid) for pid in project_ids)
+            scopes: list[OperationScope] = [UserVFolderTarget(user_id=user_id)]
+            scopes.extend(ProjectVFolderTarget(project_id=pid) for pid in project_ids)
             vfolder_id = await self._vfolder_repository.resolve_vfolder_id_by_name(
                 scopes, action.folder_id_or_name
             )
@@ -1165,9 +1151,9 @@ class VFolderService:
         """The scope a vfolder's name is unique within."""
         match vfolder.ownership_type:
             case VFolderOwnershipType.GROUP if vfolder.group is not None:
-                return ProjectVFolderOperationScope(project_id=vfolder.group)
+                return ProjectVFolderTarget(project_id=vfolder.group)
             case VFolderOwnershipType.USER if vfolder.user is not None:
-                return UserVFolderOperationScope(user_id=UserID(vfolder.user))
+                return UserVFolderTarget(user_id=UserID(vfolder.user))
         raise UnreachableError(f"VFolder {vfolder.id} names no owner")
 
     async def _check_ownership_allowed(self, ownership_type: str) -> Sequence[str]:
@@ -1360,7 +1346,7 @@ class VFolderService:
 
         # Check for duplicate vfolder names
         duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
-            UserVFolderOperationScope(user_id=UserID(action.user_id)),
+            UserVFolderTarget(user_id=UserID(action.user_id)),
             action.target_name,
         )
 

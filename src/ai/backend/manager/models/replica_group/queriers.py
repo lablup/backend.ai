@@ -6,6 +6,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.deployment.types import ReplicaGroupData
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.replica_group.searchable_fields import (
+    ReplicaGroupSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkFieldQuerier
 
 
@@ -22,4 +25,4 @@ class BulkReplicaGroupQuerier(BulkFieldQuerier[ReplicaGroupRow, ReplicaGroupData
 
     @override
     def to_data(self, row: ReplicaGroupRow) -> ReplicaGroupData:
-        return row.to_data()
+        return ReplicaGroupSearchableFields.own.to_data(row)

@@ -24,6 +24,7 @@ def _make_registry_node(
 ) -> ContainerRegistryNode:
     return ContainerRegistryNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         url="https://registry.example.com",
         registry_name="test-registry",
         type=registry_type,
@@ -56,6 +57,7 @@ class TestContainerRegistryNode:
     def test_with_optional_fields(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://harbor.example.com",
             registry_name="harbor-reg",
             type=ContainerRegistryType.HARBOR,
@@ -72,6 +74,7 @@ class TestContainerRegistryNode:
     def test_with_extra_metadata(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://registry.example.com",
             registry_name="extra-reg",
             type=ContainerRegistryType.DOCKER,
@@ -100,6 +103,7 @@ class TestContainerRegistryNode:
     def test_serialization_round_trip(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://registry.example.com",
             registry_name="my-reg",
             type=ContainerRegistryType.HARBOR,
@@ -156,6 +160,7 @@ class TestUpdateContainerRegistryPayload:
     def test_creation_with_registry_node(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://updated.example.com",
             registry_name="updated-registry",
             type=ContainerRegistryType.HARBOR,

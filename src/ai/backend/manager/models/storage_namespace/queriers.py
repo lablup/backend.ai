@@ -9,6 +9,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 
 
 class BulkStorageNamespaceQuerier(BulkEntityQuerier[StorageNamespaceRow, StorageNamespaceData]):
@@ -24,4 +27,4 @@ class BulkStorageNamespaceQuerier(BulkEntityQuerier[StorageNamespaceRow, Storage
 
     @override
     def to_data(self, row: StorageNamespaceRow) -> StorageNamespaceData:
-        return row.to_dataclass()
+        return StorageNamespaceSearchableFields.own.to_data(row)

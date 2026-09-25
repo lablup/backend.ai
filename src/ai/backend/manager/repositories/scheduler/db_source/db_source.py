@@ -35,7 +35,11 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
@@ -84,8 +88,9 @@ from ai.backend.manager.models.kernel import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
-from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.creators import KernelCreator
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
@@ -113,6 +118,7 @@ from ai.backend.manager.models.session import (
     SessionRow,
 )
 from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
@@ -120,10 +126,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
-)
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
 )
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.write import BatchReconcileTransition
@@ -1163,7 +1165,7 @@ class ScheduleDBSource:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
         message: str = "mark_terminating success",
@@ -1214,7 +1216,7 @@ class ScheduleDBSource:
         self,
         session_ids: list[SessionId],
         to_status: SessionStatus,
-        reason: str,
+        reason: KernelLifecycleEventReason,
     ) -> list[SessionId]:
         """
         Move sessions to ``to_status`` and record the transition in the
@@ -1773,7 +1775,10 @@ class ScheduleDBSource:
                         else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
-                        status_info=session_row.status_info or "UNKNOWN",
+                        status_info=(
+                            KernelLifecycleEventReason.from_value(session_row.status_info)
+                            or KernelLifecycleEventReason.UNKNOWN
+                        ),
                         session_type=session_row.session_type,
                         kernels=kernels,
                     )
@@ -4009,49 +4014,32 @@ class ScheduleDBSource:
 
     async def search_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: KernelSearcher,
     ) -> KernelListResult:
         """Search kernels for kernel handler execution.
 
-        This method is for KernelLifecycleHandler. It queries kernels
-        directly using BatchQuerier conditions.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use KernelConditions for filtering.
-
-        Returns:
-            KernelListResult containing KernelInfo objects.
+        This method is for KernelLifecycleHandler.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(KernelRow)
-            result = await execute_batch_querier(db_sess, stmt, querier)
-            return KernelListResult(
-                items=[row.KernelRow.to_kernel_info() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return KernelListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_sessions_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionInfo]:
         """Search sessions without kernel data for handlers.
 
-        This method uses EXISTS subqueries for optimized kernel condition checking
-        without loading kernel data.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            List of SessionInfo matching all conditions.
+        The kernel conditions stay EXISTS subqueries, so no kernel row is loaded.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(SessionRow)
-            result = await execute_batch_querier(db_sess, stmt, querier)
-            return [row.SessionRow.to_session_info() for row in result.rows]
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return list(result.items)
 
     async def update_with_history(
         self,
@@ -4324,7 +4312,7 @@ class ScheduleDBSource:
 
     async def search_sessions_with_kernels(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsSearchResult:
         """Search sessions with kernel data and image configs.
 
@@ -4334,53 +4322,37 @@ class ScheduleDBSource:
         Uses separate queries for sessions, kernels, and images to avoid
         data duplication from JOINs and improve memory efficiency.
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use NoPagination for scheduler batch operations.
-                     Conditions should target SessionRow columns.
-
-        Returns:
-            SessionWithKernelsSearchResult with sessions, image_configs, and pagination info
-
         Example:
-            querier = BatchQuerier(
+            searcher = SessionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_resource_group_id(resource_group_id),
-                    SessionConditions.by_statuses([SessionStatus.SCHEDULED]),
+                    fields.resource_group_id.filter.equals(resource_group_spec),
+                    fields.status.filter.in_([SessionStatus.SCHEDULED]),
                 ],
-                orders=[SessionOrders.created_at()],
+                orders=[fields.created_at.order.apply(ascending=True)],
             )
-            result = await db_source.search_sessions_with_kernels(querier)
+            result = await db_source.search_sessions_with_kernels(searcher)
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions
-            session_query = sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.status,
+        async with self._reconcile_ops.read_ops() as r:
+            session_result = await r.search_in_global(searcher)
+        if not session_result.items:
+            return SessionWithKernelsSearchResult(
+                sessions=[],
+                image_configs={},
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
             )
-            session_result = await execute_batch_querier(db_sess, session_query, querier)
-
-            if not session_result.rows:
-                return SessionWithKernelsSearchResult(
-                    sessions=[],
-                    image_configs={},
-                    total_count=0,
-                    has_next_page=False,
-                    has_previous_page=False,
-                )
-
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build session map
             session_ids: list[SessionId] = []
             sessions_map: dict[SessionId, SessionDataForPull] = {}
-            for row in session_result.rows:
-                session_ids.append(row.id)
-                sessions_map[row.id] = SessionDataForPull(
-                    session_id=row.id,
-                    creation_id=row.creation_id,
-                    access_key=row.access_key,
+            for session in session_result.items:
+                session_ids.append(SessionId(session.id))
+                sessions_map[SessionId(session.id)] = SessionDataForPull(
+                    session_id=SessionId(session.id),
+                    creation_id=session.creation_id or "",
+                    access_key=session.access_key or AccessKey(""),
                     kernels=[],
                 )
 
@@ -4469,7 +4441,7 @@ class ScheduleDBSource:
 
     async def search_sessions_with_kernels_and_user(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsAndUserSearchResult:
         """Search sessions with kernel data, user info, and image configs.
 
@@ -4479,72 +4451,50 @@ class ScheduleDBSource:
         Uses separate queries for sessions, kernels, users, and images to avoid
         data duplication from JOINs and improve memory efficiency.
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use NoPagination for scheduler batch operations.
-                     Conditions should target SessionRow columns.
-
-        Returns:
-            SessionWithKernelsAndUserSearchResult with sessions, image_configs, and pagination info
-
         Example:
-            querier = BatchQuerier(
+            searcher = SessionSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_resource_group_id(resource_group_id),
-                    SessionConditions.by_statuses([SessionStatus.PREPARED]),
+                    fields.resource_group_id.filter.equals(resource_group_spec),
+                    fields.status.filter.in_([SessionStatus.PREPARED]),
                 ],
-                orders=[SessionOrders.created_at()],
+                orders=[fields.created_at.order.apply(ascending=True)],
             )
-            result = await db_source.search_sessions_with_kernels_and_user(querier)
+            result = await db_source.search_sessions_with_kernels_and_user(searcher)
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions
-            session_query = sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.session_type,
-                SessionRow.name,
-                SessionRow.environ,
-                SessionRow.cluster_mode,
-                SessionRow.user_uuid,
-                SessionRow.network_type,
-                SessionRow.network_id,
+        async with self._reconcile_ops.read_ops() as r:
+            session_result = await r.search_in_global(searcher)
+        if not session_result.items:
+            return SessionWithKernelsAndUserSearchResult(
+                sessions=[],
+                image_configs={},
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
             )
-            session_result = await execute_batch_querier(db_sess, session_query, querier)
-
-            if not session_result.rows:
-                return SessionWithKernelsAndUserSearchResult(
-                    sessions=[],
-                    image_configs={},
-                    total_count=0,
-                    has_next_page=False,
-                    has_previous_page=False,
-                )
-
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build session info map and collect user UUIDs
             session_ids: list[SessionId] = []
             session_info_map: dict[SessionId, dict[str, Any]] = {}
             user_uuids: set[UUID] = set()
 
-            for row in session_result.rows:
-                session_ids.append(row.id)
-                session_info_map[row.id] = {
-                    "id": row.id,
-                    "creation_id": row.creation_id,
-                    "access_key": row.access_key,
-                    "session_type": row.session_type,
-                    "name": row.name,
-                    "environ": row.environ,
-                    "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
-                    "network_type": row.network_type,
-                    "network_id": row.network_id,
+            for session in session_result.items:
+                session_id = SessionId(session.id)
+                session_ids.append(session_id)
+                session_info_map[session_id] = {
+                    "id": session_id,
+                    "creation_id": session.creation_id,
+                    "access_key": session.access_key,
+                    "session_type": session.session_type,
+                    "name": session.name,
+                    "environ": session.environ,
+                    "cluster_mode": session.cluster_mode,
+                    "user_uuid": session.user_uuid,
+                    "network_type": session.network_type,
+                    "network_id": session.network_id,
                     "kernels": [],
                 }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
+                user_uuids.add(session.user_uuid)
 
             # 2. Query kernels for these sessions
             kernel_query = (
@@ -4668,43 +4618,35 @@ class ScheduleDBSource:
 
     async def search_sessions_with_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionWithKernels]:
         """Search sessions with their kernels using SessionInfo/KernelInfo for handlers.
 
-        This method uses the unified SessionInfo and KernelInfo types,
-        loading full Row objects and converting via to_session_info()/to_kernel_info().
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Conditions should target SessionRow columns.
-
-        Returns:
-            List of SessionWithKernels containing SessionInfo and KernelInfo objects.
+        This method uses the unified SessionInfo and KernelInfo types.
         """
+        async with self._reconcile_ops.read_ops() as r:
+            session_result = await r.search_in_global(searcher)
+        if not session_result.items:
+            return []
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions (full rows for to_session_info conversion)
-            session_query = sa.select(SessionRow)
-            session_result = await execute_batch_querier(db_sess, session_query, querier)
-
-            if not session_result.rows:
-                return []
-
             # Build session map
             session_ids: list[SessionId] = []
             sessions_map: dict[SessionId, SessionWithKernels] = {}
-            for row in session_result.rows:
-                session_row: SessionRow = row.SessionRow
-                session_ids.append(session_row.id)
-                sessions_map[session_row.id] = SessionWithKernels(
-                    session_info=session_row.to_session_info(),
+            for session_info in session_result.items:
+                session_ids.append(SessionId(session_info.identity.id))
+                sessions_map[SessionId(session_info.identity.id)] = SessionWithKernels(
+                    session_info=session_info,
                     kernel_infos=[],
                 )
 
             # 2. Query kernels for these sessions (full rows for to_kernel_info conversion)
             kernel_query = (
                 sa.select(KernelRow)
-                .where(KernelConditions.by_session_ids(session_ids)())
+                .where(
+                    KernelSearchableFields.own.session_id.filter.in_(
+                        UUIDInMatchSpec(values=session_ids, negated=False)
+                    )()
+                )
                 .order_by(KernelRow.session_id, KernelRow.cluster_idx)
             )
             kernel_result = await db_sess.execute(kernel_query)

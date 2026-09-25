@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -40,6 +41,14 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    DomainUsageBucketSearchableFields,
+    KernelUsageRecordSearchableFields,
+)
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -51,13 +60,8 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history import (
-    DomainUsageBucketConditions,
-    DomainUsageBucketOrders,
-    KernelUsageRecordConditions,
-    KernelUsageRecordOrders,
     ResourceUsageHistoryRepository,
 )
 from ai.backend.testutils.db import with_tables
@@ -366,7 +370,7 @@ class TestResourceUsageHistoryRepository:
         test_project_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> None:
-        """Test searching kernel usage records with BatchQuerier"""
+        """Test searching kernel usage records with a searcher"""
         kernel_id = uuid.uuid4()
         session_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
@@ -395,13 +399,17 @@ class TestResourceUsageHistoryRepository:
 
         await resource_usage_history_repository.bulk_create_kernel_usage_records(creations)
 
-        # Search by kernel using BatchQuerier
-        querier = BatchQuerier(
+        # Search by kernel using the searcher
+        searcher = KernelUsageRecordSearcher(
             pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[KernelUsageRecordConditions.by_kernel_id(kernel_id)],
-            orders=[KernelUsageRecordOrders.by_period_start()],
+            conditions=[
+                KernelUsageRecordSearchableFields.own.kernel_id.filter.equals(
+                    UUIDEqualMatchSpec(value=kernel_id, negated=False)
+                )
+            ],
+            orders=[KernelUsageRecordSearchableFields.own.period_start.order.apply(True)],
         )
-        result = await resource_usage_history_repository.search_kernel_usage_records(querier)
+        result = await resource_usage_history_repository.search_kernel_usage_records(searcher)
 
         assert result.total_count == 3
         assert len(result.items) == 3
@@ -418,7 +426,7 @@ class TestResourceUsageHistoryRepository:
         test_resource_group_id: ResourceGroupID,
         test_domain: DomainFixtureData,
     ) -> None:
-        """Test searching domain usage buckets with BatchQuerier"""
+        """Test searching domain usage buckets with a searcher"""
         today = datetime.now(tz=UTC).date()
 
         # Create buckets for multiple days
@@ -438,18 +446,25 @@ class TestResourceUsageHistoryRepository:
                 ),
             )
 
-        # Search with lookback window using BatchQuerier
+        # Search with lookback window using the searcher
         lookback_start = today - timedelta(days=3)
         lookback_end = today
-        querier = BatchQuerier(
+        searcher = DomainUsageBucketSearcher(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                DomainUsageBucketConditions.by_resource_group(test_scaling_group),
-                DomainUsageBucketConditions.by_period_range(lookback_start, lookback_end),
+                DomainUsageBucketSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(test_scaling_group, case_insensitive=False, negated=False)
+                ),
+                DomainUsageBucketSearchableFields.own.period_start.filter.on_or_after(
+                    lookback_start
+                ),
+                DomainUsageBucketSearchableFields.own.period_start.filter.on_or_before(
+                    lookback_end
+                ),
             ],
-            orders=[DomainUsageBucketOrders.by_period_start()],
+            orders=[DomainUsageBucketSearchableFields.own.period_start.order.apply(True)],
         )
-        result = await resource_usage_history_repository.search_domain_usage_buckets(querier)
+        result = await resource_usage_history_repository.search_domain_usage_buckets(searcher)
 
         assert result.total_count == 4  # days 0, 1, 2, 3
         assert len(result.items) == 4

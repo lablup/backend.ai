@@ -79,7 +79,15 @@ class ImageTagEntry:
 class ResourceLimit:
     key: str
     min: Decimal
-    max: Decimal
+    max: Decimal | str | None
+
+    def to_dict(self) -> dict[str, str | None]:
+        max_value: str | None
+        if self.max is None or (isinstance(self.max, Decimal) and self.max.is_infinite()):
+            max_value = None
+        else:
+            max_value = str(self.max)
+        return {"key": self.key, "min": str(self.min), "max": max_value}
 
 
 @dataclass
@@ -243,16 +251,6 @@ class RescanImagesResult:
 class ImageAliasData(FieldData):
     id: ImageAliasID = field(compare=False)
     alias: str
-
-
-@dataclass
-class ImageListResult:
-    """Search result with total count and pagination info for images."""
-
-    items: list[ImageData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
 
 
 @dataclass

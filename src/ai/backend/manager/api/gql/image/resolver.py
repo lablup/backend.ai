@@ -7,6 +7,7 @@ This module provides GraphQL query fields for ImageV2.
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 from uuid import UUID
 
 import strawberry
@@ -17,7 +18,10 @@ from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
     ScopedSearchImagesInput,
+    SearchImageAliasesInput,
 )
+from ai.backend.common.dto.manager.v2.image.types import ImageScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -27,11 +31,11 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 
 from .types import (
     ContainerRegistryScopeGQL,
     ImageSearchScopeGQL,
+    ImageUsageGQL,
     ImageV2AliasConnectionGQL,
     ImageV2AliasEdgeGQL,
     ImageV2AliasFilterGQL,
@@ -55,6 +59,16 @@ from .types import (
 )  # type: ignore[misc]
 async def admin_images_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        ImageUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; images the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: ImageV2FilterGQL | None = None,
     order_by: list[ImageV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -69,6 +83,7 @@ async def admin_images_v2(
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.image.admin_search_images_gql(
         AdminSearchImagesInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_orders,
             first=first,
@@ -108,6 +123,16 @@ async def admin_images_v2(
 async def scoped_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ImageSearchScopeGQL,
+    usage: Annotated[
+        ImageUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; images the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: ImageV2FilterGQL | None = None,
     order_by: list[ImageV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -120,6 +145,7 @@ async def scoped_images_v2(
     payload = await info.context.adapters.image.scoped_search(
         ScopedSearchImagesInput(
             scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -177,13 +203,11 @@ async def container_registry_images_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageV2ConnectionGQL | None:
-    pydantic_filter = filter.to_pydantic() if filter else None
-    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-    base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
-    payload = await info.context.adapters.image.admin_search_images_gql(
-        AdminSearchImagesInput(
-            filter=pydantic_filter,
-            order=pydantic_orders,
+    payload = await info.context.adapters.image.scoped_search(
+        ScopedSearchImagesInput(
+            scope=ImageScope(container_registry=[UUIDScope(value=scope.registry_id)]),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,
@@ -191,7 +215,6 @@ async def container_registry_images_v2(
             limit=limit,
             offset=offset,
         ),
-        base_conditions=base_conditions,
     )
     edges = [
         ImageV2EdgeGQL(
@@ -291,13 +314,11 @@ async def image_scoped_aliases(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageV2AliasConnectionGQL | None:
-    pydantic_filter = filter.to_pydantic() if filter else None
-    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-    base_conditions = [ImageAliasConditions.by_image_ids([ImageID(scope.image_id)])]
-    payload = await info.context.adapters.image.admin_search_image_aliases(
-        AdminSearchImageAliasesInput(
-            filter=pydantic_filter,
-            order=pydantic_orders,
+    payload = await info.context.adapters.image.scoped_search_aliases(
+        ImageID(scope.image_id),
+        SearchImageAliasesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,
@@ -305,7 +326,6 @@ async def image_scoped_aliases(
             limit=limit,
             offset=offset,
         ),
-        base_conditions=base_conditions,
     )
     edges = [
         ImageV2AliasEdgeGQL(

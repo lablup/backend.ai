@@ -62,12 +62,14 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityUpsertOpsAction,
     GlobalEntityWithFieldsCreateOpsAction,
     GlobalRoleManagedEntityCreateOpsAction,
+    GlobalSearcherOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
+    ScopedSearchOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
 )
@@ -418,6 +420,47 @@ class SearchService[TData: EntityData]:
         )
 
 
+class ScopedSearchService[TData: EntityData]:
+    """Runs the action's searcher over the scopes it names, narrowed by the uses it names."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: ScopedSearchOpsAction[Any, TData]
+    ) -> ScopedBatchOpsResult[TData]:
+        result = await self._repository.scoped_search(action.searcher)
+        return ScopedBatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
+class GlobalSearcherService[TData]:
+    """Runs the action's searcher across the entire table, narrowed by the uses it names.
+
+    Wired from ``BaseGlobalAction``, whose SUPERADMIN gate answers for the unscoped read.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: GlobalSearcherOpsAction[Any, TData]) -> BatchOpsResult[TData]:
+        result = await self._repository.global_search(action.searcher)
+        return BatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
 class SearchFieldsService[TData]:
     """Runs the action's searcher over the owner scopes it names.
 
@@ -477,7 +520,7 @@ class GlobalCreateService[TData: EntityData]:
         self, action: GlobalEntityCreateOpsAction[Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
-            data=await self._repository.create_global_entity(action.to_creator())
+            data=await self._repository.create_entity(action.to_creator())
         )
 
 
@@ -492,7 +535,7 @@ class GlobalCreateWithFieldsService[TData: EntityData]:
     async def execute(
         self, action: GlobalEntityWithFieldsCreateOpsAction[Any, TData, Any, Any]
     ) -> CreatedEntityWithFieldsOpsResult[TData, Any]:
-        result = await self._repository.create_global_entity_with_fields(
+        result = await self._repository.create_entity_with_fields(
             action.to_creator(), action.to_field_creators()
         )
         return CreatedEntityWithFieldsOpsResult(data=result.data, fields=result.fields)
@@ -549,7 +592,7 @@ class RoleManagedEntityCreateService[TData: EntityData]:
 
 
 class GlobalRoleManagedEntityCreateService[TData: EntityData]:
-    """Inserts the role-managed entity row created in no scope, preset roles
+    """Inserts the role-managed entity row in the global scope, preset roles
     included."""
 
     _repository: OpsRepository[TData]
@@ -561,7 +604,7 @@ class GlobalRoleManagedEntityCreateService[TData: EntityData]:
         self, action: GlobalRoleManagedEntityCreateOpsAction[Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
-            data=await self._repository.create_role_managed_global_entity(action.to_creator())
+            data=await self._repository.create_role_managed_entity(action.to_creator())
         )
 
 
@@ -759,7 +802,7 @@ class FieldPartialBulkPurgeService[TData: FieldData]:
 
 
 class GlobalUpsertService[TData]:
-    """Inserts or updates a global row on conflict; nothing is registered."""
+    """Inserts or updates a row of an entity created in the global scope on conflict."""
 
     _repository: OpsRepository[TData]
 
@@ -769,9 +812,7 @@ class GlobalUpsertService[TData]:
     async def execute(
         self, action: GlobalEntityUpsertOpsAction[Any, TData]
     ) -> EntityOpsResult[TData]:
-        return EntityOpsResult(
-            data=await self._repository.upsert_global_entity(action.to_upserter())
-        )
+        return EntityOpsResult(data=await self._repository.upsert_entity(action.to_upserter()))
 
 
 class EntityUpsertService[TData]:
@@ -799,7 +840,7 @@ class GlobalAtomicUpsertService[TData: EntityData]:
         self, action: GlobalEntityAtomicUpsertOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.atomic_upsert_global_entities(action.to_upserters())
+            items=await self._repository.atomic_upsert_entities(action.to_upserters())
         )
 
 

@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -16,7 +17,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
+from ai.backend.manager.models.replica_group.searchable_fields import (
+    ReplicaGroupSearchableFields,
+)
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
@@ -95,7 +98,11 @@ class DeployingProvisionedHandler(DeploymentHandler):
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         deployment_ids = [d.deployment_info.id for d in deployments]
-        conditions = [ReplicaGroupConditions.by_deployment_ids(deployment_ids)]
+        conditions = [
+            ReplicaGroupSearchableFields.own.deployment_id.filter.in_(
+                UUIDInMatchSpec(values=deployment_ids, negated=False)
+            )
+        ]
         views = await self._replica_group_repository.search_deploy_scheduling_views(conditions)
         groups_by_id: dict[ReplicaGroupID, ReplicaGroupDeploySchedulingView] = {
             view.group_id: view for view in views

@@ -103,13 +103,11 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-)
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
@@ -326,11 +324,11 @@ class ModelServingService:
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
-        querier = BatchQuerier(
+        searcher = DeploymentInfoSearcher(
             pagination=OffsetPagination(offset=action.offset, limit=action.limit),
             conditions=action.conditions,
         )
-        result = await self._repository.search_services_paginated(action.session_owner_id, querier)
+        result = await self._repository.search_services_paginated(action.session_owner_id, searcher)
         return SearchServicesActionResult(
             items=result.items,
             total_count=result.total_count,
@@ -553,7 +551,7 @@ class ModelServingService:
                         if status == SessionStatus.RUNNING:
                             await self._scheduling_controller.mark_sessions_for_termination(
                                 [session_id],
-                                reason="DRY_RUN_COMPLETE",
+                                reason=KernelLifecycleEventReason.DRY_RUN_COMPLETE,
                             )
 
                         # Exit loop on terminal states
@@ -737,7 +735,7 @@ class ModelServingService:
         if route_row.session_row:
             await self._scheduling_controller.mark_sessions_for_termination(
                 [route_row.session_row.id],
-                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN.value,
+                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 forced=False,
             )
 

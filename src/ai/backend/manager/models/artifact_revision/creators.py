@@ -16,6 +16,9 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
 )
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchable_fields import (
+    ArtifactRevisionSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -67,4 +70,4 @@ class ArtifactRevisionCreator(FieldCreator[ArtifactID, ArtifactRevisionRow, Arti
 
     @override
     def to_data(self, row: ArtifactRevisionRow) -> ArtifactRevisionData:
-        return row.to_dataclass()
+        return ArtifactRevisionSearchableFields.own.to_data(row)

@@ -29,6 +29,6 @@ class AuditLogProcessors:
     bulk_get: PartialBulkFieldActionProcessor[BulkGetAuditLogsAction, AuditLogData]
 
     def __init__(self, group: LookupFieldGroup[AuditLogData]) -> None:
-        self.global_search = group.global_search_ops(SearchAuditLogsAction)
+        self.global_search = group.global_searcher_ops(SearchAuditLogsAction)
         self.scoped_search = group.atomic_bulk_scoped_search_ops(ScopedSearchAuditLogsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetAuditLogsAction)

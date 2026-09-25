@@ -37,6 +37,7 @@ from ai.backend.manager.models.agent import (
     AgentStatus,
     agents,
 )
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -783,7 +784,7 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
             return [
                 cls.from_data(
                     AgentDetailData(
-                        agent=agent.to_data(),
+                        agent=AgentSearchableFields.own.to_data(agent),
                         resources=agent.resources_by_rank(),
                         permissions=[],
                     )

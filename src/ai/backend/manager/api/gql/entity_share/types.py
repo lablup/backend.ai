@@ -42,6 +42,7 @@ from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -89,6 +90,12 @@ class EntityShareOrderFieldGQL(StrEnum):
 )
 class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the entity share.",
+        ),
+    )
     sharer_user_id: UUID | None = gql_field(
         default=None, description="Who sent the offer, while that account is still there."
     )

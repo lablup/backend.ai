@@ -268,6 +268,15 @@ class TestVFolderHosts:
         assert isinstance(result, ListAllowedTypesResponse)
         assert isinstance(result.root, list)
 
+    async def test_regular_user_lists_allowed_types(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """A regular user reads the allowed vfolder types; the route is not superadmin-only."""
+        result = await user_registry.vfolder.list_allowed_types()
+        assert isinstance(result, ListAllowedTypesResponse)
+        assert result.root == ["user"]
+
 
 class TestVFolderInvitation:
     async def test_invite_user_to_vfolder(

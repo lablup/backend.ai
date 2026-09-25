@@ -1,9 +1,9 @@
 from .authenticated import AuthenticatedActionValidator
 from .base import GlobalActionValidator
-from .superadmin import SuperAdminActionValidator
+from .refusing import RefusingGlobalActionValidator
 
 __all__ = (
     "AuthenticatedActionValidator",
     "GlobalActionValidator",
-    "SuperAdminActionValidator",
+    "RefusingGlobalActionValidator",
 )

@@ -58,4 +58,4 @@ class RetentionPolicyProcessors:
         self.update = group.single_update_ops(UpdateRetentionPolicyAction)
         self.delete = group.entity_purge_ops(DeleteRetentionPolicyAction)
         self.purge = group.entity_purge_ops(PurgeRetentionPolicyAction)
-        self.global_search = group.global_search_ops(SearchRetentionPoliciesAction)
+        self.global_search = group.global_searcher_ops(SearchRetentionPoliciesAction)

@@ -39,9 +39,7 @@ from ai.backend.common.types import (
     BinarySize,
     ImageCanonical,
     ImageID,
-    ResourceSlot,
     SlotName,
-    SlotTypes,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -50,10 +48,7 @@ from ai.backend.manager.data.image.types import (
     ImageData,
     ImageDataWithDetails,
     ImageIdentifier,
-    ImageLabelsData,
-    ImageResourcesData,
     ImageStatus,
-    ImageTagEntry,
     ImageType,
     KVPair,
     ResourceLimit,
@@ -310,6 +305,10 @@ class ImageRow(CreatedAtMixin, Base):
 
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
+        resources: dict[str, dict[str, str | None]] = {}
+        for resource_limit in image_data.resource_limits:
+            limit = resource_limit.to_dict()
+            resources[resource_limit.key] = {"min": limit["min"], "max": limit["max"]}
         image_row = cls(
             name=image_data.name,
             project=image_data.project,
@@ -324,7 +323,7 @@ class ImageRow(CreatedAtMixin, Base):
             type=image_data.type,
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
-            resources={rl.key: {rl.min, rl.max} for rl in image_data.resource_limits},
+            resources=resources,
             status=image_data.status,
         )
         image_row.id = image_data.id
@@ -400,32 +399,6 @@ class ImageRow(CreatedAtMixin, Base):
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
 
-    async def get_min_slot(self, slot_units: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
-        min_slot = ResourceSlot()
-
-        for slot_key, resource in self.resources.items():
-            slot_unit = slot_units.get(slot_key)
-            if slot_unit is None:
-                # ignore unknown slots
-                continue
-            min_value = resource.get("min")
-            if min_value is None:
-                min_value = Decimal(0)
-            if slot_unit == "bytes":
-                if not isinstance(min_value, Decimal):
-                    min_value = BinarySize.from_str(min_value)
-            else:
-                if not isinstance(min_value, Decimal):
-                    min_value = Decimal(min_value)
-            min_slot[slot_key] = min_value
-
-        # fill missing
-        for slot_key in slot_units.keys():
-            if slot_key not in min_slot:
-                min_slot[slot_key] = Decimal(0)
-
-        return min_slot
-
     def _parse_row(self) -> dict[str, Any]:
         res_limits = []
         for slot_key, slot_range in self.resources.items():
@@ -495,38 +468,6 @@ class ImageRow(CreatedAtMixin, Base):
             resources[slot_type]["max"] = str(value_range[1])
 
         self._resources = resources
-
-    def to_dataclass(self) -> ImageData:
-        _, ptag_set = self.image_ref.tag_set
-        return ImageData(
-            id=self.id,
-            name=ImageCanonical(self.name),
-            project=self.project,
-            image=self.image,
-            created_at=self.created_at,
-            tag=self.tag,
-            registry=self.registry,
-            registry_id=self.registry_id,
-            architecture=self.architecture,
-            config_digest=self.trimmed_digest,
-            size_bytes=self.size_bytes,
-            is_local=self.is_local,
-            type=self.type,
-            accelerators=self.accelerators,
-            labels=ImageLabelsData(label_data=self.labels),
-            resources=ImageResourcesData(resources_data=self.resources),
-            resource_limits=[
-                ResourceLimit(
-                    key=str(k), min=v.get("min", Decimal(0)), max=v.get("max", Decimal("Infinity"))
-                )
-                for k, v in self.resources.items()
-            ],
-            tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
-            status=self.status,
-            customized=self.customized,
-            creator_id=self.creator_id,
-            last_used_at=self.last_used_at,
-        )
 
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
         version, ptag_set = self.image_ref.tag_set
@@ -601,9 +542,6 @@ class ImageAliasRow(Base):
     @classmethod
     def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
-
-    def to_dataclass(self) -> ImageAliasData:
-        return ImageAliasData(id=ImageAliasID(self.id), alias=self.alias or "")
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList

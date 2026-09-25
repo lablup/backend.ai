@@ -52,6 +52,7 @@ from ai.backend.manager.models.app_config_fragment.purgers import AppConfigFragm
 from ai.backend.manager.models.app_config_fragment.queriers import (
     AppConfigFragmentQuerier,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.app_config_fragment.searchers import (
     AppConfigFragmentSearcher,
 )
@@ -61,6 +62,7 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -92,10 +94,7 @@ from ai.backend.manager.services.app_config.processors import AppConfigProcessor
 def _get_app_config_fragment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigFragmentOrders.created_at(ascending=False),
-        backward_order=AppConfigFragmentOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigFragmentConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigFragmentConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigFragmentOrders.id(ascending=True),
+        cursor_column=AppConfigFragmentRow.id,
     )
 
 
@@ -284,7 +283,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._app_config.fragment_admin_search.run(
-            AdminSearchAppConfigFragmentAction(searcher=searcher)
+            AdminSearchAppConfigFragmentAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.items],
@@ -352,6 +353,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     def _fragment_to_node(data: AppConfigFragmentData) -> AppConfigFragmentNode:
         return AppConfigFragmentNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             scope_type=AppConfigScopeType.of_owner(data.scope_id),
             scope_id=AppConfigScopeID(data.scope_id) if data.scope_id is not None else None,

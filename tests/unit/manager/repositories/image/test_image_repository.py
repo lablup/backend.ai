@@ -21,14 +21,23 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import BinarySize, KernelId, SessionId
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
-from ai.backend.manager.models.image.conditions import ImageConditions
+from ai.backend.manager.models.image.searchable_fields import (
+    ImageAliasSearchableFields,
+    ImageSearchableFields,
+)
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -37,15 +46,38 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
 CreateKernelForImageFunc = Callable[[ImageRow, datetime], Coroutine[Any, Any, None]]
+SearchImagesFunc = Callable[..., Coroutine[Any, Any, SearcherResult[ImageData]]]
+
+fields = ImageSearchableFields.own
+
+
+def _exact(value: str) -> StringMatchSpec:
+    return StringMatchSpec(value=value, case_insensitive=False, negated=False)
+
+
+def _alias_contains(value: str) -> QueryCondition:
+    alias_filter = ImageAliasSearchableFields.own.alias.filter
+    return ImageSearchableFields.nested.aliases.correlation.some([
+        alias_filter.contains(_exact(value))
+    ])
+
+
+def _alias_ends_with(value: str) -> QueryCondition:
+    alias_filter = ImageAliasSearchableFields.own.alias.filter
+    return ImageSearchableFields.nested.aliases.correlation.some([
+        alias_filter.ends_with(_exact(value))
+    ])
 
 
 class TestImageRepositorySearch:
@@ -69,6 +101,10 @@ class TestImageRepositorySearch:
                 ContainerRegistryRow,
                 ImageRow,
                 ImageAliasRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -188,57 +224,63 @@ class TestImageRepositorySearch:
             config_provider=mock_config,
         )
 
+    @pytest.fixture
+    def search(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> SearchImagesFunc:
+        """Run one image search the way the search actions do."""
+
+        async def run(
+            conditions: list[QueryCondition] | None = None,
+            orders: list[QueryOrder] | None = None,
+            limit: int = 10,
+            offset: int = 0,
+        ) -> SearcherResult[ImageData]:
+            async with V2DBOpsProvider(db_with_cleanup).read_ops() as r:
+                return await r.search_in_global(
+                    ImageSearcher(
+                        pagination=OffsetPagination(limit=limit, offset=offset),
+                        conditions=conditions or [],
+                        orders=orders or [],
+                    )
+                )
+
+        return run
+
     # =========================================================================
     # Tests - Search with pagination
     # =========================================================================
 
     async def test_search_images_first_page(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test first page of search results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search()
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_images_second_page(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test second page of search results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(offset=10)
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_images_last_page(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test last page with partial results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=20),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(offset=20)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -249,40 +291,24 @@ class TestImageRepositorySearch:
 
     async def test_search_images_filter_by_architecture(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test filtering images by architecture"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
-            conditions=[
-                lambda: ImageRow.architecture == "arm64",
-            ],
-            orders=[],
+        result = await search(
+            conditions=[fields.architecture.filter.equals(_exact("arm64"))],
         )
-
-        result = await image_repository.search_images(querier)
 
         assert len(result.items) == 1
         assert result.items[0].architecture == "arm64"
 
     async def test_search_images_filter_by_type(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test filtering images by type"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
-            conditions=[
-                lambda: ImageRow.type == ImageType.COMPUTE,
-            ],
-            orders=[],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(conditions=[fields.type.filter.equals(ImageType.COMPUTE)])
 
         assert len(result.items) == 2
         for item in result.items:
@@ -294,34 +320,22 @@ class TestImageRepositorySearch:
 
     async def test_search_images_order_by_name_ascending(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test ordering images by name ascending"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[ImageRow.name.asc()],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(orders=[fields.name.order.apply(ascending=True)])
 
         names = [str(item.name) for item in result.items]
         assert names == sorted(names)
 
     async def test_search_images_order_by_name_descending(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test ordering images by name descending"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[ImageRow.name.desc()],
-        )
-
-        result = await image_repository.search_images(querier)
+        result = await search(orders=[fields.name.order.apply(ascending=False)])
 
         names = [str(item.name) for item in result.items]
         assert names == sorted(names, reverse=True)
@@ -332,20 +346,13 @@ class TestImageRepositorySearch:
 
     async def test_search_images_no_results(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         sample_images: list[ImageID],
     ) -> None:
         """Test search with no matching results"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            # TODO: Refactor after adding Condition type
-            conditions=[
-                lambda: ImageRow.architecture == "nonexistent",
-            ],
-            orders=[],
+        result = await search(
+            conditions=[fields.architecture.filter.equals(_exact("nonexistent"))],
         )
-
-        result = await image_repository.search_images(querier)
 
         assert len(result.items) == 0
         assert result.total_count == 0
@@ -405,44 +412,44 @@ class TestImageRepositorySearch:
 
     async def test_filter_by_single_alias_condition(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         images_with_aliases: list[ImageID],
     ) -> None:
         """Test filtering images with a single alias condition."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
+        result = await search(conditions=[_alias_contains("py")])
         assert result.total_count == 1
         assert "python" in str(result.items[0].name)
 
     async def test_filter_by_combined_alias_conditions(
         self,
-        image_repository: ImageRepository,
+        search: SearchImagesFunc,
         images_with_aliases: list[ImageID],
     ) -> None:
         """Test filtering images with two alias conditions combined."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
-                ),
-                ImageConditions.by_alias_ends_with(
-                    StringMatchSpec(value="39", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
+        result = await search(conditions=[_alias_contains("py"), _alias_ends_with("39")])
         assert result.total_count == 1
         assert "python:3.9" in str(result.items[0].name)
+
+    async def test_purge_image_removes_its_aliases(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        image_repository: ImageRepository,
+        images_with_aliases: list[ImageID],
+    ) -> None:
+        image_id = images_with_aliases[0]
+
+        removed = await image_repository.delete_image_with_aliases(image_id)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            remaining_image = await db_sess.get(ImageRow, image_id)
+            remaining_aliases = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(ImageAliasRow)
+                .where(ImageAliasRow.image_id == image_id)
+            )
+        assert removed.id == image_id
+        assert remaining_image is None
+        assert remaining_aliases == 0
 
 
 class TestImageRepositoryLastUsedAt:
@@ -494,7 +501,11 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db=db_with_cleanup, ops_provider=V2DBOpsProvider(db_with_cleanup))
+        return SessionRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def domain(

@@ -7,10 +7,11 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -23,22 +24,28 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionRoutingInfo,
+    SessionStatus,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import (
+    MainKernelNotFound,
     SessionAlreadyExists,
     SessionNotFound,
+    TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ReferenceImageSearcher,
+)
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.resource_group import resource_groups
@@ -51,15 +58,14 @@ from ai.backend.manager.models.session import (
     SessionDependencyRow,
     SessionRow,
 )
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
@@ -92,35 +98,42 @@ class SessionDBSource:
         except (ValueError, TypeError):
             pass
         session_name = session_name_or_id
-        query = sa.select(SessionRow).where(
-            (SessionRow.name == session_name)
-            & (SessionRow.user_uuid == user_id)
-            & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
-        )
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await execute_batch_querier(
-                db_sess, query, BatchQuerier(pagination=NoPagination())
+        fields = SessionSearchableFields.own
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        fields.name.filter.equals(
+                            StringMatchSpec(session_name, case_insensitive=False, negated=False)
+                        ),
+                        fields.user_uuid.filter.equals(
+                            UUIDEqualMatchSpec(value=user_id, negated=False)
+                        ),
+                        fields.status.filter.not_in(list(TERMINAL_SESSION_STATUSES)),
+                    ],
+                )
             )
-        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
-        if not rows:
+        sessions = result.items
+        if not sessions:
             raise SessionNotFound(f"Session (name={session_name}) does not exist for the user.")
-        if len(rows) > 1:
+        if len(sessions) > 1:
             # Defensive: the partial unique index should prevent this for non-terminal
             # sessions, but guard against any data that escaped the constraint.
             raise TooManySessionsMatched(
                 extra_data={
                     "matches": [
                         {
-                            "session_id": row.id,
-                            "session_name": row.name,
-                            "status": row.status,
-                            "created_at": row.created_at,
+                            "session_id": session.id,
+                            "session_name": session.name,
+                            "status": session.status,
+                            "created_at": session.created_at,
                         }
-                        for row in rows
+                        for session in sessions
                     ]
                 }
             )
-        return rows[0].id
+        return SessionId(sessions[0].id)
 
     async def get_session_name(self, session_id: SessionId) -> str:
         """Return the canonical session name for a session id.
@@ -145,7 +158,7 @@ class SessionDBSource:
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return user.to_data()
+            return UserSearchableFields.own.to_data(user)
 
     async def get_session_validated(
         self,
@@ -251,6 +264,8 @@ class SessionDBSource:
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
                 allow_stale=False,
             )
+            if session_row.status != SessionStatus.RUNNING:
+                raise InvalidAPIParameters("Can't change name of not running session")
             if session_row.access_key is not None:
                 # The name is unique among the live sessions of the target session's owner.
                 duplicate = await db_sess.scalar(
@@ -270,44 +285,10 @@ class SessionDBSource:
                 kernel.session_name = new_name
             return session_row
 
-    async def get_container_registry(
-        self,
-        registry_hostname: str,
-        registry_project: str,
-    ) -> ContainerRegistryRow | None:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ContainerRegistryRow)
-                .where(
-                    (ContainerRegistryRow.registry_name == registry_hostname)
-                    & (ContainerRegistryRow.project == registry_project)
-                )
-                .options(
-                    load_only(
-                        ContainerRegistryRow.url,
-                        ContainerRegistryRow.username,
-                        ContainerRegistryRow.password,
-                        ContainerRegistryRow.project,
-                    )
-                )
-            )
-            return cast(ContainerRegistryRow | None, await db_session.scalar(query))
-
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:
         async with self._ops_provider.read_ops() as r:
             result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_canonical_and_architecture_or_alias(
-                            reference, architecture
-                        ),
-                        ImageConditions.by_statuses([ImageStatus.ALIVE]),
-                    ],
-                    orders=ImageOrders.canonical_match_then_alive_then_oldest(
-                        reference, architecture
-                    ),
-                )
+                ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
             )
         if not result.items:
             raise ImageNotFound(f"Unknown image reference: {reference} ({architecture})")
@@ -319,14 +300,7 @@ class SessionDBSource:
         statuses = [ImageStatus.ALIVE] if alive_only else [ImageStatus.ALIVE, ImageStatus.DELETED]
         async with self._ops_provider.read_ops() as r:
             result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_canonical_and_architecture(canonical, architecture),
-                        ImageConditions.by_statuses(statuses),
-                    ],
-                    orders=ImageOrders.alive_then_oldest(),
-                )
+                CanonicalImageSearcher(canonical, architecture, statuses)
             )
         if not result.items:
             raise ImageNotFound(f"Unknown image: {canonical} ({architecture})")
@@ -588,39 +562,57 @@ class SessionDBSource:
         """Resolve a live session by ``session_id`` into its routing info.
 
         This is a pure lookup; session access authorization is the caller's
-        responsibility. Dead (terminated/cancelled) sessions are excluded. Returns a
-        data type rather than a SessionRow so the repository never exposes an ORM row.
+        responsibility. Dead (terminated/cancelled) sessions are excluded. The main
+        kernel's routing fields are read separately: a searcher answers with one
+        entity's own columns.
         """
-        query = (
-            sa.select(SessionRow)
-            .where((SessionRow.id == session_id) & (~SessionRow.status.in_(DEAD_SESSION_STATUSES)))
-            .options(
-                noload("*"),
-                selectinload(
-                    SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                ).options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).noload("*"),
-                ),
-                joinedload(SessionRow.user),
-            )
-        )
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            result = await execute_batch_querier(
-                db_sess, query, BatchQuerier(pagination=NoPagination())
-            )
-        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
-        if not rows:
-            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
-        session_row = rows[0]
-        main_kernel = session_row.main_kernel
+        session_fields = SessionSearchableFields.own
+        kernel_fields = KernelSearchableFields.own
+        async with self._ops_provider.read_ops() as r:
+            sessions = (
+                await r.search_in_global(
+                    SessionSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            session_fields.id.filter.equals(
+                                UUIDEqualMatchSpec(value=session_id, negated=False)
+                            ),
+                            session_fields.status.filter.not_in(list(DEAD_SESSION_STATUSES)),
+                        ],
+                    )
+                )
+            ).items
+            if not sessions:
+                raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+            session = sessions[0]
+            kernels = (
+                await r.search_in_global(
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            kernel_fields.session_id.filter.equals(
+                                UUIDEqualMatchSpec(value=session.id, negated=False)
+                            ),
+                            kernel_fields.cluster_role.filter.equals(
+                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
+                            ),
+                        ],
+                    )
+                )
+            ).items
+        if len(kernels) > 1:
+            raise TooManyKernelsFound(f"Session (id: {session.id}) has more than 1 main kernel.")
+        if not kernels:
+            raise MainKernelNotFound(f"Session (id: {session.id}) has no main kernel.")
+        main_kernel = kernels[0]
+        agent = main_kernel.resource.agent
         return SessionRoutingInfo(
-            session=session_row.to_dataclass(),
+            session=session.to_session_data(),
             main_kernel_id=main_kernel.id,
-            agent_id=AgentId(main_kernel.agent) if main_kernel.agent is not None else None,
-            kernel_host=main_kernel.kernel_host,
-            agent_addr=main_kernel.agent_addr,
-            service_ports=main_kernel.service_ports or [],
+            agent_id=AgentId(agent) if agent is not None else None,
+            kernel_host=main_kernel.network.kernel_host,
+            agent_addr=main_kernel.resource.agent_addr,
+            service_ports=main_kernel.network.service_ports or [],
         )
 
     @staticmethod

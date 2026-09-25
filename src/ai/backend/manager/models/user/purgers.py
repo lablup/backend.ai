@@ -33,6 +33,7 @@ from ai.backend.manager.models.specs.purger import (
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 
 @dataclass
@@ -162,4 +163,4 @@ class UserPurger(EntityPurger[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+        return UserSearchableFields.own.to_data(row)

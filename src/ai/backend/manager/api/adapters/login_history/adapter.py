@@ -29,6 +29,7 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
 from ai.backend.manager.models.login_session.searchers import LoginHistorySearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginHistoryConditions, LoginHistoryOrders
 from ai.backend.manager.services.auth.actions.search_login_history import (
     GlobalSearchLoginHistoryAction,
@@ -38,10 +39,7 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _LOGIN_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginHistoryOrders.created_at(ascending=False),
-    backward_order=LoginHistoryOrders.created_at(ascending=True),
-    forward_condition_factory=LoginHistoryConditions.by_cursor_forward,
-    backward_condition_factory=LoginHistoryConditions.by_cursor_backward,
-    tiebreaker_order=LoginHistoryRow.id.asc(),
+    cursor_column=LoginHistoryRow.id,
 )
 
 
@@ -72,7 +70,7 @@ class LoginHistoryAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._auth.global_search_login_history.run(
-            GlobalSearchLoginHistoryAction(searcher=searcher)
+            GlobalSearchLoginHistoryAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchLoginHistoryPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -104,7 +102,7 @@ class LoginHistoryAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._auth.search_login_history.run(
-            SearchLoginHistoryAction(user_id=UserID(me.user_id), searcher=searcher)
+            SearchLoginHistoryAction(user_ids=[UserID(me.user_id)], searcher=searcher)
         )
         return MySearchLoginHistoryPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -182,6 +180,7 @@ class LoginHistoryAdapter(BaseAdapter):
     def _data_to_node(data: LoginHistoryData) -> LoginHistoryNode:
         return LoginHistoryNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             domain_name=data.domain_name,
             result=LoginAttemptResult(data.result.value),

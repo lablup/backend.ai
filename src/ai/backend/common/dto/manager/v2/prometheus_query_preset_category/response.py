@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "CategoryNode",
@@ -25,6 +26,9 @@ class CategoryNode(BaseResponseModel):
     """Node representing a single prometheus query preset category."""
 
     id: UUID = Field(description="Category ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the preset category. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Human-readable category name")
     description: str | None = Field(default=None, description="Optional category description")
     created_at: datetime = Field(description="Creation timestamp")

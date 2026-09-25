@@ -77,9 +77,10 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ✅ | The backfill covered only `entity_type='user'`; existing resource entities have not a single graph row. The recursive CTE over `association_scopes_entities` is deprecated — `alembic/versions/3ebcf2c3c959`, `db_source.py:998,1131` |
 | ✅ | `RBACElementType` is being merged into `EntityType`, and `permissions.entity_type` is a `String(32)`, so adding values needs no schema change — `common/data/permission/types.py:474` |
 | ✅ | Actual list behavior sits in the legacy path and branches only on three roles. It is cleanup material — `api/gql_legacy/base.py:548` |
-| ✅ | Global search serves superadmin and globally shared values only and skips permissions; that stays. The user data loader also skips permissions; that is to be fixed — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
+| ✅ | Global search serves superadmin and globally shared values only and skips permissions. The user data loader also skips permissions — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
+| ➕ | Global search checks permission on the global singleton and attaches no row condition (5.8). User data loaders are replaced with permission-aware bulk queries |
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
-| ➕ | The graph has two relations, own and govern. Creation (`created_in`) writes both; a share writes a capped own only. Projects and users are created in their domain. A user's virtual entity is governed by its domain only; a user on a project roster is a READ-capped share |
+| ➕ | The graph has two relations, own and govern. Creation (`created_in`) writes both; a share writes a capped own only. Projects and users are created in their domain and in global. A user's virtual entity is governed by its domain and global, never by a project; a user on a project roster is a READ-capped share |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
 | ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `replace_share` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
@@ -140,8 +141,8 @@ The graph has two relations. **own** is a virtual entity holding an entity: the 
 
 | Declaration | own | govern | Rule |
 |---|---|---|---|
-| `created_in` at creation | yes | yes | A session is created in its project and user, a project and a user in their domain. It is on the creator's list, and the creator's roles reach what is under it (invitations). Not removed by unsharing. Ownership moves with `transfer(from_scopes, to_scopes, entity)`. A user's virtual entity is governed by its domain only, never by a project — so what the user owns does not leak into the project |
-| relation `create_relation(scope, target)` | the target holds the scope under cap READ | the scope governs the target under cap READ | A project reads a resource group or registry and the agents or images it owns; the resource group or registry reads the project itself only. The only place a govern-side cap is written |
+| `created_in` at creation | yes | yes | A session is created in its project and user, a domain in global, a project and a user in their domain and global. It is on the creator's list, and the creator's roles reach what is under it (invitations). Not removed by unsharing. Ownership moves with `transfer(from_scopes, to_scopes, entity)`. A user's virtual entity is governed by its domain and global, never by a project — so what the user owns does not leak into the project |
+| relation `create_relation(scope, target)` | the target holds the scope under cap READ | the scope governs the target under cap READ | A project reads a resource group or registry and the agents or images it owns; the resource group or registry reads the project itself only. The public singleton links global container registries and resource presets with no resource group through this relation per instance, and purges the relation when public is turned off (5.8). The only place a govern-side cap is written |
 | share `replace_share(scope, entity, cap)` / `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` | yes, capped | no | `replace_share` covers every field up to the cap — the cap is always explicit, 0 included. `replace_share_fields` puts READ/UPDATE on field paths only (5.2). Removed by `unshare`. A share is lent to the receiving scope, so it answers through that scope's own govern only and for the shared entity itself only |
 
 A user on a project roster is a share: `replace_share_fields(project, user, {READ: the default public fields})`. There is no domain roster — a user is created in its domain. Granting auto_assign roles on joining is a separate primitive.
@@ -241,7 +242,7 @@ Every resource-entity query is a project view. The only difference is whether on
 | Project view | Enrollment AND accessible |
 | Shared with me | Individual shares only |
 
-Conditions attach in exactly one place: scoped search. Global search remains dedicated to superadmin and globally shared values and skips permissions. It does not enter the searcher specs. Input names only the scope; whether the requester holds permission is fixed internally. User data loaders are replaced with permission-aware bulk queries.
+Conditions attach in exactly one place: scoped search. Global search checks permission on the global singleton and attaches no row condition (5.8). It does not enter the searcher specs. Input names only the scope; whether the requester holds permission is fixed internally. User data loaders are replaced with permission-aware bulk queries.
 
 Permission resolution serves only the admission decision at the API boundary. Internal calls run no permission queries.
 
@@ -350,8 +351,13 @@ Resource-group allowance is checked against the submitting subject and stays own
 | 3 | Move personal folders' owner column and enrollment to personal projects. `quota_scope_id` stays |
 | 4 | Move image labels into the owner column, targeting personal projects. The label serves only as this initial input |
 | 5 | Migrate the legacy virtual-folder sharing tables into the sharing record and the graph |
+| 6 | Create the `global` and `public` singleton rows and their virtual entity nodes |
+| 7 | Backfill membership: global entities and domains into global, type-wide public entities into global and public, projects and users additionally into global |
+| 8 | Backfill public relations: link container registries with `is_global=true` and resource presets with no resource group to public |
+| 9 | Create the public default role and grant it to every user |
+| 10 | Switch the gate validators to singleton permission checks |
 
-Without step 1 nothing else does anything. Sessions, deployments, and model cards have non-null project columns, so there is nothing to move.
+Without step 1 nothing else does anything. Step 10 applies after steps 7 through 9. Sessions, deployments, and model cards have non-null project columns, so there is nothing to move.
 
 Relocating resource policies and allowances is follow-up work (Non-Goals). Until then, personal-folder limits and allowances are answered by today's keypair-policy path unchanged, so this migration does not alter check behavior. The follow-up direction: keep allowed storage hosts and allowed resource groups on the domain and project axes only, removing the keypair axis; move the user policy's folder and image limits into the project policy; absorb the `allowed_vfolder_types` setting into policy and retire it.
 
@@ -380,6 +386,149 @@ Opening project-folder creation and narrowing user information are the intended 
 | Owner display | The owning project's name only |
 | Delete button | Absent in non-owning projects |
 
+### 5.8 Global and public scopes
+
+Global entities that belonged to no scope are gathered under two singleton scopes, `global` and `public`. The superadmin-only gates and the login-only gates are decided by role permissions on these two scopes.
+
+Today "visible to everyone" is expressed in four ways. The superadmin-only gates cannot be delegated through roles.
+
+| Way | Examples |
+|---|---|
+| Gate checking login only | runtime_variant, resource_slot_type, login_client_type, prometheus_query_preset |
+| Column condition | `container_registries.is_global`, `resource_presets.scaling_group_name IS NULL`, `app_config_fragments.scope_type='public'` |
+| Empty `scope_targets` | Public app_config_fragment search |
+| Automatic joining | MODEL_STORE projects |
+
+**Singletons**
+
+| Name | Meaning | Default access |
+|---|---|---|
+| `global` | System-owned scope; the root of the ownership tree | None. Only users granted a role |
+| `public` | Scope exposed to every user | READ through a default role granted to every user automatically |
+
+- Both singletons have the entity type `global` and are told apart by id. They differ only in role contents.
+- One table maps to one entity type. No table is read as several types.
+
+**Table and id**
+
+| Item | Content |
+|---|---|
+| Table | `global_entities(id, name, created_at)`, `name` unique |
+| Source of names | A code enum (`GLOBAL`, `PUBLIC`) |
+| Row creation | The migration inserts by name; the DB generates the id |
+| id lookup | Queried once at manager startup into a name-to-id cache. Requests read the cache |
+| Code references | By name only. No UUID constants, no seed files |
+
+- Reading an id before the cache is loaded raises an error. CLI commands that use the DB load the cache first.
+- Ids differ per installation, so tests and fixtures reference names only.
+
+**Existence guarantee**
+
+Service logic assumes the singletons always exist.
+
+| Layer | Role |
+|---|---|
+| DB | Inserted by migration. No deletion-guard trigger; `models/AGENTS.md` states that `global_entities` rows and the singleton virtual entity nodes are never deleted |
+| ops | Singleton nodes are found or the call fails. No creation path creates a singleton implicitly |
+| Manager startup | Loading the id cache also checks that both rows and nodes exist. If not, startup fails and points to the recovery command |
+| Recovery | `mgr permissions provision` reconciles rows, nodes, memberships, relations, and preset roles from the enum. If a new id is generated, restart the manager |
+
+Deleting a singleton node removes that scope's roles, role assignments, and links through FK cascades. Roles a superadmin created or assigned by hand have no source and are recoverable from backups only.
+
+**Membership and relations**
+
+| Target | Method | Value |
+|---|---|---|
+| Global entities | Membership | `global` |
+| Entities whose whole type is public | Membership | `global`, `public` |
+| domain | Membership | `global` |
+| project, user | Membership | `domain`, `global` |
+| Per-instance public (`is_global`, presets with no resource group) | Relation to `public`, added and purged when turned off | Membership stays `global` |
+| Entities whose owner changes (vfolder, agent, template) | Move existing membership (`transfer`) | Unchanged |
+
+- Every global entity is a member of global. public widens exposure; it is not the root of the ownership tree.
+- Type-wide public is never toggled, so it is membership. Membership carries no cap, so the public role's contents limit it to READ.
+- Per-instance public is a relation. A relation governs the target under a READ cap, so the public role reads the registry and the images it owns.
+- Turning public off purges the relation immediately.
+- The source of per-instance public is the column (`is_global`, `scaling_group_name`). Recovery and query conditions read the column.
+- project and user are also members of global, so permission resolution stays two steps (membership and govern) while global roles reach resources owned by projects and users. No recursive queries.
+- Sub-resources (kernel, revision, replica, route, ...) get no node and stay field checks against the owning entity.
+- Creating a global entity uses the same creation specs and scope checks as any entity, with `global` as the target scope.
+
+**Roles**
+
+| Scope | Role | Assignment | Permissions |
+|---|---|---|---|
+| public | Default role | Granted to every user automatically | READ on type-wide public entities and container_registry, image, resource_preset |
+| global | Delegated role (optional) | Assigned by superadmin | e.g. write on container_registry |
+
+- Singleton roles are declared by adding a scope entry to a preset. Without one, the role is created per type as today; with one, only in that scope.
+- Seed files name the scope (`scope: public`); provision resolves the id from the DB.
+- Managing roles on global and public requires the `role` permission, so superadmin does it.
+
+**User-role bypass**
+
+Not synchronized with RBAC roles.
+
+| User role | Bypass location | Behavior |
+|---|---|---|
+| superadmin | Graph permission resolution | Full permission when the node exists |
+| monitor | Global validator | Only reads among global operations pass |
+
+The monitor bypass is not widened to graph permission resolution; doing so would open single lookups by id.
+
+**Gates**
+
+| Today | After | Query condition |
+|---|---|---|
+| Superadmin-only gate | After the superadmin and monitor bypass, checks action-type and operation permission on the global singleton | None. Full listing |
+| Login-only gate | Checks permission on the public singleton | None for type-wide public; per-instance public keeps the existing column condition |
+| Anonymous gate | Kept | There is no user, so no role decides |
+
+Validators are fixed in processor constructors, so call sites do not change.
+
+**Classification**
+
+| Entity | Membership | public relation condition | User exposure path |
+|---|---|---|---|
+| runtime_variant, runtime_variant_preset | global, public | | public role |
+| prometheus_query_preset, prometheus_query_preset_category | global, public | | public role |
+| resource_slot_type, login_client_type | global, public | | public role |
+| deployment_preset | global, public | | public role |
+| app_config_fragment (`scope_type='public'`) | global, public | | public role |
+| container_registry | global | `is_global=true` | public relation |
+| resource_preset | global | `scaling_group_name IS NULL` | public relation |
+| domain | global | | domain roles |
+| resource_group | global | | domain, project, user relations |
+| idle_checker | global | | domain, project, resource_group, user relations |
+| keypair, user, project resource_policy | global | | user, project references |
+| object_storage, vfs_storage, storage_namespace | global | | None |
+| artifact_registry, artifact | global | | None |
+| notification_channel, notification_rule | global | | None |
+| retention_policy, role_preset | global | | None |
+| app_config_allow_list, app_config_definition | global | | None |
+| service_catalog, client_ip_masking_policy | global | | None |
+
+**Compatibility**
+
+| Subject | Condition for unchanged behavior |
+|---|---|
+| superadmin | Bypass kept in graph resolution and the global validator |
+| monitor | Read bypass kept in the global validator |
+| Regular users reading public | The public role is granted to every user and type-wide public entities gain public membership before validators switch |
+| Regular users on global operations | Rejected for lack of a role. Same as today |
+
+Validators switch after role assignment and membership backfill (5.7).
+
+**Out of scope**
+
+| Item | Handling |
+|---|---|
+| MODEL_STORE automatic joining, model card visibility | Stay project-owned. If public exposure is needed, consider a public relation |
+| Per-domain allowed registries | public exposure and the domain allow list are separate layers |
+| Widening the monitor bypass to graph resolution | Not done |
+| artifact_registry reading one table as several types | Handled separately |
+
 ## 6. Decision Summary
 
 | Decision | Content |
@@ -393,7 +542,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Quota scope | `quota_scope_id` kept; the user quota scope reinterpreted as the personal project's. No physical moves |
 | A user's own information | Not a resource entity; stays under the user |
 | Column vs. graph | The column answers resource policy and quota, permission resolution answers capability, graph enrollment answers view membership |
-| Relations | own and govern. `created_in` writes both; a share and a relation write a capped own only. A user's virtual entity is governed by its domain only |
+| Relations | own and govern. `created_in` writes both; a share and a relation write a capped own only. A user's virtual entity is governed by its domain and global. public links global container registries and resource presets with no resource group per instance through relations |
 | Rosters | A user on a project roster is a READ-capped share (the default public fields). domain → user is govern |
 | Joining a project | Project admins invite, with the invitee's acceptance; direct registration is a domain-admin operation (BEP-1076) |
 | Credential secrets | Never readable by any administrator; administration is reissue and disable. The secret is shown once to its owner at issuance |
@@ -406,7 +555,13 @@ Opening project-folder creation and narrowing user information are the intended 
 | Member default preset | All operations on project folders; create-only for sessions and deployments; none for images and model cards |
 | Person-field disclosure | self / project / domain / authenticated users. The project policy sets the minimum; subjects can only widen |
 | Queries | Graph enrollment AND accessible (self-owned / scope permission / individual share), in one scoped-search spot. Every query is a project view |
-| Global search and data loaders | Global search stays superadmin- and global-share-only; data loaders replaced with permission-aware bulk queries |
+| Global search and data loaders | Global search checks permission on the global singleton with no row condition; data loaders replaced with permission-aware bulk queries |
+| Singleton scopes | `global` (root of the ownership tree, no default access) and `public` (READ for every user). Both have entity type `global`, told apart by id |
+| Membership rules | Global entities and domains in global; type-wide public entities in global and public; projects and users in their domain and global. Per-instance public adds a public relation to global membership |
+| Singleton ids | Inserted by name into `global_entities`, id generated by the DB. Code references names only; the manager loads a name-to-id cache once at startup and refuses to start if a row or node is missing |
+| Bypass | superadmin in graph permission resolution, monitor for reads in the global validator. Not synchronized with RBAC roles |
+| Gates | Superadmin-only gates check permission on the global singleton, login-only gates on the public singleton. Anonymous gates are kept |
+| Tables and entity types | One table, one entity type. No table is read as several types |
 | Where resolution runs | Only the admission decision at the API boundary; internal calls run no permission queries |
 | Cap-0 sharing | Leaves enrollment only and grants nothing; for surfacing in the owner's project view |
 | Reference fields | Identifiers are default-visible; dereferencing takes the target entity's permission and is rejected without it |

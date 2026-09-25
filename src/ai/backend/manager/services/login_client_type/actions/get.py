@@ -13,7 +13,7 @@ from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 
 @dataclass
 class GetLoginClientTypeAction(GetSingleEntityOpsAction[LoginClientTypeRow, LoginClientTypeData]):
-    """Read one login client type; every authenticated user may."""
+    """Read one login client type."""
 
     id: LoginClientTypeID
 

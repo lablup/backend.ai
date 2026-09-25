@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageID
 from ai.backend.common.utils import join_non_empty
@@ -24,7 +25,6 @@ from ai.backend.manager.data.image.types import (
     ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
-    ImageListResult,
     ImageStatus,
     RescanImagesResult,
     ResourceLimitInput,
@@ -38,23 +38,29 @@ from ai.backend.manager.errors.image import (
     RegistryNotFoundForImage,
     UpdateImageActionValueError,
 )
-from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
 )
-from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.lookups import ImageAliasOwnerLookup
-from ai.backend.manager.models.image.orders import ImageOrders
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.queriers import ImageQuerier
-from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
+from ai.backend.manager.models.image.scopes import ImageTarget
+from ai.backend.manager.models.image.searchable_fields import (
+    ImageAliasSearchableFields,
+    ImageSearchableFields,
+)
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ImageAliasSearcher,
+    ImageSearcher,
+    ReferenceImageSearcher,
+)
 from ai.backend.manager.models.image.updaters import ImageUpdater
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
@@ -104,32 +110,12 @@ class ImageDBSource:
     def _reference_searcher(
         self, reference: str, architecture: str, statuses: Collection[ImageStatus]
     ) -> ImageSearcher:
-        return ImageSearcher(
-            pagination=OffsetPagination(limit=1),
-            conditions=[
-                ImageConditions.by_canonical_and_architecture_or_alias(reference, architecture),
-                *self._status_conditions(statuses),
-            ],
-            orders=ImageOrders.canonical_match_then_alive_then_oldest(reference, architecture),
-        )
+        return ReferenceImageSearcher(reference, architecture, statuses)
 
     def _canonical_searcher(
         self, canonical: str, architecture: str, statuses: Collection[ImageStatus]
     ) -> ImageSearcher:
-        return ImageSearcher(
-            pagination=OffsetPagination(limit=1),
-            conditions=[
-                ImageConditions.by_canonical_and_architecture(canonical, architecture),
-                *self._status_conditions(statuses),
-            ],
-            orders=ImageOrders.alive_then_oldest(),
-        )
-
-    def _status_conditions(self, statuses: Collection[ImageStatus]) -> list[QueryCondition]:
-        """An empty collection allows every status."""
-        if not statuses:
-            return []
-        return [ImageConditions.by_statuses(statuses)]
+        return CanonicalImageSearcher(canonical, architecture, statuses)
 
     def _first_image(self, result: SearcherResult[ImageData]) -> ImageData:
         if not result.items:
@@ -160,7 +146,11 @@ class ImageDBSource:
             result = await r.search_in_global(
                 ImageAliasSearcher(
                     pagination=NoPagination(),
-                    conditions=[ImageAliasConditions.by_image_ids(image_ids)],
+                    conditions=[
+                        ImageAliasSearchableFields.own.image_id.filter.in_(
+                            UUIDInMatchSpec(values=list(image_ids), negated=False)
+                        )
+                    ],
                 )
             )
             owners = await r.lookup_field_owners(
@@ -183,69 +173,21 @@ class ImageDBSource:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
 
-    async def query_images_by_canonicals(
+    async def search_image_details(
         self,
-        canonicals: list[str],
-        status_filter: list[ImageStatus] | None = None,
-    ) -> dict[ImageID, ImageDataWithDetails]:
-        """
-        Deprecated. Use query_images_by_ids instead.
-        """
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.name.in_(canonicals))
-            .options(selectinload(ImageRow.aliases))
-        )
-        if status_filter:
-            query = query.where(ImageRow.status.in_(status_filter))
-
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(query)
-            image_rows = list(result.scalars().all())
-            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
-
-    async def query_image_details_by_identifier(
-        self,
-        identifier: ImageIdentifier,
-        status_filter: list[ImageStatus] | None = None,
-    ) -> ImageDataWithDetails:
-        """
-        Deprecated. Use query_image_details_by_id instead.
-        """
-        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
+        scopes: Sequence[ImageTarget],
+        searcher: ImageSearcher,
+    ) -> list[ImageDataWithDetails]:
+        """The images the searcher matches within the scopes, each with its aliases.
+        Naming no scope reads the whole table."""
         async with self._ops_provider.read_ops() as r:
-            result = await r.search_in_global(
-                self._reference_searcher(identifier.canonical, identifier.architecture, statuses)
-            )
-        image = self._first_image(result)
-        aliases = await self._aliases_by_image([image.id])
-        return image.to_detailed(aliases.get(image.id, []))
-
-    async def query_image_details_by_id(
-        self,
-        image_id: ImageID,
-        load_aliases: bool = False,
-        status_filter: list[ImageStatus] | None = None,
-    ) -> ImageDataWithDetails:
-        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
-        image = await self._fetch_image(image_id, statuses)
-        if not load_aliases:
-            return image.to_detailed([])
-        aliases = await self._aliases_by_image([image.id])
-        return image.to_detailed(aliases.get(image.id, []))
-
-    async def query_all_images(
-        self, status_filter: list[ImageStatus] | None = None
-    ) -> Mapping[ImageID, ImageDataWithDetails]:
-        statuses = [ImageStatus.ALIVE] if status_filter is None else status_filter
-        async with self._ops_provider.read_ops() as r:
-            result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=NoPagination(), conditions=self._status_conditions(statuses)
-                )
+            result = (
+                await r.search_with_scopes(scopes, searcher)
+                if scopes
+                else await r.search_in_global(searcher)
             )
         aliases = await self._aliases_by_image([image.id for image in result.items])
-        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in result.items}
+        return [image.to_detailed(aliases.get(image.id, [])) for image in result.items]
 
     async def mark_image_deleted(self, reference: str, architecture: str) -> ImageData:
         """
@@ -264,7 +206,7 @@ class ImageDBSource:
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             await image_row.mark_as_deleted(session)
-            return image_row.to_dataclass()
+            return ImageSearchableFields.own.to_data(image_row)
 
     async def mark_image_alive_by_id(
         self,
@@ -278,7 +220,7 @@ class ImageDBSource:
                 session, image_id, ImageStatus.restorable()
             )
             await image_row.mark_as_alive(session)
-            return image_row.to_dataclass()
+            return ImageSearchableFields.own.to_data(image_row)
 
     async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
         """
@@ -433,7 +375,7 @@ class ImageDBSource:
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
             image_row._resources = {}
-            return image_row.to_dataclass()
+            return ImageSearchableFields.own.to_data(image_row)
 
     async def set_image_resource_limit_by_id(
         self,
@@ -456,7 +398,7 @@ class ImageDBSource:
                 resources[resource_limit.slot_name]["max"] = str(resource_limit.max_value)
 
             image_row._resources = resources
-            return image_row.to_dataclass()
+            return ImageSearchableFields.own.to_data(image_row)
 
     async def remove_image_and_aliases(
         self,
@@ -474,37 +416,6 @@ class ImageDBSource:
         except DBAPIError as e:
             raise PurgeImageActionByIdObjectDBError(str(e)) from e
 
-    async def search_images(self, querier: BatchQuerier) -> ImageListResult:
-        """
-        Search images using a batch querier with conditions, pagination, and ordering.
-        Returns ImageListResult with items and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ImageRow.to_dataclass() for row in result.rows]
-            return ImageListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_images_in_scopes(
-        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
-    ) -> ImageListResult:
-        """The search of :meth:`search_images`, restricted to the scopes (OR)."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ImageRow).options(selectinload(ImageRow.aliases))
-            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
-            items = [row.ImageRow.to_dataclass() for row in result.rows]
-            return ImageListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
         """
         Search image aliases using a batch querier with conditions, pagination, and ordering.
@@ -513,7 +424,9 @@ class ImageDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ImageAliasRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ImageAliasRow.to_dataclass() for row in result.rows]
+            items = [
+                ImageAliasSearchableFields.own.to_data(row.ImageAliasRow) for row in result.rows
+            ]
             image_ids = [ImageID(row.ImageAliasRow.image_id) for row in result.rows]
             return ImageAliasListResult(
                 items=items,

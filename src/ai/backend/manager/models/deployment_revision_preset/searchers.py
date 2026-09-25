@@ -7,11 +7,19 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.manager.data.deployment_preset.types import PresetResourceSlotData
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
+from ai.backend.manager.models.resource_slot.row import (
+    PresetResourceSlotRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    PresetResourceSlotSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 __all__ = (
@@ -28,7 +36,7 @@ class DeploymentPresetSearcher(Searcher[DeploymentRevisionPresetRow, DeploymentR
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return row.to_data()
+        return DeploymentPresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -53,8 +61,4 @@ class PresetResourceSlotSearcher(Searcher[PresetResourceSlotRow, PresetResourceS
 
     @override
     def to_data(self, row: PresetResourceSlotRow) -> PresetResourceSlotData:
-        return PresetResourceSlotData(
-            preset_id=DeploymentPresetID(row.preset_id),
-            slot_name=row.slot_name,
-            quantity=row.quantity,
-        )
+        return PresetResourceSlotSearchableFields.own.to_data(row)

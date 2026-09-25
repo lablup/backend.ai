@@ -10,15 +10,20 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
+from ai.backend.manager.models.client_ip_masking.searchable_fields import (
+    ClientIPMaskingPolicySearchableFields,
+)
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
+from ai.backend.manager.models.specs.upserter import EntityUpserter
 
 __all__ = ("ClientIPMaskingPolicyUpserter",)
 
 
 @dataclass
 class ClientIPMaskingPolicyUpserter(
-    GlobalEntityUpserter[ClientIPMaskingPolicyRow, ClientIPMaskingPolicyData]
+    CreatedInGlobal[ClientIPMaskingPolicyRow],
+    EntityUpserter[ClientIPMaskingPolicyRow, ClientIPMaskingPolicyData],
 ):
     """Set the masking one target gets, replacing the row it already has.
 
@@ -67,4 +72,4 @@ class ClientIPMaskingPolicyUpserter(
 
     @override
     def to_data(self, row: ClientIPMaskingPolicyRow) -> ClientIPMaskingPolicyData:
-        return row.to_data()
+        return ClientIPMaskingPolicySearchableFields.own.to_data(row)

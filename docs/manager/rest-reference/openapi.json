@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.9.0a1",
+    "version": "26.9.0rc1",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -154,6 +154,49 @@
         "title": "AgentStatusFilter",
         "type": "object"
       },
+      "AgentUsage": {
+        "description": "Uses narrowing the agents read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Agents the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the agent narrows the result"
+          }
+        },
+        "title": "AgentUsage",
+        "type": "object"
+      },
+      "AgentUsedBy": {
+        "description": "Entities whose use of the agent narrows the result.",
+        "properties": {
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions running a kernel on the agent",
+            "title": "Session"
+          }
+        },
+        "title": "AgentUsedBy",
+        "type": "object"
+      },
       "EntityLabelFilter": {
         "description": "Filter over label rows.\n\nOne instance matches a single label at a time, so `key` and `value` given together\nconstrain the same label rather than two different ones.",
         "properties": {
@@ -260,6 +303,19 @@
       "EntityLabelNestedFilter": {
         "description": "The `labels` field of a labelable entity's filter.\n\nEach relation matches one label at a time. To require two different labels, combine\ntwo of these with the entity filter's own `AND`.",
         "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
           "some": {
             "anyOf": [
               {
@@ -270,7 +326,7 @@
               }
             ],
             "default": null,
-            "description": "At least one of the entity's labels matches"
+            "description": "At least one related row matches."
           },
           "every": {
             "anyOf": [
@@ -282,7 +338,7 @@
               }
             ],
             "default": null,
-            "description": "All of the entity's labels match; true for an unlabeled entity"
+            "description": "Every related row matches; true when there is none."
           },
           "none": {
             "anyOf": [
@@ -294,7 +350,7 @@
               }
             ],
             "default": null,
-            "description": "None of the entity's labels matches"
+            "description": "No related row matches."
           }
         },
         "title": "EntityLabelNestedFilter",
@@ -660,6 +716,18 @@
       "AdminSearchAgentsInput": {
         "description": "Input for admin-scoped paginated agent search with cursor and offset pagination.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; agents the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -2073,7 +2141,7 @@
         "properties": {
           "field": {
             "$ref": "#/components/schemas/ArtifactOrderField",
-            "description": "Field to order by."
+            "description": "Field to order by. `SIZE` is deprecated since 26.9.0: it is not used for ordering and is removed in the next release."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -2287,14 +2355,6 @@
         "title": "AdminSearchArtifactsInput",
         "type": "object"
       },
-      "Sentinel": {
-        "description": "A sentinel value to represent an unset value.",
-        "enum": [
-          1
-        ],
-        "title": "Sentinel",
-        "type": "integer"
-      },
       "UpdateArtifactInput": {
         "description": "Input for updating artifact metadata.",
         "properties": {
@@ -2307,8 +2367,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Whether the artifact should be readonly. None means no change.",
+            "description": "Whether the artifact should be readonly. Omit to leave unchanged.",
             "title": "Readonly"
           },
           "description": {
@@ -2317,14 +2376,10 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated description. Use SENTINEL to clear the field; None means no change.",
+            "description": "Updated description. Omit to leave unchanged; null clears.",
             "title": "Description"
           }
         },
@@ -4785,27 +4840,89 @@
         "title": "DeploymentOrderField",
         "type": "string"
       },
+      "DeploymentScalingStateFilter": {
+        "description": "Filter for the deployment scaling state.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScalingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ScalingState"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScalingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ScalingState"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "DeploymentScalingStateFilter",
+        "type": "object"
+      },
       "DeploymentStatusFilter": {
         "description": "Filter for deployment status.",
         "properties": {
           "equals": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/ModelDeploymentStatus"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Exact status match",
-            "title": "Equals"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/ModelDeploymentStatus"
                 },
                 "type": "array"
               },
@@ -4814,26 +4931,68 @@
               }
             ],
             "default": null,
-            "description": "Status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/ModelDeploymentStatus"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Excludes exact status match",
-            "title": "Not Equals"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
               {
                 "items": {
+                  "$ref": "#/components/schemas/ModelDeploymentStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "DeploymentStatusFilter",
+        "type": "object"
+      },
+      "DeploymentUsage": {
+        "description": "Uses narrowing the deployments read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Deployments the caller cannot\nread are left out even when a listed entity is tied to them.",
+        "properties": {
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the deployment uses, whose ids narrow the result"
+          }
+        },
+        "title": "DeploymentUsage",
+        "type": "object"
+      },
+      "DeploymentUses": {
+        "description": "Entities the deployment uses, whose ids narrow the result.",
+        "properties": {
+          "resource_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
                   "type": "string"
                 },
                 "type": "array"
@@ -4843,12 +5002,194 @@
               }
             ],
             "default": null,
-            "description": "Status is not in list",
-            "title": "Not In"
+            "description": "Resource groups the deployment runs in",
+            "title": "Resource Group"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Images the deployment's live replica group names in its current revision",
+            "title": "Image"
+          },
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VFolders the deployment's live replica group names as the model of its current revision",
+            "title": "Vfolder"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions the deployment's route rows serve as their replicas",
+            "title": "Session"
+          },
+          "runtime_variant": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Runtime variants the deployment's revisions name",
+            "title": "Runtime Variant"
+          },
+          "deployment_preset": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Presets the deployment's revisions name",
+            "title": "Deployment Preset"
           }
         },
-        "title": "DeploymentStatusFilter",
+        "title": "DeploymentUses",
         "type": "object"
+      },
+      "IntFilter": {
+        "description": "Filter for integer fields supporting equality and comparison operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact integer match",
+            "title": "Equals"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equal to this integer",
+            "title": "Not Equals"
+          },
+          "greater_than": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than this integer",
+            "title": "Greater Than"
+          },
+          "greater_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than or equal to this integer",
+            "title": "Greater Than Or Equal"
+          },
+          "less_than": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than this integer",
+            "title": "Less Than"
+          },
+          "less_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than or equal to this integer",
+            "title": "Less Than Or Equal"
+          }
+        },
+        "title": "IntFilter",
+        "type": "object"
+      },
+      "ModelDeploymentStatus": {
+        "enum": [
+          "PENDING",
+          "SCALING",
+          "DEPLOYING",
+          "READY",
+          "STOPPING",
+          "STOPPED"
+        ],
+        "title": "ModelDeploymentStatus",
+        "type": "string"
       },
       "NullableDateTimeFilter": {
         "description": "Filter for nullable datetime fields.\n\nExtends DateTimeFilter with is_null support for columns that allow NULL values\n(e.g., last_triggered_at). Use DateTimeFilter for NOT NULL columns.",
@@ -4979,6 +5320,54 @@
             "default": null,
             "description": "Replica traffic status filter"
           },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Creation datetime filter"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by replica ID"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by session ID"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by revision ID"
+          },
           "AND": {
             "anyOf": [
               {
@@ -5044,7 +5433,7 @@
               }
             ],
             "default": null,
-            "description": "Exact health status match"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -5059,7 +5448,7 @@
               }
             ],
             "default": null,
-            "description": "Health status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -5072,7 +5461,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes exact health status match"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -5087,7 +5476,7 @@
               }
             ],
             "default": null,
-            "description": "Health status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -5095,8 +5484,21 @@
         "type": "object"
       },
       "ReplicaNestedFilter": {
-        "description": "Filter deployments by conditions on their replicas.",
+        "description": "The `replicas` field of a deployment filter.\n\nEach quantifier matches one replica at a time. To require two different replicas,\ncombine two of these with the deployment filter's own `AND`.",
         "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
           "some": {
             "anyOf": [
               {
@@ -5107,7 +5509,7 @@
               }
             ],
             "default": null,
-            "description": "Matches parents with at least one replica satisfying all conditions."
+            "description": "At least one related row matches."
           },
           "every": {
             "anyOf": [
@@ -5119,7 +5521,7 @@
               }
             ],
             "default": null,
-            "description": "Matches parents where every replica satisfies all conditions (also true when the parent has no replica)."
+            "description": "Every related row matches; true when there is none."
           },
           "none": {
             "anyOf": [
@@ -5131,7 +5533,7 @@
               }
             ],
             "default": null,
-            "description": "Matches parents with no replica satisfying all conditions."
+            "description": "No related row matches."
           }
         },
         "title": "ReplicaNestedFilter",
@@ -5150,7 +5552,7 @@
               }
             ],
             "default": null,
-            "description": "Exact status match"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -5165,7 +5567,7 @@
               }
             ],
             "default": null,
-            "description": "Status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -5178,7 +5580,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes exact status match"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -5193,7 +5595,7 @@
               }
             ],
             "default": null,
-            "description": "Status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -5213,7 +5615,7 @@
               }
             ],
             "default": null,
-            "description": "Exact traffic status match"
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -5228,7 +5630,7 @@
               }
             ],
             "default": null,
-            "description": "Traffic status is in list",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -5241,7 +5643,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes exact traffic status match"
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -5256,7 +5658,7 @@
               }
             ],
             "default": null,
-            "description": "Traffic status is not in list",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -5295,9 +5697,30 @@
         "title": "RouteTrafficStatus",
         "type": "string"
       },
+      "ScalingState": {
+        "description": "Whether an endpoint is currently adjusting its replica count.\n\nOrthogonal to :class:`EndpointLifecycle`: a healthy ``READY`` endpoint\nmay also be ``SCALING`` while the coordinator reconciles\n``desired_replica_count`` against the actual replica set. Scaling only\nhappens once ``current_revision_id`` is set — the check is enforced by\nthe handler gate, not by this enum.",
+        "enum": [
+          "stable",
+          "scaling"
+        ],
+        "title": "ScalingState",
+        "type": "string"
+      },
       "AdminSearchDeploymentsInput": {
         "description": "Input for searching deployments (admin, no scope).",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -5488,6 +5911,18 @@
           "scope": {
             "$ref": "#/components/schemas/DeploymentScope",
             "description": "Scope (OR across all items)."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -5967,91 +6402,6 @@
         "title": "AddRevisionInput",
         "type": "object"
       },
-      "IntFilter": {
-        "description": "Filter for integer fields supporting equality and comparison operations.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact integer match",
-            "title": "Equals"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equal to this integer",
-            "title": "Not Equals"
-          },
-          "greater_than": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Greater than this integer",
-            "title": "Greater Than"
-          },
-          "greater_than_or_equal": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Greater than or equal to this integer",
-            "title": "Greater Than Or Equal"
-          },
-          "less_than": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Less than this integer",
-            "title": "Less Than"
-          },
-          "less_than_or_equal": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Less than or equal to this integer",
-            "title": "Less Than Or Equal"
-          }
-        },
-        "title": "IntFilter",
-        "type": "object"
-      },
       "RevisionFilter": {
         "description": "Filter for revisions.",
         "properties": {
@@ -6490,7 +6840,13 @@
         "description": "Fields available for ordering deployment replicas.",
         "enum": [
           "created_at",
-          "id"
+          "id",
+          "deployment_id",
+          "session_id",
+          "revision_id",
+          "status",
+          "traffic_status",
+          "health_status"
         ],
         "title": "ReplicaOrderField",
         "type": "string"
@@ -6888,18 +7244,6 @@
             "description": "Filter by deployment ID",
             "title": "Deployment Id"
           },
-          "token": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Token value filter"
-          },
           "expires_at": {
             "anyOf": [
               {
@@ -6923,6 +7267,18 @@
             ],
             "default": null,
             "description": "Creation datetime filter"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by access token ID"
           },
           "AND": {
             "anyOf": [
@@ -6996,7 +7352,9 @@
       "AccessTokenOrderField": {
         "description": "Fields available for ordering access tokens.",
         "enum": [
-          "created_at"
+          "created_at",
+          "field_id",
+          "expires_at"
         ],
         "title": "AccessTokenOrderField",
         "type": "string"
@@ -7280,6 +7638,69 @@
         "title": "CreateAutoScalingRuleInput",
         "type": "object"
       },
+      "AutoScalingMetricSourceFilter": {
+        "description": "Filter for the auto-scaling metric source.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoScalingMetricSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AutoScalingMetricSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoScalingMetricSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AutoScalingMetricSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "AutoScalingMetricSourceFilter",
+        "type": "object"
+      },
       "AutoScalingRuleFilter": {
         "description": "Filter for auto-scaling rules.",
         "properties": {
@@ -7351,6 +7772,115 @@
         ],
         "title": "AutoScalingRuleOrderField",
         "type": "string"
+      },
+      "DecimalFilter": {
+        "description": "Filter for decimal fields supporting equality and comparison operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact decimal match",
+            "title": "Equals"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equal to this decimal",
+            "title": "Not Equals"
+          },
+          "greater_than": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than this decimal",
+            "title": "Greater Than"
+          },
+          "greater_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Greater than or equal to this decimal",
+            "title": "Greater Than Or Equal"
+          },
+          "less_than": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than this decimal",
+            "title": "Less Than"
+          },
+          "less_than_or_equal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Less than or equal to this decimal",
+            "title": "Less Than Or Equal"
+          }
+        },
+        "title": "DecimalFilter",
+        "type": "object"
       },
       "SearchAutoScalingRulesInput": {
         "description": "Input for searching auto-scaling rules.",
@@ -7860,8 +8390,63 @@
         "title": "DeploymentRevisionPresetOrderField",
         "type": "string"
       },
+      "DeploymentRevisionPresetUsage": {
+        "description": "Uses narrowing the presets read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentRevisionPresetUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the preset narrows the result"
+          }
+        },
+        "title": "DeploymentRevisionPresetUsage",
+        "type": "object"
+      },
+      "DeploymentRevisionPresetUsedBy": {
+        "description": "Entities whose use of the preset narrows the result.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose revisions name the preset",
+            "title": "Deployment"
+          }
+        },
+        "title": "DeploymentRevisionPresetUsedBy",
+        "type": "object"
+      },
       "SearchDeploymentRevisionPresetsInput": {
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentRevisionPresetUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller."
+          },
           "filter": {
             "anyOf": [
               {
@@ -12117,6 +12702,127 @@
             "default": null,
             "description": "Filter by container registry ID."
           },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by namespace/path within the registry."
+          },
+          "registry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by registry hostname."
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project (namespace) within the registry."
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image tag."
+          },
+          "config_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image config digest."
+          },
+          "accelerators": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by accelerator requirement string."
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image size in bytes."
+          },
+          "is_local": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by local-only status.",
+            "title": "Is Local"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageTypeFilterInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image type category."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation datetime (before/after)."
+          },
           "alias": {
             "anyOf": [
               {
@@ -12140,6 +12846,18 @@
             ],
             "default": null,
             "description": "Filter by last used datetime (before/after)."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the labels on the entity"
           },
           "AND": {
             "anyOf": [
@@ -12235,9 +12953,9 @@
               }
             ],
             "default": null,
-            "description": "Matches images with this exact status."
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -12250,7 +12968,7 @@
               }
             ],
             "default": null,
-            "description": "Matches images whose status is in this list.",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -12263,7 +12981,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes images with this exact status."
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -12278,7 +12996,7 @@
               }
             ],
             "default": null,
-            "description": "Excludes images whose status is in this list.",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -12294,9 +13012,154 @@
         "title": "ImageStatusType",
         "type": "string"
       },
+      "ImageTypeEnum": {
+        "description": "Type category of an image.",
+        "enum": [
+          "compute",
+          "system",
+          "service"
+        ],
+        "title": "ImageTypeEnum",
+        "type": "string"
+      },
+      "ImageTypeFilterInputDTO": {
+        "description": "Filter for the image type category.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "ImageTypeFilterInputDTO",
+        "type": "object"
+      },
+      "ImageUsage": {
+        "description": "Uses narrowing the images read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Images the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the image narrows the result"
+          }
+        },
+        "title": "ImageUsage",
+        "type": "object"
+      },
+      "ImageUsedBy": {
+        "description": "Entities whose use of the image narrows the result.",
+        "properties": {
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions whose kernels run the image",
+            "title": "Session"
+          },
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose live replica groups name the image in their current revision",
+            "title": "Deployment"
+          }
+        },
+        "title": "ImageUsedBy",
+        "type": "object"
+      },
       "AdminSearchImagesInput": {
         "description": "Input for admin search of images with cursor and offset pagination.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -12408,7 +13271,7 @@
         "type": "object"
       },
       "ImageScope": {
-        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``global_`` names no scope and is\nauthorized against none: a registry marked global shows its images to everyone.\nRaises an error if every field is empty.",
+        "description": "Scope for the scoped image query.\n\nEach list is OR'd internally and across lists. ``public`` reads the images of the\nregistries registered in public. Raises an error if every field is empty.",
         "properties": {
           "domain": {
             "anyOf": [
@@ -12474,10 +13337,10 @@
             "description": "Container registries whose images are being read",
             "title": "Container Registry"
           },
-          "global": {
+          "public": {
             "default": false,
-            "description": "Include the images of every registry marked global",
-            "title": "Global",
+            "description": "Include the images of every registry registered in public",
+            "title": "Public",
             "type": "boolean"
           }
         },
@@ -12490,6 +13353,18 @@
           "scope": {
             "$ref": "#/components/schemas/ImageScope",
             "description": "Scope (OR across all items)."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -12631,6 +13506,18 @@
             "default": null,
             "description": "Filter by image ID."
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by alias row ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -12687,9 +13574,8 @@
         "description": "Order specification for image alias queries.",
         "properties": {
           "field": {
-            "description": "Field to order by.",
-            "title": "Field",
-            "type": "string"
+            "$ref": "#/components/schemas/ImageAliasOrderField",
+            "description": "Field to order by."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -12702,6 +13588,15 @@
         ],
         "title": "ImageAliasOrderByInputDTO",
         "type": "object"
+      },
+      "ImageAliasOrderField": {
+        "description": "Fields available for ordering image aliases.",
+        "enum": [
+          "alias",
+          "field_id"
+        ],
+        "title": "ImageAliasOrderField",
+        "type": "string"
       },
       "AdminSearchImageAliasesInput": {
         "description": "Input for admin search of image aliases with cursor and offset pagination.",
@@ -16306,7 +17201,7 @@
         "properties": {
           "field": {
             "$ref": "#/components/schemas/ObjectStorageOrderField",
-            "description": "Field to order by."
+            "description": "Field to order by. `CREATED_AT` is deprecated since 26.9.0: it is not used for ordering and is removed in the next release."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -16321,7 +17216,7 @@
         "type": "object"
       },
       "ObjectStorageOrderField": {
-        "description": "Fields available for ordering object storages.",
+        "description": "Fields available for ordering object storages.\n\n``CREATED_AT`` is deprecated since 26.9.0: the table has no such column, so the\nvalue is not used for ordering. It is removed in the next release.",
         "enum": [
           "name",
           "host",
@@ -16533,6 +17428,30 @@
             "default": null,
             "description": "Filter by domain name."
           },
+          "description": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project description."
+          },
+          "integration_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the external integration name."
+          },
           "type": {
             "anyOf": [
               {
@@ -16592,7 +17511,8 @@
               }
             ],
             "default": null,
-            "description": "Nested filter for domain conditions."
+            "deprecated": true,
+            "description": "Filter by the domain holding the project. Deprecated: search domains first, then narrow by `domain_name`."
           },
           "user": {
             "anyOf": [
@@ -16604,7 +17524,8 @@
               }
             ],
             "default": null,
-            "description": "Nested filter for user conditions."
+            "deprecated": true,
+            "description": "Filter by the users enrolled in the project. Deprecated: search users first, then pass their ids as the `user` scope."
           },
           "AND": {
             "anyOf": [
@@ -16680,12 +17601,15 @@
       "ProjectOrderField": {
         "description": "Fields available for ordering projects.",
         "enum": [
+          "id",
           "name",
           "created_at",
           "modified_at",
           "is_active",
           "type",
           "domain_name",
+          "description",
+          "integration_name",
           "user_username",
           "user_email"
         ],
@@ -17931,6 +18855,172 @@
         "title": "CreateRolePresetInput",
         "type": "object"
       },
+      "PermissionBitFilter": {
+        "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionBitDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionBitDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "PermissionBitFilter",
+        "type": "object"
+      },
+      "RolePermissionPresetFilter": {
+        "description": "Filter criteria for role_permission_presets rows.\n\nDoubles as the input for the ``permissions`` field resolver under\n``RolePresetNode``: the resolver supplies ``role_preset_id`` from its parent\nand merges any caller-provided fields here.",
+        "properties": {
+          "role_preset_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by parent role preset ID."
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by entity type the permission applies to."
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the operation bit granted."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation timestamp."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation.",
+            "title": "Not"
+          }
+        },
+        "title": "RolePermissionPresetFilter",
+        "type": "object"
+      },
       "RolePresetFilter": {
         "description": "Filter criteria for searching role presets.",
         "properties": {
@@ -17983,6 +19073,18 @@
             "default": null,
             "description": "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to ``true`` to inspect archived presets.",
             "title": "Deleted"
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePresetPermissionNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by conditions on the permission entries the preset carries."
           },
           "AND": {
             "anyOf": [
@@ -18066,9 +19168,120 @@
         "title": "RolePresetOrderField",
         "type": "string"
       },
+      "RolePresetPermissionNestedFilter": {
+        "description": "The `permissions` field of a role preset filter.\n\nEach quantifier matches one permission entry at a time. To require two different\nentries, combine two of these with the preset filter's own `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePermissionPresetFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePermissionPresetFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePermissionPresetFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "RolePresetPermissionNestedFilter",
+        "type": "object"
+      },
+      "RolePresetUsage": {
+        "description": "Uses narrowing the presets read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePresetUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the preset narrows the result"
+          }
+        },
+        "title": "RolePresetUsage",
+        "type": "object"
+      },
+      "RolePresetUsedBy": {
+        "description": "Entities whose use of the preset narrows the result.",
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Roles instantiated from the preset",
+            "title": "Role"
+          }
+        },
+        "title": "RolePresetUsedBy",
+        "type": "object"
+      },
       "SearchRolePresetsInput": {
         "description": "Input for paginated search of role presets.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RolePresetUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller."
+          },
           "filter": {
             "anyOf": [
               {
@@ -18288,168 +19501,6 @@
           }
         },
         "title": "UpdateRolePresetBody",
-        "type": "object"
-      },
-      "PermissionBitFilter": {
-        "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "in_": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionBitDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionBitDTO"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not In"
-          }
-        },
-        "title": "PermissionBitFilter",
-        "type": "object"
-      },
-      "RolePermissionPresetFilter": {
-        "description": "Filter criteria for role_permission_presets rows.\n\nDoubles as the input for the ``permissions`` field resolver under\n``RolePresetNode``: the resolver supplies ``role_preset_id`` from its parent\nand merges any caller-provided fields here.",
-        "properties": {
-          "role_preset_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by parent role preset ID."
-          },
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by entity type the permission applies to."
-          },
-          "permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PermissionBitFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by the operation bit granted."
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by creation timestamp."
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "AND conjunction.",
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "OR conjunction.",
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RolePermissionPresetFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "NOT negation.",
-            "title": "Not"
-          }
-        },
-        "title": "RolePermissionPresetFilter",
         "type": "object"
       },
       "RolePermissionPresetOrder": {
@@ -19562,9 +20613,20 @@
         "title": "MappedScopeNestedFilter",
         "type": "object"
       },
-      "PermissionNestedFilter": {
-        "description": "Nested filter for permissions within a role assignment.",
+      "PermissionFilter": {
+        "description": "Filter for scoped permissions.",
         "properties": {
+          "role_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "entity_type": {
             "anyOf": [
               {
@@ -19585,13 +20647,25 @@
                 "type": "null"
               }
             ],
+            "default": null,
+            "description": "Filter by the permission bit the entry grants."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": null
           },
           "AND": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                  "$ref": "#/components/schemas/PermissionFilter"
                 },
                 "type": "array"
               },
@@ -19606,7 +20680,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                  "$ref": "#/components/schemas/PermissionFilter"
                 },
                 "type": "array"
               },
@@ -19621,7 +20695,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                  "$ref": "#/components/schemas/PermissionFilter"
                 },
                 "type": "array"
               },
@@ -19633,7 +20707,7 @@
             "title": "Not"
           }
         },
-        "title": "PermissionNestedFilter",
+        "title": "PermissionFilter",
         "type": "object"
       },
       "RoleFilter": {
@@ -19703,6 +20777,62 @@
           "field"
         ],
         "title": "RoleOrderBy",
+        "type": "object"
+      },
+      "RolePermissionNestedFilter": {
+        "description": "The `permissions` field of a role filter.\n\nEach quantifier matches one permission entry at a time. To require two different\nentries, combine two of these with the role filter's own `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "RolePermissionNestedFilter",
         "type": "object"
       },
       "RoleSourceFilter": {
@@ -19827,6 +20957,49 @@
         "title": "RoleStatusFilter",
         "type": "object"
       },
+      "RoleUsage": {
+        "description": "Uses narrowing the roles read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Roles the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the role uses, whose ids narrow the result"
+          }
+        },
+        "title": "RoleUsage",
+        "type": "object"
+      },
+      "RoleUses": {
+        "description": "Entities the role uses, whose ids narrow the result.",
+        "properties": {
+          "role_preset": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Role presets the roles were instantiated from",
+            "title": "Role Preset"
+          }
+        },
+        "title": "RoleUses",
+        "type": "object"
+      },
       "UserNestedFilter": {
         "description": "Filter roles by their user assignments.",
         "properties": {
@@ -19893,6 +21066,17 @@
       "SearchRolesInput": {
         "description": "Pagination search input for roles.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "filter": {
             "anyOf": [
               {
@@ -20117,91 +21301,6 @@
           "permission"
         ],
         "title": "CreatePermissionInput",
-        "type": "object"
-      },
-      "PermissionFilter": {
-        "description": "Filter for scoped permissions.",
-        "properties": {
-          "role_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "entity_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DateTimeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PermissionFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Not"
-          }
-        },
-        "title": "PermissionFilter",
         "type": "object"
       },
       "PermissionOrderBy": {
@@ -20505,6 +21604,80 @@
         "title": "RevokeRoleInput",
         "type": "object"
       },
+      "PermissionNestedFilter": {
+        "description": "Nested filter for permissions within a role assignment.",
+        "properties": {
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionBitFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PermissionNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "PermissionNestedFilter",
+        "type": "object"
+      },
       "RoleAssignmentFilter": {
         "description": "Filter for role assignments.",
         "properties": {
@@ -20528,7 +21701,9 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "deprecated": true,
+            "description": "Filter by the role the assignment names. Deprecated: search roles first, then narrow by `role_id`."
           },
           "permission": {
             "anyOf": [
@@ -20539,7 +21714,9 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "deprecated": true,
+            "description": "Filter by the permissions the assignment's role carries. Deprecated: search roles by permission first, then narrow by `role_id`."
           },
           "username": {
             "anyOf": [
@@ -20659,17 +21836,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RoleStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "mapped_scope": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MappedScopeNestedFilter"
               },
               {
                 "type": "null"
@@ -21261,6 +22427,18 @@
             "description": "Filter by whether the resource group is the default one.",
             "title": "Is Default"
           },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the labels on the entity"
+          },
           "AND": {
             "anyOf": [
               {
@@ -21406,12 +22584,84 @@
         "title": "ResourceGroupScope",
         "type": "object"
       },
+      "ResourceGroupUsage": {
+        "description": "Uses narrowing the resource groups read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Resource groups the caller\ncannot read are left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the resource group narrows the result"
+          }
+        },
+        "title": "ResourceGroupUsage",
+        "type": "object"
+      },
+      "ResourceGroupUsedBy": {
+        "description": "Entities whose use of the resource group narrows the result.",
+        "properties": {
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sessions the resource group runs",
+            "title": "Session"
+          },
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments the resource group runs",
+            "title": "Deployment"
+          }
+        },
+        "title": "ResourceGroupUsedBy",
+        "type": "object"
+      },
       "ScopedSearchResourceGroupsInput": {
         "description": "Input for searching the resource groups the named scopes reach.",
         "properties": {
           "scope": {
             "$ref": "#/components/schemas/ResourceGroupScope",
             "description": "Scope (OR across all items)."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -21529,6 +22779,18 @@
       "AdminSearchResourceGroupsInput": {
         "description": "Input for admin search of resource groups with cursor and offset pagination.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceGroupUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -25761,8 +27023,63 @@
         "title": "RuntimeVariantOrderField",
         "type": "string"
       },
+      "RuntimeVariantUsage": {
+        "description": "Uses narrowing the runtime variants read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeVariantUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the runtime variant narrows the result"
+          }
+        },
+        "title": "RuntimeVariantUsage",
+        "type": "object"
+      },
+      "RuntimeVariantUsedBy": {
+        "description": "Entities whose use of the runtime variant narrows the result.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose revisions name the runtime variant",
+            "title": "Deployment"
+          }
+        },
+        "title": "RuntimeVariantUsedBy",
+        "type": "object"
+      },
       "SearchRuntimeVariantsInput": {
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeVariantUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller."
+          },
           "filter": {
             "anyOf": [
               {
@@ -26706,6 +28023,18 @@
       },
       "ModelCardFilter": {
         "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by model card ID"
+          },
           "name": {
             "anyOf": [
               {
@@ -26715,7 +28044,20 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Name filter"
+          },
+          "vfolder_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the VFolder holding the model"
           },
           "domain_name": {
             "anyOf": [
@@ -26726,7 +28068,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Domain name filter"
           },
           "project_id": {
             "anyOf": [
@@ -26737,7 +28080,116 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Filter by project ID"
+          },
+          "creator_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the user who created the model card"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Author filter"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Title filter"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Model version filter"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Task filter"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Category filter"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Architecture filter"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "License filter"
+          },
+          "access_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison."
           },
           "storage_host": {
             "anyOf": [
@@ -26749,7 +28201,44 @@
               }
             ],
             "default": null,
-            "description": "Filter by the storage host backing the model card's VFolder. Evaluated as an EXISTS subquery joining the model VFolder's host column."
+            "deprecated": true,
+            "description": "Filter by the storage host backing the model card's VFolder. Deprecated: search vfolders by host first, then pass their ids as `usage.uses.vfolder`."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Creation datetime filter"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Update datetime filter (supports is_null)"
+          },
+          "min_resource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by conditions on the minimum resource requirements"
           },
           "AND": {
             "anyOf": [
@@ -26818,14 +28307,170 @@
       },
       "ModelCardOrderField": {
         "enum": [
+          "entity_id",
           "name",
-          "created_at"
+          "vfolder_id",
+          "domain_name",
+          "project_id",
+          "creator_id",
+          "author",
+          "title",
+          "model_version",
+          "task",
+          "category",
+          "architecture",
+          "license",
+          "access_level",
+          "created_at",
+          "updated_at"
         ],
         "title": "ModelCardOrderField",
         "type": "string"
       },
+      "ModelCardResourceRequirementFilter": {
+        "description": "Filter for one minimum resource requirement row.",
+        "properties": {
+          "slot_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource slot name filter"
+          },
+          "min_quantity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum quantity filter"
+          }
+        },
+        "title": "ModelCardResourceRequirementFilter",
+        "type": "object"
+      },
+      "ModelCardResourceRequirementNestedFilter": {
+        "description": "The `min_resource` field of a model card filter.\n\nEach quantifier matches one requirement at a time. To require two different slots,\ncombine two of these with the model card filter's own `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardResourceRequirementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "ModelCardResourceRequirementNestedFilter",
+        "type": "object"
+      },
+      "ModelCardUsage": {
+        "description": "Uses narrowing the model cards read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Model cards the caller cannot\nread are left out even when a listed entity is tied to them.",
+        "properties": {
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the model card uses, whose ids narrow the result"
+          }
+        },
+        "title": "ModelCardUsage",
+        "type": "object"
+      },
+      "ModelCardUses": {
+        "description": "Entities the model card uses, whose ids narrow the result.",
+        "properties": {
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VFolders the model card is built on",
+            "title": "Vfolder"
+          }
+        },
+        "title": "ModelCardUses",
+        "type": "object"
+      },
       "SearchModelCardsInput": {
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -26993,6 +28638,18 @@
           "scope": {
             "$ref": "#/components/schemas/ModelCardScope",
             "description": "Scope (OR across all items)."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelCardUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -30153,13 +31810,36 @@
             "description": "Shell script executed on container startup. Falls back to keypair setting.",
             "title": "Bootstrap Script"
           },
+          "tier": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scheduling tier (0-100).",
+            "title": "Tier"
+          },
           "priority": {
-            "default": 10,
-            "description": "Scheduling priority (0-100).",
-            "maximum": 100,
-            "minimum": 0,
-            "title": "Priority",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Scheduling tier (0-100). Renamed to `tier`.",
+            "title": "Priority"
           },
           "job_priority": {
             "default": 0,
@@ -30389,6 +32069,79 @@
         "title": "ComputeScheduleInput",
         "type": "object"
       },
+      "NetworkTypeEnum": {
+        "description": "Inter-container network types a session may use.",
+        "enum": [
+          "volatile",
+          "persistent",
+          "host"
+        ],
+        "title": "NetworkTypeEnum",
+        "type": "string"
+      },
+      "NetworkTypeFilter": {
+        "description": "Filter for session network type values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NetworkTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NetworkTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "NetworkTypeFilter",
+        "type": "object"
+      },
       "SessionFilter": {
         "description": "Filter criteria for session listing.",
         "properties": {
@@ -30481,6 +32234,225 @@
             "default": null,
             "description": "Filter by the labels on the entity"
           },
+          "creation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the id the creating request carried"
+          },
+          "session_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by session type"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the scheduling tier of the pending queue"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Filter by the scheduling tier of the pending queue. Renamed to `tier`"
+          },
+          "job_priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the preemption priority among the owner's sessions"
+          },
+          "is_preemptible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the session may be preempted",
+            "title": "Is Preemptible"
+          },
+          "cluster_size": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the number of kernels in the session"
+          },
+          "resource_group_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the resource group the session runs in"
+          },
+          "access_key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the access key the session was created with"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the user-supplied tag"
+          },
+          "use_host_network": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the session uses the host network",
+            "title": "Use Host Network"
+          },
+          "batch_timeout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the batch execution timeout in seconds"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the session started running"
+          },
+          "terminated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the session terminated"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionResultFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the session result"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the inter-container network type"
+          },
+          "network_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the network reference the session uses"
+          },
+          "replica_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the deployment replica the session serves"
+          },
           "AND": {
             "anyOf": [
               {
@@ -30554,10 +32526,104 @@
           "terminated_at",
           "status",
           "id",
-          "name"
+          "name",
+          "creation_id",
+          "session_type",
+          "priority",
+          "tier",
+          "job_priority",
+          "is_preemptible",
+          "cluster_size",
+          "resource_group_name",
+          "domain_name",
+          "project_id",
+          "user_id",
+          "access_key",
+          "tag",
+          "use_host_network",
+          "batch_timeout",
+          "starts_at",
+          "result",
+          "network_type",
+          "network_id",
+          "replica_id"
         ],
         "title": "SessionOrderField",
         "type": "string"
+      },
+      "SessionResultEnum": {
+        "description": "Session result values.",
+        "enum": [
+          "undefined",
+          "success",
+          "failure",
+          "cancelled"
+        ],
+        "title": "SessionResultEnum",
+        "type": "string"
+      },
+      "SessionResultFilter": {
+        "description": "Filter for session result values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionResultEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionResultEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionResultEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionResultEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SessionResultFilter",
+        "type": "object"
       },
       "SessionStatusEnum": {
         "description": "Full set of session lifecycle statuses for DTO filtering.",
@@ -30595,9 +32661,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -30610,6 +32677,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -30621,7 +32689,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -30636,15 +32705,215 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
         "title": "SessionStatusFilter",
         "type": "object"
       },
+      "SessionTypeEnum": {
+        "description": "Session types for DTO filtering.",
+        "enum": [
+          "interactive",
+          "batch",
+          "inference",
+          "system"
+        ],
+        "title": "SessionTypeEnum",
+        "type": "string"
+      },
+      "SessionTypeFilter": {
+        "description": "Filter for session type values.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTypeEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypeEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SessionTypeFilter",
+        "type": "object"
+      },
+      "SessionUsage": {
+        "description": "Uses narrowing the sessions read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Sessions the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the session narrows the result"
+          },
+          "uses": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the session uses, whose ids narrow the result"
+          }
+        },
+        "title": "SessionUsage",
+        "type": "object"
+      },
+      "SessionUsedBy": {
+        "description": "Entities whose use of the session narrows the result.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose route rows the session serves as a replica",
+            "title": "Deployment"
+          }
+        },
+        "title": "SessionUsedBy",
+        "type": "object"
+      },
+      "SessionUses": {
+        "description": "Entities the session uses, whose ids narrow the result.",
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Images the session's kernels run",
+            "title": "Image"
+          },
+          "agent": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Agents running a kernel of the session",
+            "title": "Agent"
+          },
+          "resource_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource groups the session runs in",
+            "title": "Resource Group"
+          }
+        },
+        "title": "SessionUses",
+        "type": "object"
+      },
       "AdminSearchSessionsInput": {
         "description": "Input for admin search of sessions with cursor and offset pagination.",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -31129,6 +33398,18 @@
             "$ref": "#/components/schemas/SessionScope",
             "description": "Scope (OR across all items)."
           },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -31588,8 +33869,64 @@
         "title": "ArrayFilter[int]",
         "type": "object"
       },
+      "KeypairNestedFilter": {
+        "description": "The `keypairs` field of a user filter.\n\nEach quantifier matches one keypair at a time. To require two different keypairs,\ncombine two of these with the user filter's own `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "KeypairNestedFilter",
+        "type": "object"
+      },
       "UserDomainFilter": {
-        "description": "Nested filter for the domain a user belongs to.",
+        "description": "Deprecated. Nested filter for the domain a user belongs to.",
         "properties": {
           "name": {
             "anyOf": [
@@ -31751,7 +34088,7 @@
         "type": "string"
       },
       "UserProjectFilter": {
-        "description": "Nested filter for projects a user belongs to.",
+        "description": "Deprecated. Nested filter for projects a user belongs to.",
         "properties": {
           "name": {
             "anyOf": [
@@ -31805,7 +34142,7 @@
               }
             ],
             "default": null,
-            "description": "Exact match for user role."
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -31820,7 +34157,7 @@
               }
             ],
             "default": null,
-            "description": "Match any of the provided roles.",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -31833,7 +34170,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude exact role match."
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -31848,7 +34185,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude any of the provided roles.",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -31878,7 +34215,7 @@
               }
             ],
             "default": null,
-            "description": "Exact match for user status."
+            "description": "Exact match."
           },
           "in": {
             "anyOf": [
@@ -31893,7 +34230,7 @@
               }
             ],
             "default": null,
-            "description": "Match any of the provided statuses.",
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -31906,7 +34243,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude exact status match."
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -31921,7 +34258,7 @@
               }
             ],
             "default": null,
-            "description": "Exclude any of the provided statuses.",
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
@@ -32721,9 +35058,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -32736,6 +35074,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -32747,7 +35086,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -32762,10 +35102,30 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
         "title": "VFolderStatusFilter",
+        "type": "object"
+      },
+      "VFolderUsage": {
+        "description": "Uses narrowing the vfolders read; every id is AND-ed.\n\nAn entity the caller cannot read refuses the request. Vfolders the caller cannot read\nare left out even when a listed entity is tied to them.",
+        "properties": {
+          "used_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderUsedBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities whose use of the vfolder narrows the result"
+          }
+        },
+        "title": "VFolderUsage",
         "type": "object"
       },
       "VFolderUsageMode": {
@@ -32790,9 +35150,10 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exact match."
           },
-          "in_": {
+          "in": {
             "anyOf": [
               {
                 "items": {
@@ -32805,6 +35166,7 @@
               }
             ],
             "default": null,
+            "description": "Match any of the provided values.",
             "title": "In"
           },
           "not_equals": {
@@ -32816,7 +35178,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "Exclude an exact match."
           },
           "not_in": {
             "anyOf": [
@@ -32831,15 +35194,69 @@
               }
             ],
             "default": null,
+            "description": "Exclude any of the provided values.",
             "title": "Not In"
           }
         },
         "title": "VFolderUsageModeFilter",
         "type": "object"
       },
+      "VFolderUsedBy": {
+        "description": "Entities whose use of the vfolder narrows the result.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployments whose live replica groups use the vfolder as the model of their current revision",
+            "title": "Deployment"
+          },
+          "model_card": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Model cards built on the vfolder",
+            "title": "Model Card"
+          }
+        },
+        "title": "VFolderUsedBy",
+        "type": "object"
+      },
       "SearchVFoldersInput": {
         "description": "Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches).",
         "properties": {
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
+          },
           "filter": {
             "anyOf": [
               {
@@ -33008,9 +35425,17 @@
       "ScopedSearchVFoldersInput": {
         "description": "Input for searching the vfolders the named scopes reach.",
         "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/VFolderScope",
-            "description": "Scope (OR across all items)."
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderUsage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out."
           },
           "filter": {
             "anyOf": [
@@ -33117,6 +35542,10 @@
             "default": null,
             "description": "Offset pagination: number to skip.",
             "title": "Offset"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/VFolderScope",
+            "description": "Scope (OR across all items)."
           }
         },
         "required": [
@@ -36310,103 +38739,6 @@
           }
         },
         "title": "SearchUsersAssignedToRoleRequest",
-        "type": "object"
-      },
-      "ScopeFilter": {
-        "description": "Filter for scopes.",
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by name"
-          }
-        },
-        "title": "ScopeFilter",
-        "type": "object"
-      },
-      "ScopeOrder": {
-        "description": "Order specification for scopes.",
-        "properties": {
-          "field": {
-            "$ref": "#/components/schemas/ScopeOrderField",
-            "description": "Field to order by"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/OrderDirection",
-            "default": "asc",
-            "description": "Order direction"
-          }
-        },
-        "required": [
-          "field"
-        ],
-        "title": "ScopeOrder",
-        "type": "object"
-      },
-      "ScopeOrderField": {
-        "description": "Fields available for ordering scope IDs.",
-        "enum": [
-          "name",
-          "created_at"
-        ],
-        "title": "ScopeOrderField",
-        "type": "string"
-      },
-      "SearchScopesRequest": {
-        "description": "Request body for searching scopes with filters and pagination.",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ScopeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter conditions"
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ScopeOrder"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Order specifications",
-            "title": "Order"
-          },
-          "limit": {
-            "default": 50,
-            "description": "Maximum items to return",
-            "maximum": 1000,
-            "minimum": 1,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "offset": {
-            "default": 0,
-            "description": "Number of items to skip",
-            "minimum": 0,
-            "title": "Offset",
-            "type": "integer"
-          }
-        },
-        "title": "SearchScopesRequest",
         "type": "object"
       },
       "QuotaScopeFilter": {
@@ -42262,18 +44594,6 @@
         "title": "CreateDeploymentRequest",
         "type": "object"
       },
-      "ModelDeploymentStatus": {
-        "enum": [
-          "PENDING",
-          "SCALING",
-          "DEPLOYING",
-          "READY",
-          "STOPPING",
-          "STOPPED"
-        ],
-        "title": "ModelDeploymentStatus",
-        "type": "string"
-      },
       "SearchDeploymentsRequest": {
         "description": "Request body for searching deployments with filters, orders, and pagination.",
         "properties": {
@@ -47772,6 +50092,11 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -47782,7 +50107,7 @@
           }
         },
         "parameters": [],
-        "description": "Search the images the named scopes reach."
+        "description": "Search the images the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/aliases/search": {
@@ -52665,6 +54990,35 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/project/projects/{project_id}": {
+      "get": {
+        "operationId": "v2/resource-policies.scoped_project_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-presets/search": {
@@ -58105,44 +60459,6 @@
         ],
         "parameters": [],
         "description": "Get available scope types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/admin/rbac/scopes/{scope_type}/search": {
-      "post": {
-        "operationId": "admin/rbac.search_scopes",
-        "tags": [
-          "admin/rbac"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchScopesRequest"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "scope_type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Search scopes for a specific scope type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/entity-types": {

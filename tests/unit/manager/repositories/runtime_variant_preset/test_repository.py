@@ -18,15 +18,14 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant_preset.conditions import (
-    RuntimeVariantPresetConditions,
-)
 from ai.backend.manager.models.runtime_variant_preset.creators import (
     RANK_GAP,
     RuntimeVariantPresetCreator,
 )
-from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
+    RuntimeVariantPresetSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
 )
@@ -51,10 +50,10 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def db_with_cleanup(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -68,7 +67,7 @@ async def db_with_cleanup(
             RuntimeVariantPresetRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -126,7 +125,7 @@ class TestRuntimeVariantPresetRepositoryFlag:
             display_name=None,
             ui_option=None,
         )
-        created = await preset_ops.create_global_entity(creator)
+        created = await preset_ops.create_entity(creator)
 
         assert created.value_type == PresetValueType.FLAG
         assert created.preset_target == PresetTarget.ARGS
@@ -159,8 +158,8 @@ class TestRuntimeVariantPresetRepositoryFlag:
                 ui_option=None,
             )
 
-        first = await preset_ops.create_global_entity(creator_named("first"))
-        second = await preset_ops.create_global_entity(creator_named("second"))
+        first = await preset_ops.create_entity(creator_named("first"))
+        second = await preset_ops.create_entity(creator_named("second"))
 
         assert first.rank == RANK_GAP
         assert second.rank == RANK_GAP * 2
@@ -174,7 +173,7 @@ class TestRuntimeVariantPresetVersionRange:
         preset_ops: OpsRepository[RuntimeVariantPresetData],
         runtime_variant_id: uuid.UUID,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="added-at-0-9-0",
@@ -195,13 +194,13 @@ class TestRuntimeVariantPresetVersionRange:
         before = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.5")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.5"),
             )
         )
         at = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.9.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.9.0"),
             )
         )
 
@@ -213,7 +212,7 @@ class TestRuntimeVariantPresetVersionRange:
         preset_ops: OpsRepository[RuntimeVariantPresetData],
         runtime_variant_id: uuid.UUID,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="dropped-at-0-9-0",
@@ -234,13 +233,13 @@ class TestRuntimeVariantPresetVersionRange:
         before = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.5")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.5"),
             )
         )
         at = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.9.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.9.0"),
             )
         )
 
@@ -252,7 +251,7 @@ class TestRuntimeVariantPresetVersionRange:
         preset_ops: OpsRepository[RuntimeVariantPresetData],
         runtime_variant_id: uuid.UUID,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="added-at-0-9-0",
@@ -274,7 +273,7 @@ class TestRuntimeVariantPresetVersionRange:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.10.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.10.0"),
             )
         )
 
@@ -302,16 +301,16 @@ class TestRuntimeVariantPresetVersionRange:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("old", None))
-        await preset_ops.create_global_entity(creator_named("new-a", "0.9.0"))
-        await preset_ops.create_global_entity(creator_named("new-b", "0.9.0"))
+        await preset_ops.create_entity(creator_named("old", None))
+        await preset_ops.create_entity(creator_named("new-a", "0.9.0"))
+        await preset_ops.create_entity(creator_named("new-b", "0.9.0"))
 
         # A page of one: were the filter ignored, the two later presets would still be
         # waiting and has_next_page would be True.
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=1),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.0"),
             )
         )
 
@@ -342,13 +341,13 @@ class TestRuntimeVariantPresetVersionRange:
         at_the_release = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.9.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.9.0"),
             )
         )
         before_it = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.9")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.9"),
             )
         )
 
@@ -378,7 +377,7 @@ class TestRuntimeVariantPresetVersionRange:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("10.0.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("10.0.0"),
             )
         )
 
@@ -410,14 +409,14 @@ class TestRuntimeVariantPresetVersionOrder:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("at-0-10-0", "0.10.0"))
-        await preset_ops.create_global_entity(creator_named("at-0-9-0", "0.9.0"))
-        await preset_ops.create_global_entity(creator_named("always", None))
+        await preset_ops.create_entity(creator_named("at-0-10-0", "0.10.0"))
+        await preset_ops.create_entity(creator_named("at-0-9-0", "0.9.0"))
+        await preset_ops.create_entity(creator_named("always", None))
 
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                orders=RuntimeVariantPresetOrders.added_version(ascending=True),
+                orders=RuntimeVariantPresetSearchableFields.own.added_version_order(True),
             )
         )
 
@@ -446,14 +445,14 @@ class TestRuntimeVariantPresetVersionOrder:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("still-offered", None))
-        await preset_ops.create_global_entity(creator_named("gone-at-0-10-0", "0.10.0"))
-        await preset_ops.create_global_entity(creator_named("gone-at-0-9-0", "0.9.0"))
+        await preset_ops.create_entity(creator_named("still-offered", None))
+        await preset_ops.create_entity(creator_named("gone-at-0-10-0", "0.10.0"))
+        await preset_ops.create_entity(creator_named("gone-at-0-9-0", "0.9.0"))
 
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                orders=RuntimeVariantPresetOrders.deprecated_version(ascending=True),
+                orders=RuntimeVariantPresetSearchableFields.own.deprecated_version_order(True),
             )
         )
 
@@ -489,15 +488,15 @@ class TestRuntimeVariantPresetVersionSegmentCount:
                 ui_option=None,
             )
 
-        await preset_ops.create_global_entity(creator_named("one-segment", "1"))
-        await preset_ops.create_global_entity(creator_named("two-segments", "1.0"))
-        await preset_ops.create_global_entity(creator_named("three-segments", "1.0.0"))
-        await preset_ops.create_global_entity(creator_named("later", "1.0.1"))
+        await preset_ops.create_entity(creator_named("one-segment", "1"))
+        await preset_ops.create_entity(creator_named("two-segments", "1.0"))
+        await preset_ops.create_entity(creator_named("three-segments", "1.0.0"))
+        await preset_ops.create_entity(creator_named("later", "1.0.1"))
 
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("1")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("1"),
             )
         )
 
@@ -527,7 +526,7 @@ class TestRuntimeVariantPresetVersionSegmentCount:
         version: str,
         included: bool,
     ) -> None:
-        await preset_ops.create_global_entity(
+        await preset_ops.create_entity(
             RuntimeVariantPresetCreator(
                 runtime_variant_id=RuntimeVariantID(runtime_variant_id),
                 name="two-to-three",
@@ -548,7 +547,7 @@ class TestRuntimeVariantPresetVersionSegmentCount:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version(version)],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version(version),
             )
         )
 

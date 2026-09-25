@@ -101,7 +101,7 @@ class TestIdleCheckerSpecLabelValidation:
     @pytest.fixture()
     def ops_repository(self) -> MagicMock:
         ops_repository = MagicMock(spec=OpsRepository)
-        ops_repository.create_global_entity = AsyncMock()
+        ops_repository.create_entity = AsyncMock()
         ops_repository.update = AsyncMock()
         return ops_repository
 
@@ -133,7 +133,7 @@ class TestIdleCheckerSpecLabelValidation:
 
         await service.create(_create_action(spec))
 
-        ops_repository.create_global_entity.assert_awaited_once()
+        ops_repository.create_entity.assert_awaited_once()
 
     @pytest.mark.parametrize(
         "spec",
@@ -150,7 +150,7 @@ class TestIdleCheckerSpecLabelValidation:
     ) -> None:
         with pytest.raises(PrometheusQueryPresetInvalidLabel):
             await service.create(_create_action(spec))
-        ops_repository.create_global_entity.assert_not_awaited()
+        ops_repository.create_entity.assert_not_awaited()
 
     async def test_non_utilization_spec_skips_preset_lookup(
         self,

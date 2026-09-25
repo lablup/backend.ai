@@ -381,7 +381,7 @@ type Query {
   available_service: AvailableServiceNode
 
   """Added in 25.8.0."""
-  available_services(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AvailableServiceConnection
+  available_services(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AvailableServiceConnection @deprecated(reason: "Deprecated since 26.9.0.")
 
   """Added in 25.8.0."""
   service_config(service: String!): ServiceConfigNode
@@ -2155,7 +2155,7 @@ type UserUtilizationMetric {
 type ContainerUtilizationMetric {
   metric_name: String
 
-  """One of 'current', 'capacity'."""
+  """One of 'current', 'capacity', 'pct'."""
   value_type: String
   values: [MetricResultValue]
 
@@ -2174,7 +2174,7 @@ type MetricResultValue {
 
 """Added in 25.6.0."""
 input UserUtilizationMetricQueryInput {
-  """One of 'current', 'capacity'. Default value is 'current'."""
+  """One of 'current', 'capacity', 'pct'. Default value is 'current'."""
   value_type: String = "current"
 
   """metric name of container utilization. For example, 'cpu_util', 'mem'."""

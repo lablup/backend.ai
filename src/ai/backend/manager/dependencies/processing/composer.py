@@ -47,6 +47,15 @@ from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionA
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
 )
+from ai.backend.manager.actions.v2.membership.monitor.audit_log import (
+    MembershipActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.prometheus import (
+    MembershipActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.reporter import (
+    MembershipActionReporterMonitor,
+)
 from ai.backend.manager.actions.v2.relation.monitor.audit_log import (
     RelationActionAuditLogMonitor,
 )
@@ -72,6 +81,9 @@ from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.container_registry.pool import (
+    ContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -90,9 +102,6 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.service.container_registry.harbor import (
-    AbstractPerProjectContainerRegistryQuotaService,
-)
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -103,7 +112,6 @@ from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import SMTPTriggerPolicy
 
-from .agent_lost_checker import AgentLostCheckerDependency, AgentLostCheckerInput
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
 from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
@@ -159,6 +167,7 @@ class ProcessingInput:
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool
     prometheus_client: PrometheusClient
 
     # BgtaskRegistry creation (additional)
@@ -167,9 +176,6 @@ class ProcessingInput:
     # Lifecycle background tasks
     stats_monitor: StatsPluginContext
     pidx: int
-
-    # Registry quota service (optional, defaults to None)
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
@@ -300,6 +306,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                     client_ip_masking_repository,
                 ),
             ],
+            membership=[
+                MembershipActionReporterMonitor(reporter_hub),
+                MembershipActionPrometheusMonitor(),
+                MembershipActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
             global_scope=[
                 GlobalActionReporterMonitor(reporter_hub),
                 GlobalActionPrometheusMonitor(),
@@ -353,10 +368,10 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
+            registry_quota_client_pool=setup_input.registry_quota_client_pool,
             prometheus_client=setup_input.prometheus_client,
             ssh_key_validator=ssh_key_validator,
             key_provider_pool=setup_input.key_provider_pool,
-            registry_quota_service=setup_input.registry_quota_service,
         )
 
         v2_validators = build_action_validators(
@@ -375,6 +390,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ),
         )
         processors = processor_bundle.processors
+        services = processor_bundle.services
 
         # Step 3: Register Dispatchers and start EventDispatcher
         dispatchers = Dispatchers(
@@ -396,7 +412,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 idle_checker_host=setup_input.idle_checker_host,
                 event_dispatcher_plugin_ctx=setup_input.event_dispatcher_plugin_ctx,
                 repositories=setup_input.repositories,
-                processors_factory=lambda: processors,
+                notification_service=services.notification,
+                artifact_service=services.artifact,
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 event_producer=setup_input.event_producer,
@@ -409,7 +426,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         await stack.enter_dependency(
             BgtaskRegistryDependency(),
             BgtaskRegistryInput(
-                processors=processors,
+                container_registry_service=services.container_registry,
+                image_service=services.image,
                 background_task_manager=setup_input.background_task_manager,
                 repositories=setup_input.repositories,
                 agent_client_pool=setup_input.agent_client_pool,
@@ -420,14 +438,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         # Step 5: Start lifecycle background tasks
-        await stack.enter_dependency(
-            AgentLostCheckerDependency(),
-            AgentLostCheckerInput(
-                config_provider=setup_input.config_provider,
-                valkey_live=setup_input.valkey_live,
-                event_producer=setup_input.event_producer,
-            ),
-        )
         await stack.enter_dependency(
             StatsReporterDependency(),
             StatsReporterInput(

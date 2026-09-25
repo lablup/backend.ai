@@ -1,8 +1,9 @@
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import (
     AccessKey,
     SlotQuantity,
@@ -11,15 +12,18 @@ from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
 )
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.services.resource_preset.actions.scope_base import (
+    ResourcePresetScopeAction,
+)
 
 
 @dataclass
-class CheckResourcePresetsAction(ResourcePresetAction):
-    """List the presets a resource group offers, against the caller's own limits.
+class CheckResourcePresetsAction(ResourcePresetScopeAction):
+    """List the presets the named scopes offer, against the caller's own limits.
 
-    Public for the reason the listing beside it is, and the occupancy it adds is
-    the caller's own: the keypair, group and domain it reports on are theirs.
+    The occupancy it adds is the caller's own: the keypair, group and domain it reports
+    on are theirs.
     """
 
     access_key: AccessKey
@@ -32,7 +36,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_check_resource_presets"
+        return "check_resource_presets"
 
     @override
     @classmethod
@@ -41,7 +45,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 
 
 @dataclass
-class CheckResourcePresetsActionResult:
+class CheckResourcePresetsActionResult(BaseScopeActionResult):
     presets: list[Mapping[str, Any]]
     keypair_limits: list[SlotQuantity]
     keypair_using: list[SlotQuantity]
@@ -53,3 +57,7 @@ class CheckResourcePresetsActionResult:
     resource_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
 
     # TODO: Should return preset row ids after changing to batching.
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()

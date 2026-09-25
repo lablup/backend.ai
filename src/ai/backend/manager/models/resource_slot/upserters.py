@@ -10,6 +10,9 @@ from typing import Any, override
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 
@@ -57,4 +60,4 @@ class AgentResourceUpserter(FieldUpserter[AgentUUID, AgentResourceRow, AgentReso
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:
-        return row.to_data()
+        return AgentResourceSearchableFields.own.to_data(row)

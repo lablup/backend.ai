@@ -10,9 +10,13 @@ from uuid import UUID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 
@@ -52,7 +56,7 @@ class ModelCardScanUpserter(EntityUpserter[ModelCardRow, ModelCardData]):
 
     @override
     def created_in(self, row: ModelCardRow) -> Collection[EntityIdentifier]:
-        return (ProjectID(self.project_id),)
+        return (ProjectID(row.project), UserID(row.creator))
 
     @override
     def row_class(self) -> type[ModelCardRow]:
@@ -97,4 +101,4 @@ class ModelCardScanUpserter(EntityUpserter[ModelCardRow, ModelCardData]):
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:
-        return row.to_data()
+        return ModelCardSearchableFields.own.to_data(row)

@@ -16,6 +16,7 @@ from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
@@ -46,7 +47,11 @@ class ComputeSessionsHandler:
 
         # Step 1: Search sessions
         session_result = await self._session.global_search.run(
-            GlobalSearchSessionsAction(searcher=self._adapter.build_session_searcher(body.parsed))
+            GlobalSearchSessionsAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=self._adapter.build_session_searcher(body.parsed)
+                )
+            )
         )
         sessions = [item.to_session_data() for item in session_result.items]
 
@@ -56,7 +61,10 @@ class ComputeSessionsHandler:
         if session_ids:
             kernel_result = await self._session.global_search_kernels.run(
                 GlobalSearchKernelsAction(
-                    searcher=self._adapter.build_kernel_searcher_for_sessions(session_ids)
+                    searcher=GlobalSearcher(
+                        used_by=(),
+                        searcher=self._adapter.build_kernel_searcher_for_sessions(session_ids),
+                    )
                 )
             )
             kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.items)

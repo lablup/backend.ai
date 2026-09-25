@@ -3,35 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import ResourcePresetAction
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 
 
-@dataclass
-class SearchResourcePresetsV2Action(ResourcePresetAction):
-    """Action to search resource presets with filter/order/pagination."""
+@dataclass(frozen=True)
+class SearchResourcePresetsV2Action(GlobalSearcherOpsAction[ResourcePresetRow, ResourcePresetData]):
+    """Page through the resource preset catalog."""
 
-    querier: BatchQuerier
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return ResourcePresetEntityType()
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "global_search_resource_presets"
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchResourcePresetsV2ActionResult:
-    """Result of searching resource presets."""
-
-    presets: list[ResourcePresetData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool

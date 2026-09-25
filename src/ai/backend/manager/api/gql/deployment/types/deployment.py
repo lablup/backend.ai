@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentOrder as DeploymentOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentScalingStateFilter as DeploymentScalingStateFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStatusFilter as DeploymentStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -109,6 +112,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntFilter,
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
@@ -363,6 +367,12 @@ class ModelDeploymentNetworkAccess:
 )
 class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment.",
+        ),
+    )
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     current_revision_id: ID | None = None
@@ -513,7 +523,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
         nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
-        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+        edges = [ModelReplicaEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ModelReplicaConnection(
             count=payload.total_count,
             edges=edges,
@@ -770,6 +780,16 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
     name="ReplicaNestedFilter",
 )
 class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    exists: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Matches parents that have at least one replica when true, and parents "
+                "with none when false. Says nothing about what the replicas hold."
+            ),
+        ),
+        default=None,
+    )
     some: ReplicaFilter | None = gql_field(
         description="Matches parents with at least one replica satisfying all conditions.",
         default=None,
@@ -784,6 +804,28 @@ class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
     none: ReplicaFilter | None = gql_field(
         description="Matches parents with no replica satisfying all conditions.",
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the deployment scaling state.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ScalingStateFilter",
+)
+class ScalingStateFilterGQL(PydanticInputMixin[DeploymentScalingStateFilterDTO]):
+    in_: list[ScalingStateGQL] | None = gql_field(
+        description="Scaling states to match.", name="in", default=None
+    )
+    equals: ScalingStateGQL | None = gql_field(
+        description="Exact scaling state match.", default=None
+    )
+    not_in: list[ScalingStateGQL] | None = gql_field(
+        description="Excludes scaling states in the list.", name="notIn", default=None
+    )
+    not_equals: ScalingStateGQL | None = gql_field(
+        description="Excludes exact scaling state match.", name="notEquals", default=None
     )
 
 
@@ -842,6 +884,25 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by deployment ID."
+        ),
+        default=None,
+    )
+    desired_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the requested replica count.",
+        ),
+        default=None,
+    )
+    scaling_state: ScalingStateFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by scaling state."
         ),
         default=None,
     )

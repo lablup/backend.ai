@@ -1,26 +1,103 @@
 ---
 name: login-client-type-adapter-scenarios
 type: reference
-description: TODO - what the login client type adapter guarantees, as scenarios; nobody has written these yet
+description: what the login client type adapter guarantees, as scenarios; the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the page size of fifty
 scope: src/ai/backend/manager/api/adapters/login_client_type
-keywords: [login client type, scenario, adapter, todo]
+keywords: [login client type, scenario, adapter, superadmin, public read, page size]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-09-21
 status: draft
 ---
 # login_client_type 어댑터 — 시나리오
 
-TODO. 아직 아무도 적지 않았다.
+규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
+의심한다.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+`login_client_type` 엔티티는 global 과 public 양쪽에 소속된다. 생성은 호출한 사용자가
+슈퍼관리자인지 검사하고, 하나를 지정해 수정·삭제하는 호출은 그 `login_client_type` 행에 부여된
+권한을 검사하는데 그 권한은 global 에서만 나온다. 생성과 수정·삭제 모두 슈퍼관리자만 성공하지만
+거부 이유가 서로 다르다. 조회와 검색은 public 에서 READ 를 검사한다. 모든 계정이 public 소속
+역할을 자동으로 받으므로 로그인한 사용자는 모두 읽을 수 있다.
 
-## 적는 법
+## 생성
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 이름만 지정해 생성한다 | `login_client_type` 없음, 슈퍼관리자 | 이름만 지정해 생성 | 설명이 비어 있는 노드 |
+| 이름과 설명을 함께 지정해 생성한다 | `login_client_type` 없음, 슈퍼관리자 | 이름과 설명으로 생성 | 지정한 값이 그대로 담긴 노드 |
+| 이미 사용 중인 이름으로 생성한다 | 그 이름의 `login_client_type` 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
+| 슈퍼관리자가 아닌 사용자가 생성한다 | 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
+| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+이름이 비어 있거나 길이 제한을 넘는 요청은 시나리오로 두지 않는다. 요청 타입이 이미 막기
+때문이다.
+
+## 조회
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| public 에서 읽는 사용자가 id로 조회한다 | `login_client_type` 하나, public 조회 권한만 있음 | id로 조회 | 그 `login_client_type` 노드 전체 |
+| 존재하지 않는 id로 조회한다 | 다른 `login_client_type` 행만 있음 | id로 조회 | 권한 부족으로 거부 |
+
+조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자가 성공하는 시나리오가 그것을
+증명하고, 대응하는 거부 시나리오는 생성 절의 역할 부족으로 거부되는 시나리오다. 존재하지 않는 id와
+닿을 수 없는 id는 같은 이유로 거부된다.
+
+인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
+
+## 검색
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 아무 권한도 없는 사용자가 검색한다 | `login_client_type` 둘, 아무 권한도 없음 | 전체 조회 | 둘 다 반환된다 |
+
+이름 필터가 무엇을 좁히는지와 페이지 방식 — 기본 크기 50, `first`만 지정한 요청을 커서로 읽는지
+(BA-7927) — 는 시나리오로 두지 않는다. 필터를 조건으로 옮기고 페이지를 자르는 것은 단위 테스트의
+자리다.
+
+## 수정
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 이름만 바꾼다 | 설명이 있는 `login_client_type` 하나, 슈퍼관리자 | 이름 수정 | 이름은 새 값, 설명은 그대로 |
+| 설명을 지운다 | 설명이 있는 `login_client_type`, 슈퍼관리자 | 설명을 비우는 수정 | 설명이 없어진다 |
+| 값을 하나도 지정하지 않는다 | `login_client_type` 하나, 슈퍼관리자 | 빈 수정 | 아무것도 바뀌지 않은 노드 |
+| 이미 사용 중인 이름으로 바꾼다 | `login_client_type` 둘, 슈퍼관리자 | 한쪽 이름을 다른 쪽 이름으로 수정 | 이름 중복으로 거부 |
+| 존재하지 않는 id를 수정한다 | 다른 `login_client_type` 행만 있음, 슈퍼관리자 | 이름 수정 | 대상을 찾을 수 없어 거부 |
+| 아무 권한도 없는 사용자가 수정한다 | 같은 `login_client_type`, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
+| 아무 권한도 없는 사용자가 없는 id를 수정한다 | 다른 `login_client_type` 행만 있음, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
+| 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 새 값인 노드 |
+
+수정은 대상 id를 요청 본문 밖에서 별도 인자로 받는다. 시나리오가 id를 인자와 본문에 거듭 적지
+않도록 이 구조를 유지한다.
+
+존재하지 않는 id는 슈퍼관리자와 그 밖의 사용자에게 서로 다른 이유로 거부된다. 권한 검사가 먼저
+실행되는데 존재하지 않는 행에는 부여된 권한도 없으므로, 그 검사를 통과하는 슈퍼관리자만 대상을
+찾을 수 없어 거부된다. 삭제 절의 같은 시나리오도 마찬가지다.
+
+이름 중복은 생성할 때와 수정할 때 서로 다른 오류로 거부된다. 생성은 이 엔티티 전용 오류로
+거부하고, 수정은 저장소의 제약 위반 오류를 그대로 전파한다. 시나리오를 적기 전에 하나로 맞출
+것인지 정한다.
+
+## 삭제
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 삭제한다 | `login_client_type` 하나, 슈퍼관리자 | 삭제 | 삭제한 id를 담은 응답 |
+| 존재하지 않는 id를 삭제한다 | 다른 `login_client_type` 행만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
+| 아무 권한도 없는 사용자가 삭제한다 | 같은 `login_client_type`, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
+| 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 id를 담은 응답 |
+
+이 어댑터에는 soft delete가 없다.
+
+## 아직 적지 않은 것
+
+없다. 어댑터가 제공하는 `admin_create`, `get`, `search`, `admin_update`, `admin_delete`가 모두 위에
+있다.
+
+`batch_load_fields`는 모든 어댑터가 상속받는 공용 헬퍼이지 이 엔티티의 호출이 아니다. 리포트는
+이것도 함께 세지만 적을 것이 없다.

@@ -8,7 +8,11 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey, OwnCheckKey
+from ai.backend.manager.data.permission.virtual_entity import (
+    GovernCheckKey,
+    OwnCheckKey,
+    PermissionCheckResult,
+)
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 
 __all__ = ("RbacPermissionCheckRepository",)
@@ -46,6 +50,23 @@ class RbacPermissionCheckRepository:
             return dict.fromkeys(keys, Permission.full())
         async with self._ops.read_ops() as r:
             return await r.governed_permissions(keys)
+
+    async def checked_permissions(
+        self,
+        govern_keys: Sequence[GovernCheckKey],
+        own_keys: Sequence[OwnCheckKey],
+    ) -> PermissionCheckResult:
+        """Both checks of one run, answered in a single read session."""
+        if not self._enforced():
+            return PermissionCheckResult(
+                governed=dict.fromkeys(govern_keys, Permission.full()),
+                owned=dict.fromkeys(own_keys, Permission.full()),
+            )
+        async with self._ops.read_ops() as r:
+            return PermissionCheckResult(
+                governed=await r.governed_permissions(govern_keys),
+                owned=await r.owned_permissions(own_keys),
+            )
 
     async def held_permissions(
         self, user_id: UserID, entity_ids: Sequence[EntityIdentifier]

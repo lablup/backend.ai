@@ -115,7 +115,7 @@ class ServiceMetadata(BackendAISchema):
     Metadata for a service.
     """
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    id: uuid.UUID = Field(..., description="Identifier of the service")
     display_name: str = Field(..., description="Display name of the service")
     service_group: str = Field(..., description="Name of the service group (manager, agent, etc.)")
     version: str = Field(..., description="Version of the service")
@@ -129,6 +129,32 @@ class ServiceMetadata(BackendAISchema):
     )
 
     @classmethod
+    def for_endpoint(
+        cls,
+        *,
+        display_name: str,
+        service_group: str,
+        version: str,
+        endpoint: ServiceEndpoint,
+        labels: dict[str, str] | None = None,
+    ) -> Self:
+        """Build metadata whose identity is the endpoint rather than the caller.
+
+        A component's worker processes share one listening socket, so an identity
+        per process registers that one endpoint once per worker. See KNOWLEDGE.md.
+        """
+        return cls(
+            id=uuid.uuid5(
+                uuid.NAMESPACE_DNS, f"{service_group}/{endpoint.address}:{endpoint.port}"
+            ),
+            display_name=display_name,
+            service_group=service_group,
+            version=version,
+            endpoint=endpoint,
+            labels=labels or {},
+        )
+
+    @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(**data)
 
@@ -137,7 +163,7 @@ class ServiceMetadata(BackendAISchema):
         Convert the service metadata to a dictionary.
         :return: Dictionary representation of the service metadata.
         """
-        return self.model_dump()
+        return self.model_dump(mode="json")
 
 
 class ServiceDiscovery(ABC):

@@ -36,10 +36,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.permission_defs import ResourceGroupPermission
-from ai.backend.manager.data.resource_group.types import (
-    FairShareResourceGroupSpec,
-    ResourceGroupData,
-)
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
     GUID,
@@ -311,67 +308,6 @@ class ResourceGroupRow(CreatedAtMixin, Base):
     @classmethod
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
-
-    def to_dataclass(self) -> ResourceGroupData:
-        """Convert Row to domain model data."""
-        from ai.backend.manager.data.resource_group.types import (
-            PreemptionConfig as DataPreemptionConfig,
-        )
-        from ai.backend.manager.data.resource_group.types import (
-            ResourceGroupDriverConfig,
-            ResourceGroupMetadata,
-            ResourceGroupNetworkConfig,
-            ResourceGroupSchedulerConfig,
-            ResourceGroupSchedulerOptions,
-            ResourceGroupStatus,
-            SchedulerType,
-        )
-
-        return ResourceGroupData(
-            id=self.id,
-            name=self.name,
-            status=ResourceGroupStatus(
-                is_active=self.is_active if self.is_active is not None else True,
-                is_public=self.is_public,
-                is_default=self.is_default,
-            ),
-            metadata=ResourceGroupMetadata(
-                description=self.description or "",
-                created_at=self.created_at,
-            ),
-            network=ResourceGroupNetworkConfig(
-                wsproxy_addr=self.wsproxy_addr or "",
-                wsproxy_api_token=self.wsproxy_api_token or "",
-                use_host_network=self.use_host_network,
-            ),
-            driver=ResourceGroupDriverConfig(
-                name=self.driver,
-                options=self.driver_opts,
-            ),
-            scheduler=ResourceGroupSchedulerConfig(
-                name=SchedulerType(self.scheduler),
-                options=ResourceGroupSchedulerOptions(
-                    allowed_session_types=self.scheduler_opts.allowed_session_types,
-                    pending_timeout=self.scheduler_opts.pending_timeout,
-                    config=self.scheduler_opts.config,
-                    agent_selection_strategy=self.scheduler_opts.agent_selection_strategy,
-                    agent_selector_config=self.scheduler_opts.agent_selector_config,
-                    allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
-                    route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
-                    preemption=DataPreemptionConfig(
-                        enabled=self.scheduler_opts.preemption.enabled,
-                        preemptible_priority=self.scheduler_opts.preemption.preemptible_priority,
-                        order=self.scheduler_opts.preemption.order,
-                        mode=self.scheduler_opts.preemption.mode,
-                        preemption_min_runtime=self.scheduler_opts.preemption.preemption_min_runtime,
-                        victim_scope=self.scheduler_opts.preemption.victim_scope,
-                    ),
-                ),
-            ),
-            fair_share_spec=self.fair_share_spec or FairShareResourceGroupSpec(),
-            default_deployment_options=self.default_deployment_options,
-            default_session_options=self.default_session_options,
-        )
 
     @classmethod
     async def list_by_condition(

@@ -77,13 +77,21 @@ from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload as TerminateSessionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
+    NetworkTypeFilter,
     ProjectSessionScope,
+    SessionResultFilter,
     SessionScope,
     SessionStatusFilter,
+    SessionTypeFilter,
+    SessionUsage,
+    SessionUsedBy,
+    SessionUses,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    IntFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -160,9 +168,13 @@ class SessionV2StatusGQL(StrEnum):
 # ========== Order and Filter Types ==========
 
 
+_PRIORITY_RENAMED = f"Deprecated since {NEXT_RELEASE_VERSION}. Renamed to `tier`; the value and its meaning are unchanged."
+
+
 @gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Fields available for ordering sessions."),
     name="SessionV2OrderField",
+    deprecated_values={"PRIORITY": _PRIORITY_RENAMED},
 )
 class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -170,6 +182,26 @@ class SessionV2OrderFieldGQL(StrEnum):
     STATUS = "status"
     ID = "id"
     NAME = "name"
+    CREATION_ID = "creation_id"
+    SESSION_TYPE = "session_type"
+    PRIORITY = "priority"
+    TIER = "tier"
+    JOB_PRIORITY = "job_priority"
+    IS_PREEMPTIBLE = "is_preemptible"
+    CLUSTER_SIZE = "cluster_size"
+    RESOURCE_GROUP_NAME = "resource_group_name"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    USER_ID = "user_id"
+    ACCESS_KEY = "access_key"
+    TAG = "tag"
+    USE_HOST_NETWORK = "use_host_network"
+    BATCH_TIMEOUT = "batch_timeout"
+    STARTS_AT = "starts_at"
+    RESULT = "result"
+    NETWORK_TYPE = "network_type"
+    NETWORK_ID = "network_id"
+    REPLICA_ID = "replica_id"
 
 
 @gql_pydantic_input(
@@ -185,6 +217,80 @@ class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
         description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[SessionV2StatusGQL] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the session type.", added_version=NEXT_RELEASE_VERSION
+    ),
+    name="SessionV2TypeFilter",
+)
+class SessionV2TypeFilterGQL(PydanticInputMixin[SessionTypeFilter]):
+    equals: SessionV2TypeGQL | None = gql_field(
+        description="Exact session type match.", default=None
+    )
+    in_: list[SessionV2TypeGQL] | None = gql_field(
+        description="Session types to match.", name="in", default=None
+    )
+    not_equals: SessionV2TypeGQL | None = gql_field(
+        description="Excludes exact session type match.", name="notEquals", default=None
+    )
+    not_in: list[SessionV2TypeGQL] | None = gql_field(
+        description="Excludes session types in the list.", name="notIn", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the session result.", added_version=NEXT_RELEASE_VERSION
+    ),
+    name="SessionV2ResultFilter",
+)
+class SessionV2ResultFilterGQL(PydanticInputMixin[SessionResultFilter]):
+    equals: SessionV2ResultGQL | None = gql_field(description="Exact result match.", default=None)
+    in_: list[SessionV2ResultGQL] | None = gql_field(
+        description="Results to match.", name="in", default=None
+    )
+    not_equals: SessionV2ResultGQL | None = gql_field(
+        description="Excludes exact result match.", name="notEquals", default=None
+    )
+    not_in: list[SessionV2ResultGQL] | None = gql_field(
+        description="Excludes results in the list.", name="notIn", default=None
+    )
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Inter-container network type a session uses.",
+    ),
+    name="SessionV2NetworkType",
+)
+class SessionV2NetworkTypeGQL(StrEnum):
+    VOLATILE = "volatile"
+    PERSISTENT = "persistent"
+    HOST = "host"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the session network type.", added_version=NEXT_RELEASE_VERSION
+    ),
+    name="SessionV2NetworkTypeFilter",
+)
+class SessionV2NetworkTypeFilterGQL(PydanticInputMixin[NetworkTypeFilter]):
+    equals: SessionV2NetworkTypeGQL | None = gql_field(
+        description="Exact network type match.", default=None
+    )
+    in_: list[SessionV2NetworkTypeGQL] | None = gql_field(
+        description="Network types to match.", name="in", default=None
+    )
+    not_equals: SessionV2NetworkTypeGQL | None = gql_field(
+        description="Excludes exact network type match.", name="notEquals", default=None
+    )
+    not_in: list[SessionV2NetworkTypeGQL] | None = gql_field(
+        description="Excludes network types in the list.", name="notIn", default=None
+    )
 
 
 @gql_pydantic_input(
@@ -206,6 +312,134 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+
+    creation_id: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the id the creating request carried.",
+        ),
+        default=None,
+    )
+    session_type: SessionV2TypeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by session type.",
+        ),
+        default=None,
+    )
+    tier: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the scheduling tier of the pending queue.",
+        ),
+        default=None,
+    )
+    priority: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the scheduling tier of the pending queue.",
+        ),
+        default=None,
+        deprecation_reason=_PRIORITY_RENAMED,
+    )
+    job_priority: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the preemption priority among the owner's sessions.",
+        ),
+        default=None,
+    )
+    is_preemptible: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by whether the session may be preempted.",
+        ),
+        default=None,
+    )
+    cluster_size: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the number of kernels in the session.",
+        ),
+        default=None,
+    )
+    resource_group_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the resource group the session runs in.",
+        ),
+        default=None,
+    )
+    access_key: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the access key the session was created with.",
+        ),
+        default=None,
+    )
+    tag: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the user-supplied tag.",
+        ),
+        default=None,
+    )
+    use_host_network: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by whether the session uses the host network.",
+        ),
+        default=None,
+    )
+    batch_timeout: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the batch execution timeout in seconds.",
+        ),
+        default=None,
+    )
+    starts_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by when the session started running.",
+        ),
+        default=None,
+    )
+    terminated_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by when the session terminated.",
+        ),
+        default=None,
+    )
+    result: SessionV2ResultFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the session result.",
+        ),
+        default=None,
+    )
+    network_type: SessionV2NetworkTypeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the inter-container network type.",
+        ),
+        default=None,
+    )
+    network_id: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the network reference the session uses.",
+        ),
+        default=None,
+    )
+    replica_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the deployment replica the session serves.",
         ),
         default=None,
     )
@@ -264,7 +498,16 @@ class SessionV2MetadataInfoGQL:
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = gql_field(description="Number of nodes in the cluster.")
-    priority: int = gql_field(description="Scheduling priority of the session.")
+    tier: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduling tier of the session.",
+        )
+    )
+    priority: int = gql_field(
+        description="Scheduling tier of the session.",
+        deprecation_reason=_PRIORITY_RENAMED,
+    )
     job_priority: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.8.0",
@@ -378,6 +621,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     """Session type representing a compute session."""
 
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the session.",
+        ),
+    )
 
     # Image IDs for this session (used by images resolver)
     image_ids: list[strawberry.ID] | None = gql_field(
@@ -754,7 +1003,18 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     preopen_ports: list[int] | None = gql_field(default=None, description="Ports to pre-open.")
     bootstrap_script: str | None = gql_field(default=None, description="Bootstrap script.")
 
-    priority: int = gql_field(default=10, description="Scheduling priority (0-100).")
+    tier: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduling tier (0-100).",
+        ),
+        default=None,
+    )
+    priority: int | None = gql_field(
+        default=None,
+        description="Scheduling tier (0-100).",
+        deprecation_reason=_PRIORITY_RENAMED,
+    )
     job_priority: int = gql_field(
         default=0,
         description="Scope-local preemption priority among the requester's own sessions.",
@@ -944,4 +1204,62 @@ class SessionScopeGQL(PydanticInputMixin[SessionScope]):
     )
     user: list[UUIDScopeGQL] | None = gql_field(
         default=None, description="Users whose sessions are being read."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities whose use of a session narrows the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionUsedBy",
+)
+class SessionUsedByGQL(PydanticInputMixin[SessionUsedBy]):
+    """The entities whose use of a session narrows the read."""
+
+    deployment: list[UUID] | None = gql_field(
+        default=None, description="Deployments whose route rows the session serves as a replica."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities a session uses, whose ids narrow the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionUses",
+)
+class SessionUsesGQL(PydanticInputMixin[SessionUses]):
+    """The entities a session uses, whose ids narrow the read."""
+
+    image: list[UUID] | None = gql_field(
+        default=None, description="Images the session's kernels run."
+    )
+    agent: list[UUID] | None = gql_field(
+        default=None, description="Agents running a kernel of the session."
+    )
+    resource_group: list[UUID] | None = gql_field(
+        default=None, description="Resource groups the session runs in."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing a session query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only sessions the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionUsage",
+)
+class SessionUsageGQL(PydanticInputMixin[SessionUsage]):
+    """The uses that narrow a session read."""
+
+    used_by: SessionUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the session narrows the read."
+    )
+    uses: SessionUsesGQL | None = gql_field(
+        default=None, description="Entities the session uses, whose ids narrow the read."
     )

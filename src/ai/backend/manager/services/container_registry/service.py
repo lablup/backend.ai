@@ -2,17 +2,33 @@ from __future__ import annotations
 
 import logging
 import secrets
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.container_registry.base import (
+    AbstractContainerRegistryQuotaClient,
+    ContainerRegistryAuthArgs,
+    ContainerRegistryProjectInfo,
+)
+from ai.backend.manager.clients.container_registry.pool import (
+    ContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaNotConfigurable
 from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryGlobalUpdater
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
@@ -61,9 +77,9 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
-from ai.backend.manager.services.container_registry.actions.search_container_registries import (
-    SearchContainerRegistriesAction,
-    SearchContainerRegistriesActionResult,
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+    SetContainerRegistryGlobalActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
@@ -76,27 +92,31 @@ from ai.backend.manager.services.container_registry.actions.update_registry_quot
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
-    from ai.backend.manager.service.container_registry.harbor import (
-        AbstractPerProjectContainerRegistryQuotaService,
-    )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass(frozen=True)
+class _RegistryQuotaTarget:
+    client: AbstractContainerRegistryQuotaClient
+    registry_info: ContainerRegistryProjectInfo
+    auth: ContainerRegistryAuthArgs
 
 
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
     _container_registry_repository: ContainerRegistryRepository
-    _quota_service: AbstractPerProjectContainerRegistryQuotaService | None
+    _quota_client_pool: ContainerRegistryQuotaClientPool
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         container_registry_repository: ContainerRegistryRepository,
-        quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None,
+        quota_client_pool: ContainerRegistryQuotaClientPool,
     ) -> None:
         self._db = db
         self._container_registry_repository = container_registry_repository
-        self._quota_service = quota_service
+        self._quota_client_pool = quota_client_pool
 
     async def create_container_registry(
         self, action: CreateContainerRegistryAction
@@ -109,6 +129,16 @@ class ContainerRegistryService:
     ) -> UpdateContainerRegistryActionResult:
         data = await self._container_registry_repository.modify_registry(action.updater)
         return UpdateContainerRegistryActionResult(data=data)
+
+    async def set_container_registry_global(
+        self, action: SetContainerRegistryGlobalAction
+    ) -> SetContainerRegistryGlobalActionResult:
+        data = await self._container_registry_repository.set_global(
+            ContainerRegistryGlobalUpdater(
+                registry_id=action.registry_id, is_global=action.is_global
+            )
+        )
+        return SetContainerRegistryGlobalActionResult(data=data)
 
     async def delete_container_registry(
         self, action: DeleteContainerRegistryAction
@@ -131,7 +161,9 @@ class ContainerRegistryService:
         result = await scanner.rescan_single_registry(action.progress_reporter)
 
         return RescanImagesActionResult(
-            images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
+            images=result.images,
+            errors=result.errors,
+            registry=ContainerRegistrySearchableFields.own.to_data(registry_row),
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
@@ -167,20 +199,6 @@ class ContainerRegistryService:
     ) -> LoadAllContainerRegistriesActionResult:
         registries = await self._container_registry_repository.get_all()
         return LoadAllContainerRegistriesActionResult(registries=registries)
-
-    async def search_container_registries(
-        self, action: SearchContainerRegistriesAction
-    ) -> SearchContainerRegistriesActionResult:
-        """Search container registries with pagination and ordering."""
-        result = await self._container_registry_repository.search_container_registries(
-            action.querier
-        )
-        return SearchContainerRegistriesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def get_container_registries(
         self, _action: GetContainerRegistriesAction
@@ -236,35 +254,49 @@ class ContainerRegistryService:
 
         return HandleHarborWebhookActionResult()
 
-    def _ensure_quota_service(self) -> AbstractPerProjectContainerRegistryQuotaService:
-        if self._quota_service is None:
-            raise RuntimeError("Registry quota service is not configured")
-        return self._quota_service
+    async def _registry_quota_target(self, scope_id: ProjectScope) -> _RegistryQuotaTarget:
+        project_id = ProjectID(scope_id.project_id)
+        registry = await self._container_registry_repository.get_project_registry(scope_id)
+        if registry.project is None or registry.username is None or registry.password is None:
+            raise ContainerRegistryQuotaNotConfigurable(
+                f"Container registry {registry.registry_name} has no project or credentials"
+                f" for quota management. (project: {project_id})"
+            )
+        ssl_verify = registry.ssl_verify if registry.ssl_verify is not None else True
+        return _RegistryQuotaTarget(
+            client=self._quota_client_pool.make_client(registry.type),
+            registry_info=ContainerRegistryProjectInfo(
+                url=registry.url,
+                project=registry.project,
+                ssl_verify=ssl_verify,
+            ),
+            auth=ContainerRegistryAuthArgs(username=registry.username, password=registry.password),
+        )
 
     async def create_registry_quota(
         self, action: CreateRegistryQuotaAction
     ) -> CreateRegistryQuotaActionResult:
-        quota_service = self._ensure_quota_service()
-        await quota_service.create_quota(action.scope_id, action.quota)
+        target = await self._registry_quota_target(action.scope_id)
+        await target.client.create_quota(target.registry_info, action.quota, target.auth)
         return CreateRegistryQuotaActionResult()
 
     async def read_registry_quota(
         self, action: ReadRegistryQuotaAction
     ) -> ReadRegistryQuotaActionResult:
-        quota_service = self._ensure_quota_service()
-        quota = await quota_service.read_quota(action.scope_id)
+        target = await self._registry_quota_target(action.scope_id)
+        quota = await target.client.read_quota(target.registry_info, target.auth)
         return ReadRegistryQuotaActionResult(quota=quota)
 
     async def update_registry_quota(
         self, action: UpdateRegistryQuotaAction
     ) -> UpdateRegistryQuotaActionResult:
-        quota_service = self._ensure_quota_service()
-        await quota_service.update_quota(action.scope_id, action.quota)
+        target = await self._registry_quota_target(action.scope_id)
+        await target.client.update_quota(target.registry_info, action.quota, target.auth)
         return UpdateRegistryQuotaActionResult()
 
     async def delete_registry_quota(
         self, action: DeleteRegistryQuotaAction
     ) -> DeleteRegistryQuotaActionResult:
-        quota_service = self._ensure_quota_service()
-        await quota_service.delete_quota(action.scope_id)
+        target = await self._registry_quota_target(action.scope_id)
+        await target.client.delete_quota(target.registry_info, target.auth)
         return DeleteRegistryQuotaActionResult()

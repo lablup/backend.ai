@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, NullableDateTimeFilter
 from ai.backend.common.types import AutoScalingMetricSource
 
@@ -91,7 +92,9 @@ class SearchAutoScalingRulesRequest(BaseRequestModel):
     order: list[AutoScalingRuleOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 

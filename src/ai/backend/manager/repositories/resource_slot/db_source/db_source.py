@@ -14,11 +14,8 @@ from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceDrift,
-    AgentResourceSearchResult,
     OrphanedAllocation,
     ReconciliationResult,
-    ResourceAllocationData,
-    ResourceAllocationSearchResult,
     ResourceOccupancy,
     TerminalSessionKernelReconciliation,
 )
@@ -35,10 +32,6 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import sql_json_merge
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -96,20 +89,6 @@ class ResourceSlotDBSource:
                 )
             return row
 
-    async def search_agent_resources(self, querier: BatchQuerier) -> AgentResourceSearchResult:
-        # Paginated search across all agent_resources rows.
-        # Caller injects conditions (e.g. by_slot_name, by_agent_id) via querier.
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(AgentResourceRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.AgentResourceRow.to_data() for row in result.rows]
-            return AgentResourceSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     # ==================== resource_allocations Read ====================
     async def get_kernel_allocation_by_slot(
         self, kernel_id: uuid.UUID, slot_name: str
@@ -131,30 +110,6 @@ class ResourceSlotDBSource:
                     f"Resource allocation not found for kernel='{kernel_id}', slot='{slot_name}'."
                 )
             return row
-
-    async def search_resource_allocations(
-        self, querier: BatchQuerier
-    ) -> ResourceAllocationSearchResult:
-        # Paginated search across all resource_allocations rows.
-        # Caller injects conditions (e.g. by_slot_name, by_kernel_id) via querier.
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ResourceAllocationRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                ResourceAllocationData(
-                    kernel_id=row.ResourceAllocationRow.kernel_id,
-                    slot_name=row.ResourceAllocationRow.slot_name,
-                    requested=row.ResourceAllocationRow.requested,
-                    used=row.ResourceAllocationRow.used,
-                )
-                for row in result.rows
-            ]
-            return ResourceAllocationSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     # ==================== Aggregation Queries ====================
 

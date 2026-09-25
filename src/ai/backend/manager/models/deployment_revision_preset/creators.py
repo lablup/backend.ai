@@ -22,11 +22,15 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
-from ai.backend.manager.models.specs.creator import FieldCreator, GlobalEntityCreator
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
+from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 __all__ = (
@@ -48,7 +52,8 @@ def _parse_quantity(value: str) -> Decimal:
 
 @dataclass
 class DeploymentPresetCreator(
-    GlobalEntityCreator[DeploymentRevisionPresetRow, DeploymentRevisionPresetData]
+    CreatedInPublic[DeploymentRevisionPresetRow],
+    EntityCreator[DeploymentRevisionPresetRow, DeploymentRevisionPresetData],
 ):
     """Insert a preset, ranked last within its runtime variant.
 
@@ -92,7 +97,7 @@ class DeploymentPresetCreator(
 
     @override
     def to_data(self, row: DeploymentRevisionPresetRow) -> DeploymentRevisionPresetData:
-        return row.to_data()
+        return DeploymentPresetSearchableFields.own.to_data(row)
 
     @override
     def build_row(self) -> DeploymentRevisionPresetRow:

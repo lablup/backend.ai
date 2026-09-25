@@ -15,5 +15,6 @@ class VFSStorageRepositories:
         return cls(
             repository=VFSStorageRepository(
                 db=args.db,
+                v2_ops_provider=args.v2_ops_provider,
             ),
         )

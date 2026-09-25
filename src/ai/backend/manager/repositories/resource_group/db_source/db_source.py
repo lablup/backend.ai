@@ -31,8 +31,10 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 
 if TYPE_CHECKING:
@@ -58,29 +60,6 @@ class ResourceGroupDBSource:
         db: ExtendedAsyncSAEngine,
     ) -> None:
         self._db = db
-
-    async def search_resource_groups(
-        self,
-        querier: BatchQuerier,
-    ) -> ResourceGroupListResult:
-        """Searches resource groups with total count."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ResourceGroupRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.ResourceGroupRow.to_dataclass() for row in result.rows]
-
-            return ResourceGroupListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -124,7 +103,7 @@ class ResourceGroupDBSource:
             row = await db_sess.get(ResourceGroupRow, name)
             if row is None:
                 raise ResourceGroupNotFound(name)
-            return row.to_dataclass()
+            return ResourceGroupSearchableFields.own.to_data(row)
 
     async def replace_default_deployment_options(
         self,

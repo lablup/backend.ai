@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -58,8 +59,37 @@ class TestCreateRuntimeVariantPresetInputFlagValidation:
         assert result.preset_target == PresetTarget.ENV
 
 
+@dataclass(frozen=True)
+class _FittingDefault:
+    value_type: PresetValueType
+    preset_target: PresetTarget
+    default_value: str
+
+
 class TestCreateRuntimeVariantPresetInputDefaultValueValidation:
     """Regression tests for value_type-aware default_value validation on create."""
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FittingDefault(PresetValueType.STR, PresetTarget.ENV, "abc"),
+            _FittingDefault(PresetValueType.INT, PresetTarget.ENV, "4"),
+            _FittingDefault(PresetValueType.FLOAT, PresetTarget.ENV, "0.5"),
+            _FittingDefault(PresetValueType.BOOL, PresetTarget.ENV, "true"),
+            _FittingDefault(PresetValueType.FLAG, PresetTarget.ARGS, "true"),
+        ],
+        ids=lambda case: case.value_type.value,
+    )
+    def test_a_default_that_fits_each_value_type_is_accepted(self, case: _FittingDefault) -> None:
+        result = CreateRuntimeVariantPresetInput(
+            runtime_variant_id=uuid4(),
+            name="test-preset",
+            preset_target=case.preset_target,
+            key="MY_VAR",
+            value_type=case.value_type,
+            default_value=case.default_value,
+        )
+        assert result.default_value == case.default_value
 
     @pytest.mark.parametrize(
         "default_value",

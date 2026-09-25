@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
@@ -47,16 +48,16 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
 )
 from ai.backend.manager.models.fair_share.upserters import (
     DomainFairShareUpserter,
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow, ProjectType
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_usage_history import (
@@ -66,6 +67,7 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -205,7 +207,7 @@ class FairShareDBSource:
 
     async def search_rg_domain_fair_shares(
         self,
-        scope: DomainFairShareOperationScope,
+        scope: DomainFairShareTarget,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
         """Search domain fair shares within a resource group.
@@ -404,7 +406,7 @@ class FairShareDBSource:
 
     async def search_rg_project_fair_shares(
         self,
-        scope: ProjectFairShareOperationScope,
+        scope: ProjectFairShareTarget,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
         """Search project fair shares within a resource group.
@@ -587,7 +589,7 @@ class FairShareDBSource:
         """Get user fair share data.
 
         Steps:
-        1. Check if user exists in project (AssocGroupUserRow)
+        1. Check if user is a member of the project
         2. Query fair share record with (resource_group, user_uuid, project_id)
         3. If record exists, convert and return
         4. If no record, create default from scaling group spec
@@ -597,14 +599,9 @@ class FairShareDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Step 1: Check user-project association and get domain_name
-            assoc_query = (
-                sa.select(ProjectRow.domain_name)
-                .select_from(AssocGroupUserRow)
-                .join(ProjectRow, AssocGroupUserRow.group_id == ProjectRow.id)
-                .where(
-                    AssocGroupUserRow.group_id == project_id,
-                    AssocGroupUserRow.user_id == user_uuid,
-                )
+            assoc_query = sa.select(ProjectRow.domain_name).where(
+                ProjectRow.id == project_id,
+                user_scope_membership_exists(ProjectEntityType(), project_id, user_uuid),
             )
             assoc_result = await db_sess.execute(assoc_query)
             assoc_row = assoc_result.one_or_none()
@@ -657,16 +654,9 @@ class FairShareDBSource:
             domain_name if user is member of project, None otherwise.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(ProjectRow.domain_name)
-                .select_from(AssocGroupUserRow)
-                .join(ProjectRow, ProjectRow.id == AssocGroupUserRow.group_id)
-                .where(
-                    sa.and_(
-                        AssocGroupUserRow.group_id == project_id,
-                        AssocGroupUserRow.user_id == user_uuid,
-                    )
-                )
+            query = sa.select(ProjectRow.domain_name).where(
+                ProjectRow.id == project_id,
+                user_scope_membership_exists(ProjectEntityType(), project_id, user_uuid),
             )
             result = await db_sess.execute(query)
             return result.scalar_one_or_none()
@@ -750,7 +740,7 @@ class FairShareDBSource:
 
     async def search_rg_user_fair_shares(
         self,
-        scope: UserFairShareOperationScope,
+        scope: UserFairShareTarget,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
         """Search user fair shares within a resource group.
@@ -769,23 +759,25 @@ class FairShareDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query:
             # Users via project membership LEFT JOIN fair_share (filtered by resource_group)
-            # Path: AssocGroupUserRow -> ProjectRow -> DomainRow -> UserRow -> LEFT JOIN UserFairShareRow
+            # Path: ProjectRow -> DomainRow -> UserRow (project members) -> LEFT JOIN UserFairShareRow
             query = (
                 sa.select(
-                    AssocGroupUserRow.user_id.label("user_uuid"),
-                    AssocGroupUserRow.group_id.label("project_id"),
+                    UserRow.uuid.label("user_uuid"),
+                    ProjectRow.id.label("project_id"),
                     DomainRow.name.label("domain_name"),
                     UserFairShareRow,
                 )
-                .select_from(AssocGroupUserRow)
-                .join(ProjectRow, AssocGroupUserRow.group_id == ProjectRow.id)
+                .select_from(ProjectRow)
                 .join(DomainRow, ProjectRow.domain_name == DomainRow.name)
-                .join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
+                .join(
+                    UserRow,
+                    user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, UserRow.uuid),
+                )
                 .outerjoin(
                     UserFairShareRow,
                     sa.and_(
-                        AssocGroupUserRow.user_id == UserFairShareRow.user_uuid,
-                        AssocGroupUserRow.group_id == UserFairShareRow.project_id,
+                        UserRow.uuid == UserFairShareRow.user_uuid,
+                        ProjectRow.id == UserFairShareRow.project_id,
                         UserFairShareRow.resource_group_id == scope.resource_group_id,
                     ),
                 )

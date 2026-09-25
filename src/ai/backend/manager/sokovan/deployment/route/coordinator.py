@@ -28,11 +28,11 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
-from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteDataSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteHistoryToCreate
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -224,17 +224,18 @@ class RouteCoordinator:
 
             # Build filter conditions from handler target statuses
             target = handler.target_statuses()
+            fields = ReplicaSearchableFields.own
             conditions: list[QueryCondition] = []
             if target.lifecycle is not None:
-                conditions.append(RouteConditions.by_lifecycle_statuses(target.lifecycle))
+                conditions.append(fields.status.filter.in_(target.lifecycle))
             if target.health is not None:
-                conditions.append(RouteConditions.by_health_statuses(target.health))
+                conditions.append(fields.health_status.filter.in_(target.health))
             if target.traffic is not None:
-                conditions.append(RouteConditions.by_traffic_statuses(target.traffic))
+                conditions.append(fields.traffic_status.filter.in_(target.traffic))
             if target.sub_status is not None:
-                conditions.append(RouteConditions.by_sub_statuses(target.sub_status))
+                conditions.append(fields.sub_status.filter.in_(target.sub_status))
             routes = await self._deployment_repository.search_route_datas_with_last_history(
-                querier=BatchQuerier(pagination=NoPagination(), conditions=conditions),
+                searcher=RouteDataSearcher(pagination=NoPagination(), conditions=conditions),
                 category=handler.category(),
             )
             if not routes:
@@ -270,19 +271,20 @@ class RouteCoordinator:
           Without this, warming-up routes have no one writing to Valkey
           and time out after `initial_delay`.
         """
+        replica_fields = ReplicaSearchableFields.own
         try:
             routes = await self._deployment_repository.search_route_datas(
-                querier=BatchQuerier(
+                searcher=RouteDataSearcher(
                     pagination=NoPagination(),
                     conditions=[
                         combine_conditions_or([
                             combine_conditions_and([
-                                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                                RouteConditions.by_health_statuses(list(RouteHealthStatus)),
+                                replica_fields.status.filter.in_([RouteStatus.RUNNING]),
+                                replica_fields.health_status.filter.in_(list(RouteHealthStatus)),
                             ]),
                             combine_conditions_and([
-                                RouteConditions.by_lifecycle_statuses([RouteStatus.PROVISIONING]),
-                                RouteConditions.by_sub_statuses([RouteSubStatus.WARMING_UP]),
+                                replica_fields.status.filter.in_([RouteStatus.PROVISIONING]),
+                                replica_fields.sub_status.filter.in_([RouteSubStatus.WARMING_UP]),
                             ]),
                         ]),
                     ],

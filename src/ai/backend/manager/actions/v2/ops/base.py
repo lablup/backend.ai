@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import Any, override
+from dataclasses import dataclass
+from typing import Any, final, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
@@ -19,7 +20,6 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
-    RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.purger import (
@@ -34,12 +34,11 @@ from ai.backend.manager.models.specs.querier import (
     FieldQuerier,
     OwnedFieldQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, Searcher
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
-    GlobalEntityUpserter,
 )
 
 __all__ = (
@@ -49,6 +48,8 @@ __all__ = (
     "LookupOpsAction",
     "BulkLookupOpsAction",
     "ScopeItem",
+    "ScopedSearchOpsAction",
+    "GlobalSearcherOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
@@ -262,7 +263,7 @@ class SearchOpsAction[TRow: Base, TData](OpsBackendAction):
 class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
     """A list read across an entire table, with no scope filter.
 
-    Mixed in alongside ``BaseGlobalAction``, whose SUPERADMIN gate is what makes an
+    Mixed in alongside ``BaseGlobalAction``, whose global gate is what makes an
     unscoped scan answerable for. Kept apart from :class:`SearchOpsAction` rather than
     signalled by an empty scope list, so the authority a query needs is visible in the
     action's shape instead of in the value of one of its fields.
@@ -275,10 +276,10 @@ class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the global insert spec; no scope membership involved."""
+    """Carries the insert spec of an entity created in the global scope."""
 
     @abstractmethod
-    def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
+    def to_creator(self) -> EntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
@@ -296,7 +297,7 @@ class GlobalEntityWithFieldsCreateOpsAction[
     """
 
     @abstractmethod
-    def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
+    def to_creator(self) -> EntityCreator[TRow, TData]:
         """Return the insert spec for the owning row."""
         raise NotImplementedError
 
@@ -347,11 +348,11 @@ class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalRoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the role-managed entity insert spec of an entity created in no
-    scope: the row and its preset roles."""
+    """Carries the role-managed entity insert spec of an entity created in the
+    global scope: the row and its preset roles."""
 
     @abstractmethod
-    def to_creator(self) -> RoleManagedGlobalEntityCreator[TRow, TData]:
+    def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
@@ -482,10 +483,10 @@ class FieldPartialBulkGetOpsAction[TRow: Base, TData: FieldData](OpsBackendActio
 
 
 class GlobalEntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A create-or-update of a global entity; nothing is registered either way."""
+    """A create-or-update of an entity created in the global scope."""
 
     @abstractmethod
-    def to_upserter(self) -> GlobalEntityUpserter[TRow, TData]:
+    def to_upserter(self) -> EntityUpserter[TRow, TData]:
         """Return the upsert spec this action executes."""
         raise NotImplementedError
 
@@ -500,11 +501,11 @@ class EntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalEntityAtomicUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A create-or-update of several global rows at once, atomically; each node stays
-    provisioned, and none belongs under another scope."""
+    """A create-or-update of several global rows at once, atomically; each row stays
+    provisioned in the scopes it is created in."""
 
     @abstractmethod
-    def to_upserters(self) -> Sequence[GlobalEntityUpserter[TRow, TData]]:
+    def to_upserters(self) -> Sequence[EntityUpserter[TRow, TData]]:
         """Return one upsert spec per row this action writes."""
         raise NotImplementedError
 
@@ -674,6 +675,42 @@ class OperationScopeOpsAction[TRow: Base, TData](
         return ActionOperationType.SEARCH
 
 
+@dataclass(frozen=True)
+class ScopedSearchOpsAction[TRow: Base, TData](BaseScopeAction, OpsBackendAction, ABC):
+    """A page read from within the scopes the searcher names, narrowed by the uses it names.
+
+    Every scope is authorized and every using entity must be readable; both are read off
+    the searcher, so what is checked is what is queried.
+    """
+
+    searcher: ScopedSearcher[TRow, TData]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @final
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [scope.scope_id() for scope in self.searcher.scopes]
+
+
+@dataclass(frozen=True)
+class GlobalSearcherOpsAction[TRow: Base, TData](BaseGlobalAction, OpsBackendAction, ABC):
+    """A page read across the whole table, narrowed by the uses the searcher names.
+
+    The global gate answers for the unscoped read by type, so the uses are not checked.
+    """
+
+    searcher: GlobalSearcher[TRow, TData]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
 class BulkScopedSearchOpsAction[TRow: Base, TData](
     BaseBulkAction, SearchOpsAction[TRow, TData], ABC
 ):
@@ -805,7 +842,7 @@ class CreateGlobalRoleManagedEntityOpsAction[TRow: Base, TData](
     """An insert of one role-managed entity row that belongs under no other scope.
 
     Global-shaped rather than scope-shaped: a top-level entity has no parent scope to
-    target, and the SUPERADMIN gate is what answers for creating one.
+    target, and the global gate is what answers for creating one.
     """
 
     @override
@@ -983,7 +1020,7 @@ class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction
     """A write to one row of system-wide state, named by a key that is not an ``EntityIdentifier``.
 
     Global rather than single-entity because the row it names belongs to no RBAC scope:
-    the SUPERADMIN gate is what answers for the write, and the catalogs this shape
+    the global gate is what answers for the write, and the catalogs this shape
     serves are keyed by a name that the caller passes as-is.
     """
 

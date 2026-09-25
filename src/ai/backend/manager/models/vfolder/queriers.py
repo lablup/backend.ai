@@ -1,4 +1,4 @@
-"""Single-row read specs for vfolders."""
+"""Read specs for vfolders."""
 
 from __future__ import annotations
 
@@ -11,8 +11,16 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderMountPolicyData
-from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
+    DataQuerier,
+    OwnedFieldQuerier,
+)
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
+from ai.backend.manager.models.vfolder.searchable_fields import (
+    VFolderMountPolicySearchableFields,
+    VFolderSearchableFields,
+)
 
 
 @dataclass
@@ -35,7 +43,23 @@ class VFolderQuerier(DataQuerier[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
+
+
+class BulkVFolderQuerier(BulkEntityQuerier[VFolderRow, VFolderData]):
+    """The vfolders the caller named, keyed by the id column."""
+
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderRow.id
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -58,4 +82,4 @@ class VFolderUserMountPolicyQuerier(
 
     @override
     def to_data(self, row: VFolderUserMountPolicyRow) -> VFolderMountPolicyData:
-        return row.to_data()
+        return VFolderMountPolicySearchableFields.own.to_data(row)

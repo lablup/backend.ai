@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
@@ -26,7 +27,11 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.entity import (
+    EntityError,
+    EntityErrorCode,
+    EntityNotFoundError,
+)
 
 from .common import ObjectNotFound
 
@@ -76,6 +81,19 @@ class PersonalProjectMemberAdditionError(EntityError, web.HTTPConflict):
         )
 
 
+class ModelStoreProjectLeaveError(EntityError, web.HTTPConflict):
+    """Raised when a write would take a user off a model-store project's roster."""
+
+    error_type = "https://api.backend.ai/probs/model-store-project-leave"
+    error_title = "Model-store project keeps every user of its domain."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )
+
+
 class PersonalProjectDeletionError(EntityError, web.HTTPConflict):
     """Raised when a personal project is deleted or purged on its own, apart from
     the user it belongs to."""
@@ -86,6 +104,21 @@ class PersonalProjectDeletionError(EntityError, web.HTTPConflict):
     @override
     def entity_error_code(self) -> EntityErrorCode:
         return EntityErrorCode(ProjectEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT)
+
+
+class ProjectResourcePolicyNotFound(EntityNotFoundError):
+    error_type = "https://api.backend.ai/probs/project-resource-policy-not-found"
+    error_title = "The project resource policy does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(
+            extra_msg, entity_type=ProjectResourcePolicyEntityType(), operation=operation
+        )
 
 
 class ProjectHasActiveKernelsError(EntityError, web.HTTPConflict):
@@ -221,14 +254,17 @@ class ResourcePresetNotFound(EntityError, ObjectNotFound):
         )
 
 
-class RuntimeVariantNotFound(EntityError, ObjectNotFound):
-    object_name = "runtime variant"
+class RuntimeVariantNotFound(EntityNotFoundError):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-found"
+    error_title = "The runtime variant does not exist."
 
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(
-            RuntimeVariantEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
-        )
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, entity_type=RuntimeVariantEntityType(), operation=operation)
 
 
 class RuntimeVariantConflict(EntityError, web.HTTPConflict):

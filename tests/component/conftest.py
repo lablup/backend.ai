@@ -111,6 +111,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -154,8 +155,12 @@ from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
 )
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -166,6 +171,7 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
@@ -584,7 +590,11 @@ async def database_engine(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Provide a function-scoped ExtendedAsyncSAEngine for repository/service fixtures."""
     async with connect_database(bootstrap_config.db) as db:
-        yield db
+        await GlobalEntityIDLoader(db).load()
+        try:
+            yield db
+        finally:
+            GlobalEntityIDCache.clear()
 
 
 @pytest.fixture()
@@ -1516,11 +1526,13 @@ def auth_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     group_repository = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -1545,12 +1557,21 @@ def auth_processors(
 
 
 @pytest.fixture()
-def processor_registry(database_engine: ExtendedAsyncSAEngine) -> ProcessorRegistry[Any]:
-    """The registry every v2-wired processor group is built from."""
+def processor_registry(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorRegistry[Any]:
+    """The registry every v2-wired processor group is built from.
+
+    Only the global gate is real here: these tests run global actions as the caller they
+    set, and the other shapes are gated by the domain conftest that needs them.
+    """
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=V2ActionValidators(),
+            validators=V2ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )

@@ -12,15 +12,13 @@ from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
+    build_orders,
     build_pagination,
 )
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.entity_label.conditions import (
-    EntityLabelConditions,
-    EntityLabelNestedConditions,
-)
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -28,7 +26,6 @@ from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapte
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.entity_label.request import (
         EntityLabelFilter,
-        EntityLabelNestedFilter,
     )
 
 
@@ -51,48 +48,13 @@ class BaseAdapter(BaseFilterAdapter):
         One instance narrows one row, so a `key` and a `value` given together constrain
         the same label rather than two different ones.
         """
-        conditions: list[QueryCondition] = []
-        if f.key is not None:
-            condition = self.convert_string_filter(
-                f.key,
-                contains_factory=EntityLabelConditions.by_key_contains,
-                equals_factory=EntityLabelConditions.by_key_equals,
-                starts_with_factory=EntityLabelConditions.by_key_starts_with,
-                ends_with_factory=EntityLabelConditions.by_key_ends_with,
-                in_factory=EntityLabelConditions.by_key_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.value is not None:
-            condition = self.convert_string_filter(
-                f.value,
-                contains_factory=EntityLabelConditions.by_value_contains,
-                equals_factory=EntityLabelConditions.by_value_equals,
-                starts_with_factory=EntityLabelConditions.by_value_starts_with,
-                ends_with_factory=EntityLabelConditions.by_value_ends_with,
-                in_factory=EntityLabelConditions.by_value_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.entity_type is not None:
-            condition = self.convert_string_filter(
-                f.entity_type,
-                contains_factory=EntityLabelConditions.by_entity_type_contains,
-                equals_factory=EntityLabelConditions.by_entity_type_equals,
-                starts_with_factory=EntityLabelConditions.by_entity_type_starts_with,
-                ends_with_factory=EntityLabelConditions.by_entity_type_ends_with,
-                in_factory=EntityLabelConditions.by_entity_type_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.entity_id is not None:
-            condition = self.convert_uuid_filter(
-                f.entity_id,
-                equals_factory=EntityLabelConditions.by_entity_id_equals,
-                in_factory=EntityLabelConditions.by_entity_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = EntityLabelSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.key, fields.key.filter),
+            *self.apply_string_filter(f.value, fields.value.filter),
+            *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.entity_id.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_entity_label_filter(sub))
@@ -108,24 +70,6 @@ class BaseAdapter(BaseFilterAdapter):
                 not_conditions.extend(self._convert_entity_label_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
-        return conditions
-
-    def _convert_entity_label_nested_filter(
-        self, f: EntityLabelNestedFilter, nested: EntityLabelNestedConditions
-    ) -> list[QueryCondition]:
-        """Conditions selecting entities by the labels on them.
-
-        Each relation compiles to one correlated EXISTS, so a relation's `key` and
-        `value` land on the same label. Requiring two different labels is two relations
-        combined by the entity filter's own AND.
-        """
-        conditions: list[QueryCondition] = []
-        if f.some is not None:
-            conditions.append(nested.some(self._convert_entity_label_filter(f.some)))
-        if f.every is not None:
-            conditions.append(nested.every(self._convert_entity_label_filter(f.every)))
-        if f.none is not None:
-            conditions.append(nested.none(self._convert_entity_label_filter(f.none)))
         return conditions
 
     async def batch_load_fields[TAction: BasePartialBulkFieldAction[Any, Any], TData, TNode](
@@ -181,7 +125,8 @@ class BaseAdapter(BaseFilterAdapter):
         Handles pagination mode selection (cursor forward/backward/offset/default)
         via the shared ``build_pagination()`` utility. Domain adapters supply
         pre-converted ``conditions`` and ``orders`` from their private conversion
-        methods; cursor and tiebreaker orders are taken from ``pagination_spec``.
+        methods; cursor and tiebreaker orders are taken from ``pagination_spec``,
+        and cursor pagination drops ``orders``.
 
         The optional ``base_conditions`` are prepended before ``conditions``
         (e.g., a foreign-key scope filter applied before user-supplied filters).
@@ -198,30 +143,27 @@ class BaseAdapter(BaseFilterAdapter):
             offset: Offset-based page offset.
             base_conditions: Extra conditions prepended before ``conditions``.
         """
-        is_cursor_pagination = first is not None or last is not None
+        options = PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
 
         all_conditions: list[QueryCondition] = []
         if base_conditions:
             all_conditions.extend(base_conditions)
         all_conditions.extend(conditions)
 
-        all_orders: list[QueryOrder] = list(orders)
-        if not all_orders and not is_cursor_pagination:
-            all_orders.append(pagination_spec.forward_order)
-        all_orders.append(pagination_spec.tiebreaker_order)
-
-        pagination = build_pagination(
-            PaginationOptions(
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
-            ),
-            pagination_spec,
+        final_orders = build_orders(options, pagination_spec, orders)
+        pagination = build_pagination(options, pagination_spec)
+        return BatchQuerier(
+            conditions=all_conditions,
+            orders=final_orders,
+            pagination=pagination,
         )
-        return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
 
     def _build_searcher[TSearcher: Searcher[Any, Any]](
         self,

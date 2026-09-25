@@ -2,47 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
-from ai.backend.common.data.entity.deployment import (
-    DeploymentEntityType,
-    DeploymentID,
-)
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.actions.v2.scope.target import SearchableScopeTarget
 from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
-from ai.backend.manager.models.scheduling_history.scopes import (
-    DeploymentReplicaGroupHistoryOperationScope,
+from ai.backend.manager.models.replica_group_history.searchers import (
+    ReplicaGroupHistorySearcher,
 )
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.base import BatchQuerier
-
-
-@dataclass(frozen=True)
-class ReplicaGroupHistoryTarget(SearchableScopeTarget):
-    """One scope item of a replica-group scheduling-history search.
-
-    Each variant carries only the id its own dimension is keyed by and derives
-    both the row filter and the scope it is answered for from it.
-    """
-
-
-@dataclass(frozen=True)
-class DeploymentReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
-    """Scope item covering the history of every replica group the deployment owns."""
-
-    deployment_id: DeploymentID
-
-    @override
-    def to_search_scope(self) -> OperationScope:
-        return DeploymentReplicaGroupHistoryOperationScope(deployment_id=self.deployment_id)
-
-    @override
-    def to_scope_id(self) -> EntityIdentifier:
-        return self.deployment_id
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentReplicaGroupHistoryTarget,
+)
 
 
 @dataclass
@@ -52,12 +25,13 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     # TODO: Widen to a list of targets once this becomes a bulk action; the scope
     # input already accepts several items and means them to be OR'd, but a
     # BaseScopeAction authorizes exactly one target.
-    target: ReplicaGroupHistoryTarget
-    querier: BatchQuerier
+    target: DeploymentReplicaGroupHistoryTarget
+    searcher: ReplicaGroupHistorySearcher
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.target.to_scope_id(),)
+        return (self.target.scope_id(),)
 
     @override
     @classmethod
@@ -87,4 +61,4 @@ class ScopedSearchReplicaGroupHistoryActionResult(BaseScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    target: ReplicaGroupHistoryTarget
+    target: DeploymentReplicaGroupHistoryTarget

@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateRangeFilter, StringFilter, UUIDFilter
 
 from .types import (
@@ -70,8 +71,6 @@ __all__ = (
     "UpdateResourceGroupFairShareSpecInput",
 )
 
-_DEFAULT_PAGE_LIMIT = 50
-
 
 # Filter nested sub-models
 
@@ -103,7 +102,12 @@ class DomainFairShareFilter(BaseRequestModel):
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     domain: DomainFairShareDomainNestedFilter | None = Field(
-        default=None, description="Filter by domain entity properties"
+        default=None,
+        description=(
+            "Filter by the domain this fair share is calculated for. Deprecated: search "
+            "domains first, then narrow by `domain_name`."
+        ),
+        deprecated=True,
     )
     AND: list[DomainFairShareFilter] | None = Field(
         default=None, description="Combine with AND logic"
@@ -121,7 +125,12 @@ class ProjectFairShareFilter(BaseRequestModel):
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     project: ProjectFairShareProjectNestedFilter | None = Field(
-        default=None, description="Filter by project entity properties"
+        default=None,
+        description=(
+            "Filter by the project this fair share is calculated for. Deprecated: search "
+            "projects first, then narrow by `project_id`."
+        ),
+        deprecated=True,
     )
     AND: list[ProjectFairShareFilter] | None = Field(
         default=None, description="Combine with AND logic"
@@ -140,7 +149,12 @@ class UserFairShareFilter(BaseRequestModel):
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     user: UserFairShareUserNestedFilter | None = Field(
-        default=None, description="Filter by user entity properties"
+        default=None,
+        description=(
+            "Filter by the user this fair share is calculated for. Deprecated: search users "
+            "first, then narrow by `user_uuid`."
+        ),
+        deprecated=True,
     )
     AND: list[UserFairShareFilter] | None = Field(
         default=None, description="Combine with AND logic"
@@ -318,7 +332,7 @@ class SearchDomainUsageBucketsInput(BaseRequestModel):
         default=None, description="Order specifications"
     )
     limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
     )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
@@ -331,7 +345,7 @@ class SearchProjectUsageBucketsInput(BaseRequestModel):
         default=None, description="Order specifications"
     )
     limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
     )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
@@ -344,7 +358,7 @@ class SearchUserUsageBucketsInput(BaseRequestModel):
         default=None, description="Order specifications"
     )
     limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
     )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 

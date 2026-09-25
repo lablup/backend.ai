@@ -56,6 +56,7 @@ def _make_preset_node(
     now = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
     return DeploymentRevisionPresetNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
         name="preset",
         description=None,

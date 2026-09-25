@@ -14,6 +14,7 @@ from graphql import Undefined, UndefinedType
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import (
@@ -36,11 +37,20 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.create_registry_quota import (
+    CreateRegistryQuotaAction,
+)
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.delete_registry_quota import (
+    DeleteRegistryQuotaAction,
+)
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
+    UpdateRegistryQuotaAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -452,7 +462,6 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                 url=OptionalState.from_graphql(url),
                 type=OptionalState.from_graphql(type),
                 registry_name=OptionalState.from_graphql(registry_name),
-                is_global=TriState.from_graphql(is_global),
                 project=TriState.from_graphql(project),
                 username=TriState.from_graphql(username),
                 password=TriState.from_graphql(password),
@@ -463,8 +472,13 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 
         # Execute action through processor
         result = await ctx.processors.container_registry.update_container_registry.run(action)
+        data = result.data
+        if not isinstance(is_global, UndefinedType):
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(ContainerRegistryID(reg_id), is_global)
 
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(data))
 
 
 class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
@@ -531,10 +545,8 @@ class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
         try:
             match scope_id:
                 case ProjectScope():
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.create_quota(
-                            scope_id, int(quota)
-                        )
+                    await graph_ctx.processors.container_registry.create_registry_quota.run(
+                        CreateRegistryQuotaAction(scope_id=scope_id, quota=int(quota))
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -571,10 +583,8 @@ class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
         try:
             match scope_id:
                 case ProjectScope(_):
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.update_quota(
-                            scope_id, int(quota)
-                        )
+                    await graph_ctx.processors.container_registry.update_registry_quota.run(
+                        UpdateRegistryQuotaAction(scope_id=scope_id, quota=int(quota))
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -609,10 +619,8 @@ class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
         try:
             match scope_id:
                 case ProjectScope(_):
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
-                            scope_id
-                        )
+                    await graph_ctx.processors.container_registry.delete_registry_quota.run(
+                        DeleteRegistryQuotaAction(scope_id=scope_id)
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -811,7 +819,6 @@ class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
             input_config["type"] = ContainerRegistryType(props.type)
 
         set_if_set(props, input_config, "url")
-        set_if_set(props, input_config, "is_global")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
         set_if_set(props, input_config, "ssl_verify")
@@ -826,8 +833,15 @@ class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
 
             for field, val in input_config.items():
                 setattr(reg_row, field, val)
+            registry_id = ContainerRegistryID(reg_row.id)
+            container_registry = ContainerRegistry.from_row(ctx, reg_row)
 
-            return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
+        if props.is_global is not Undefined:
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(registry_id, props.is_global)
+            container_registry.is_global = data.is_global
+        return cls(container_registry=container_registry)
 
 
 class DeleteContainerRegistry(graphene.Mutation):  # type: ignore[misc]

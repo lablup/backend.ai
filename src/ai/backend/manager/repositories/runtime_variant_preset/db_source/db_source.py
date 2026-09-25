@@ -11,6 +11,9 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
+    RuntimeVariantPresetSearchableFields,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -28,7 +31,7 @@ class RuntimeVariantPresetDBSource:
             row = (await session.execute(stmt)).scalar_one_or_none()
             if row is None:
                 raise RuntimeVariantPresetNotFound()
-            return row.to_data()
+            return RuntimeVariantPresetSearchableFields.own.to_data(row)
 
     async def get_by_ids(self, preset_ids: list[UUID]) -> list[RuntimeVariantPresetData]:
         if not preset_ids:
@@ -38,4 +41,4 @@ class RuntimeVariantPresetDBSource:
                 RuntimeVariantPresetRow.id.in_(preset_ids)
             )
             rows = (await session.execute(stmt)).scalars().all()
-            return [row.to_data() for row in rows]
+            return [RuntimeVariantPresetSearchableFields.own.to_data(row) for row in rows]

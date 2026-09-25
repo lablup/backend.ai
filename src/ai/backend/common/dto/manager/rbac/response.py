@@ -32,9 +32,7 @@ __all__ = (
     "PermissionDTO",
     "RevokeRoleResponse",
     "RoleDTO",
-    "ScopeDTO",
     "SearchRolesResponse",
-    "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
     "UpdateRoleResponse",
 )
@@ -140,21 +138,6 @@ class GetScopeTypesResponse(BaseResponseModel):
     """Response for getting available scope types."""
 
     items: list[EntityType] = Field(description="List of available scope types")
-
-
-class ScopeDTO(BackendAISchema):
-    """DTO for scope data."""
-
-    scope_type: EntityType = Field(description="Scope type")
-    scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
-    name: str = Field(description="Scope display name")
-
-
-class SearchScopesResponse(BaseResponseModel):
-    """Response for searching scopes."""
-
-    items: list[ScopeDTO] = Field(description="List of scopes")
-    pagination: PaginationInfo = Field(description="Pagination information")
 
 
 class GetEntityTypesResponse(BaseResponseModel):

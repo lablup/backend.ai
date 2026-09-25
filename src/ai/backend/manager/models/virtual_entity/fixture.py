@@ -5,6 +5,8 @@ provision alongside a created row is missing and every graph read of that entity
 fails. Each table below declares the entity its rows are, and provisioning gives
 every row of it a node owning and governing itself.
 
+Every declared entity is created in the `global` scope as well.
+
 The declaration covers the tables the repository's fixtures load. A fixture of an
 entity table left out of it writes rows with no node, the state this module exists
 to prevent.
@@ -23,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
@@ -43,9 +46,10 @@ from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.base import metadata
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -92,7 +96,8 @@ FIXTURE_ENTITY_SPECS: Final[Mapping[str, FixtureEntitySpec]] = {
 
 async def provision_fixture_entities(conn: AsyncConnection, table_names: Collection[str]) -> None:
     """Give every row of each declared table among ``table_names`` a virtual entity node
-    that owns and governs it, as creating the row through the entity ops would have.
+    that owns and governs it, owned and governed by the `global` scope too, as creating
+    the row through the entity ops would have.
 
     Runs over the whole table rather than the rows just written, so a fixture leaving
     the id to the server default is covered and a second run changes nothing. A node a
@@ -132,6 +137,37 @@ async def _provision_table(conn: AsyncConnection, table_name: str, spec: Fixture
         .from_select(
             ["virtual_entity_id", "scope_entity_id"],
             nodes.add_columns(VirtualEntityRow.id),
+        )
+        .on_conflict_do_nothing()
+    )
+    global_nodes = (
+        sa.select(VirtualEntityRow.id)
+        .join(GlobalEntityRow, VirtualEntityRow.entity_id == GlobalEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == GlobalEntityType(),
+            GlobalEntityRow.name == GlobalEntityName.GLOBAL,
+        )
+        .subquery()
+    )
+    members = nodes.subquery()
+    pairs = sa.select(global_nodes.c.id.label("scope"), members.c.id.label("member")).select_from(
+        global_nodes.join(members, sa.true())
+    )
+    await conn.execute(
+        pg_insert(EntityMembershipRow)
+        .from_select(
+            ["virtual_entity_id", "member_entity_id", "capped"],
+            pairs.add_columns(sa.literal(False)),
+        )
+        .on_conflict_do_nothing(index_elements=["virtual_entity_id", "member_entity_id"])
+    )
+    await conn.execute(
+        pg_insert(ScopeBindingRow)
+        .from_select(
+            ["virtual_entity_id", "scope_entity_id"],
+            sa.select(members.c.id, global_nodes.c.id).select_from(
+                global_nodes.join(members, sa.true())
+            ),
         )
         .on_conflict_do_nothing()
     )

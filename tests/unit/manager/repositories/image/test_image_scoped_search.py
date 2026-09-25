@@ -24,9 +24,9 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.image.scopes import (
-    ContainerRegistryImageOperationScope,
-    GlobalImageOperationScope,
-    ProjectImageOperationScope,
+    ContainerRegistryImageTarget,
+    ProjectImageTarget,
+    PublicImageTarget,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -110,7 +110,7 @@ class TestImageScopedSearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> dict[str, uuid.UUID]:
-        """One image created in a project, one in a registry marked global."""
+        """One image created in a project, one in a registry registered in public."""
         project_id = uuid.uuid4()
         owned_registry_id = uuid.uuid4()
         global_registry_id = uuid.uuid4()
@@ -198,7 +198,7 @@ class TestImageScopedSearch:
     ) -> None:
         result = await _search(
             db_with_cleanup,
-            [ProjectImageOperationScope(project_id=ProjectID(test_data["project_id"]))],
+            [ProjectImageTarget(project_id=ProjectID(test_data["project_id"]))],
         )
         assert [row.ImageRow.id for row in result.rows] == [test_data["owned_image_id"]]
 
@@ -210,7 +210,7 @@ class TestImageScopedSearch:
         result = await _search(
             db_with_cleanup,
             [
-                ContainerRegistryImageOperationScope(
+                ContainerRegistryImageTarget(
                     registry_id=ContainerRegistryID(test_data["owned_registry_id"])
                 )
             ],
@@ -223,7 +223,7 @@ class TestImageScopedSearch:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """The global image is in no scope's graph, and is read all the same."""
-        result = await _search(db_with_cleanup, [GlobalImageOperationScope()])
+        result = await _search(db_with_cleanup, [PublicImageTarget()])
         assert [row.ImageRow.id for row in result.rows] == [test_data["shared_image_id"]]
 
     async def test_scopes_are_combined_with_or(
@@ -234,8 +234,8 @@ class TestImageScopedSearch:
         result = await _search(
             db_with_cleanup,
             [
-                ProjectImageOperationScope(project_id=ProjectID(test_data["project_id"])),
-                GlobalImageOperationScope(),
+                ProjectImageTarget(project_id=ProjectID(test_data["project_id"])),
+                PublicImageTarget(),
             ],
         )
         assert {row.ImageRow.id for row in result.rows} == {

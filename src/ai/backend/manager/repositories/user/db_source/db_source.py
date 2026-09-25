@@ -25,7 +25,6 @@ from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
@@ -65,7 +64,7 @@ from ai.backend.manager.models.keypair.row import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -88,6 +87,8 @@ from ai.backend.manager.models.user.purgers import (
     UserPurger,
     UserSessionGroupPurger,
 )
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -97,8 +98,10 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import (
@@ -118,6 +121,7 @@ class UserDBSource:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
     _share_ops: ShareOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _user_ops_provider: UserOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -126,11 +130,13 @@ class UserDBSource:
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
         self._share_ops = share_ops_provider
+        self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
@@ -141,7 +147,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
-            return user_row.to_data()
+            return UserSearchableFields.own.to_data(user_row)
 
     async def get_by_email_validated(
         self,
@@ -153,7 +159,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return user_row.to_data()
+            return UserSearchableFields.own.to_data(user_row)
 
     async def _default_keypair_resource_policy(self, session: SASession) -> str:
         """The name of the policy a keypair gets when nothing else names one."""
@@ -336,6 +342,7 @@ class UserDBSource:
             await self._sync_user_project_memberships(
                 updated_user.uuid, updated_user.domain_name, group_ids
             )
+        await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
 
     async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
@@ -708,6 +715,19 @@ class UserDBSource:
                 UserID(user_uuid), domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
             )
 
+    async def _restate_user_policy_shares(self, user_id: UserID) -> None:
+        """Lend the user the user and keypair policies they are now subject to — the
+        write above may have moved either one."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_user_resource_policy_share(user_id)
+            await w.restate_keypair_resource_policy_share(user_id)
+
+    async def _restate_keypair_policy_share(self, user_id: UserID) -> None:
+        """Lend the user the keypair policy the key they now authorize with is subject
+        to."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_keypair_resource_policy_share(user_id)
+
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""
         result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
@@ -863,27 +883,17 @@ class UserDBSource:
 
     async def search_users(
         self,
-        querier: BatchQuerier,
+        searcher: UserSearcher,
     ) -> UserSearchResult:
-        """Search all users with pagination and filters (admin only).
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier)
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search all users with pagination and filters (admin only)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return UserSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def keypair_settings_to_inherit(self, user_uuid: UUID) -> KeyPairCreator:
         """The settings a newly issued keypair takes from the user's default keypair,
@@ -938,47 +948,7 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
             await self._switch_default_keypair(session, user_id, access_key)
-
-    async def search_my_keypairs(
-        self,
-        scope: UserKeypairOperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs owned by the scoped user.
-
-        Args:
-            scope: Search scope containing the user UUID whose keypairs to retrieve.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def admin_search_keypairs(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Admin search all keypairs without scope restriction."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        await self._restate_keypair_policy_share(user_id)
 
     async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Read one keypair by its id."""
@@ -990,7 +960,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {keypair_id} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:
         """Admin retrieves a single keypair by access key."""
@@ -1004,7 +974,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_update_ssh_keypair(
         self,

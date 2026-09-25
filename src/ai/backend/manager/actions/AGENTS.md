@@ -22,15 +22,16 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Searching within scopes
 
-- A `scope`-shaped search takes `items: Sequence[<Entity>ScopeItem]` and nothing else
+- A `scope`-shaped search takes `targets: Sequence[<Entity>Target]` and nothing else
   standing for a scope. One action per entity, never one per scope kind.
-- `ScopeItem` (`actions/v2/ops/base.py`) declares the pair every item answers with:
-  `scope_ref()` names the scope the read is authorized against, `operation_scope()` the
-  rows it is restricted to. Declaring them together is what keeps a read from being
-  authorized against one thing and served another.
-- The action lists both back: `scope_targets()` is every item's `scope_ref()`, and
-  `operation_scopes()` every item's `operation_scope()`. Ops ORs the conditions; the gate
-  authorizes each scope, so a caller naming one they cannot see is refused the whole read.
+- A `ScopeTarget` (`models/scopes.py`) answers both axes: `scope_id()` names the scope the
+  read is authorized against, `to_condition()` the rows it is restricted to. Declaring them
+  on one class is what keeps a read from being authorized against one thing and served
+  another.
+- The action derives both from that one list and marks them `@final`: `scope_targets()` is
+  every target's `scope_id()`, `operation_scopes()` the targets themselves. Ops ORs the
+  conditions; the gate authorizes each scope, so a caller naming one they cannot see is
+  refused the whole read.
 
 ## Linking two entities
 
@@ -186,9 +187,17 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Gates
 
-- `global` extends `scope` to the whole system and runs behind the SUPERADMIN
-  gate. Global reads open to all authenticated users are wired via the `public_*`
-  factories — read operations only; the constructor rejects writes.
+- `global` extends `scope` to the whole system. The gate is what the `global`
+  singleton grants on the action's entity type, and the check is by type, so it puts no
+  row condition on the query. A super admin passes everything and a monitor passes the
+  reads — both are read off the user role, so neither needs a role row. With RBAC
+  enforcement off those two bypasses are the whole gate. Global reads open to all
+  authenticated users are wired via the `public_*` factories — read operations only;
+  the constructor rejects writes.
+- The global gate is a validator the wiring supplies, as it is for every other shape.
+  `GlobalActionProcessor` refuses an empty validator list, so a wiring that states no
+  gate fails where it is made rather than at request time. A tool that only reads the
+  wiring states `RefusingGlobalActionValidator`, which lets no one through.
 - `anonymous_global` takes no gate at all and accepts writes. Wire through any other
   factory that fits. It is available only when both hold — the caller is an external
   system that can never hold a principal, and the service checks that caller itself

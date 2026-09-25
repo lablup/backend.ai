@@ -16,6 +16,10 @@ from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
+from ai.backend.manager.models.audit_log.searchable_fields import (
+    AuditLogScopeSearchableFields,
+    AuditLogSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     FieldCreator,
@@ -71,7 +75,7 @@ class BaseAuditLogFields:
         return ()
 
     def to_data(self, row: AuditLogRow) -> AuditLogData:
-        return row.to_dataclass()
+        return AuditLogSearchableFields.own.to_data(row)
 
     def _build_row(
         self,
@@ -230,6 +234,17 @@ class RelationAuditLogCreator(DanglingAuditLogCreator):
 
 
 @dataclass
+class MembershipAuditLogCreator(OwnedAuditLogCreator):
+    """One entity moved into scopes or out of them. The scopes go to
+    ``audit_log_scopes``."""
+
+    @classmethod
+    @override
+    def action_kind(cls) -> ActionKind:
+        return ActionKind.MEMBERSHIP
+
+
+@dataclass
 class GlobalAuditLogCreator(DanglingAuditLogCreator):
     @classmethod
     @override
@@ -258,8 +273,4 @@ class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, Audi
 
     @override
     def to_data(self, row: AuditLogScopeRow) -> AuditLogScopeData:
-        return AuditLogScopeData(
-            audit_log_id=AuditLogID(row.audit_log_id),
-            scope_type=row.scope_type,
-            scope_id=row.scope_id,
-        )
+        return AuditLogScopeSearchableFields.own.to_data(row)

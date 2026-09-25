@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -15,11 +15,14 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import association_groups_users as agus
 from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.session_template.creators import SessionTemplateCreator
 from ai.backend.manager.models.session_template.row import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.virtual_entity.queries import (
+    user_scope_membership_exists,
+    user_scope_membership_query,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
@@ -102,10 +105,12 @@ class TemplateDBSource:
             else:
                 if requesting_domain != owner_domain:
                     raise InvalidAPIParameters("You can only set the domain to your domain.")
-                membership_query = sa.select(agus.c.group_id).where(
-                    (agus.c.user_id == owner_uuid) & (agus.c.group_id == requesting_project_id)
+                membership_query = sa.select(
+                    user_scope_membership_exists(
+                        ProjectEntityType(), requesting_project_id, owner_uuid
+                    )
                 )
-                if await conn.scalar(membership_query) is None:
+                if not await conn.scalar(membership_query):
                     raise InvalidAPIParameters("Invalid group")
 
         return owner_uuid, requesting_project_id
@@ -402,14 +407,10 @@ class TemplateDBSource:
                     result = await conn.execute(grp_query)
                     group_ids = [g.id for g in result.fetchall()]
                 else:
-                    j2 = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-                    grp_query = (
-                        sa.select(agus.c.group_id)
-                        .select_from(j2)
-                        .where(agus.c.user_id == user_uuid)
+                    result = await conn.execute(
+                        user_scope_membership_query(ProjectEntityType(), user_uuid)
                     )
-                    result = await conn.execute(grp_query)
-                    group_ids = [g.group_id for g in result.fetchall()]
+                    group_ids = [g.scope_id for g in result.fetchall()]
 
                 j3 = sa.join(SessionTemplateRow, groups, SessionTemplateRow.group_id == groups.c.id)
                 grp_tmpl_query = (

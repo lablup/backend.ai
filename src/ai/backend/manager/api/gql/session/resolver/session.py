@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
 import strawberry
@@ -32,6 +33,7 @@ from ai.backend.manager.api.gql.session.types import (
     ProjectSessionScopeGQL,
     SessionIdleCheckTargetInfoGQL,
     SessionScopeGQL,
+    SessionUsageGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -66,6 +68,16 @@ async def session_v2(
 )  # type: ignore[misc]
 async def admin_sessions_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; sessions the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: SessionV2FilterGQL | None = None,
     order_by: list[SessionV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -78,6 +90,7 @@ async def admin_sessions_v2(
     check_admin_only()
     payload = await info.context.adapters.session.admin_search(
         AdminSearchSessionsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -114,6 +127,16 @@ async def admin_sessions_v2(
 async def scoped_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: SessionScopeGQL,
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; sessions the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: SessionV2FilterGQL | None = None,
     order_by: list[SessionV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -127,6 +150,7 @@ async def scoped_sessions_v2(
     payload = await info.context.adapters.session.scoped_search(
         ScopedSearchSessionsInput(
             scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -160,6 +184,16 @@ async def scoped_sessions_v2(
 async def project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; sessions the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: SessionV2FilterGQL | None = None,
     order_by: list[SessionV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -172,6 +206,7 @@ async def project_sessions_v2(
     payload = await info.context.adapters.session.gql_search_by_project(
         project_id=ProjectID(scope.project_id),
         input=AdminSearchSessionsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

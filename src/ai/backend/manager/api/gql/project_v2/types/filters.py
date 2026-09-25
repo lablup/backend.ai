@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -19,7 +20,9 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -86,15 +89,50 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
     id: UUIDFilter | None = None
     name: StringFilter | None = None
     domain_name: StringFilter | None = None
+    description: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by project description."
+        ),
+        default=None,
+    )
+    integration_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the external integration name.",
+        ),
+        default=None,
+    )
     type: ProjectTypeEnumFilter | None = None
     is_active: bool | None = None
     created_at: DateTimeFilter | None = None
     modified_at: DateTimeFilter | None = None
-    domain: ProjectDomainNestedFilter | None = None
-    user: ProjectUserNestedFilter | None = None
+    domain: ProjectDomainNestedFilter | None = gql_field(
+        default=None,
+        description="Filter by the domain holding the project.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            " cannot check whether the caller may read that row. Search domains first, then"
+            " narrow by `domainName`."
+        ),
+    )
+    user: ProjectUserNestedFilter | None = gql_field(
+        default=None,
+        description="Filter by the users enrolled in the project.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            " cannot check whether the caller may read that row. Search users first, then pass"
+            " their ids as the `user` scope."
+        ),
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+_USER_ORDER_DEPRECATION_TEMPLATE = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A project holds many users, so this order"
+    " folds them into a single {subject}. Narrow the results with the `user` filter instead."
+)
 
 
 @gql_enum(
@@ -107,12 +145,19 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
             "NAME: Order by project name alphabetically. "
             "IS_ACTIVE: Order by active status. "
             "TYPE: Order by project type. "
-            "DOMAIN_NAME: Order by domain name (scalar subquery). "
-            "USER_USERNAME: Order by username (MIN aggregation). "
-            "USER_EMAIL: Order by user email (MIN aggregation)."
+            "DOMAIN_NAME: Order by domain name. "
+            "ID: Order by project ID. "
+            "DESCRIPTION: Order by project description. "
+            "INTEGRATION_NAME: Order by the external integration name. "
+            "USER_USERNAME: Order by username. "
+            "USER_EMAIL: Order by user email."
         ),
     ),
     name="ProjectV2OrderField",
+    deprecated_values={
+        "USER_USERNAME": _USER_ORDER_DEPRECATION_TEMPLATE.format(subject="username"),
+        "USER_EMAIL": _USER_ORDER_DEPRECATION_TEMPLATE.format(subject="email address"),
+    },
 )
 class ProjectV2OrderField(StrEnum):
     CREATED_AT = "created_at"
@@ -121,6 +166,9 @@ class ProjectV2OrderField(StrEnum):
     IS_ACTIVE = "is_active"
     TYPE = "type"
     DOMAIN_NAME = "domain_name"
+    ID = "id"
+    DESCRIPTION = "description"
+    INTEGRATION_NAME = "integration_name"
     USER_USERNAME = "user_username"
     USER_EMAIL = "user_email"
 

@@ -33,6 +33,9 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+    from ai.backend.manager.clients.container_registry.pool import (
+        ContainerRegistryQuotaClientPool,
+    )
     from ai.backend.manager.clients.prometheus.client import PrometheusClient
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -42,9 +45,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
-    from ai.backend.manager.service.container_registry.harbor import (
-        AbstractPerProjectContainerRegistryQuotaService,
-    )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
     from ai.backend.manager.services.app_config.processors import (
@@ -305,9 +305,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,
     )
-    from ai.backend.manager.services.vfolder.services.vfolder_admin import (
-        VFolderAdminService,
-    )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,
     )
@@ -350,10 +347,10 @@ class ServiceArgs:
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool
     prometheus_client: PrometheusClient
     ssh_key_validator: SSHKeyValidator
     key_provider_pool: KeyProviderPool
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
@@ -370,7 +367,6 @@ class Services:
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
-    vfolder_admin: VFolderAdminService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
@@ -489,7 +485,8 @@ class ProcessorsBundle:
     """What processor assembly hands back, without widening the Processors contract:
     the processors themselves, plus the one registry every v2-wired package
     registered through — its wired_specs() is the catalog of every registered
-    action."""
+    action — and the services for internal callers that run without a request user."""
 
     processors: Processors
+    services: Services
     registry: ProcessorRegistry[Any]

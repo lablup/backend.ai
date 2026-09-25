@@ -43,6 +43,12 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.membership.validator.rbac import (
+    VirtualEntityMembershipActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
     VirtualEntityRelationActionRBACValidator,
 )
@@ -170,6 +176,8 @@ def action_registry(
         partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo),
         atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo),
         relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
+        membership=VirtualEntityMembershipActionRBACValidator(permission_repo, config_provider),
+        global_scope=VirtualEntityGlobalActionRBACValidator(permission_repo, config_provider),
     )
     return ProcessorRegistry(
         ProcessorDependencies(
@@ -325,7 +333,7 @@ async def assignment_seed(
         for scope in provisioned:
             await _provision(conn, scope)
     catalog: OpsRepository[IdleCheckerData] = OpsRepository(V2DBOpsProvider(database_engine))
-    checker = await catalog.create_global_entity(
+    checker = await catalog.create_entity(
         IdleCheckerCreator(
             name=f"icb-checker-{domain_id.hex[:8]}",
             description=None,

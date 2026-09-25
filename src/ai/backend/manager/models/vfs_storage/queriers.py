@@ -11,6 +11,9 @@ from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.searchable_fields import (
+    VFSStorageSearchableFields,
+)
 
 
 @dataclass
@@ -32,7 +35,7 @@ class VFSStorageQuerier(DataQuerier[VFSStorageRow, VFSStorageData]):
 
     @override
     def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return row.to_dataclass()
+        return VFSStorageSearchableFields.own.to_data(row)
 
 
 class BulkVFSStorageQuerier(BulkEntityQuerier[VFSStorageRow, VFSStorageData]):
@@ -48,4 +51,4 @@ class BulkVFSStorageQuerier(BulkEntityQuerier[VFSStorageRow, VFSStorageData]):
 
     @override
     def to_data(self, row: VFSStorageRow) -> VFSStorageData:
-        return row.to_dataclass()
+        return VFSStorageSearchableFields.own.to_data(row)

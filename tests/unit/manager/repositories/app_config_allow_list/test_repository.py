@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
     AppConfigDefinitionData,
@@ -76,12 +77,12 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     # FK order: app_config_definitions (parent), then the allow-list, then the
     # fragments hanging off the allow-list (cascade tests need them).
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -100,7 +101,7 @@ async def database(
             EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -119,9 +120,7 @@ async def _register(
     definition_repository: OpsRepository[AppConfigDefinitionData], config_name: str
 ) -> None:
     """Seed the FK parent: register a config_name in app_config_definitions."""
-    await definition_repository.create_global_entity(
-        AppConfigDefinitionCreator(config_name=config_name)
-    )
+    await definition_repository.create_entity(AppConfigDefinitionCreator(config_name=config_name))
 
 
 async def _create_entry(
@@ -130,13 +129,21 @@ async def _create_entry(
     scope_type: AppConfigScopeType,
     rank: int | None = None,
 ) -> AppConfigAllowListData:
-    return await repository.create_global_entity(
+    return await repository.create_entity(
         AppConfigAllowListCreator(config_name=config_name, scope_type=scope_type, rank=rank)
     )
 
 
 def _missing_id() -> AppConfigAllowListID:
     return AppConfigAllowListID(uuid.uuid4())
+
+
+@pytest.fixture
+def pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AppConfigAllowListOrders.created_at(ascending=False),
+        cursor_column=AppConfigAllowListRow.id,
+    )
 
 
 @pytest.fixture
@@ -316,7 +323,7 @@ class TestPurge:
         definition_repository: OpsRepository[AppConfigDefinitionData],
     ) -> None:
         # Deleting the definition cascades to its allow-list entry and its fragment.
-        definition = await definition_repository.create_global_entity(
+        definition = await definition_repository.create_entity(
             AppConfigDefinitionCreator(config_name="theme")
         )
         entry = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
@@ -498,6 +505,7 @@ class TestAdminSearch:
         self,
         repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
+        pagination_spec: PaginationSpec,
     ) -> None:
         by_created_desc = sorted(seeded_entries, key=lambda e: e.created_at, reverse=True)
         cursor = by_created_desc[0].id
@@ -506,7 +514,7 @@ class TestAdminSearch:
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigAllowListOrders.created_at(ascending=False),
-                    cursor_condition=AppConfigAllowListConditions.by_cursor_forward(str(cursor)),
+                    cursor_condition=pagination_spec.forward_condition(str(cursor)),
                 )
             )
         )
@@ -516,6 +524,7 @@ class TestAdminSearch:
         self,
         repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
+        pagination_spec: PaginationSpec,
     ) -> None:
         by_created_asc = sorted(seeded_entries, key=lambda e: e.created_at)
         cursor = by_created_asc[0].id
@@ -524,8 +533,83 @@ class TestAdminSearch:
                 pagination=CursorBackwardPagination(
                     last=10,
                     cursor_order=AppConfigAllowListOrders.created_at(ascending=True),
-                    cursor_condition=AppConfigAllowListConditions.by_cursor_backward(str(cursor)),
+                    cursor_condition=pagination_spec.backward_condition(str(cursor)),
                 )
             )
         )
         assert {item.id for item in result.items} == {entry.id for entry in by_created_asc[1:]}
+
+
+class TestCursorPaginationWithEqualCreatedAt:
+    @pytest.fixture
+    async def tied_entry_ids(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[AppConfigAllowListData],
+        definition_repository: OpsRepository[AppConfigDefinitionData],
+    ) -> list[AppConfigAllowListID]:
+        """Six rows sharing one created_at, in forward order (id ASC)."""
+        entries: list[AppConfigAllowListData] = []
+        for config_name in ("theme", "menu"):
+            await _register(definition_repository, config_name)
+            for scope_type in AppConfigScopeType:
+                entries.append(await _create_entry(repository, config_name, scope_type))
+        async with database.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(AppConfigAllowListRow).values(created_at=entries[0].created_at)
+            )
+        return sorted(entry.id for entry in entries)
+
+    async def test_forward_pages_visit_every_row_once(
+        self,
+        repository: OpsRepository[AppConfigAllowListData],
+        tied_entry_ids: list[AppConfigAllowListID],
+        pagination_spec: PaginationSpec,
+    ) -> None:
+        visited: list[AppConfigAllowListID] = []
+        cursor: str | None = None
+        while True:
+            result = await repository.search_in_global(
+                AppConfigAllowListSearcher(
+                    pagination=CursorForwardPagination(
+                        first=2,
+                        cursor_order=pagination_spec.forward_order,
+                        cursor_condition=(
+                            pagination_spec.forward_condition(cursor) if cursor else None
+                        ),
+                    ),
+                    orders=[pagination_spec.tiebreaker_order],
+                )
+            )
+            visited.extend(item.id for item in result.items)
+            if not result.has_next_page:
+                break
+            cursor = str(result.items[-1].id)
+        assert visited == tied_entry_ids
+
+    async def test_backward_pages_visit_every_row_once_in_reverse(
+        self,
+        repository: OpsRepository[AppConfigAllowListData],
+        tied_entry_ids: list[AppConfigAllowListID],
+        pagination_spec: PaginationSpec,
+    ) -> None:
+        visited: list[AppConfigAllowListID] = []
+        cursor: str | None = None
+        while True:
+            result = await repository.search_in_global(
+                AppConfigAllowListSearcher(
+                    pagination=CursorBackwardPagination(
+                        last=2,
+                        cursor_order=pagination_spec.backward_order,
+                        cursor_condition=(
+                            pagination_spec.backward_condition(cursor) if cursor else None
+                        ),
+                    ),
+                    orders=[pagination_spec.backward_tiebreaker_order],
+                )
+            )
+            visited.extend(item.id for item in result.items)
+            if not result.has_previous_page:
+                break
+            cursor = str(result.items[-1].id)
+        assert visited == list(reversed(tied_entry_ids))

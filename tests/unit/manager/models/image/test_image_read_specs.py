@@ -17,17 +17,14 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
 from ai.backend.manager.models.image.queriers import ImageQuerier
-from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -163,18 +160,7 @@ def resolve_reference(ops_provider: V2DBOpsProvider) -> ResolveReference:
     ) -> list[ImageID]:
         async with ops_provider.read_ops() as r:
             result = await r.search_in_global(
-                ImageSearcher(
-                    pagination=OffsetPagination(limit=1),
-                    conditions=[
-                        ImageConditions.by_canonical_and_architecture_or_alias(
-                            reference, architecture
-                        ),
-                        ImageConditions.by_statuses(statuses),
-                    ],
-                    orders=ImageOrders.canonical_match_then_alive_then_oldest(
-                        reference, architecture
-                    ),
-                )
+                ReferenceImageSearcher(reference, architecture, statuses)
             )
         return [item.id for item in result.items]
 
@@ -234,7 +220,8 @@ class TestImageSearcherByReference:
         await add_alias(_CANONICAL, aliased_id)
         canonical_id = await add_image(_CANONICAL, created_at=_BASE_TIME + timedelta(hours=1))
 
-        assert await resolve_reference(_CANONICAL, "x86_64") == [canonical_id]
+        # Both rows are on the page; the order decides which one answers.
+        assert (await resolve_reference(_CANONICAL, "x86_64"))[0] == canonical_id
 
     async def test_alive_wins_over_an_older_deleted_duplicate(
         self, add_image: AddImage, resolve_reference: ResolveReference
@@ -244,9 +231,11 @@ class TestImageSearcherByReference:
             _CANONICAL, project=None, created_at=_BASE_TIME + timedelta(hours=1)
         )
 
-        assert await resolve_reference(
+        matched = await resolve_reference(
             _CANONICAL, "x86_64", (ImageStatus.ALIVE, ImageStatus.DELETED)
-        ) == [alive_id]
+        )
+
+        assert matched[0] == alive_id
 
     async def test_oldest_wins_among_alive_duplicates(
         self, add_image: AddImage, resolve_reference: ResolveReference
@@ -254,7 +243,7 @@ class TestImageSearcherByReference:
         await add_image(_CANONICAL, project=None, created_at=_BASE_TIME + timedelta(hours=1))
         oldest_id = await add_image(_CANONICAL, project=None)
 
-        assert await resolve_reference(_CANONICAL, "x86_64") == [oldest_id]
+        assert (await resolve_reference(_CANONICAL, "x86_64"))[0] == oldest_id
 
 
 class TestImageQuerier:

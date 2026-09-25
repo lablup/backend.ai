@@ -1,6 +1,8 @@
 import asyncio
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import replace
 from decimal import Decimal
 from functools import partial
 from typing import Any, cast
@@ -18,6 +20,7 @@ from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -66,29 +69,31 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
 )
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
 from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
@@ -266,9 +271,7 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
-            if lifecycle_stage == EndpointLifecycle.DESTROYED:
-                update_values["destroyed_at"] = sa.func.now()
+            update_values: dict[str, Any] = EndpointRow.lifecycle_values(lifecycle_stage)
             if replicas is not None:
                 update_values["replicas"] = replicas
 
@@ -730,7 +733,7 @@ class ModelServingRepository:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
                 raise ImageNotFound(f"Image {image_id} not found")
-            return image_row.to_dataclass()
+            return ImageSearchableFields.own.to_data(image_row)
 
     @model_serving_repository_resilience.apply()
     async def modify_endpoint_fields(
@@ -838,61 +841,83 @@ class ModelServingRepository:
     async def search_services_paginated(
         self,
         session_owner_id: uuid.UUID,
-        querier: BatchQuerier,
+        searcher: DeploymentInfoSearcher,
     ) -> ServiceSearchResult:
         """
         Search services with pagination.
         Base conditions (session_owner, lifecycle_stage) are applied as security constraints.
-        Additional filter/pagination conditions come from the querier.
+        Additional filter/pagination conditions come from the searcher.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.session_owner == session_owner_id)
-                .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
-                .options(selectinload(EndpointRow.routings))
-                .options(selectinload(EndpointRow.current_revision_row))
-            )
-
-            result = await execute_batch_querier(session, query, querier)
-
-            items: list[ServiceSearchItem] = []
-            for row in result.rows:
-                ep = row.EndpointRow
-                current_rev = ep._find_current_revision()
-                routings_data = [r.to_data() for r in ep.routings] if ep.routings else []
-                active_route_count = (
-                    len([
-                        r
-                        for r in ep.routings
-                        if r.status == RouteStatus.RUNNING
-                        and r.health_status == RouteHealthStatus.HEALTHY
-                    ])
-                    if ep.routings
-                    else 0
-                )
-                items.append(
-                    ServiceSearchItem(
-                        id=ep.id,
-                        name=ep.name,
-                        replicas=ep.replicas,
-                        active_route_count=active_route_count,
-                        service_endpoint=HttpUrl(ep.url) if ep.url else None,
-                        open_to_public=ep.open_to_public or False,
-                        resource_slots=(
-                            current_rev.resource_slots if current_rev else ResourceSlot({})
-                        ),
-                        resource_group=ep.resource_group,
-                        routings=routings_data,
+        deployment_fields = DeploymentSearchableFields.own
+        replica_fields = ReplicaSearchableFields.own
+        bounded = replace(
+            searcher,
+            conditions=[
+                deployment_fields.session_owner.filter.equals(
+                    UUIDEqualMatchSpec(value=session_owner_id, negated=False)
+                ),
+                deployment_fields.lifecycle_stage.filter.in_([EndpointLifecycle.CREATED]),
+                *searcher.conditions,
+            ],
+        )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(bounded)
+            deployments = result.items
+            routes = (
+                (
+                    await r.search_in_global(
+                        RoutingDataSearcher(
+                            pagination=NoPagination(),
+                            conditions=[
+                                replica_fields.deployment_id.filter.in_(
+                                    UUIDInMatchSpec(
+                                        values=[info.id for info in deployments], negated=False
+                                    )
+                                )
+                            ],
+                        )
                     )
-                )
-
-            return ServiceSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
+                ).items
+                if deployments
+                else []
             )
+        routes_by_deployment: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
+        for route in routes:
+            routes_by_deployment[route.endpoint].append(route)
+
+        items: list[ServiceSearchItem] = []
+        for info in deployments:
+            deployment_routes = routes_by_deployment[info.id]
+            current_rev = info.current_revision
+            items.append(
+                ServiceSearchItem(
+                    id=info.id,
+                    name=info.metadata.name,
+                    replicas=info.replica.replica_count,
+                    active_route_count=len([
+                        route
+                        for route in deployment_routes
+                        if route.status == RouteStatus.RUNNING
+                        and route.health_status == RouteHealthStatus.HEALTHY
+                    ]),
+                    service_endpoint=HttpUrl(info.network.url) if info.network.url else None,
+                    open_to_public=info.network.open_to_public,
+                    resource_slots=(
+                        current_rev.resource_config.resource_slot
+                        if current_rev
+                        else ResourceSlot({})
+                    ),
+                    resource_group=info.metadata.resource_group,
+                    routings=deployment_routes,
+                )
+            )
+
+        return ServiceSearchResult(
+            items=items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     @model_serving_repository_resilience.apply()
     async def resolve_model_service_validation_context(

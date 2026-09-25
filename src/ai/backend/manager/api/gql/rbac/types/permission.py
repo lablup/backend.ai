@@ -51,6 +51,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     ReplaceRolePermissionsInput as ReplaceRolePermissionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    RolePermissionNestedFilter as RolePermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -112,13 +115,81 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
     PermissionBitGQL,
+    RBACElementTypeFilterGQL,
+    RBACElementTypeGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
 
+_REMOVED_SCOPE_REASON = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A permission follows the scope of its role;"
+    " this field is always null."
+)
+_REMOVED_OPERATION_REASON = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; this field is always null."
+)
+_IGNORED_SCOPE_REASON = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. A permission follows the scope of its role;"
+    " the value is ignored."
+)
+_IGNORED_OPERATION_REASON = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
+)
+
 # ==================== Enums ====================
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="RBAC operation type",
+        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecation_hint="`PermissionBit`",
+    ),
+    name="OperationType",
+)
+class OperationTypeGQL(StrEnum):
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    SOFT_DELETE = "soft-delete"
+    HARD_DELETE = "hard-delete"
+    GRANT_ALL = "grant:all"
+    GRANT_READ = "grant:read"
+    GRANT_UPDATE = "grant:update"
+    GRANT_SOFT_DELETE = "grant:soft-delete"
+    GRANT_HARD_DELETE = "grant:hard-delete"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Filter for permission operation columns. Supports equals / in / not_equals / not_in."
+        ),
+        added_version="26.4.4",
+        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecation_hint="`PermissionBitFilter`",
+    ),
+    name="OperationTypeFilter",
+)
+class OperationTypeFilterGQL(PydanticInputMixin[Any]):
+    equals: OperationTypeGQL | None = gql_field(
+        description="Matches rows with this exact operation.", default=None
+    )
+    in_: list[OperationTypeGQL] | None = gql_field(
+        description="Matches rows whose operation is in this list.",
+        name="in",
+        default=None,
+    )
+    not_equals: OperationTypeGQL | None = gql_field(
+        description="Excludes rows with this exact operation.", default=None
+    )
+    not_in: list[OperationTypeGQL] | None = gql_field(
+        description="Excludes rows whose operation is in this list.", default=None
+    )
 
 
 @gql_pydantic_input(
@@ -163,6 +234,12 @@ class PermissionOrderField(StrEnum):
 )
 class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the permission row.",
+        ),
+    )
     role_id: UUID
     entity_type: str
     created_at: datetime
@@ -201,6 +278,33 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(RoleID(self.role_id))
 
+    @gql_field(description="Scope type.", deprecation_reason=_REMOVED_SCOPE_REASON)  # type: ignore[misc]
+    def scope_type(self) -> RBACElementTypeGQL | None:
+        return None
+
+    @gql_field(description="Scope ID.", deprecation_reason=_REMOVED_SCOPE_REASON)  # type: ignore[misc]
+    def scope_id(self) -> str | None:
+        return None
+
+    @gql_field(description="Operation type.", deprecation_reason=_REMOVED_OPERATION_REASON)  # type: ignore[misc]
+    def operation(self) -> OperationTypeGQL | None:
+        return None
+
+    @gql_field(
+        description="The scope this permission applies to.",
+        deprecation_reason=_REMOVED_SCOPE_REASON,
+    )  # type: ignore[misc]
+    def scope(
+        self,
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        return None
+
 
 # ==================== Filter Types ====================
 
@@ -215,6 +319,15 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
     entity_type: StringFilter | None = None
     permission: PermissionBitFilterGQL | None = None
+    scope_id: StringFilter | None = gql_field(
+        description="Scope ID.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    scope_type: RBACElementTypeFilterGQL | None = gql_field(
+        description="Scope type.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    operation: OperationTypeFilterGQL | None = gql_field(
+        description="Operation type.", default=None, deprecation_reason=_IGNORED_OPERATION_REASON
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -228,10 +341,55 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: UUIDFilter | None = None
     entity_type: StringFilter | None = None
+    permission: PermissionBitFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the permission bit the entry grants.",
+        ),
+        default=None,
+    )
     created_at: DateTimeFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = gql_field(
+        description="Scope type.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    scope_id: StringFilter | None = gql_field(
+        description="Scope ID.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter roles by conditions on the permission entries they carry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RolePermissionNestedFilter",
+)
+class RolePermissionNestedFilterGQL(PydanticInputMixin[RolePermissionNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "Matches roles that carry at least one permission entry when true, and roles "
+            "carrying none when false. Says nothing about what the entries hold."
+        ),
+        default=None,
+    )
+    some: PermissionFilter | None = gql_field(
+        description="Matches roles with at least one permission entry satisfying all conditions.",
+        default=None,
+    )
+    every: PermissionFilter | None = gql_field(
+        description=(
+            "Matches roles whose every permission entry satisfies all conditions "
+            "(also true when the role carries none)."
+        ),
+        default=None,
+    )
+    none: PermissionFilter | None = gql_field(
+        description="Matches roles with no permission entry satisfying all conditions.",
+        default=None,
+    )
 
 
 # ==================== OrderBy Types ====================
@@ -256,6 +414,15 @@ class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
     role_id: UUID
     entity_type: str
     permission: PermissionBitGQL
+    scope_type: RBACElementTypeGQL | None = gql_field(
+        description="Scope type.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    scope_id: str | None = gql_field(
+        description="Scope ID.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    operation: OperationTypeGQL | None = gql_field(
+        description="Operation type.", default=None, deprecation_reason=_IGNORED_OPERATION_REASON
+    )
 
 
 @gql_pydantic_input(
@@ -265,6 +432,15 @@ class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: UUID
     entity_type: str | None = strawberry.UNSET
     permission: PermissionBitGQL | None = strawberry.UNSET
+    scope_type: RBACElementTypeGQL | None = gql_field(
+        description="Scope type.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    scope_id: str | None = gql_field(
+        description="Scope ID.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    operation: OperationTypeGQL | None = gql_field(
+        description="Operation type.", default=None, deprecation_reason=_IGNORED_OPERATION_REASON
+    )
 
 
 @gql_pydantic_input(
@@ -342,6 +518,27 @@ class BulkAddRolePermissionFailureInfoGQL(
     permission: PermissionBitGQL = gql_field(description="Operation bit of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
 
+    @gql_field(
+        description="Scope element type of the failed entry.",
+        deprecation_reason=_REMOVED_SCOPE_REASON,
+    )  # type: ignore[misc]
+    def scope_type(self) -> str | None:
+        return None
+
+    @gql_field(
+        description="Scope element ID of the failed entry.",
+        deprecation_reason=_REMOVED_SCOPE_REASON,
+    )  # type: ignore[misc]
+    def scope_id(self) -> str | None:
+        return None
+
+    @gql_field(
+        description="Operation type of the failed entry.",
+        deprecation_reason=_REMOVED_OPERATION_REASON,
+    )  # type: ignore[misc]
+    def operation(self) -> str | None:
+        return None
+
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
@@ -373,6 +570,27 @@ class ReplaceRolePermissionFailureInfoGQL(
     entity_type: str = gql_field(description="Entity element type of the failed entry.")
     permission: PermissionBitGQL = gql_field(description="Operation bit of the failed entry.")
     message: str = gql_field(description="Error message describing the failure.")
+
+    @gql_field(
+        description="Scope element type of the failed entry.",
+        deprecation_reason=_REMOVED_SCOPE_REASON,
+    )  # type: ignore[misc]
+    def scope_type(self) -> str | None:
+        return None
+
+    @gql_field(
+        description="Scope element ID of the failed entry.",
+        deprecation_reason=_REMOVED_SCOPE_REASON,
+    )  # type: ignore[misc]
+    def scope_id(self) -> str | None:
+        return None
+
+    @gql_field(
+        description="Operation type of the failed entry.",
+        deprecation_reason=_REMOVED_OPERATION_REASON,
+    )  # type: ignore[misc]
+    def operation(self) -> str | None:
+        return None
 
 
 @gql_pydantic_type(

@@ -1,90 +1,25 @@
 from __future__ import annotations
 
-from abc import ABC
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction, ScopeItem
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.scopes import (
-    DomainModelCardOperationScope,
-    ProjectModelCardOperationScope,
-    UserModelCardOperationScope,
-)
-from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
-from ai.backend.manager.models.scopes import OperationScope
 
-__all__ = (
-    "DomainModelCardScopeItem",
-    "ModelCardScopeItem",
-    "ProjectModelCardScopeItem",
-    "ScopedSearchModelCardsAction",
-    "UserModelCardScopeItem",
-)
-
-
-class ModelCardScopeItem(ScopeItem, ABC):
-    """One side a model card is reachable from."""
+__all__ = ("ScopedSearchModelCardsAction",)
 
 
 @dataclass(frozen=True)
-class DomainModelCardScopeItem(ModelCardScopeItem):
-    """The model cards of one domain."""
+class ScopedSearchModelCardsAction(ScopedSearchOpsAction[ModelCardRow, ModelCardData]):
+    """Page through the model cards the named scopes reach, combined with OR.
 
-    domain_id: DomainID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.domain_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return DomainModelCardOperationScope(domain_id=self.domain_id)
-
-
-@dataclass(frozen=True)
-class ProjectModelCardScopeItem(ModelCardScopeItem):
-    """The model cards of one project."""
-
-    project_id: ProjectID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.project_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return ProjectModelCardOperationScope(project_id=self.project_id)
-
-
-@dataclass(frozen=True)
-class UserModelCardScopeItem(ModelCardScopeItem):
-    """The model cards one user holds."""
-
-    user_id: UserID
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.user_id
-
-    @override
-    def operation_scope(self) -> OperationScope:
-        return UserModelCardOperationScope(user_id=self.user_id)
-
-
-@dataclass(frozen=True)
-class ScopedSearchModelCardsAction(OperationScopeOpsAction[ModelCardRow, ModelCardData]):
-    """Page through the model cards the named scopes reach, combined with OR."""
-
-    items: Sequence[ModelCardScopeItem]
-    searcher: ModelCardSearcher
+    Every scope is authorized and every using entity must be readable before the read
+    runs, so a caller reaching for one they cannot see is refused rather than served the
+    rest.
+    """
 
     @override
     @classmethod
@@ -95,15 +30,3 @@ class ScopedSearchModelCardsAction(OperationScopeOpsAction[ModelCardRow, ModelCa
     @classmethod
     def action_name(cls) -> str:
         return "scoped_search_model_cards"
-
-    @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
-
-    @override
-    def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
-
-    @override
-    def to_searcher(self) -> ModelCardSearcher:
-        return self.searcher

@@ -37,8 +37,19 @@ class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
         description='Possible values of "Config.service". Added in 25.8.0.',
     )
 
-    async def resolve_component_variants(self, info: graphene.ResolveInfo) -> list[str]:
+    async def resolve_service_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return ["manager", "common"]
+
+    @classmethod
+    def get_connection(cls) -> ConnectionResolverResult[Self]:
+        # The connection encodes each node's id into its edge cursor, so the node needs one.
+        return ConnectionResolverResult(
+            node_list=[cls(id="available_services")],
+            cursor=None,
+            pagination_order=None,
+            requested_page_size=None,
+            total_count=1,
+        )
 
 
 class AvailableServiceConnection(Connection):

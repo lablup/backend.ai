@@ -7,6 +7,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     SearchLoginClientTypesInput,
 )
@@ -67,7 +68,7 @@ async def login_client_types(
         SearchLoginClientTypesInput(
             filter=pydantic_filter,
             order=pydantic_order,
-            limit=limit if limit is not None else 50,
+            limit=limit if limit is not None else DEFAULT_PAGE_LIMIT,
             offset=offset if offset is not None else 0,
         )
     )

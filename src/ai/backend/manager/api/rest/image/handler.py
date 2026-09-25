@@ -7,6 +7,8 @@ from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.image import (
     AliasImageRequest,
     AliasImageResponse,
@@ -24,15 +26,24 @@ from ai.backend.common.dto.manager.image import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.image_request import GetImagePathParam
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.image.scopes import VisibleImageTarget
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.image.searchers import ImageSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.get_images import PublicGetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
+from ai.backend.manager.services.image.actions.search_install_status import (
+    SearchImagesWithInstallStatusAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 
 from .adapter import ImageAdapter
@@ -53,10 +64,15 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search images with filters, orders, and pagination."""
-        querier = self._adapter.build_querier(body.parsed)
-        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
+        action_result = await self._image.search_images.run(
+            SearchImagesAction(
+                searcher=GlobalSearcher(
+                    used_by=[], searcher=self._adapter.build_searcher(body.parsed)
+                )
+            )
+        )
         resp = SearchImagesResponse(
-            items=[self._adapter.convert_to_dto(img) for img in action_result.data],
+            items=[self._adapter.convert_to_dto(img) for img in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -71,13 +87,26 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get a single image by ID."""
-        action_result = await self._image.public_get_image_by_id.run(
-            PublicGetImageByIdAction(image_id=ImageID(path.parsed.image_id), image_status=None)
-        )
-        resp = GetImageResponse(
-            item=self._adapter.convert_detailed_to_dto(
-                action_result.image_with_agent_install_status.image
+        action_result = await self._image.search_with_install_status.run(
+            SearchImagesWithInstallStatusAction(
+                targets=[VisibleImageTarget(user_id=UserID(ctx.user_uuid))],
+                searcher=ImageSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        ImageSearchableFields.own.id.filter.equals(
+                            UUIDEqualMatchSpec(value=path.parsed.image_id, negated=False)
+                        ),
+                        # A forgotten image is soft-deleted, so the row outlives it.
+                        ImageSearchableFields.own.status.filter.in_([ImageStatus.ALIVE]),
+                    ],
+                ),
             )
+        )
+        # The id is the primary key, so at most one row answers.
+        if not action_result.items:
+            raise ImageNotFound()
+        resp = GetImageResponse(
+            item=self._adapter.convert_detailed_to_dto(action_result.items[0].image)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 

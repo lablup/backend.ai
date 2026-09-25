@@ -12,6 +12,7 @@ from ai.backend.manager.data.auth.types import AuthorizingUser
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 __all__ = ("AuthorizingUserQuerier", "BulkUserQuerier")
 
@@ -62,4 +63,4 @@ class BulkUserQuerier(BulkEntityQuerier[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+        return UserSearchableFields.own.to_data(row)

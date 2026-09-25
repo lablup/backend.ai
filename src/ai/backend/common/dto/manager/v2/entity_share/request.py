@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.types import (
@@ -57,7 +57,7 @@ class CreateEntityShareInput(BaseRequestModel):
     means no ceiling, so the recipient's own permissions stand unclipped.
     """
 
-    target_entity_type: EntityType = Field(description="Type of the entity being offered")
+    target_entity_type: DeclaredEntityType = Field(description="Type of the entity being offered")
     target_entity_id: UUID = Field(description="Id of the entity being offered")
     recipient: EntityShareRecipientInput = Field(description="Who the offer goes to")
     permissions: list[PermissionBitDTO] = Field(
@@ -93,7 +93,7 @@ class EntityShareTargetScope(BaseRequestModel):
     open entity type, which that closed element enum cannot name.
     """
 
-    entity_type: EntityType = Field(description="Type of the entity being offered")
+    entity_type: DeclaredEntityType = Field(description="Type of the entity being offered")
     entity_id: UUID = Field(description="Id of the entity being offered")
 
 

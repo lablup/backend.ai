@@ -100,7 +100,7 @@ class PresetAllocatabilityData:
         """Deserialize from cache format."""
         return cls(
             preset=ResourcePresetData(
-                id=ResourcePresetID(data["preset"]["id"]),
+                id=ResourcePresetID(UUID(data["preset"]["id"])),
                 name=data["preset"]["name"],
                 resource_slots=ResourceSlot.from_json(data["preset"]["resource_slots"]),
                 shared_memory=int(BinarySize.from_str(data["preset"]["shared_memory"]))

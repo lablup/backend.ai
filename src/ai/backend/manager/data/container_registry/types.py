@@ -16,7 +16,7 @@ class ContainerRegistryData(EntityData):
     username: str | None
     password: str | None
     ssl_verify: bool | None
-    is_global: bool | None
+    is_global: bool
     # TODO: Add proper type
     extra: dict[str, Any] | None
 
@@ -35,21 +35,10 @@ class ContainerRegistrySearchResult:
     has_previous_page: bool
 
 
-@dataclass
-class PerProjectContainerRegistryInfo:
-    """Container registry info resolved from a project's container_registry config.
-
-    Unlike ContainerRegistryData, all fields are non-nullable because
-    the data is validated during the lookup process (ProjectRow → ContainerRegistryRow).
-    """
-
-    id: ContainerRegistryID
-    url: str
+@dataclass(frozen=True)
+class ImageCommitRegistry:
     registry_name: str
-    type: ContainerRegistryType
-    project: str
-    username: str
-    password: str
-    ssl_verify: bool
-    is_global: bool
-    extra: dict[str, Any]
+    project_name: str | None
+
+    def to_json(self) -> dict[str, str | None]:
+        return {"registry": self.registry_name, "project": self.project_name}

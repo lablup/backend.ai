@@ -26,6 +26,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.scopes import PublicResourcePresetTarget
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -351,7 +352,11 @@ class TestResourcePresetServiceCompatibility:
             return_value=mock_presets
         )
 
-        action = ListResourcePresetsAction(access_key="test-access-key", resource_group=None)
+        action = ListResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
+            access_key="test-access-key",
+            resource_group=None,
+        )
 
         result = await resource_preset_service.list_presets(action)
 
@@ -373,6 +378,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test check presets when resources are sufficient."""
         action = CheckResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
             access_key=AccessKey("test-key"),
             resource_policy={
                 "total_resource_slots": {"cpu": "100", "mem": "100G", "gpu": "10"},
@@ -607,6 +613,7 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = ListResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
             access_key="test-key",
             resource_group="gpu-cluster",
         )
@@ -671,6 +678,7 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CheckResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
             access_key=AccessKey("test-key"),
             resource_policy={
                 "total_resource_slots": {"cpu": "100", "mem": "100G"},

@@ -28,7 +28,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -77,7 +77,7 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
+from ai.backend.manager.data.session.types import SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import (
@@ -100,7 +100,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -413,22 +412,9 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        project: ProjectRow = session.group
-        if not project.container_registry:
-            raise InvalidAPIParameters(
-                "Project not ready to convert session image (registry configuration not populated)"
-            )
-
-        registry_hostname = project.container_registry["registry"]
-        registry_project = project.container_registry["project"]
-
-        registry_conf = await self._session_repository.get_container_registry(
-            registry_hostname, registry_project
-        )
-        if not registry_conf:
-            raise InvalidAPIParameters(
-                f"Project {registry_project} not found in registry {registry_hostname}."
-            )
+        registry_conf = await self._session_repository.get_image_commit_registry(session.group_id)
+        registry_hostname = registry_conf.registry_name
+        registry_project = registry_conf.project
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:
@@ -439,6 +425,7 @@ class SessionService:
         # Create manifest for background task
         manifest = CommitSessionManifest(
             session_id=session.id,
+            registry_id=registry_conf.id,
             registry_hostname=registry_hostname,
             registry_project=registry_project,
             image_name=image_name,
@@ -829,7 +816,7 @@ class SessionService:
         # Mark sessions for termination
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             session_ids,
-            reason=reason.value,
+            reason=reason,
             forced=forced,
         )
 
@@ -855,7 +842,7 @@ class SessionService:
             else KernelLifecycleEventReason.USER_REQUESTED
         )
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-            action.session_ids, reason=reason.value, forced=action.forced
+            action.session_ids, reason=reason, forced=action.forced
         )
         # The controller answers in four buckets; the bulk shape answers per session,
         # so the state each one ended in becomes that session's value.
@@ -1270,8 +1257,6 @@ class SessionService:
             compute_session = await self._session_repository.update_session_name(
                 SessionId(action.session_id), new_name
             )
-            if compute_session.status != SessionStatus.RUNNING:
-                raise InvalidAPIParameters("Can't change name of not running session")
         except ValueError as e:
             if "already exists" in str(e):
                 raise InvalidAPIParameters(str(e)) from e
@@ -1617,7 +1602,7 @@ class SessionService:
                 dependencies=dependencies,
                 resource=ResourceSpecDraft(
                     options=SessionOptionsDraft(
-                        priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                        priority=action.scheduling.tier,
                         job_priority=action.scheduling.job_priority,
                         is_preemptible=action.scheduling.is_preemptible,
                         cluster_mode=action.resource.cluster_mode,

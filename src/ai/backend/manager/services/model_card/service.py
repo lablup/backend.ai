@@ -18,10 +18,6 @@ from ai.backend.manager.errors.storage import ModelCardParseError
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
-from ai.backend.manager.services.model_card.actions.available_presets import (
-    AvailablePresetsAction,
-    AvailablePresetsActionResult,
-)
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
 )
@@ -82,14 +78,6 @@ class ModelCardService:
                 for card_id in action.ids
             ]
         )
-
-    async def available_presets(
-        self, action: AvailablePresetsAction
-    ) -> AvailablePresetsActionResult:
-        result = await self._repository.search_available_presets(
-            action.model_card_id, action.search_input
-        )
-        return AvailablePresetsActionResult(result=result)
 
     async def scan(self, action: ScanProjectModelCardsAction) -> ScanProjectModelCardsActionResult:
         vfolders = await self._repository.get_scan_target_vfolders(action.project_id)

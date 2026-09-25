@@ -45,8 +45,8 @@ from ai.backend.manager.models.vfolder.creators import (
     ProjectVFolderCreator,
 )
 from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -165,10 +165,6 @@ def _make_vfolder_data(
         quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_id),
         usage_mode=usage_mode,
         default_mount_permission=VFolderMountPolicy.READ_WRITE,
-        max_files=0,
-        max_size=None,
-        num_files=0,
-        cur_size=0,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
         updated_at=datetime(2025, 1, 1, tzinfo=UTC),
@@ -1073,8 +1069,8 @@ class TestGetAccessibleVFolderAction:
         assert result.row["name"] == "my-folder"
         mock_vfolder_repository.resolve_vfolder_id_by_name.assert_awaited_once_with(
             [
-                UserVFolderOperationScope(user_id=UserID(user_uuid)),
-                ProjectVFolderOperationScope(project_id=ProjectID(group_uuid)),
+                UserVFolderTarget(user_id=UserID(user_uuid)),
+                ProjectVFolderTarget(project_id=ProjectID(group_uuid)),
             ],
             "my-folder",
         )

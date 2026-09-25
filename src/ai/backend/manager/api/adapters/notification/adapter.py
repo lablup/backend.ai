@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.data.entity.notification import (
@@ -72,17 +73,13 @@ from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
 from ai.backend.manager.models.notification.creators import (
     NotificationChannelCreator,
     NotificationRuleCreator,
 )
-from ai.backend.manager.models.notification.orders import (
-    NotificationChannelOrders,
-    NotificationRuleOrders,
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
 )
 from ai.backend.manager.models.notification.searchers import (
     NotificationChannelSearcher,
@@ -92,6 +89,7 @@ from ai.backend.manager.models.notification.updaters import (
     NotificationChannelUpdater,
     NotificationRuleUpdater,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -143,21 +141,17 @@ def _spec_input_to_domain(spec: NotificationChannelSpecInputDTO) -> WebhookSpec 
 
 def _channel_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=NotificationChannelOrders.created_at(ascending=False),
-        backward_order=NotificationChannelOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
-        backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
-        tiebreaker_order=NotificationChannelRow.id.asc(),
+        forward_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+            ascending=False
+        ),
+        cursor_column=NotificationChannelRow.id,
     )
 
 
 def _rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=NotificationRuleOrders.created_at(ascending=False),
-        backward_order=NotificationRuleOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
-        backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
-        tiebreaker_order=NotificationRuleRow.id.asc(),
+        forward_order=NotificationRuleSearchableFields.own.created_at.order.apply(ascending=False),
+        cursor_column=NotificationRuleRow.id,
     )
 
 
@@ -355,7 +349,7 @@ class NotificationAdapter(BaseAdapter):
         )
 
         action_result = await self._notification.search_channels.run(
-            SearchChannelsAction(searcher=searcher)
+            SearchChannelsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return SearchNotificationChannelsPayload(
@@ -385,7 +379,7 @@ class NotificationAdapter(BaseAdapter):
         )
 
         action_result = await self._notification.search_rules.run(
-            SearchRulesAction(searcher=searcher)
+            SearchRulesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return SearchNotificationRulesPayload(
@@ -439,6 +433,7 @@ class NotificationAdapter(BaseAdapter):
                 raise InvalidNotificationSpec(f"Unsupported channel type: {data.channel_type}")
         return NotificationChannelNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             channel_type=NotificationChannelTypeDTO(data.channel_type.value),
@@ -454,6 +449,7 @@ class NotificationAdapter(BaseAdapter):
         """Convert NotificationRuleData to NotificationRuleNode DTO."""
         return NotificationRuleNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             rule_type=NotificationRuleTypeDTO(data.rule_type.value),
@@ -494,15 +490,16 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_channel_filter(f: NotificationChannelFilter) -> list[QueryCondition]:
         """Convert NotificationChannelFilter DTO to QueryCondition list."""
+        fields = NotificationChannelSearchableFields.own
         conditions: list[QueryCondition] = []
 
         if f.name:
             cond = f.name.build_query_condition(
-                contains_factory=NotificationChannelConditions.by_name_contains,
-                equals_factory=NotificationChannelConditions.by_name_equals,
-                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
-                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
-                in_factory=NotificationChannelConditions.by_name_in,
+                contains_factory=fields.name.filter.contains,
+                equals_factory=fields.name.filter.equals,
+                starts_with_factory=fields.name.filter.starts_with,
+                ends_with_factory=fields.name.filter.ends_with,
+                in_factory=fields.name.filter.in_,
             )
             if cond:
                 conditions.append(cond)
@@ -511,31 +508,29 @@ class NotificationAdapter(BaseAdapter):
             ct = f.channel_type
             if ct.equals is not None:
                 conditions.append(
-                    NotificationChannelConditions.by_channel_type_equals(
-                        NotificationChannelType(ct.equals.value)
-                    )
+                    fields.channel_type.filter.equals(NotificationChannelType(ct.equals.value))
                 )
             if ct.in_ is not None:
                 conditions.append(
-                    NotificationChannelConditions.by_channel_types([
+                    fields.channel_type.filter.in_([
                         NotificationChannelType(t.value) for t in ct.in_
                     ])
                 )
             if ct.not_equals is not None:
                 conditions.append(
-                    NotificationChannelConditions.by_channel_type_not_equals(
+                    fields.channel_type.filter.not_equals(
                         NotificationChannelType(ct.not_equals.value)
                     )
                 )
             if ct.not_in is not None:
                 conditions.append(
-                    NotificationChannelConditions.by_channel_type_not_in([
+                    fields.channel_type.filter.not_in([
                         NotificationChannelType(t.value) for t in ct.not_in
                     ])
                 )
 
         if f.enabled is not None:
-            conditions.append(NotificationChannelConditions.by_enabled(f.enabled))
+            conditions.append(fields.enabled.filter.equals(f.enabled))
 
         if f.AND:
             for sub in f.AND:
@@ -560,30 +555,34 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_channel_orders(orders: list[NotificationChannelOrder]) -> list[QueryOrder]:
         """Convert NotificationChannelOrder DTO list to QueryOrder list."""
+        fields = NotificationChannelSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
                 case NotificationChannelOrderField.NAME:
-                    result.append(NotificationChannelOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case NotificationChannelOrderField.CREATED_AT:
-                    result.append(NotificationChannelOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case NotificationChannelOrderField.UPDATED_AT:
-                    result.append(NotificationChannelOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
         return result
 
     @staticmethod
     def _convert_rule_filter(f: NotificationRuleFilter) -> list[QueryCondition]:
         """Convert NotificationRuleFilter DTO to QueryCondition list."""
+        fields = NotificationRuleSearchableFields.own
         conditions: list[QueryCondition] = []
 
         if f.name:
             cond = f.name.build_query_condition(
-                contains_factory=NotificationRuleConditions.by_name_contains,
-                equals_factory=NotificationRuleConditions.by_name_equals,
-                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
-                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
-                in_factory=NotificationRuleConditions.by_name_in,
+                contains_factory=fields.name.filter.contains,
+                equals_factory=fields.name.filter.equals,
+                starts_with_factory=fields.name.filter.starts_with,
+                ends_with_factory=fields.name.filter.ends_with,
+                in_factory=fields.name.filter.in_,
             )
             if cond:
                 conditions.append(cond)
@@ -592,31 +591,25 @@ class NotificationAdapter(BaseAdapter):
             rt = f.rule_type
             if rt.equals is not None:
                 conditions.append(
-                    NotificationRuleConditions.by_rule_type_equals(
-                        NotificationRuleType(rt.equals.value)
-                    )
+                    fields.rule_type.filter.equals(NotificationRuleType(rt.equals.value))
                 )
             if rt.in_ is not None:
                 conditions.append(
-                    NotificationRuleConditions.by_rule_types([
-                        NotificationRuleType(t.value) for t in rt.in_
-                    ])
+                    fields.rule_type.filter.in_([NotificationRuleType(t.value) for t in rt.in_])
                 )
             if rt.not_equals is not None:
                 conditions.append(
-                    NotificationRuleConditions.by_rule_type_not_equals(
-                        NotificationRuleType(rt.not_equals.value)
-                    )
+                    fields.rule_type.filter.not_equals(NotificationRuleType(rt.not_equals.value))
                 )
             if rt.not_in is not None:
                 conditions.append(
-                    NotificationRuleConditions.by_rule_type_not_in([
+                    fields.rule_type.filter.not_in([
                         NotificationRuleType(t.value) for t in rt.not_in
                     ])
                 )
 
         if f.enabled is not None:
-            conditions.append(NotificationRuleConditions.by_enabled(f.enabled))
+            conditions.append(fields.enabled.filter.equals(f.enabled))
 
         if f.AND:
             for sub in f.AND:
@@ -641,14 +634,17 @@ class NotificationAdapter(BaseAdapter):
     @staticmethod
     def _convert_rule_orders(orders: list[NotificationRuleOrder]) -> list[QueryOrder]:
         """Convert NotificationRuleOrder DTO list to QueryOrder list."""
+        fields = NotificationRuleSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
                 case NotificationRuleOrderField.NAME:
-                    result.append(NotificationRuleOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case NotificationRuleOrderField.CREATED_AT:
-                    result.append(NotificationRuleOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case NotificationRuleOrderField.UPDATED_AT:
-                    result.append(NotificationRuleOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
         return result

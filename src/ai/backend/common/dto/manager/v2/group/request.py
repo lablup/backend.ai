@@ -117,6 +117,12 @@ class ProjectFilter(BaseRequestModel):
     id: UUIDFilter | None = Field(default=None, description="Filter by project ID (UUID).")
     name: StringFilter | None = Field(default=None, description="Filter by group name.")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
+    description: StringFilter | None = Field(
+        default=None, description="Filter by project description."
+    )
+    integration_name: StringFilter | None = Field(
+        default=None, description="Filter by the external integration name."
+    )
     type: ProjectTypeFilter | None = Field(default=None, description="Filter by project type.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(
@@ -126,10 +132,20 @@ class ProjectFilter(BaseRequestModel):
         default=None, description="Filter by last modification timestamp."
     )
     domain: ProjectDomainFilter | None = Field(
-        default=None, description="Nested filter for domain conditions."
+        default=None,
+        description=(
+            "Filter by the domain holding the project. Deprecated: search domains first, "
+            "then narrow by `domain_name`."
+        ),
+        deprecated=True,
     )
     user: ProjectUserFilter | None = Field(
-        default=None, description="Nested filter for user conditions."
+        default=None,
+        description=(
+            "Filter by the users enrolled in the project. Deprecated: search users first, "
+            "then pass their ids as the `user` scope."
+        ),
+        deprecated=True,
     )
     AND: list[ProjectFilter] | None = Field(
         default=None, description="Combine filters with AND logic."

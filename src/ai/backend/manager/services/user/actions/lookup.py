@@ -28,7 +28,11 @@ class UserEmailKey(LookupKey):
 
 @dataclass
 class LookupUserAction(LookupEntityOpsAction[UserRow, UserID]):
-    """Resolve a user's email into the user it names."""
+    """Resolve a user's email into the user it names.
+
+    Gated on READ of the user it resolves to. A caller without it and an email
+    nobody holds get the same answer.
+    """
 
     email: str
 

@@ -1,14 +1,33 @@
-"""Searcher spec for the endpoint_tokens table."""
+"""List-read specs for deployments and the endpoint sidecar tables."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
-from ai.backend.manager.models.endpoint.row import EndpointTokenRow
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
+    ModelDeploymentData,
+)
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
+from ai.backend.manager.models.endpoint.row import (
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+)
+from ai.backend.manager.models.endpoint.searchable_fields import (
+    AutoScalingRuleSearchableFields,
+    DeploymentAccessTokenSearchableFields,
+    DeploymentSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,4 +39,86 @@ class DeploymentAccessTokenSearcher(Searcher[EndpointTokenRow, ModelDeploymentAc
 
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
-        return row.to_access_token_data()
+        return DeploymentAccessTokenSearchableFields.own.to_data(row)
+
+
+@dataclass
+class AutoScalingRuleSearcher(
+    Searcher[EndpointAutoScalingRuleRow, ModelDeploymentAutoScalingRuleData]
+):
+    """Auto-scaling rules matching the conditions."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(EndpointAutoScalingRuleRow)
+
+    @override
+    def to_data(self, row: EndpointAutoScalingRuleRow) -> ModelDeploymentAutoScalingRuleData:
+        return AutoScalingRuleSearchableFields.own.to_data(row)
+
+
+@dataclass
+class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
+    """The deployment rows a page read returns.
+
+    The active revision and the policy live on other rows, so the groups holding them
+    are loaded with the page and read onto the projection.
+    """
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(EndpointRow).options(
+            selectinload(EndpointRow.primary_replica_group_row),
+            selectinload(EndpointRow.target_replica_group_row),
+            selectinload(EndpointRow.deployment_policy),
+        )
+
+    @override
+    def to_data(self, row: EndpointRow) -> ModelDeploymentData:
+        data = DeploymentSearchableFields.own.to_data(row)
+        current_revision_id = row.current_revision_id
+        policy = (
+            DeploymentPolicySearchableFields.own.to_data(row.deployment_policy)
+            if row.deployment_policy is not None
+            else None
+        )
+        return replace(
+            data,
+            current_revision_id=current_revision_id,
+            revision_history_ids=[current_revision_id] if current_revision_id is not None else [],
+            policy=policy,
+        )
+
+
+@dataclass
+class DeploymentIDSearcher(Searcher[EndpointRow, DeploymentID]):
+    """Deployment rows read as their ids alone."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(EndpointRow)
+
+    @override
+    def to_data(self, row: EndpointRow) -> DeploymentID:
+        return DeploymentSearchableFields.own.entity_id.read(row)
+
+
+@dataclass
+class DeploymentInfoSearcher(Searcher[EndpointRow, DeploymentInfo]):
+    """Deployment rows read with the revision rows embedded.
+
+    The REST v1 surface and the reconcilers need the current and deploying revision
+    themselves, so both are loaded with the page.
+    """
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(EndpointRow).options(
+            selectinload(EndpointRow.current_revision_row),
+            selectinload(EndpointRow.deploying_revision_row),
+            selectinload(EndpointRow.deployment_policy),
+        )
+
+    @override
+    def to_data(self, row: EndpointRow) -> DeploymentInfo:
+        return row.to_deployment_info()

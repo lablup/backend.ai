@@ -1141,7 +1141,7 @@ class TestMarkTerminatingSchedulingHistory:
     ) -> None:
         result = await scheduler_repository.mark_sessions_terminating(
             [running_session_id],
-            reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
+            reason=KernelLifecycleEventReason.IDLE_TIMEOUT,
             message="idle check timeout",
         )
 
@@ -1198,7 +1198,7 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.result == str(SchedulingResult.SUCCESS)
             assert history_record.from_status == str(SessionStatus.PENDING)
             assert history_record.to_status == str(SessionStatus.CANCELLED)
-            assert history_record.message == "USER_REQUESTED"
+            assert history_record.message == KernelLifecycleEventReason.USER_REQUESTED
 
     async def test_force_terminate_creates_scheduling_history(
         self,

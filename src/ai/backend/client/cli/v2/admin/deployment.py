@@ -17,6 +17,7 @@ from ai.backend.client.cli.v2.helpers import (
     print_result,
 )
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 
 
 @click.group()
@@ -35,9 +36,9 @@ def deployment() -> None:
 @click.option("--name-contains", type=str, default=None, help="Filter by name (contains).")
 @click.option(
     "--status",
-    type=str,
+    type=click.Choice([status.value for status in ModelDeploymentStatus], case_sensitive=False),
     multiple=True,
-    help="Filter by status (repeatable, e.g., --status ACTIVE --status DEGRADED).",
+    help="Filter by status (repeatable, e.g., --status DEPLOYING --status READY).",
 )
 @click.option(
     "--open-to-public",

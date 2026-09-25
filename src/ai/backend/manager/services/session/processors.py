@@ -314,7 +314,7 @@ class SessionProcessors:
         self.scoped_search_kernels = kernels.atomic_bulk_scoped_search_ops(
             ScopedSearchKernelsAction
         )
-        self.global_search_kernels = kernels.global_search_ops(GlobalSearchKernelsAction)
+        self.global_search_kernels = kernels.global_searcher_ops(GlobalSearchKernelsAction)
         self.batch_get_session_resource_allocation = group.partial_bulk(
             BatchGetSessionResourceAllocationAction, service.batch_get_session_resource_allocation
         )
@@ -323,9 +323,9 @@ class SessionProcessors:
             LookupBulkKernelOwnerAction,
             service.batch_get_kernel_resource_allocation,
         )
-        self.global_search = group.global_search_ops(GlobalSearchSessionsAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchSessionsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetSessionsAction)
-        self.scoped_search = group.scope_search_ops(ScopedSearchSessionsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchSessionsAction)
         self.terminate_sessions = group.partial_bulk(
             TerminateSessionsAction, service.terminate_sessions
         )

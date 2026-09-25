@@ -42,7 +42,11 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -82,7 +86,7 @@ def resource_allocation_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
-        v2_ops_provider=V2DBOpsProvider(database_engine),
+        v2_ops_provider=ShareOpsProvider(database_engine),
     )
     service = ResourceAllocationService(
         resource_allocation_repository=ra_repo,
@@ -114,6 +118,7 @@ def user_processors(
             database_engine,
             V2DBOpsProvider(database_engine),
             ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
         scheduling_controller=AsyncMock(),
@@ -128,7 +133,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

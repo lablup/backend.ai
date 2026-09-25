@@ -12,6 +12,9 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
+from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
+    DeploymentRevisionPresetAdapter,
+)
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -61,4 +64,5 @@ async def adapter(
             ),
         ),
         unwired(DeploymentProcessors, "only deploy() reaches it"),
+        unwired(DeploymentRevisionPresetAdapter, "only available_presets() reaches it"),
     )

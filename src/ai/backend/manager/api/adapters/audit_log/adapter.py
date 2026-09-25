@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from typing import assert_never
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
@@ -29,27 +30,27 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.audit_log.scopes import (
+    AuditLogTarget,
+    EntityAuditLogTarget,
+    ScopeAuditLogTarget,
+    TriggeredByAuditLogTarget,
+)
+from ai.backend.manager.models.audit_log.searchable_fields import AuditLogSearchableFields
 from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
-    AuditLogScopeItem,
-    EntityAuditLogScopeItem,
-    ScopeAuditLogScopeItem,
     ScopedSearchAuditLogsAction,
-    TriggeredByAuditLogScopeItem,
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 
 _AUDIT_LOG_PAGINATION_SPEC = PaginationSpec(
-    forward_order=AuditLogOrders.created_at(ascending=False),
-    backward_order=AuditLogOrders.created_at(ascending=True),
-    forward_condition_factory=AuditLogConditions.by_cursor_forward,
-    backward_condition_factory=AuditLogConditions.by_cursor_backward,
-    tiebreaker_order=AuditLogRow.id.asc(),
+    forward_order=AuditLogSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=AuditLogRow.id,
 )
 
 
@@ -92,7 +93,7 @@ class AuditLogAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._audit_log.global_search.run(
-            SearchAuditLogsAction(searcher=searcher)
+            SearchAuditLogsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchAuditLogsPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -120,7 +121,7 @@ class AuditLogAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._audit_log.scoped_search.run(
-            ScopedSearchAuditLogsAction(items=self._scope_items(input), searcher=searcher)
+            ScopedSearchAuditLogsAction(targets=self._scope_targets(input), searcher=searcher)
         )
         return SearchAuditLogsPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -130,12 +131,12 @@ class AuditLogAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _scope_items(input: ScopedSearchAuditLogsInput) -> list[AuditLogScopeItem]:
+    def _scope_targets(input: ScopedSearchAuditLogsInput) -> list[AuditLogTarget]:
         """The scopes the request names; an entity id that is not one is refused here.
 
         A scope is an entity — a session, a deployment, a user — so its id has to be one.
         """
-        items: list[AuditLogScopeItem] = []
+        targets: list[AuditLogTarget] = []
         for entity_scope in input.scope.entity or []:
             try:
                 entity_id = uuid.UUID(entity_scope.entity_id)
@@ -146,76 +147,24 @@ class AuditLogAdapter(BaseAdapter):
             owner = RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id)
             # An entity's history is both halves: what was done to it, and what was done
             # in it. The request names the entity once and the action ORs the two.
-            items.append(EntityAuditLogScopeItem(owner=owner))
-            items.append(ScopeAuditLogScopeItem(owner=owner))
+            targets.append(EntityAuditLogTarget(owner=owner))
+            targets.append(ScopeAuditLogTarget(owner=owner))
         for user_scope in input.scope.triggered_user or []:
-            items.append(TriggeredByAuditLogScopeItem(user_id=UserID(user_scope.value)))
-        return items
+            targets.append(TriggeredByAuditLogTarget(user_id=UserID(user_scope.value)))
+        return targets
 
     def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.entity_type is not None:
-            condition = self.convert_string_filter(
-                f.entity_type,
-                contains_factory=AuditLogConditions.by_entity_type_contains,
-                equals_factory=AuditLogConditions.by_entity_type_equals,
-                starts_with_factory=AuditLogConditions.by_entity_type_starts_with,
-                ends_with_factory=AuditLogConditions.by_entity_type_ends_with,
-                in_factory=AuditLogConditions.by_entity_type_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.entity_id is not None:
-            condition = self.convert_string_filter(
-                f.entity_id,
-                contains_factory=AuditLogConditions.by_entity_id_contains,
-                equals_factory=AuditLogConditions.by_entity_id_equals,
-                starts_with_factory=AuditLogConditions.by_entity_id_starts_with,
-                ends_with_factory=AuditLogConditions.by_entity_id_ends_with,
-                in_factory=AuditLogConditions.by_entity_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.operation is not None:
-            condition = self.convert_string_filter(
-                f.operation,
-                contains_factory=AuditLogConditions.by_operation_contains,
-                equals_factory=AuditLogConditions.by_operation_equals,
-                starts_with_factory=AuditLogConditions.by_operation_starts_with,
-                ends_with_factory=AuditLogConditions.by_operation_ends_with,
-                in_factory=AuditLogConditions.by_operation_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.triggered_by is not None:
-            condition = self.convert_string_filter(
-                f.triggered_by,
-                contains_factory=AuditLogConditions.by_triggered_by_contains,
-                equals_factory=AuditLogConditions.by_triggered_by_equals,
-                starts_with_factory=AuditLogConditions.by_triggered_by_starts_with,
-                ends_with_factory=AuditLogConditions.by_triggered_by_ends_with,
-                in_factory=AuditLogConditions.by_triggered_by_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.acted_as is not None:
-            condition = self.convert_uuid_filter(
-                f.acted_as,
-                equals_factory=AuditLogConditions.by_acted_as_equals,
-                in_factory=AuditLogConditions.by_acted_as_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = AuditLogSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
+            *self.apply_string_filter(f.entity_id, fields.target_entity_id.filter),
+            *self.apply_string_filter(f.operation, fields.operation.filter),
+            *self.apply_string_filter(f.triggered_by, fields.triggered_by.filter),
+            *self.apply_uuid_filter(f.acted_as, fields.acted_as.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+        ]
         if f.status is not None:
             self._apply_status_filter(f.status, conditions)
-        if f.created_at is not None:
-            condition = f.created_at.build_query_condition(
-                before_factory=AuditLogConditions.by_created_at_before,
-                after_factory=AuditLogConditions.by_created_at_after,
-                equals_factory=AuditLogConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
         if f.AND:
             for sub_filter in f.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -235,35 +184,40 @@ class AuditLogAdapter(BaseAdapter):
 
     @staticmethod
     def _apply_status_filter(s: AuditLogStatusFilter, conditions: list[QueryCondition]) -> None:
+        status = AuditLogSearchableFields.own.status.filter
         if s.equals is not None:
-            conditions.append(AuditLogConditions.by_status_in([s.equals]))
+            conditions.append(status.equals(status.to_value(s.equals)))
         if s.in_ is not None:
-            conditions.append(AuditLogConditions.by_status_in(list(s.in_)))
+            conditions.append(status.in_([status.to_value(value) for value in s.in_]))
         if s.not_equals is not None:
-            conditions.append(AuditLogConditions.by_status_not_in([s.not_equals]))
+            conditions.append(status.not_equals(status.to_value(s.not_equals)))
         if s.not_in is not None:
-            conditions.append(AuditLogConditions.by_status_not_in(list(s.not_in)))
+            conditions.append(status.not_in([status.to_value(value) for value in s.not_in]))
 
     @staticmethod
     def _convert_orders(orders: list[AuditLogOrder]) -> list[QueryOrder]:
+        fields = AuditLogSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
                 case AuditLogOrderField.CREATED_AT:
-                    result.append(AuditLogOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case AuditLogOrderField.ENTITY_TYPE:
-                    result.append(AuditLogOrders.entity_type(ascending))
+                    result.append(fields.entity_type.order.apply(ascending))
                 case AuditLogOrderField.OPERATION:
-                    result.append(AuditLogOrders.operation(ascending))
+                    result.append(fields.operation.order.apply(ascending))
                 case AuditLogOrderField.STATUS:
-                    result.append(AuditLogOrders.status(ascending))
+                    result.append(fields.status.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
         return result
 
     @staticmethod
     def _data_to_node(data: AuditLogData) -> AuditLogNode:
         return AuditLogNode(
             id=data.id,
+            field_id=data.id,
             action_id=data.action_id,
             entity_type=data.entity_type,
             operation=data.operation,

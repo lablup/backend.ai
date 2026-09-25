@@ -2,7 +2,10 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -30,10 +33,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    GlobalBatchLoadVFoldersAction,
-    GlobalBatchLoadVFoldersActionResult,
-)
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
     BulkLoadVFolderMountLevelsAction,
 )
@@ -86,14 +86,14 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GlobalGetVolumePerfMetricActionResult,
     GlobalListAllHostsAction,
     GlobalListAllHostsActionResult,
-    GlobalListAllowedTypesAction,
-    GlobalListAllowedTypesActionResult,
     GlobalListMountsAction,
     GlobalListMountsActionResult,
     GlobalMountHostAction,
     GlobalMountHostActionResult,
     GlobalUmountHostAction,
     GlobalUmountHostActionResult,
+    PublicListAllowedTypesAction,
+    PublicListAllowedTypesActionResult,
     SearchHostsAction,
     SearchHostsActionResult,
     UpdateQuotaAction,
@@ -136,8 +136,8 @@ class VFolderProcessors:
     ]
     clone_vfolder: SingleEntityActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: ScopeActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
-    list_allowed_types: GlobalActionProcessor[
-        GlobalListAllowedTypesAction, GlobalListAllowedTypesActionResult
+    public_list_allowed_types: PublicActionProcessor[
+        PublicListAllowedTypesAction, PublicListAllowedTypesActionResult
     ]
     list_all_hosts: GlobalActionProcessor[GlobalListAllHostsAction, GlobalListAllHostsActionResult]
     get_volume_perf_metric: GlobalActionProcessor[
@@ -170,9 +170,7 @@ class VFolderProcessors:
     get_vfolder_row: SingleEntityActionProcessor[
         GetVFolderLegacyRowAction, GetVFolderLegacyRowActionResult
     ]
-    batch_load_vfolders_by_ids: GlobalActionProcessor[
-        GlobalBatchLoadVFoldersAction, GlobalBatchLoadVFoldersActionResult
-    ]
+    bulk_get: PartialBulkActionProcessor[BulkGetVFoldersAction, VFolderData]
     bulk_load_permissions: PartialBulkActionProcessor[BulkLoadVFolderPermissionsAction, Permission]
     bulk_load_mount_levels: PartialBulkActionProcessor[
         BulkLoadVFolderMountLevelsAction, VFolderMountPolicy
@@ -192,7 +190,7 @@ class VFolderProcessors:
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
-        self.scoped_search = group.scope_search_ops(ScopedSearchVFoldersAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchVFoldersAction)
 
         # Single entity actions with RBAC validation
         self.get_vfolder = group.single_entity(GetVFolderAction, service.get)
@@ -216,8 +214,8 @@ class VFolderProcessors:
 
         # Actions without RBAC validation (internal/legacy/storage ops)
         self.get_task_logs = group.scope(GetTaskLogsAction, service.get_task_logs)
-        self.list_allowed_types = group.global_scope(
-            GlobalListAllowedTypesAction, service.list_allowed_types
+        self.public_list_allowed_types = group.public(
+            PublicListAllowedTypesAction, service.public_list_allowed_types
         )
         self.list_all_hosts = group.global_scope(GlobalListAllHostsAction, service.list_all_hosts)
         self.get_volume_perf_metric = group.global_scope(
@@ -249,10 +247,8 @@ class VFolderProcessors:
             GetVFolderLegacyRowAction, service.get_vfolder_row
         )
 
-        # Cross-entity loaders (no RBAC validation; caller has parent access)
-        self.batch_load_vfolders_by_ids = group.global_scope(
-            GlobalBatchLoadVFoldersAction, service.batch_load_by_ids
-        )
+        # Bulk reads, answered per folder
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetVFoldersAction)
         self.bulk_load_permissions = group.partial_bulk(
             BulkLoadVFolderPermissionsAction, service.bulk_load_permissions
         )

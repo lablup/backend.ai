@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
 from pydantic import Field
 
@@ -49,6 +50,9 @@ class IdleCheckerSpecInfo(BaseResponseModel):
 
 class IdleCheckerNode(BaseResponseModel):
     id: IdleCheckerID
+    entity_id: UUID = Field(
+        description=f"UUID of the idle checker. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str
     description: str | None
     checker_type: IdleCheckerTypeDTO

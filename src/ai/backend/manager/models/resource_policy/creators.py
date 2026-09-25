@@ -22,13 +22,20 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    ProjectResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
 class KeyPairResourcePolicyCreator(
-    GlobalEntityCreator[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+    CreatedInGlobal[KeyPairResourcePolicyRow],
+    EntityCreator[KeyPairResourcePolicyRow, KeyPairResourcePolicyData],
 ):
     name: str
     allowed_vfolder_hosts: dict[str, Any] | None
@@ -70,11 +77,14 @@ class KeyPairResourcePolicyCreator(
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return row.to_dataclass()
+        return KeyPairResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
-class UserResourcePolicyCreator(GlobalEntityCreator[UserResourcePolicyRow, UserResourcePolicyData]):
+class UserResourcePolicyCreator(
+    CreatedInGlobal[UserResourcePolicyRow],
+    EntityCreator[UserResourcePolicyRow, UserResourcePolicyData],
+):
     name: str
     max_vfolder_count: int
     max_quota_scope_size: int
@@ -103,12 +113,13 @@ class UserResourcePolicyCreator(GlobalEntityCreator[UserResourcePolicyRow, UserR
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return row.to_dataclass()
+        return UserResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
 class ProjectResourcePolicyCreator(
-    GlobalEntityCreator[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+    CreatedInGlobal[ProjectResourcePolicyRow],
+    EntityCreator[ProjectResourcePolicyRow, ProjectResourcePolicyData],
 ):
     name: str
     max_vfolder_count: int
@@ -134,4 +145,4 @@ class ProjectResourcePolicyCreator(
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return row.to_dataclass()
+        return ProjectResourcePolicySearchableFields.own.to_data(row)

@@ -344,13 +344,16 @@ class DataLoaders:
     ) -> DataLoader[VFolderUUID, VFolderGQL | None]:
         adapter = self._adapters.vfolder
 
-        async def load_fn(ids: list[VFolderUUID]) -> list[VFolderGQL | None]:
+        async def load_fn(ids: list[VFolderUUID]) -> list[VFolderGQL | Exception | None]:
             from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
                 VFolderGQL as VF,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [VF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else VF.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -749,13 +752,15 @@ class DataLoaders:
     ) -> DataLoader[SessionID, ResourceAllocationGQL]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionID]) -> list[ResourceAllocationGQL]:
+        async def load_fn(
+            session_ids: list[SessionID],
+        ) -> list[ResourceAllocationGQL | Exception]:
             from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
                 ResourceAllocationGQL as RA,
             )
 
             dtos = await adapter.batch_resource_allocation_by_session(session_ids)
-            return [RA.from_pydantic(dto) for dto in dtos]
+            return [dto if isinstance(dto, Exception) else RA.from_pydantic(dto) for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

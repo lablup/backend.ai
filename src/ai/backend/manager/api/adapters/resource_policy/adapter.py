@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -73,29 +74,33 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
+from ai.backend.manager.errors.resource import ProjectResourcePolicyNotFound
 from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_policy.conditions import (
-    KeypairResourcePolicyConditions,
-    ProjectResourcePolicyConditions,
-    UserResourcePolicyConditions,
 )
 from ai.backend.manager.models.resource_policy.creators import (
     KeyPairResourcePolicyCreator,
     ProjectResourcePolicyCreator,
     UserResourcePolicyCreator,
 )
-from ai.backend.manager.models.resource_policy.orders import (
-    KeypairResourcePolicyOrders,
-    ProjectResourcePolicyOrders,
-    UserResourcePolicyOrders,
+from ai.backend.manager.models.resource_policy.deprecated_search import (
+    DeprecatedKeyPairResourcePolicyConditions,
+)
+from ai.backend.manager.models.resource_policy.scopes import (
+    ProjectResourcePolicyTarget,
+    UserKeypairResourcePolicyTarget,
+    UserResourcePolicyTarget,
+)
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    ProjectResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
@@ -108,6 +113,7 @@ from ai.backend.manager.models.resource_policy.updaters import (
     UserResourcePolicyUpdater,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
@@ -124,7 +130,6 @@ from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_r
     PurgeKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
-    KeypairResourcePolicyScopeItem,
     SearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
@@ -138,6 +143,9 @@ from ai.backend.manager.services.project_resource_policy.actions.create_project_
 )
 from ai.backend.manager.services.project_resource_policy.actions.get import (
     GetProjectResourcePolicyAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.global_search_project_resource_policies import (
+    GlobalSearchProjectResourcePoliciesAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
@@ -169,7 +177,6 @@ from ai.backend.manager.services.user_resource_policy.actions.purge_user_resourc
 )
 from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
     SearchUserResourcePoliciesAction,
-    UserResourcePolicyScopeItem,
 )
 from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
     UpdateUserResourcePolicyAction,
@@ -178,27 +185,18 @@ from ai.backend.manager.services.user_resource_policy.processors import UserReso
 from ai.backend.manager.types import OptionalState, TriState
 
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeypairResourcePolicyOrders.created_at(ascending=False),
-    backward_order=KeypairResourcePolicyOrders.created_at(ascending=True),
-    forward_condition_factory=KeypairResourcePolicyConditions.by_cursor_forward,
-    backward_condition_factory=KeypairResourcePolicyConditions.by_cursor_backward,
-    tiebreaker_order=KeyPairResourcePolicyRow.name.asc(),
+    forward_order=KeyPairResourcePolicySearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=KeyPairResourcePolicyRow.uuid,
 )
 
 _USER_RP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=UserResourcePolicyOrders.created_at(ascending=False),
-    backward_order=UserResourcePolicyOrders.created_at(ascending=True),
-    forward_condition_factory=UserResourcePolicyConditions.by_cursor_forward,
-    backward_condition_factory=UserResourcePolicyConditions.by_cursor_backward,
-    tiebreaker_order=UserResourcePolicyRow.name.asc(),
+    forward_order=UserResourcePolicySearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=UserResourcePolicyRow.uuid,
 )
 
 _PROJECT_RP_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectResourcePolicyOrders.created_at(ascending=False),
-    backward_order=ProjectResourcePolicyOrders.created_at(ascending=True),
-    forward_condition_factory=ProjectResourcePolicyConditions.by_cursor_forward,
-    backward_condition_factory=ProjectResourcePolicyConditions.by_cursor_backward,
-    tiebreaker_order=ProjectResourcePolicyRow.name.asc(),
+    forward_order=ProjectResourcePolicySearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=ProjectResourcePolicyRow.uuid,
 )
 
 
@@ -249,7 +247,9 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._keypair_resource_policy.global_search.run(
-            GlobalSearchKeypairResourcePoliciesAction(searcher=searcher)
+            GlobalSearchKeypairResourcePoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         items = [self._keypair_policy_data_to_node(d) for d in result.items]
         return SearchKeypairResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -334,8 +334,11 @@ class ResourcePolicyAdapter(BaseAdapter):
             raise UnreachableError("User context is not available.")
         result = await self._keypair_resource_policy.search.run(
             SearchKeypairResourcePoliciesAction(
-                items=[KeypairResourcePolicyScopeItem(user_id=UserID(me.user_id))],
-                searcher=KeyPairResourcePolicySearcher(pagination=NoPagination()),
+                searcher=ScopedSearcher(
+                    scopes=[UserKeypairResourcePolicyTarget(user_id=UserID(me.user_id))],
+                    used_by=(),
+                    searcher=KeyPairResourcePolicySearcher(pagination=NoPagination()),
+                )
             )
         )
         if not result.items:
@@ -372,7 +375,9 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._user_resource_policy.global_search.run(
-            GlobalSearchUserResourcePoliciesAction(searcher=searcher)
+            GlobalSearchUserResourcePoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         items = [self._user_policy_data_to_node(d) for d in result.items]
         return SearchUserResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -437,8 +442,11 @@ class ResourcePolicyAdapter(BaseAdapter):
             raise UnreachableError("User context is not available.")
         result = await self._user_resource_policy.search.run(
             SearchUserResourcePoliciesAction(
-                items=[UserResourcePolicyScopeItem(user_id=UserID(me.user_id))],
-                searcher=UserResourcePolicySearcher(pagination=NoPagination()),
+                searcher=ScopedSearcher(
+                    scopes=[UserResourcePolicyTarget(user_id=UserID(me.user_id))],
+                    used_by=(),
+                    searcher=UserResourcePolicySearcher(pagination=NoPagination()),
+                )
             )
         )
         if not result.items:
@@ -475,7 +483,9 @@ class ResourcePolicyAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project_resource_policy.global_search.run(
-            SearchProjectResourcePoliciesAction(searcher=searcher)
+            GlobalSearchProjectResourcePoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         items = [self._project_policy_data_to_node(d) for d in result.items]
         return SearchProjectResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -516,6 +526,27 @@ class ResourcePolicyAdapter(BaseAdapter):
         return UpdateProjectResourcePolicyPayload(
             project_resource_policy=self._project_policy_data_to_node(result.data)
         )
+
+    async def get_project_resource_policy(self, project_id: ProjectID) -> ProjectResourcePolicyNode:
+        """The policy the named project is subject to, read at that project's scope.
+
+        The project is an argument rather than the caller's own: a caller belongs to
+        several, and which one is asked about is theirs to say.
+        """
+        result = await self._project_resource_policy.search.run(
+            SearchProjectResourcePoliciesAction(
+                searcher=ScopedSearcher(
+                    scopes=[ProjectResourcePolicyTarget(project_id=project_id)],
+                    used_by=(),
+                    searcher=ProjectResourcePolicySearcher(pagination=NoPagination()),
+                )
+            )
+        )
+        if not result.items:
+            raise ProjectResourcePolicyNotFound(
+                f"No project resource policy applies to project {project_id}."
+            )
+        return self._project_policy_data_to_node(result.items[0])
 
     async def admin_delete_project_resource_policy(
         self, input: DeleteProjectResourcePolicyInput
@@ -585,6 +616,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> KeypairResourcePolicyNode:
         return KeypairResourcePolicyNode(
             id=data.name,
+            entity_id=data.uuid,
             name=data.name,
             created_at=data.created_at,
             default_for_unspecified=data.default_for_unspecified,
@@ -610,6 +642,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> UserResourcePolicyNode:
         return UserResourcePolicyNode(
             id=data.name,
+            entity_id=data.uuid,
             name=data.name,
             created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
@@ -625,6 +658,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> ProjectResourcePolicyNode:
         return ProjectResourcePolicyNode(
             id=data.name,
+            entity_id=data.uuid,
             name=data.name,
             created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
@@ -635,75 +669,26 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Filter converters ──
 
     def _convert_keypair_filter(self, filter: KeypairResourcePolicyFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.name is not None:
-            cond = self.convert_string_filter(
-                filter.name,
-                contains_factory=KeypairResourcePolicyConditions.by_name_contains,
-                equals_factory=KeypairResourcePolicyConditions.by_name_equals,
-                starts_with_factory=KeypairResourcePolicyConditions.by_name_starts_with,
-                ends_with_factory=KeypairResourcePolicyConditions.by_name_ends_with,
-                in_factory=KeypairResourcePolicyConditions.by_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.created_at is not None:
-            cond = filter.created_at.build_query_condition(
-                before_factory=KeypairResourcePolicyConditions.by_created_at_before,
-                after_factory=KeypairResourcePolicyConditions.by_created_at_after,
-                equals_factory=KeypairResourcePolicyConditions.by_created_at_equals,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_session_lifetime is not None:
-            cond = self.convert_int_filter(
-                filter.max_session_lifetime,
-                KeypairResourcePolicyConditions.by_max_session_lifetime,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_concurrent_sessions is not None:
-            cond = self.convert_int_filter(
-                filter.max_concurrent_sessions,
-                KeypairResourcePolicyConditions.by_max_concurrent_sessions,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_containers_per_session is not None:
-            cond = self.convert_int_filter(
-                filter.max_containers_per_session,
-                KeypairResourcePolicyConditions.by_max_containers_per_session,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.idle_timeout is not None:
-            cond = self.convert_int_filter(
-                filter.idle_timeout,
-                KeypairResourcePolicyConditions.by_idle_timeout,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_concurrent_sftp_sessions is not None:
-            cond = self.convert_int_filter(
-                filter.max_concurrent_sftp_sessions,
-                KeypairResourcePolicyConditions.by_max_concurrent_sftp_sessions,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_pending_session_count is not None:
-            cond = self.convert_int_filter(
-                filter.max_pending_session_count,
-                KeypairResourcePolicyConditions.by_max_pending_session_count,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_priority is not None:
-            cond = self.convert_int_filter(
-                filter.max_priority,
-                KeypairResourcePolicyConditions.by_max_priority,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = KeyPairResourcePolicySearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_int_filter(filter.max_session_lifetime, fields.max_session_lifetime.filter),
+            *self.apply_int_filter(
+                filter.max_concurrent_sessions, fields.max_concurrent_sessions.filter
+            ),
+            *self.apply_int_filter(
+                filter.max_containers_per_session, fields.max_containers_per_session.filter
+            ),
+            *self.apply_int_filter(filter.idle_timeout, fields.idle_timeout.filter),
+            *self.apply_int_filter(
+                filter.max_concurrent_sftp_sessions, fields.max_concurrent_sftp_sessions.filter
+            ),
+            *self.apply_int_filter(
+                filter.max_pending_session_count, fields.max_pending_session_count.filter
+            ),
+            *self.apply_int_filter(filter.max_priority, fields.max_priority.filter),
+        ]
         if filter.keypair is not None:
             cond = self._convert_keypair_nested_filter(filter.keypair)
             if cond is not None:
@@ -728,78 +713,33 @@ class ResourcePolicyAdapter(BaseAdapter):
     def _convert_keypair_nested_filter(
         self, filter: KeypairResourcePolicyKeypairNestedFilter
     ) -> QueryCondition | None:
-        """Convert a keypair nested filter into a single EXISTS condition.
-
-        Builds keypair-level conditions and wraps them in an EXISTS subquery
-        correlating keypairs back to their resource policy.
-        """
-        if filter.user_id is None:
-            return None
-        cond = self.convert_uuid_filter(
-            filter.user_id,
-            equals_factory=KeypairConditions.by_user_id_equals,
-            in_factory=KeypairConditions.by_user_id_in,
+        """Deprecated. Every condition lands in one EXISTS over one keypair the policy
+        applies to."""
+        conditions = self.apply_uuid_filter(
+            filter.user_id, KeyPairSearchableFields.own.user_id.filter
         )
-        if cond is None:
+        if not conditions:
             return None
-        return KeypairResourcePolicyConditions.exists_keypair_combined([cond])
+        return DeprecatedKeyPairResourcePolicyConditions.exists_keypair_combined(conditions)
 
     def _convert_user_filter(self, filter: UserResourcePolicyFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.name is not None:
-            cond = self.convert_string_filter(
-                filter.name,
-                contains_factory=UserResourcePolicyConditions.by_name_contains,
-                equals_factory=UserResourcePolicyConditions.by_name_equals,
-                starts_with_factory=UserResourcePolicyConditions.by_name_starts_with,
-                ends_with_factory=UserResourcePolicyConditions.by_name_ends_with,
-                in_factory=UserResourcePolicyConditions.by_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.created_at is not None:
-            cond = filter.created_at.build_query_condition(
-                before_factory=UserResourcePolicyConditions.by_created_at_before,
-                after_factory=UserResourcePolicyConditions.by_created_at_after,
-                equals_factory=UserResourcePolicyConditions.by_created_at_equals,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_vfolder_count is not None:
-            cond = self.convert_int_filter(
-                filter.max_vfolder_count,
-                UserResourcePolicyConditions.by_max_vfolder_count,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_concurrent_logins is not None:
-            cond = self.convert_int_filter(
-                filter.max_concurrent_logins,
-                UserResourcePolicyConditions.by_max_concurrent_logins,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_quota_scope_size is not None:
-            cond = self.convert_int_filter(
-                filter.max_quota_scope_size,
-                UserResourcePolicyConditions.by_max_quota_scope_size,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_session_count_per_model_session is not None:
-            cond = self.convert_int_filter(
+        fields = UserResourcePolicySearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_int_filter(filter.max_vfolder_count, fields.max_vfolder_count.filter),
+            *self.apply_int_filter(
+                filter.max_concurrent_logins, fields.max_concurrent_logins.filter
+            ),
+            *self.apply_int_filter(filter.max_quota_scope_size, fields.max_quota_scope_size.filter),
+            *self.apply_int_filter(
                 filter.max_session_count_per_model_session,
-                UserResourcePolicyConditions.by_max_session_count_per_model_session,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_customized_image_count is not None:
-            cond = self.convert_int_filter(
-                filter.max_customized_image_count,
-                UserResourcePolicyConditions.by_max_customized_image_count,
-            )
-            if cond is not None:
-                conditions.append(cond)
+                fields.max_session_count_per_model_session.filter,
+            ),
+            *self.apply_int_filter(
+                filter.max_customized_image_count, fields.max_customized_image_count.filter
+            ),
+        ]
         if filter.AND:
             for sub_filter in filter.AND:
                 conditions.extend(self._convert_user_filter(sub_filter))
@@ -818,47 +758,14 @@ class ResourcePolicyAdapter(BaseAdapter):
         return conditions
 
     def _convert_project_filter(self, filter: ProjectResourcePolicyFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.name is not None:
-            cond = self.convert_string_filter(
-                filter.name,
-                contains_factory=ProjectResourcePolicyConditions.by_name_contains,
-                equals_factory=ProjectResourcePolicyConditions.by_name_equals,
-                starts_with_factory=ProjectResourcePolicyConditions.by_name_starts_with,
-                ends_with_factory=ProjectResourcePolicyConditions.by_name_ends_with,
-                in_factory=ProjectResourcePolicyConditions.by_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.created_at is not None:
-            cond = filter.created_at.build_query_condition(
-                before_factory=ProjectResourcePolicyConditions.by_created_at_before,
-                after_factory=ProjectResourcePolicyConditions.by_created_at_after,
-                equals_factory=ProjectResourcePolicyConditions.by_created_at_equals,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_vfolder_count is not None:
-            cond = self.convert_int_filter(
-                filter.max_vfolder_count,
-                ProjectResourcePolicyConditions.by_max_vfolder_count,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_quota_scope_size is not None:
-            cond = self.convert_int_filter(
-                filter.max_quota_scope_size,
-                ProjectResourcePolicyConditions.by_max_quota_scope_size,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter.max_network_count is not None:
-            cond = self.convert_int_filter(
-                filter.max_network_count,
-                ProjectResourcePolicyConditions.by_max_network_count,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = ProjectResourcePolicySearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_int_filter(filter.max_vfolder_count, fields.max_vfolder_count.filter),
+            *self.apply_int_filter(filter.max_quota_scope_size, fields.max_quota_scope_size.filter),
+            *self.apply_int_filter(filter.max_network_count, fields.max_network_count.filter),
+        ]
         if filter.AND:
             for sub_filter in filter.AND:
                 conditions.extend(self._convert_project_filter(sub_filter))
@@ -903,23 +810,35 @@ def _resolve_keypair_order(
     ascending = direction == OrderDirection.ASC
     match field:
         case KeypairResourcePolicyOrderField.NAME:
-            return KeypairResourcePolicyOrders.name(ascending)
+            return KeyPairResourcePolicySearchableFields.own.name.order.apply(ascending)
         case KeypairResourcePolicyOrderField.CREATED_AT:
-            return KeypairResourcePolicyOrders.created_at(ascending)
+            return KeyPairResourcePolicySearchableFields.own.created_at.order.apply(ascending)
         case KeypairResourcePolicyOrderField.MAX_SESSION_LIFETIME:
-            return KeypairResourcePolicyOrders.max_session_lifetime(ascending)
+            return KeyPairResourcePolicySearchableFields.own.max_session_lifetime.order.apply(
+                ascending
+            )
         case KeypairResourcePolicyOrderField.MAX_CONCURRENT_SESSIONS:
-            return KeypairResourcePolicyOrders.max_concurrent_sessions(ascending)
+            return KeyPairResourcePolicySearchableFields.own.max_concurrent_sessions.order.apply(
+                ascending
+            )
         case KeypairResourcePolicyOrderField.MAX_CONTAINERS_PER_SESSION:
-            return KeypairResourcePolicyOrders.max_containers_per_session(ascending)
+            return KeyPairResourcePolicySearchableFields.own.max_containers_per_session.order.apply(
+                ascending
+            )
         case KeypairResourcePolicyOrderField.IDLE_TIMEOUT:
-            return KeypairResourcePolicyOrders.idle_timeout(ascending)
+            return KeyPairResourcePolicySearchableFields.own.idle_timeout.order.apply(ascending)
         case KeypairResourcePolicyOrderField.MAX_CONCURRENT_SFTP_SESSIONS:
-            return KeypairResourcePolicyOrders.max_concurrent_sftp_sessions(ascending)
+            return (
+                KeyPairResourcePolicySearchableFields.own.max_concurrent_sftp_sessions.order.apply(
+                    ascending
+                )
+            )
         case KeypairResourcePolicyOrderField.MAX_PENDING_SESSION_COUNT:
-            return KeypairResourcePolicyOrders.max_pending_session_count(ascending)
+            return KeyPairResourcePolicySearchableFields.own.max_pending_session_count.order.apply(
+                ascending
+            )
         case KeypairResourcePolicyOrderField.MAX_PRIORITY:
-            return KeypairResourcePolicyOrders.max_priority(ascending)
+            return KeyPairResourcePolicySearchableFields.own.max_priority.order.apply(ascending)
 
 
 def _resolve_user_order(
@@ -928,19 +847,27 @@ def _resolve_user_order(
     ascending = direction == OrderDirection.ASC
     match field:
         case UserResourcePolicyOrderField.NAME:
-            return UserResourcePolicyOrders.name(ascending)
+            return UserResourcePolicySearchableFields.own.name.order.apply(ascending)
         case UserResourcePolicyOrderField.CREATED_AT:
-            return UserResourcePolicyOrders.created_at(ascending)
+            return UserResourcePolicySearchableFields.own.created_at.order.apply(ascending)
         case UserResourcePolicyOrderField.MAX_VFOLDER_COUNT:
-            return UserResourcePolicyOrders.max_vfolder_count(ascending)
+            return UserResourcePolicySearchableFields.own.max_vfolder_count.order.apply(ascending)
         case UserResourcePolicyOrderField.MAX_CONCURRENT_LOGINS:
-            return UserResourcePolicyOrders.max_concurrent_logins(ascending)
+            return UserResourcePolicySearchableFields.own.max_concurrent_logins.order.apply(
+                ascending
+            )
         case UserResourcePolicyOrderField.MAX_QUOTA_SCOPE_SIZE:
-            return UserResourcePolicyOrders.max_quota_scope_size(ascending)
+            return UserResourcePolicySearchableFields.own.max_quota_scope_size.order.apply(
+                ascending
+            )
         case UserResourcePolicyOrderField.MAX_SESSION_COUNT_PER_MODEL_SESSION:
-            return UserResourcePolicyOrders.max_session_count_per_model_session(ascending)
+            return UserResourcePolicySearchableFields.own.max_session_count_per_model_session.order.apply(
+                ascending
+            )
         case UserResourcePolicyOrderField.MAX_CUSTOMIZED_IMAGE_COUNT:
-            return UserResourcePolicyOrders.max_customized_image_count(ascending)
+            return UserResourcePolicySearchableFields.own.max_customized_image_count.order.apply(
+                ascending
+            )
 
 
 def _resolve_project_order(
@@ -949,12 +876,18 @@ def _resolve_project_order(
     ascending = direction == OrderDirection.ASC
     match field:
         case ProjectResourcePolicyOrderField.NAME:
-            return ProjectResourcePolicyOrders.name(ascending)
+            return ProjectResourcePolicySearchableFields.own.name.order.apply(ascending)
         case ProjectResourcePolicyOrderField.CREATED_AT:
-            return ProjectResourcePolicyOrders.created_at(ascending)
+            return ProjectResourcePolicySearchableFields.own.created_at.order.apply(ascending)
         case ProjectResourcePolicyOrderField.MAX_VFOLDER_COUNT:
-            return ProjectResourcePolicyOrders.max_vfolder_count(ascending)
+            return ProjectResourcePolicySearchableFields.own.max_vfolder_count.order.apply(
+                ascending
+            )
         case ProjectResourcePolicyOrderField.MAX_QUOTA_SCOPE_SIZE:
-            return ProjectResourcePolicyOrders.max_quota_scope_size(ascending)
+            return ProjectResourcePolicySearchableFields.own.max_quota_scope_size.order.apply(
+                ascending
+            )
         case ProjectResourcePolicyOrderField.MAX_NETWORK_COUNT:
-            return ProjectResourcePolicyOrders.max_network_count(ascending)
+            return ProjectResourcePolicySearchableFields.own.max_network_count.order.apply(
+                ascending
+            )

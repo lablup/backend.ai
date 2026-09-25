@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from strawberry import ID, UNSET
 from strawberry.relay import NodeID
@@ -28,12 +29,14 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategySpecInfo,
     RollingUpdateStrategySpecInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import (
     IntOrPercent as IntOrPercentDTO,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_enum,
     gql_node_type,
     gql_pydantic_input,
@@ -138,6 +141,12 @@ class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
 )
 class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the deployment policy.",
+        ),
+    )
     strategy_spec: DeploymentStrategySpecGQL
     created_at: datetime
     updated_at: datetime

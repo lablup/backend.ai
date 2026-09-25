@@ -70,7 +70,11 @@ class SessionMetadataInfo(BaseResponseModel):
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = Field(description="Number of nodes in the cluster.")
-    priority: int = Field(description="Scheduling priority of the session.")
+    tier: int = Field(description="Scheduling tier of the session.")
+    priority: int = Field(
+        deprecated=True,
+        description="Scheduling tier of the session. Renamed to `tier`.",
+    )
     job_priority: int = Field(
         description=(
             "Preemption priority among the owner's own sessions. A pending "
@@ -172,6 +176,9 @@ class SessionNode(BaseResponseModel):
     """Node model representing a session entity with nested info sub-models."""
 
     id: UUID = Field(description="Session ID.")
+    entity_id: UUID = Field(
+        description=f"UUID of the session. Added in {NEXT_RELEASE_VERSION}.",
+    )
     image_ids: list[UUID] | None = Field(
         default=None,
         description=(
@@ -381,7 +388,11 @@ class SessionMetadataInfoGQLDTO(BaseResponseModel):
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = Field(description="Number of nodes in the cluster.")
-    priority: int = Field(description="Scheduling priority of the session.")
+    tier: int = Field(description="Scheduling tier of the session.")
+    priority: int = Field(
+        deprecated=True,
+        description="Scheduling tier of the session. Renamed to `tier`.",
+    )
     job_priority: int = Field(
         description=(
             "Preemption priority among the owner's own sessions. A pending "

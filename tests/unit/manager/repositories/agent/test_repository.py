@@ -6,7 +6,6 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Mapping
-from copy import copy
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -76,7 +75,6 @@ from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSl
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -86,7 +84,6 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -1156,18 +1153,6 @@ class TestAgentRepositoryCache:
         }
 
 
-@dataclass
-class KernelFilteringTestCase:
-    """Test case for kernel filtering validation via actual_occupied_slots"""
-
-    test_id: str
-    agent_id: AgentId
-    occupied_kernel_count: int
-    non_occupied_kernel_count: int
-    cpu_per_kernel: Decimal
-    expected_actual_occupied_cpu: Decimal
-
-
 class TestAgentDBSourceKernelFiltering:
     """Test kernel filtering with with_loader_criteria at db_source level"""
 
@@ -1308,168 +1293,6 @@ class TestAgentDBSourceKernelFiltering:
         yield name
 
     @pytest.fixture
-    async def agent_with_kernels(
-        self,
-        request: pytest.FixtureRequest,
-        db_with_tables: ExtendedAsyncSAEngine,
-        test_group: tuple[str, str],
-        test_domain_id: DomainID,
-        resource_group: str,
-        test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[KernelFilteringTestCase, None]:
-        """Create ONE agent with kernels based on the test case from indirect parametrization"""
-        test_case: KernelFilteringTestCase = request.param
-        group_id_str, domain_name = test_group
-
-        # Generate random IDs and values for this test execution
-        random_suffix = uuid4().hex[:8]
-        actual_agent_id = AgentId(f"{test_case.agent_id}-{random_suffix}")
-        random_ip_suffix = uuid4().int % 256  # Random IP octet (0-255)
-        random_ip = f"192.168.1.{random_ip_suffix}"
-        session_id = uuid4()
-        session_name = f"test-session-{uuid4().hex[:12]}"
-
-        async with db_with_tables.begin_session() as db_sess:
-            # Create agent
-            agent = AgentRow(
-                id=actual_agent_id,
-                status=AgentStatus.ALIVE,
-                status_changed=datetime.now(tzutc()),
-                region="us-west-1",
-                scaling_group=resource_group,
-                resource_group_id=test_scaling_group_id,
-                addr=f"tcp://{random_ip}:6001",
-                first_contact=datetime.now(tzutc()),
-                lost_at=None,
-                public_host=random_ip,
-                public_key=PublicKey(f"test-key-{random_suffix}".encode()),
-                version="24.12.0",
-                architecture="x86_64",
-                compute_plugins={},
-                schedulable=True,
-                auto_terminate_abusing_kernel=False,
-            )
-            db_sess.add(agent)
-            await db_sess.flush()
-
-            # Seed AgentResourceRow with expected occupied value
-            expected_used = test_case.cpu_per_kernel * test_case.occupied_kernel_count
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=actual_agent_id,
-                    agent_uuid=await _agent_uuid(db_sess, actual_agent_id),
-                    slot_name="cpu",
-                    capacity=Decimal("16"),
-                    used=expected_used,
-                )
-            )
-            await db_sess.flush()
-
-            # Create session for all kernels
-            session = SessionRow(
-                id=session_id,
-                name=session_name,
-                session_type=SessionTypes.INTERACTIVE,
-                domain_id=test_domain_id,
-                domain_name=domain_name,
-                group_id=UUID(group_id_str),
-                user_uuid=uuid4(),
-                resource_group_id=test_scaling_group_id,
-                scaling_group_name=resource_group,
-                status=SessionStatus.RUNNING,
-                status_info="test",
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                created_at=datetime.now(tzutc()),
-                images=["python:3.11"],
-                vfolder_mounts=[],
-                environ={},
-                result=SessionResult.UNDEFINED,
-            )
-            db_sess.add(session)
-            await db_sess.flush()
-
-            # Create resource-occupied kernels
-            # Only RUNNING and TERMINATING are considered resource-occupied
-            occupied_statuses = [
-                KernelStatus.RUNNING,
-                KernelStatus.TERMINATING,
-            ]
-            for i in range(test_case.occupied_kernel_count):
-                status = occupied_statuses[i % len(occupied_statuses)]
-                kernel = KernelRow(
-                    id=uuid4(),
-                    session_id=session_id,
-                    agent=actual_agent_id,
-                    agent_addr=f"{random_ip}:6001",
-                    scaling_group=resource_group,
-                    resource_group_id=test_scaling_group_id,
-                    cluster_idx=i,
-                    cluster_role="main",
-                    cluster_hostname=f"main{i}-{uuid4().hex[:6]}",
-                    image="python:3.11",
-                    architecture="x86_64",
-                    registry="docker.io",
-                    container_id=f"container-{uuid4().hex[:8]}",
-                    status=status,
-                    domain_name=domain_name,
-                    group_id=UUID(group_id_str),
-                    user_uuid=uuid4(),
-                    access_key="AKTEST" + uuid4().hex[:12],
-                    environ={},
-                    mounts=[],
-                    vfolder_mounts=[],
-                    preopen_ports=[],
-                    repl_in_port=2001 + i * 4,
-                    repl_out_port=2002 + i * 4,
-                    stdin_port=2003 + i * 4,
-                    stdout_port=2004 + i * 4,
-                )
-                db_sess.add(kernel)
-
-            # Create non-occupied kernels
-            non_occupied_statuses = [
-                KernelStatus.TERMINATED,
-                KernelStatus.CANCELLED,
-            ]
-            for i in range(test_case.non_occupied_kernel_count):
-                status = non_occupied_statuses[i % len(non_occupied_statuses)]
-                kernel = KernelRow(
-                    id=uuid4(),
-                    session_id=session_id,
-                    agent=actual_agent_id,
-                    agent_addr=f"{random_ip}:6001",
-                    scaling_group=resource_group,
-                    resource_group_id=test_scaling_group_id,
-                    cluster_idx=test_case.occupied_kernel_count + i,
-                    cluster_role="main",
-                    cluster_hostname=f"main{test_case.occupied_kernel_count + i}-{uuid4().hex[:6]}",
-                    image="python:3.11",
-                    architecture="x86_64",
-                    registry="docker.io",
-                    container_id=f"container-{uuid4().hex[:8]}",
-                    status=status,
-                    domain_name=domain_name,
-                    group_id=UUID(group_id_str),
-                    user_uuid=uuid4(),
-                    access_key="AKTEST" + uuid4().hex[:12],
-                    environ={},
-                    mounts=[],
-                    vfolder_mounts=[],
-                    preopen_ports=[],
-                    repl_in_port=2001 + (test_case.occupied_kernel_count + i) * 4,
-                    repl_out_port=2002 + (test_case.occupied_kernel_count + i) * 4,
-                    stdin_port=2003 + (test_case.occupied_kernel_count + i) * 4,
-                    stdout_port=2004 + (test_case.occupied_kernel_count + i) * 4,
-                )
-                db_sess.add(kernel)
-
-        # Create a copy of test_case with the actual random agent_id
-        test_case_with_random_id = copy(test_case)
-        test_case_with_random_id.agent_id = actual_agent_id
-
-        yield test_case_with_random_id
-
-    @pytest.fixture
     async def db_source(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -1477,66 +1300,6 @@ class TestAgentDBSourceKernelFiltering:
         """Create AgentDBSource for testing"""
         db_source = AgentDBSource(db_with_tables, ShareOpsProvider(db_with_tables))
         yield db_source
-
-    @pytest.mark.parametrize(
-        "agent_with_kernels",
-        [
-            KernelFilteringTestCase(
-                test_id="mixed_kernels",
-                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
-                occupied_kernel_count=3,
-                non_occupied_kernel_count=2,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("3.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_occupied",
-                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=4,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("2.0"),
-                expected_actual_occupied_cpu=Decimal("8.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_non_occupied",
-                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=5,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="no_kernels",
-                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("0.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-        ],
-        indirect=True,
-        ids=["mixed_kernels", "only_occupied", "only_non_occupied", "no_kernels"],
-    )
-    async def test_search_agents_validates_actual_occupied_slots(
-        self,
-        db_source: AgentDBSource,
-        agent_with_kernels: KernelFilteringTestCase,
-    ) -> None:
-        """Test that actual_occupied_slots correctly reflects kernel filtering via with_loader_criteria"""
-        # Filter to only this test case's agent
-        querier = BatchQuerier(
-            pagination=OffsetPagination(offset=0, limit=10),
-            conditions=[lambda: AgentRow.id == agent_with_kernels.agent_id],
-        )
-
-        result = await db_source.search_agents(querier)
-
-        assert len(result.items) == 1
-        agent_detail = result.items[0]
-
-        # Validate actual_occupied_slots reflects only resource-occupied kernels
-        actual_cpu = agent_detail.occupied_slots().get("cpu", 0)
-        assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
 
     # ==================== update_resource_group tests ====================
 

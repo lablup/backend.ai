@@ -8,6 +8,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
+from ai.backend.manager.models.audit_log.searchable_fields import (
+    AuditLogSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkFieldQuerier
 
 
@@ -24,4 +27,4 @@ class BulkAuditLogQuerier(BulkFieldQuerier[AuditLogRow, AuditLogData]):
 
     @override
     def to_data(self, row: AuditLogRow) -> AuditLogData:
-        return row.to_dataclass()
+        return AuditLogSearchableFields.own.to_data(row)

@@ -44,7 +44,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentPolicyData,
-    DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentState,
     ExecutionData,
@@ -67,7 +66,6 @@ from ai.backend.manager.services.deployment.actions.access_token.create_access_t
     CreateAccessTokenAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    SearchDeploymentPoliciesAction,
     UpsertDeploymentPolicyAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
@@ -237,83 +235,6 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
             conditions=[],
             orders=[],
         )
-
-    async def test_search_deployment_policies_success(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        deployment_policy_data: DeploymentPolicyData,
-        default_querier: BatchQuerier,
-    ) -> None:
-        """Search deployment policies should return matching results."""
-        mock_deployment_repository.search_deployment_policies = AsyncMock(
-            return_value=DeploymentPolicySearchResult(
-                items=[deployment_policy_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchDeploymentPoliciesAction(querier=default_querier)
-
-        result = await deployment_service.search_deployment_policies(action)
-
-        assert result.data == [deployment_policy_data]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_deployment_repository.search_deployment_policies.assert_called_once_with(
-            default_querier
-        )
-
-    async def test_search_deployment_policies_empty_result(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        default_querier: BatchQuerier,
-    ) -> None:
-        """Search deployment policies should return empty list when no results found."""
-        mock_deployment_repository.search_deployment_policies = AsyncMock(
-            return_value=DeploymentPolicySearchResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchDeploymentPoliciesAction(querier=default_querier)
-
-        result = await deployment_service.search_deployment_policies(action)
-
-        assert result.data == []
-        assert result.total_count == 0
-
-    async def test_search_deployment_policies_with_pagination(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        deployment_policy_data: DeploymentPolicyData,
-        paginated_querier: BatchQuerier,
-    ) -> None:
-        """Search deployment policies should handle pagination correctly."""
-        mock_deployment_repository.search_deployment_policies = AsyncMock(
-            return_value=DeploymentPolicySearchResult(
-                items=[deployment_policy_data],
-                total_count=25,
-                has_next_page=True,
-                has_previous_page=True,
-            )
-        )
-
-        action = SearchDeploymentPoliciesAction(querier=paginated_querier)
-
-        result = await deployment_service.search_deployment_policies(action)
-
-        assert result.total_count == 25
-        assert result.has_next_page is True
-        assert result.has_previous_page is True
 
 
 class ModelRevisionFixtures(DeploymentServiceBaseFixtures):

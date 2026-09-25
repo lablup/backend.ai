@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from functools import lru_cache
-from typing import cast
+from typing import assert_never, cast
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
@@ -49,11 +49,14 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
-from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
 )
@@ -68,11 +71,8 @@ from ai.backend.manager.types import OptionalState, TriState
 @lru_cache(maxsize=1)
 def _get_idle_checker_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=IdleCheckerOrders.created_at(ascending=False),
-        backward_order=IdleCheckerOrders.created_at(ascending=True),
-        forward_condition_factory=IdleCheckerConditions.by_cursor_forward,
-        backward_condition_factory=IdleCheckerConditions.by_cursor_backward,
-        tiebreaker_order=IdleCheckerOrders.id(ascending=True),
+        forward_order=IdleCheckerSearchableFields.own.created_at.order.apply(ascending=False),
+        cursor_column=IdleCheckerRow.id,
     )
 
 
@@ -135,7 +135,7 @@ class IdleCheckerAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._idle_checker.admin_search.run(
-            AdminSearchIdleCheckersAction(searcher=searcher)
+            AdminSearchIdleCheckersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchIdleCheckerPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -190,6 +190,7 @@ class IdleCheckerAdapter(BaseAdapter):
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:
         return IdleCheckerNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             checker_type=IdleCheckerTypeDTO(data.checker_type.value),
@@ -276,47 +277,25 @@ class IdleCheckerAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter_: IdleCheckerFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.name is not None:
-            condition = self.convert_string_filter(
-                filter_.name,
-                contains_factory=IdleCheckerConditions.by_name_contains,
-                equals_factory=IdleCheckerConditions.by_name_equals,
-                starts_with_factory=IdleCheckerConditions.by_name_starts_with,
-                ends_with_factory=IdleCheckerConditions.by_name_ends_with,
-                in_factory=IdleCheckerConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = IdleCheckerSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_datetime_filter(filter_.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter_.updated_at, fields.updated_at.filter),
+        ]
         if filter_.checker_type is not None:
             if filter_.checker_type.equals is not None:
                 conditions.append(
-                    IdleCheckerConditions.by_checker_type_equals(
+                    fields.checker_type.filter.equals(
                         CheckerType(filter_.checker_type.equals.value)
                     )
                 )
             if filter_.checker_type.in_ is not None:
                 conditions.append(
-                    IdleCheckerConditions.by_checker_type_in([
+                    fields.checker_type.filter.in_([
                         CheckerType(checker_type.value) for checker_type in filter_.checker_type.in_
                     ])
                 )
-        if filter_.created_at is not None:
-            condition = filter_.created_at.build_query_condition(
-                before_factory=IdleCheckerConditions.by_created_at_before,
-                after_factory=IdleCheckerConditions.by_created_at_after,
-                equals_factory=IdleCheckerConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter_.updated_at is not None:
-            condition = filter_.updated_at.build_query_condition(
-                before_factory=IdleCheckerConditions.by_updated_at_before,
-                after_factory=IdleCheckerConditions.by_updated_at_after,
-                equals_factory=IdleCheckerConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
         if filter_.AND:
             for sub_filter in filter_.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -336,16 +315,19 @@ class IdleCheckerAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_orders(orders: list[IdleCheckerOrder]) -> list[QueryOrder]:
+        fields = IdleCheckerSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field:
                 case IdleCheckerOrderField.NAME:
-                    result.append(IdleCheckerOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case IdleCheckerOrderField.CHECKER_TYPE:
-                    result.append(IdleCheckerOrders.checker_type(ascending))
+                    result.append(fields.checker_type.order.apply(ascending))
                 case IdleCheckerOrderField.CREATED_AT:
-                    result.append(IdleCheckerOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case IdleCheckerOrderField.UPDATED_AT:
-                    result.append(IdleCheckerOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
         return result

@@ -43,10 +43,6 @@ from ai.backend.manager.services.resource_group.actions.get_wsproxy_version impo
     GetWsproxyVersionAction,
     GetWsproxyVersionActionResult,
 )
-from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
-    SearchResourceGroupsAction,
-    SearchResourceGroupsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
     PurgeResourceGroupAction,
     PurgeResourceGroupActionResult,
@@ -96,11 +92,7 @@ class ResourceGroupService:
         """Get wsproxy version for a specific resource group."""
         if self._appproxy_client_pool is None:
             raise ObjectNotFound(object_name="AppProxy client pool")
-        sgroups = await self._repository.list_allowed_sgroups(
-            domain_id=action.domain_id,
-            project_ids=action.project_ids,
-            user_id=action.user_id,
-        )
+        sgroups = await self._repository.list_active_resource_groups(action.targets)
         sgroup_filtered = [sg for sg in sgroups if sg.name == action.resource_group_name]
         if not sgroup_filtered:
             raise ResourceGroupNotFound()
@@ -119,21 +111,6 @@ class ResourceGroupService:
     ) -> ResolveResourceGroupIDsByNamesActionResult:
         ids_by_name = await self._repository.get_resource_group_ids_by_names(action.names)
         return ResolveResourceGroupIDsByNamesActionResult(ids_by_name=ids_by_name)
-
-    async def search_resource_groups(
-        self, action: SearchResourceGroupsAction
-    ) -> SearchResourceGroupsActionResult:
-        """Searches resource groups."""
-        result = await self._repository.search_resource_groups(
-            querier=action.querier,
-        )
-
-        return SearchResourceGroupsActionResult(
-            resource_groups=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def create_resource_group(
         self, action: CreateResourceGroupAction

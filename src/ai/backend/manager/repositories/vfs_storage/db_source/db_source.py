@@ -10,16 +10,22 @@ from ai.backend.manager.errors.vfs_storage import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.models.vfs_storage.searchable_fields import (
+    VFSStorageSearchableFields,
+)
+from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 class VFSStorageDBSource:
     """Database source for VFS storage operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     async def get_by_name(self, storage_name: str) -> VFSStorageData:
         """
@@ -31,7 +37,7 @@ class VFSStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with name {storage_name} not found.")
-            return row.to_dataclass()
+            return VFSStorageSearchableFields.own.to_data(row)
 
     async def get_by_id(self, storage_id: uuid.UUID) -> VFSStorageData:
         """
@@ -43,7 +49,7 @@ class VFSStorageDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
-            return row.to_dataclass()
+            return VFSStorageSearchableFields.own.to_data(row)
 
     async def list_vfs_storages(self) -> list[VFSStorageData]:
         """
@@ -53,27 +59,18 @@ class VFSStorageDBSource:
             query = sa.select(VFSStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
+            return [VFSStorageSearchableFields.own.to_data(row) for row in rows]
 
     async def search(
         self,
-        querier: BatchQuerier,
+        searcher: VFSStorageSearcher,
     ) -> VFSStorageListResult:
         """Searches VFS storages with total count."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(VFSStorageRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.VFSStorageRow.to_dataclass() for row in result.rows]
-
-            return VFSStorageListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return VFSStorageListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

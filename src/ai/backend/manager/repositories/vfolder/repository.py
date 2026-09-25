@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -113,7 +114,6 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -130,7 +130,8 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderQuerier,
     VFolderUserMountPolicyQuerier,
 )
-from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
@@ -236,18 +237,18 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[VFolderData | None]:
-        """
-        Batch fetch vfolders by IDs without permission validation.
+        """The named vfolders in the given order, ``None`` where an id matches no row.
 
-        Returns a list with the same length and order as the input ids;
-        entries that are not found are ``None``. Intended for GraphQL
-        DataLoader use where the caller has already authorized access to a
-        parent entity that references these vfolder IDs.
+        No permission check: the partial bulk action calling this has already
+        narrowed ``ids`` to what the caller may read.
         """
         if not ids:
             return []
         async with self._db.begin_readonly_session() as session:
-            query = sa.select(VFolderRow).where(VFolderConditions.by_ids(ids)())
+            id_in = VFolderSearchableFields.own.id.filter.in_(
+                UUIDInMatchSpec(values=list(ids), negated=False)
+            )
+            query = sa.select(VFolderRow).where(id_in())
             result = await session.execute(query)
             rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
             return [rows_by_id.get(VFolderUUID(vfolder_id)) for vfolder_id in ids]
@@ -1212,10 +1213,6 @@ class VfolderRepository:
             quota_scope_id=row.quota_scope_id,
             usage_mode=row.usage_mode,
             default_mount_permission=row.default_mount_permission,
-            max_files=row.max_files or 0,
-            max_size=row.max_size,
-            num_files=row.num_files or 0,
-            cur_size=row.cur_size or 0,
             created_at=row.created_at,
             last_used=row.last_used,
             updated_at=row.updated_at,
@@ -1661,7 +1658,7 @@ class VfolderRepository:
         """The ``.logs`` vfolder the user reaches, or ``None`` when there is none."""
         async with self._v2_ops.read_ops() as r:
             vfolder_id = await r.lookup_entity_id(
-                VFolderNameLookup(scopes=[UserVFolderOperationScope(user_id=user_id)], name=".logs")
+                VFolderNameLookup(scopes=[UserVFolderTarget(user_id=user_id)], name=".logs")
             )
         if vfolder_id is None:
             return None

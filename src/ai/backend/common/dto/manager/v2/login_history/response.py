@@ -23,6 +23,9 @@ class LoginHistoryNode(BaseResponseModel):
     """Node model representing a login history entry."""
 
     id: UUID = Field(description="Login history entry ID")
+    field_id: UUID = Field(
+        description=f"UUID of the login history record. Added in {NEXT_RELEASE_VERSION}.",
+    )
     user_id: UUID = Field(description="UUID of the user who attempted to log in")
     domain_name: str = Field(description="Domain name of the user at the time of the attempt")
     result: LoginAttemptResult = Field(description="Result of the login attempt")

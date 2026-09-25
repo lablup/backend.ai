@@ -16,8 +16,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.scopes import (
-    PublicAppConfigFragmentOperationScope,
-    VisibleAppConfigFragmentOperationScope,
+    PublicAppConfigFragmentTarget,
+    VisibleAppConfigFragmentTarget,
 )
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -108,6 +108,30 @@ class TestAppConfigService:
         ])
 
     @pytest.fixture
+    def nested_overlap_fragments(
+        self,
+        make_fragment: FragmentFactory,
+        found: Callable[[list[AppConfigFragmentData]], None],
+    ) -> None:
+        found([
+            make_fragment(
+                "editor", {"editor": {"font": {"size": 12, "family": "mono"}, "wrap": True}}, None
+            ),
+            make_fragment("editor", {"editor": {"font": {"size": 14}, "theme": "night"}}, _USER_ID),
+        ])
+
+    @pytest.fixture
+    def null_override_fragments(
+        self,
+        make_fragment: FragmentFactory,
+        found: Callable[[list[AppConfigFragmentData]], None],
+    ) -> None:
+        found([
+            make_fragment("banner", {"banner": "welcome"}, None),
+            make_fragment("banner", {"banner": None}, _USER_ID),
+        ])
+
+    @pytest.fixture
     def no_fragments(self, found: Callable[[list[AppConfigFragmentData]], None]) -> None:
         found([])
 
@@ -157,9 +181,7 @@ class TestAppConfigService:
         await service.search_app_configs(action)
 
         scopes, _searcher = mock_repository.search_in_scopes.call_args.args
-        assert scopes == (
-            VisibleAppConfigFragmentOperationScope(user_id=_USER_ID, domain_id=_DOMAIN_ID),
-        )
+        assert scopes == (VisibleAppConfigFragmentTarget(user_id=_USER_ID, domain_id=_DOMAIN_ID),)
         assert list(action.scope_targets()) == [_USER_ID]
 
     async def test_search_replaces_lists_wholesale(
@@ -176,6 +198,30 @@ class TestAppConfigService:
             "nav": ["dashboard"],
             "theme": {"light": True, "dark": True},
         }
+
+    async def test_search_merges_overlapping_nested_keys_inside(
+        self,
+        service: AppConfigService,
+        nested_overlap_fragments: None,
+    ) -> None:
+        result = await service.search_app_configs(
+            SearchAppConfigsAction(config_names=["editor"], user_id=_USER_ID, domain_id=_DOMAIN_ID)
+        )
+
+        assert result.app_configs[0].config == {
+            "editor": {"font": {"size": 14, "family": "mono"}, "wrap": True, "theme": "night"}
+        }
+
+    async def test_search_lets_an_explicit_null_override(
+        self,
+        service: AppConfigService,
+        null_override_fragments: None,
+    ) -> None:
+        result = await service.search_app_configs(
+            SearchAppConfigsAction(config_names=["banner"], user_id=_USER_ID, domain_id=_DOMAIN_ID)
+        )
+
+        assert result.app_configs[0].config == {"banner": None}
 
     async def test_search_groups_by_name_and_merges_each(
         self,
@@ -255,5 +301,5 @@ class TestAppConfigService:
         )
 
         scopes, _searcher = mock_repository.search_in_scopes.call_args.args
-        assert scopes == (PublicAppConfigFragmentOperationScope(),)
+        assert scopes == (PublicAppConfigFragmentTarget(),)
         assert result.app_configs[0].config == {"theme": "light", "lang": "en"}

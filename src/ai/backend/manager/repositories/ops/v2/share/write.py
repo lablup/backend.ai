@@ -3,8 +3,9 @@
 ``replace_share`` / ``replace_share_fields`` replace everything before with what holds now,
 ``widen_*`` add to it, ``narrow_*`` take part of it back, ``unshare`` takes all of it. Every-field caps
 and field paths are different statements and keep different methods. An invitation
-is a share on offer, so accepting one lives here too, and so does moving an entity
-between the scopes it is created in.
+is a share on offer, so accepting one lives here too. Moving an entity between the
+scopes it is created in lives here as well, and so does adding one of those scopes
+or taking one away.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.searchable_fields import (
+    EntityShareSearchableFields,
+)
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -123,6 +127,25 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         await self._removed_from(from_scopes, entity)
         await self._created_in(to_scopes, entity)
 
+    async def add_membership(
+        self,
+        scopes: Collection[EntityIdentifier],
+        entities: Collection[EntityIdentifier],
+    ) -> None:
+        """Each scope owns and governs every entity named, beside the scopes already
+        holding them. A share the scope held becomes own. Idempotent, so a run split
+        into parts can be repeated from the start."""
+        await self._created_in_all(scopes, entities)
+
+    async def remove_membership(
+        self,
+        scopes: Collection[EntityIdentifier],
+        entities: Collection[EntityIdentifier],
+    ) -> None:
+        """Each scope stops owning and governing every entity named; the other scopes
+        holding them stay. Silent where it never did."""
+        await self._removed_from_all(scopes, entities)
+
     async def accept_share(self, updater: EntityShareAcceptUpdater) -> EntityShareData | None:
         """Settle the invitation as accepted and share its entity to the invitee.
 
@@ -196,7 +219,7 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         ).scalar_one_or_none()
         if row is None:
             return None
-        data: EntityShareData = row.to_data()
+        data = EntityShareSearchableFields.own.to_data(row)
         if data.status is EntityShareStatus.ACCEPTED and data.recipient is not None:
             await self.replace_share(
                 await self._landing_scope(data.recipient),

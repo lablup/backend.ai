@@ -38,11 +38,11 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import DeploymentHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import DeploymentHistoryToCreate
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
@@ -414,22 +414,23 @@ class DeploymentCoordinator:
             await self._run_handler(handler)
 
     @staticmethod
-    def _build_deployment_querier(target: DeploymentTargetStatuses) -> BatchQuerier:
-        """Assemble a :class:`BatchQuerier` from the handler's target declaration.
+    def _build_deployment_searcher(target: DeploymentTargetStatuses) -> DeploymentInfoSearcher:
+        """Assemble a searcher from the handler's target declaration.
 
         Each non-empty axis list becomes a separate ``IN (...)`` predicate
         and the three predicates AND together. Pagination is skipped —
         coordinator fetches need every matching deployment per tick.
         """
+        fields = DeploymentSearchableFields.own
         conditions: list[QueryCondition] = []
         if target.lifecycle_stages:
-            conditions.append(DeploymentConditions.by_lifecycle_stages(target.lifecycle_stages))
+            conditions.append(fields.lifecycle_stage.filter.in_(target.lifecycle_stages))
         if target.scaling_states:
-            conditions.append(DeploymentConditions.by_scaling_state_in(target.scaling_states))
+            conditions.append(fields.scaling_state.filter.in_(target.scaling_states))
         if target.sub_steps:
-            conditions.append(DeploymentConditions.by_sub_step_in(target.sub_steps))
+            conditions.append(fields.sub_step.filter.in_(target.sub_steps))
 
-        return BatchQuerier(pagination=NoPagination(), conditions=conditions)
+        return DeploymentInfoSearcher(pagination=NoPagination(), conditions=conditions)
 
     async def _run_handler(
         self,
@@ -438,9 +439,9 @@ class DeploymentCoordinator:
         """Run a single handler: fetch filtered deployments -> execute -> transitions -> post_process."""
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
-        querier = self._build_deployment_querier(target_statuses)
+        searcher = self._build_deployment_searcher(target_statuses)
         deployments = await self._deployment_repository.search_deployments_with_last_history(
-            querier=querier,
+            searcher=searcher,
             category=handler.category(),
         )
         if not deployments:

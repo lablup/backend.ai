@@ -59,6 +59,7 @@ from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
@@ -322,6 +323,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the kernel.",
+        ),
+    )
     image_id: strawberry.ID | None = gql_field(
         description="The UUID of the image used by this kernel. Null if the image has been purged.",
     )
@@ -548,11 +555,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             slot_name = item.slot_name
             node = KernelResourceAllocationGQL(
                 id=_strawberry.ID(item.id),
+                field_id=item.field_id,
                 slot_name=slot_name,
                 requested=Decimal(item.requested),
                 used=Decimal(item.used) if item.used is not None else None,
             )
-            cursor = encode_cursor(slot_name)
+            cursor = encode_cursor(item.field_id)
             edges.append(KernelResourceAllocationEdgeGQL(node=node, cursor=cursor))
 
         return ResourceAllocationConnectionGQL(

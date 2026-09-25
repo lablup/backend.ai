@@ -19,6 +19,7 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
@@ -28,7 +29,6 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
     ImageLabelsData,
-    ImageListResult,
     ImageResourcesData,
     RescanImagesResult,
     ResourceLimitInput,
@@ -40,10 +40,11 @@ from ai.backend.manager.errors.image import (
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.scopes import VisibleImageTarget
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -68,7 +69,9 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesKeyData,
 )
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
-from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
+from ai.backend.manager.services.image.actions.search_install_status import (
+    SearchImagesWithInstallStatusAction,
+)
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
 )
@@ -878,97 +881,6 @@ class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
             await image_service.clear_image_custom_resource_limit(action)
 
 
-class TestSearchImages(ImageServiceBaseFixtures):
-    """Tests for ImageService.search_images"""
-
-    async def test_search_images_success(
-        self,
-        image_service: ImageService,
-        mock_image_repository: MagicMock,
-        image_data: ImageData,
-    ) -> None:
-        """Search images should return matching results."""
-        mock_image_repository.search_images = AsyncMock(
-            return_value=ImageListResult(
-                items=[image_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchImagesAction(querier=querier)
-
-        result = await image_service.search_images(action)
-
-        assert result.data == [image_data]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_image_repository.search_images.assert_called_once_with(querier)
-
-    async def test_search_images_empty_result(
-        self,
-        image_service: ImageService,
-        mock_image_repository: MagicMock,
-    ) -> None:
-        """Search images should return empty list when no results found."""
-        mock_image_repository.search_images = AsyncMock(
-            return_value=ImageListResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchImagesAction(querier=querier)
-
-        result = await image_service.search_images(action)
-
-        assert result.data == []
-        assert result.total_count == 0
-
-    async def test_search_images_with_pagination(
-        self,
-        image_service: ImageService,
-        mock_image_repository: MagicMock,
-        image_data: ImageData,
-    ) -> None:
-        """Search images should handle pagination correctly."""
-        mock_image_repository.search_images = AsyncMock(
-            return_value=ImageListResult(
-                items=[image_data],
-                total_count=25,
-                has_next_page=True,
-                has_previous_page=True,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchImagesAction(querier=querier)
-
-        result = await image_service.search_images(action)
-
-        assert result.total_count == 25
-        assert result.has_next_page is True
-        assert result.has_previous_page is True
-
-
 class TestAliasImageById(ImageServiceBaseFixtures):
     """Tests for ImageService.alias_image_by_id"""
 
@@ -1257,3 +1169,44 @@ class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
         result = await image_service.get_image_installed_agents(action)
 
         assert result.data == {}
+
+
+class TestSearchImagesWithInstallStatus(ImageServiceBaseFixtures):
+    """Tests for the scopes ImageService.search_images_with_install_status reads at"""
+
+    def _action(self, user_id: uuid.UUID) -> SearchImagesWithInstallStatusAction:
+        return SearchImagesWithInstallStatusAction(
+            targets=[VisibleImageTarget(user_id=UserID(user_id))],
+            searcher=ImageSearcher(pagination=NoPagination(), conditions=[]),
+        )
+
+    async def test_a_superadmin_reads_without_a_scope(
+        self,
+        image_service: ImageService,
+        mock_image_repository: MagicMock,
+        superadmin_user_data: UserData,
+    ) -> None:
+        mock_image_repository.search_images_with_install_status = AsyncMock(return_value=[])
+
+        with with_user(superadmin_user_data):
+            await image_service.search_images_with_install_status(
+                self._action(superadmin_user_data.user_id)
+            )
+
+        scopes, _searcher = mock_image_repository.search_images_with_install_status.call_args.args
+        assert list(scopes) == []
+
+    async def test_a_regular_user_reads_at_the_scope_the_action_names(
+        self,
+        image_service: ImageService,
+        mock_image_repository: MagicMock,
+        regular_user_data: UserData,
+    ) -> None:
+        mock_image_repository.search_images_with_install_status = AsyncMock(return_value=[])
+        action = self._action(regular_user_data.user_id)
+
+        with with_user(regular_user_data):
+            await image_service.search_images_with_install_status(action)
+
+        scopes, _searcher = mock_image_repository.search_images_with_install_status.call_args.args
+        assert list(scopes) == action.targets

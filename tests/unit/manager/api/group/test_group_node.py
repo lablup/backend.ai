@@ -63,7 +63,7 @@ class TestCreateGroupMutation:
             resource_policy="default",
             type=ProjectType.GENERAL,
             integration_name=None,
-            container_registry={},
+            container_registry=None,
         )
 
     @pytest.fixture

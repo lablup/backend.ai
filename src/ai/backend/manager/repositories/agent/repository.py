@@ -22,7 +22,6 @@ from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDetailData,
     AgentHeartbeatUpsert,
-    AgentListResult,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -30,6 +29,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
@@ -40,7 +40,6 @@ from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSou
 from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
     AgentStatefulSource,
 )
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
@@ -265,7 +264,7 @@ class AgentRepository:
             # and fills them itself.
             return [
                 AgentDetailData(
-                    agent=agent_row.to_data(),
+                    agent=AgentSearchableFields.own.to_data(agent_row),
                     resources=agent_row.resources_by_rank(),
                     permissions=[],
                 )
@@ -279,11 +278,3 @@ class AgentRepository:
             [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
         ):
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
-
-    @agent_repository_resilience.apply()
-    async def search_agents(
-        self,
-        querier: BatchQuerier,
-    ) -> AgentListResult:
-        """Searches agents with total count."""
-        return await self._db_source.search_agents(querier=querier)

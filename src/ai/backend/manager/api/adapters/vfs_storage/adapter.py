@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
@@ -69,7 +70,7 @@ class VFSStorageAdapter(BaseAdapter):
         )
         searcher = VFSStorageSearcher(pagination=pagination, conditions=[], orders=[])
         action_result = await self._vfs_storage.global_search_vfs_storages.run(
-            SearchVFSStoragesAction(searcher=searcher)
+            SearchVFSStoragesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchVFSStoragesPayload(
             items=[self._vfs_storage_data_to_dto(item) for item in action_result.items],
@@ -107,7 +108,11 @@ class VFSStorageAdapter(BaseAdapter):
     async def list_all(self) -> list[VFSStorageNode]:
         """List all VFS storages without pagination."""
         action_result = await self._vfs_storage.global_list_storages.run(
-            ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
+            ListVFSStorageAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=VFSStorageSearcher(pagination=NoPagination())
+                )
+            )
         )
         return [self._vfs_storage_data_to_dto(item) for item in action_result.items]
 
@@ -143,6 +148,7 @@ class VFSStorageAdapter(BaseAdapter):
     def _vfs_storage_data_to_dto(data: VFSStorageData) -> VFSStorageNode:
         return VFSStorageNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             host=data.host,
             base_path=str(data.base_path),

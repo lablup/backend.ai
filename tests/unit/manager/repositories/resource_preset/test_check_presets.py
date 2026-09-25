@@ -91,7 +91,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
@@ -612,7 +612,7 @@ class TestCheckPresetsOccupiedSlots:
             db=db_with_cleanup,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )
         yield repo
 
@@ -1530,7 +1530,7 @@ class TestCheckPresetsZeroValues:
             db=db_with_cleanup,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )
         yield repo
 

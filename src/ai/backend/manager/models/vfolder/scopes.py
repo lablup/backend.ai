@@ -10,7 +10,8 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
-from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
@@ -18,24 +19,28 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 from ai.backend.manager.models.user.queries import user_scope_reaches
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 
 __all__ = (
-    "DomainVFolderOperationScope",
-    "ProjectVFolderOperationScope",
-    "UserVFolderOperationScope",
+    "DomainVFolderTarget",
+    "ProjectVFolderTarget",
+    "UserVFolderTarget",
 )
 
 
 @dataclass(frozen=True)
-class DomainVFolderOperationScope(OperationScope):
+class DomainVFolderTarget(ScopeTarget):
     """The vfolders of one domain."""
 
     domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -61,7 +66,7 @@ class DomainVFolderOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectVFolderOperationScope(OperationScope):
+class ProjectVFolderTarget(ScopeTarget):
     """Required scope for searching vfolders within a project.
 
     Used for project-scoped vfolder search (project admin).
@@ -69,6 +74,10 @@ class ProjectVFolderOperationScope(OperationScope):
 
     project_id: UUID
     """Required. The project (group) to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return ProjectID(self.project_id)
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -96,7 +105,7 @@ class ProjectVFolderOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserVFolderOperationScope(OperationScope):
+class UserVFolderTarget(ScopeTarget):
     """Required scope for searching vfolders owned by a specific user.
 
     Used for my_vfolders query (current authenticated user).
@@ -104,6 +113,10 @@ class UserVFolderOperationScope(OperationScope):
 
     user_id: UserID
     """Required. The user whose vfolders to search."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:

@@ -136,12 +136,18 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
     async def _disown(self, owners: Collection[EntityIdentifier], entity: EntityIdentifier) -> None:
         """Each owner's virtual entity stops owning the entity. Silent where it never
         did, or where either side has no virtual entity."""
-        if not owners:
+        await self._disown_all(owners, [entity])
+
+    async def _disown_all(
+        self, owners: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each owner's virtual entity stops owning every entity named."""
+        if not owners or not entities:
             return
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.virtual_entity_id.in_(self._node_ids_query(list(owners))),
-                EntityMembershipRow.member_entity_id == self._node_id_query(entity),
+                EntityMembershipRow.member_entity_id.in_(self._node_ids_query(list(entities))),
             )
         )
 
@@ -175,11 +181,17 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
     ) -> None:
         """Each scope stops governing the entity's virtual entity. Silent where it
         never did, or where either side has no virtual entity."""
-        if not scopes:
+        await self._ungovern_all(scopes, [entity])
+
+    async def _ungovern_all(
+        self, scopes: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each scope stops governing the virtual entity of every entity named."""
+        if not scopes or not entities:
             return
         await self._sess.execute(
             sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.virtual_entity_id == self._node_id_query(entity),
+                ScopeBindingRow.virtual_entity_id.in_(self._node_ids_query(list(entities))),
                 ScopeBindingRow.scope_entity_id.in_(self._node_ids_query(list(scopes))),
             )
         )
@@ -188,17 +200,25 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
         self, scopes: Collection[EntityIdentifier], entity: EntityIdentifier
     ) -> None:
         """Each scope owns and governs the entity — one node lookup for both."""
-        if not scopes:
+        await self._created_in_all(scopes, [entity])
+
+    async def _created_in_all(
+        self, scopes: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each scope owns and governs every entity named. Idempotent, so a run that
+        stopped part way can be repeated."""
+        if not scopes or not entities:
             return
-        node_ids = await self._node_ids([entity, *scopes])
-        entity_node = node_ids[self._node_key(entity)]
+        node_ids = await self._node_ids([*entities, *scopes])
+        entity_nodes = [node_ids[self._node_key(entity)] for entity in entities]
         scope_nodes = [node_ids[self._node_key(scope)] for scope in scopes]
         membership_ids = (
             await self._sess.scalars(
                 pg_insert(EntityMembershipRow)
                 .values([
-                    {"virtual_entity_id": scope, "member_entity_id": entity_node, "capped": False}
+                    {"virtual_entity_id": scope, "member_entity_id": node, "capped": False}
                     for scope in scope_nodes
+                    for node in entity_nodes
                 ])
                 .on_conflict_do_update(
                     index_elements=["virtual_entity_id", "member_entity_id"],
@@ -215,8 +235,9 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
         await self._sess.execute(
             pg_insert(ScopeBindingRow)
             .values([
-                {"virtual_entity_id": entity_node, "scope_entity_id": scope, "permission_cap": None}
+                {"virtual_entity_id": node, "scope_entity_id": scope, "permission_cap": None}
                 for scope in scope_nodes
+                for node in entity_nodes
             ])
             .on_conflict_do_nothing()
         )
@@ -226,8 +247,15 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
     ) -> None:
         """Each scope stops owning and governing the entity — the reverse of
         :meth:`_created_in`. Silent where it never did."""
-        await self._disown(scopes, entity)
-        await self._ungovern(scopes, entity)
+        await self._removed_from_all(scopes, [entity])
+
+    async def _removed_from_all(
+        self, scopes: Collection[EntityIdentifier], entities: Collection[EntityIdentifier]
+    ) -> None:
+        """Each scope stops owning and governing every entity named — the reverse of
+        :meth:`_created_in_all`. Silent where it never did."""
+        await self._disown_all(scopes, entities)
+        await self._ungovern_all(scopes, entities)
 
     async def _reset_share(
         self, scope: EntityIdentifier, entity: EntityIdentifier

@@ -276,7 +276,6 @@ from ai.backend.manager.services.vfolder.services.invite import VFolderInviteSer
 from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
-from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
@@ -333,7 +332,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         container_registry=ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
-            quota_service=args.registry_quota_service,
+            args.registry_quota_client_pool,
         ),
         vfolder=VFolderService(
             args.config_provider,
@@ -344,9 +343,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.user.repository,
             args.valkey_stat_client,
             BulkOwnCheck(repositories.rbac.permission_check),
-        ),
-        vfolder_admin=VFolderAdminService(
-            vfolder_admin_repository=repositories.vfolder.admin_repository,
         ),
         vfolder_file=VFolderFileService(
             args.config_provider,
@@ -659,9 +655,7 @@ def create_processors(
         vfolder=VFolderProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder
         ),
-        vfolder_admin=VFolderAdminProcessors(
-            vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_admin
-        ),
+        vfolder_admin=VFolderAdminProcessors(vfolder_groups.group(GroupMeta(VFolderEntityType()))),
         vfolder_file=VFolderFileProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_file
         ),
@@ -874,4 +868,4 @@ def create_processors(
             session_groups.group(GroupMeta(SessionEntityType())), services.stream
         ),
     )
-    return ProcessorsBundle(processors=processors, registry=registry)
+    return ProcessorsBundle(processors=processors, services=services, registry=registry)

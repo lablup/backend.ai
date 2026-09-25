@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-import yarl
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
@@ -19,19 +18,8 @@ from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
     MountPermission,
-    ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
-    ExecutionData,
-    ModelMountConfigData,
-    ModelRevisionData,
-    ModelRuntimeConfigData,
-    PresetAttributionData,
-    ResourceConfigData,
-)
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -249,52 +237,3 @@ class DeploymentRevisionRow(CreatedAtMixin, Base):
         lazy="joined",
         innerjoin=True,
     )
-
-    def to_data(self) -> ModelRevisionData:
-        """Convert to ModelRevisionData dataclass."""
-        return ModelRevisionData(
-            id=self.id,
-            deployment_id=self.endpoint,
-            revision_number=self.revision_number,
-            created_at=self.created_at,
-            image_id=self.image,
-            cluster_config=ClusterConfigData(
-                mode=ClusterMode(self.cluster_mode),
-                size=self.cluster_size,
-            ),
-            resource_config=ResourceConfigData(
-                resource_group_name=self.resource_group,
-                resource_slot=ResourceSlot({
-                    r.slot_name: r.quantity for r in self.resource_slot_rows
-                }),
-                resource_opts=self.resource_opts or {},
-            ),
-            model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
-                environ=self.environ,
-                runtime_variant_preset_values=[
-                    RuntimeVariantPresetValueData(preset_id=pv.preset_id, value=pv.value)
-                    for pv in (self.preset_values or [])
-                ],
-            ),
-            execution=ExecutionData(
-                startup_command=self.startup_command,
-                bootstrap_script=self.bootstrap_script,
-                callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
-            ),
-            model_mount_config=ModelMountConfigData(
-                vfolder_id=self.model,
-                mount_destination=self.model_mount_destination,
-                subpath=self.vfolder_subpath,
-                definition_path=self.model_definition_path or "",
-                extra_mounts=list(self.extra_mounts),
-                model_mount_perm=self.model_mount_perm,
-            ),
-            revision_preset=PresetAttributionData(
-                preset_id=self.revision_preset_id,
-                # DeploymentRevisionPresetData is not stored on the row
-                # value fields are not used, currently dead code
-                values=[],
-            ),
-            model_definition=self.model_definition,
-        )

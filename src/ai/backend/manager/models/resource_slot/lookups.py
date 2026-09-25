@@ -4,21 +4,28 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
 from ai.backend.common.data.entity.resource_slot import (
     ResourceSlotTypeEntityType,
     ResourceSlotTypeUUID,
 )
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_slot.row import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.specs.lookup import DataLookup, FieldOwnerLookup
 
 
@@ -61,3 +68,19 @@ class AgentResourceOwnerLookup(FieldOwnerLookup[AgentResourceID, AgentUUID]):
     @override
     def to_entity_id(self, value: UUID) -> AgentUUID:
         return AgentUUID(value)
+
+
+class ResourceAllocationOwnerLookup(FieldOwnerLookup[ResourceAllocationID, SessionID]):
+    """The session an allocation row belongs to, reached through its kernel."""
+
+    @override
+    def build_query(self, field_ids: Sequence[ResourceAllocationID]) -> sa.sql.Select[Any]:
+        return (
+            sa.select(ResourceAllocationRow.id, KernelRow.session_id)
+            .join(KernelRow, KernelRow.id == ResourceAllocationRow.kernel_id)
+            .where(ResourceAllocationRow.id.in_(field_ids))
+        )
+
+    @override
+    def to_entity_id(self, value: UUID) -> SessionID:
+        return SessionID(value)

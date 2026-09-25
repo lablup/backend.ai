@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
@@ -14,6 +15,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -48,6 +50,12 @@ if TYPE_CHECKING:
 )
 class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the policy.",
+        ),
+    )
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     default_for_unspecified: str = gql_field(
@@ -148,8 +156,10 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
                 offset=offset,
             ),
         )
-        nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
-        edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        edges = [
+            KeyPairEdge(node=KeyPairGQL.from_pydantic(item), cursor=encode_cursor(item.field_id))
+            for item in result.items
+        ]
         return KeyPairConnection(
             edges=edges,
             page_info=PageInfo(
@@ -191,6 +201,12 @@ class KeypairResourcePolicyV2Connection(Connection[KeypairResourcePolicyV2GQL]):
 )
 class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the policy.",
+        ),
+    )
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
@@ -243,6 +259,12 @@ class UserResourcePolicyV2Connection(Connection[UserResourcePolicyV2GQL]):
 )
 class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the policy.",
+        ),
+    )
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a project can have.")

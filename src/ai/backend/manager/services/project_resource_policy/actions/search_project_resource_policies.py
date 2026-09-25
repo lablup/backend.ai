@@ -7,21 +7,20 @@ from ai.backend.common.data.entity.resource_policy import (
     ProjectResourcePolicyEntityType,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
-from ai.backend.manager.models.resource_policy.searchers import (
-    ProjectResourcePolicySearcher,
-)
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchProjectResourcePoliciesAction(
-    SearchGlobalOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+    ScopedSearchOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
-    """Page through the project resource policy catalog."""
+    """Page through the project resource policies the named scopes reach, combined
+    with OR.
 
-    searcher: ProjectResourcePolicySearcher
+    Which projects those are, is the caller's business: the scopes are an argument.
+    """
 
     @override
     @classmethod
@@ -31,8 +30,4 @@ class SearchProjectResourcePoliciesAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_search_project_resource_policies"
-
-    @override
-    def to_searcher(self) -> ProjectResourcePolicySearcher:
-        return self.searcher
+        return "search_project_resource_policies"

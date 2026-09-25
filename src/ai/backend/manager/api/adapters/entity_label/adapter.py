@@ -26,11 +26,8 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.models.clauses import QueryOrder
-from ai.backend.manager.models.entity_label.conditions import (
-    EntityLabelConditions,
-    EntityLabelOrders,
-)
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.entity_label.searchers import EntityLabelSearcher
 from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
 from ai.backend.manager.services.entity_label.actions.purge import PurgeEntityLabelAction
@@ -39,11 +36,8 @@ from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntity
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 
 _LABEL_PAGINATION_SPEC = PaginationSpec(
-    forward_order=EntityLabelOrders.created_at(ascending=False),
-    backward_order=EntityLabelOrders.created_at(ascending=True),
-    forward_condition_factory=EntityLabelConditions.by_cursor_forward,
-    backward_condition_factory=EntityLabelConditions.by_cursor_backward,
-    tiebreaker_order=EntityLabelRow.id.asc(),
+    forward_order=EntityLabelSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=EntityLabelRow.id,
 )
 
 
@@ -121,24 +115,25 @@ class EntityLabelAdapter(BaseAdapter):
         """The entity the request names; a type nothing is wired for is refused here."""
         return RuntimeEntityID(self._entity_types.resolve(target.entity_type), target.entity_id)
 
-    @staticmethod
-    def _convert_orders(orders: list[EntityLabelOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case EntityLabelOrderField.KEY:
-                    result.append(EntityLabelOrders.key(ascending))
-                case EntityLabelOrderField.VALUE:
-                    result.append(EntityLabelOrders.value(ascending))
-                case EntityLabelOrderField.CREATED_AT:
-                    result.append(EntityLabelOrders.created_at(ascending))
-        return result
+    def _convert_orders(self, orders: list[EntityLabelOrder]) -> list[QueryOrder]:
+        return [self._convert_order(order) for order in orders]
+
+    def _convert_order(self, order: EntityLabelOrder) -> QueryOrder:
+        fields = EntityLabelSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case EntityLabelOrderField.KEY:
+                return fields.key.order.apply(ascending)
+            case EntityLabelOrderField.VALUE:
+                return fields.value.order.apply(ascending)
+            case EntityLabelOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
 
     @staticmethod
     def _data_to_node(data: EntityLabelData) -> EntityLabelNode:
         return EntityLabelNode(
             id=data.id,
+            field_id=data.id,
             entity_type=data.entity.entity_type(),
             entity_id=data.entity,
             key=data.key,

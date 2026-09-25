@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
@@ -12,7 +13,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingControllerArgs,
 )
 
-_REASON = "PREEMPTED_BY_SCHEDULER"
+_REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
 
 def _build_controller() -> tuple[SchedulingController, AsyncMock, MagicMock, MagicMock]:

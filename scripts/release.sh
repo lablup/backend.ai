@@ -29,6 +29,14 @@ fi
 TARGET_VERSION=$1
 WEBUI_VERSION=$2
 
+# An alpha is an internal build: the release PR's CI runs the same checks, so the
+# local dependency and BUILD-file checks below are skipped for it.
+if [[ "$TARGET_VERSION" =~ a[0-9]+$ ]]; then
+    IS_ALPHA=true
+else
+    IS_ALPHA=false
+fi
+
 if [ "$#" -eq 1 ]; then
     echo "Preparing release for version ${TARGET_VERSION} (skipping WebUI update)"
     git checkout -b "release/$TARGET_VERSION"
@@ -53,9 +61,10 @@ fi
 echo $TARGET_VERSION > VERSION
 
 # Freeze NEXT_RELEASE_VERSION references to the actual version string.
-# Skip for pre-release versions (PEP 440: rc, a, b, dev, post) so the
-# placeholder survives until the eventual stable release is cut.
-if [[ "$TARGET_VERSION" =~ (rc|a|b|dev|post)[0-9]+ ]]; then
+# Skip for pre-release versions (PEP 440: rc, a, b, dev) so the placeholder
+# survives until the eventual stable release is cut. A `post` re-release is a
+# final release, so it freezes.
+if [[ "$TARGET_VERSION" =~ (rc|a|b|dev)[0-9]+ ]]; then
     echo "Skipping NEXT_RELEASE_VERSION freeze for pre-release version ${TARGET_VERSION}"
 else
     echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
@@ -82,8 +91,12 @@ python3 scripts/run-towncrier.py "${TARGET_VERSION}"
 .github/scripts/update-maintained-versions.sh "${TARGET_VERSION}" "${LTS_ARG[@]}"
 
 # Check dependencies
-pants tailor --check update-build-files --check '::'
-pants check ::
+if [ "$IS_ALPHA" = "true" ]; then
+    echo "Skipping the dependency and BUILD-file checks for alpha version ${TARGET_VERSION}"
+else
+    pants tailor --check update-build-files --check '::'
+    pants check ::
+fi
 
 git add -A
 git commit -m "release: $TARGET_VERSION"

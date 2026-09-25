@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -34,7 +35,7 @@ class TerminatingSessionData:
     access_key: AccessKey
     creation_id: str
     status: SessionStatus
-    status_info: str
+    status_info: KernelLifecycleEventReason
     session_type: SessionTypes
     kernels: list[TerminatingKernelData]
 

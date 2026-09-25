@@ -15,16 +15,25 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    GlobalEntityType,
+    RuntimeEntityID,
+)
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
+from ai.backend.manager.errors.role_preset import RolePresetScopeNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -51,6 +60,7 @@ class RolePresetWriteOps(PermissionWriteOps):
     _scope_rows: ClassVar[Mapping[EntityType, type[ScopeSource]]] = {
         ContainerRegistryEntityType(): ContainerRegistryRow,
         DomainEntityType(): DomainRow,
+        GlobalEntityType(): GlobalEntityRow,
         ProjectEntityType(): ProjectRow,
         ResourceGroupEntityType(): ResourceGroupRow,
         UserEntityType(): UserRow,
@@ -75,10 +85,17 @@ class RolePresetWriteOps(PermissionWriteOps):
                 preset, scope_type, granted, dict(roles[start : start + _SYNC_CHUNK_SIZE])
             )
 
-    async def provision_preset_roles(self, creator_preset_ids: Collection[RolePresetID]) -> None:
-        """Give every domain, project and user in the graph the role of each active preset it
-        lacks, grant what each scope assigns on its own, and grant a project's creator still
-        on its roster the project's roles of ``creator_preset_ids``."""
+    async def provision_preset_roles(
+        self,
+        creator_preset_ids: Collection[RolePresetID],
+        preset_scopes: Mapping[RolePresetID, EntityIdentifier],
+    ) -> None:
+        """Point each preset of ``preset_scopes`` at its scope, give every scope in the graph
+        the role of each active preset it lacks, grant what each scope assigns on its own,
+        and grant a project's creator still on its roster the project's roles of
+        ``creator_preset_ids``."""
+        await self._set_preset_scopes(preset_scopes)
+        await self._ensure_preset_scopes_exist()
         values: dict[EntityIdentifier, ScopeTemplateValue] = {}
         for scope_type, scopes in (await self._graph_scopes()).items():
             values.update(await self._scope_template_values(scope_type, scopes))
@@ -88,21 +105,74 @@ class RolePresetWriteOps(PermissionWriteOps):
             for spec in await self._preset_role_specs(values)
             if (str(spec.role_preset_id), str(spec.entity)) not in held
         ])
+        public_id = global_entity_id(GlobalEntityName.PUBLIC)
         for user_id, domain_id in await self._users_by_domain():
-            await self._grant_auto_assign_roles([user_id, domain_id], user_id)
+            await self._grant_auto_assign_roles([user_id, domain_id, public_id], user_id)
         roster = await self._project_roster()
         for user_id, project_id in roster:
             await self._grant_auto_assign_roles([project_id], user_id)
         await self._grant_creator_roles(roster, creator_preset_ids)
 
+    async def _set_preset_scopes(
+        self, preset_scopes: Mapping[RolePresetID, EntityIdentifier]
+    ) -> None:
+        if not preset_scopes:
+            return
+        presets = RolePresetRow.__table__
+        await self._sess.execute(
+            sa.update(presets)
+            .where(
+                presets.c.id == sa.bindparam("b_preset_id"),
+                presets.c.scope_type == sa.bindparam("b_scope_type"),
+            )
+            .values(scope_id=sa.bindparam("b_scope_id")),
+            [
+                {
+                    "b_preset_id": preset_id,
+                    "b_scope_type": str(scope.entity_type()),
+                    "b_scope_id": scope,
+                }
+                for preset_id, scope in preset_scopes.items()
+            ],
+        )
+
+    async def _ensure_preset_scopes_exist(self) -> None:
+        """Refuse an active preset whose scope has no virtual entity."""
+        missing = (
+            await self._sess.execute(
+                sa.select(RolePresetRow.name, RolePresetRow.scope_type, RolePresetRow.scope_id)
+                .outerjoin(
+                    VirtualEntityRow,
+                    sa.and_(
+                        VirtualEntityRow.entity_type == RolePresetRow.scope_type,
+                        VirtualEntityRow.entity_id == RolePresetRow.scope_id,
+                    ),
+                )
+                .where(
+                    RolePresetRow.scope_id.is_not(None),
+                    RolePresetRow.deleted.is_(False),
+                    VirtualEntityRow.id.is_(None),
+                )
+            )
+        ).all()
+        if missing:
+            raise RolePresetScopeNotFound(
+                "No virtual entity exists for the scope of "
+                + ", ".join(
+                    f"{name} ({scope_type} {scope_id})" for name, scope_type, scope_id in missing
+                )
+            )
+
     async def _graph_scopes(self) -> dict[EntityType, list[EntityIdentifier]]:
-        """The domains, projects and users that have a virtual entity, by type."""
+        """The domains, projects, users and global entities that have a virtual entity, by
+        type."""
         rows = await self._sess.execute(
             sa.select(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).where(
                 VirtualEntityRow.entity_type.in_([
                     DomainEntityType(),
                     ProjectEntityType(),
                     UserEntityType(),
+                    GlobalEntityType(),
                 ])
             )
         )

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
+from typing import assert_never
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainName
@@ -10,7 +12,6 @@ from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
@@ -43,10 +44,15 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     UpdateResourceSlotTypePayload,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AgentResourceOrderField,
     NumberFormatInfo,
     NumberFormatInput,
+    OrderDirection,
+    ResourceAllocationOrderField,
+    ResourceSlotTypeOrderField,
 )
 from ai.backend.common.types import AgentId
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
@@ -54,31 +60,29 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot.conditions import (
-    AgentResourceConditions,
-    ResourceAllocationConditions,
-    ResourceSlotTypeConditions,
-)
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
-from ai.backend.manager.models.resource_slot.orders import (
-    AGENT_RESOURCE_DEFAULT_FORWARD_ORDER,
-    AGENT_RESOURCE_TIEBREAKER_ORDER,
-    RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER,
-    RESOURCE_ALLOCATION_TIEBREAKER_ORDER,
-    SLOT_TYPE_DEFAULT_FORWARD_ORDER,
-    SLOT_TYPE_TIEBREAKER_ORDER,
-    resolve_agent_resource_order,
-    resolve_resource_allocation_order,
-    resolve_slot_type_order,
-)
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
+from ai.backend.manager.models.resource_slot.row import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.resource_slot.scopes import PublicResourceSlotTypeTarget
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+    ResourceAllocationSearchableFields,
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.searchers import (
     AgentResourceSearcher,
+    ResourceAllocationSearcher,
     ResourceSlotTypeSearcher,
+    UnrankedAgentResourceSearcher,
 )
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
 from ai.backend.manager.services.agent.actions.scoped_search_resources import (
@@ -108,20 +112,42 @@ from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner impor
     LookupKernelOwnerAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
+    ScopedSearchResourceSlotTypesAction,
+)
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
     GlobalSearchAgentResourcesAction,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_allocations import (
     GlobalSearchResourceAllocationsAction,
 )
-from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
-    SearchResourceSlotTypesAction,
-)
 from ai.backend.manager.services.resource_slot.actions.update import UpdateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.types import OptionalState
 
-DEFAULT_PAGINATION_LIMIT = 10
+
+@lru_cache(maxsize=1)
+def _get_slot_type_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ResourceSlotTypeSearchableFields.own.slot_name.order.apply(ascending=True),
+        cursor_column=ResourceSlotTypeRow.uuid,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_agent_resource_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AgentResourceSearchableFields.own.slot_name.order.apply(ascending=True),
+        cursor_column=AgentResourceRow.id,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_resource_allocation_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ResourceAllocationSearchableFields.own.slot_name.order.apply(ascending=True),
+        cursor_column=ResourceAllocationRow.id,
+    )
 
 
 class ResourceSlotAdapter(BaseAdapter):
@@ -159,8 +185,12 @@ class ResourceSlotAdapter(BaseAdapter):
         """
         searcher = self._build_slot_type_searcher(input)
 
-        action_result = await self._resource_slot.public_search_resource_slot_types.run(
-            SearchResourceSlotTypesAction(searcher=searcher)
+        action_result = await self._resource_slot.scoped_search_resource_slot_types.run(
+            ScopedSearchResourceSlotTypesAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicResourceSlotTypeTarget()], used_by=(), searcher=searcher
+                )
+            )
         )
 
         return AdminSearchResourceSlotTypesPayload(
@@ -175,45 +205,37 @@ class ResourceSlotAdapter(BaseAdapter):
     ) -> ResourceSlotTypeSearcher:
         """Build a Searcher for resource slot type search."""
         conditions = self._convert_slot_type_filter(input.filter) if input.filter else []
-        orders = (
-            self._convert_slot_type_orders(input.order)
-            if input.order
-            else [SLOT_TYPE_DEFAULT_FORWARD_ORDER]
+        orders = self._convert_slot_type_orders(input.order) if input.order else []
+        return self._build_searcher(
+            ResourceSlotTypeSearcher,
+            pagination_spec=_get_slot_type_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        orders.append(SLOT_TYPE_TIEBREAKER_ORDER)
-        pagination = self._build_slot_type_pagination(input)
-        return ResourceSlotTypeSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.slot_name is not None:
-            condition = self._convert_slot_name_filter_for_slot_type(filter.slot_name)
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
+        fields = ResourceSlotTypeSearchableFields.own
+        return self.apply_string_filter(filter.slot_name, fields.slot_name.filter)
 
-    def _convert_slot_name_filter_for_slot_type(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ResourceSlotTypeConditions.by_slot_name_contains,
-            equals_factory=ResourceSlotTypeConditions.by_slot_name_equals,
-            starts_with_factory=ResourceSlotTypeConditions.by_slot_name_starts_with,
-            ends_with_factory=ResourceSlotTypeConditions.by_slot_name_ends_with,
-            in_factory=ResourceSlotTypeConditions.by_slot_name_in,
-        )
-
-    @staticmethod
-    def _convert_slot_type_orders(orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
-        return [resolve_slot_type_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_slot_type_pagination(
-        input: AdminSearchResourceSlotTypesInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
+    def _convert_slot_type_orders(self, orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
+        fields = ResourceSlotTypeSearchableFields.own
+        result: list[QueryOrder] = []
+        for order in orders:
+            ascending = order.direction == OrderDirection.ASC
+            match order.field:
+                case ResourceSlotTypeOrderField.SLOT_NAME:
+                    result.append(fields.slot_name.order.apply(ascending))
+                case ResourceSlotTypeOrderField.RANK:
+                    result.append(fields.rank.order.apply(ascending))
+                case ResourceSlotTypeOrderField.DISPLAY_NAME:
+                    result.append(fields.display_name.order.apply(ascending))
+        return result
 
     # -------------------------------------------------------------------------
     # ResourceSlotType write (superadmin only)
@@ -246,7 +268,7 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: UpdateResourceSlotTypeInput
     ) -> UpdateResourceSlotTypePayload:
         """Update the display and scheduling flags of a resource slot type."""
-        target = await self._resource_slot.public_lookup_resource_slot_type.run(
+        target = await self._resource_slot.lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=input.slot_name)
         )
         updater = ResourceSlotTypeUpdater(
@@ -275,7 +297,7 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: PurgeResourceSlotTypeInput
     ) -> PurgeResourceSlotTypePayload:
         """Remove a resource slot type, refusing while anything still references it."""
-        target = await self._resource_slot.public_lookup_resource_slot_type.run(
+        target = await self._resource_slot.lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=input.slot_name)
         )
         action_result = await self._resource_slot.purge_resource_slot_type.run(
@@ -298,6 +320,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """Convert ResourceSlotTypeData to Pydantic DTO node."""
         return ResourceSlotTypeNode(
             id=data.slot_name,
+            entity_id=data.entity_id(),
             uuid=data.uuid,
             slot_name=data.slot_name,
             slot_type=data.slot_type,
@@ -333,7 +356,16 @@ class ResourceSlotAdapter(BaseAdapter):
         querier = self._build_agent_resource_querier(input)
 
         action_result = await self._resource_slot.search_agent_resources.run(
-            GlobalSearchAgentResourcesAction(querier=querier)
+            GlobalSearchAgentResourcesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=UnrankedAgentResourceSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         return AdminSearchAgentResourcesPayload(
@@ -372,67 +404,51 @@ class ResourceSlotAdapter(BaseAdapter):
     def _build_agent_resource_querier(self, input: AdminSearchAgentResourcesInput) -> BatchQuerier:
         """Build a BatchQuerier for agent resource search."""
         conditions = self._convert_agent_resource_filter(input.filter) if input.filter else []
-        orders = (
-            self._convert_agent_resource_orders(input.order)
-            if input.order
-            else [AGENT_RESOURCE_DEFAULT_FORWARD_ORDER]
+        orders = self._convert_agent_resource_orders(input.order) if input.order else []
+        return self._build_querier(
+            pagination_spec=_get_agent_resource_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        orders.append(AGENT_RESOURCE_TIEBREAKER_ORDER)
-        pagination = self._build_agent_resource_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_agent_resource_filter(self, filter: AgentResourceFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.slot_name is not None:
-            condition = self._convert_slot_name_filter_for_agent_resource(filter.slot_name)
-            if condition is not None:
-                conditions.append(condition)
-        if filter.agent_id is not None:
-            condition = self._convert_agent_id_filter(filter.agent_id)
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
-
-    def _convert_slot_name_filter_for_agent_resource(
-        self, sf: StringFilter
-    ) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=AgentResourceConditions.by_slot_name_contains,
-            equals_factory=AgentResourceConditions.by_slot_name_equals,
-            starts_with_factory=AgentResourceConditions.by_slot_name_starts_with,
-            ends_with_factory=AgentResourceConditions.by_slot_name_ends_with,
-            in_factory=AgentResourceConditions.by_slot_name_in,
-        )
-
-    def _convert_agent_id_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=AgentResourceConditions.by_agent_id_contains,
-            equals_factory=AgentResourceConditions.by_agent_id_equals,
-            starts_with_factory=AgentResourceConditions.by_agent_id_starts_with,
-            ends_with_factory=AgentResourceConditions.by_agent_id_ends_with,
-            in_factory=AgentResourceConditions.by_agent_id_in,
-        )
+        fields = AgentResourceSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_string_filter(filter.agent_id, fields.agent_id.filter),
+        ]
 
     @staticmethod
     def _convert_agent_resource_orders(orders: list[AgentResourceOrder]) -> list[QueryOrder]:
-        return [resolve_agent_resource_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_agent_resource_pagination(
-        input: AdminSearchAgentResourcesInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
+        fields = AgentResourceSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AgentResourceOrderField.AGENT_ID:
+                    converted.append(fields.agent_id.order.apply(ascending))
+                case AgentResourceOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case AgentResourceOrderField.CAPACITY:
+                    converted.append(fields.capacity.order.apply(ascending))
+                case AgentResourceOrderField.USED:
+                    converted.append(fields.used.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return converted
 
     @staticmethod
     def _agent_resource_data_to_node(data: AgentResourceData) -> AgentResourceNode:
         """Convert AgentResourceData to Pydantic DTO node."""
         return AgentResourceNode(
             id=f"{data.agent_id}:{data.slot_name}",
+            field_id=data.id,
             agent_id=data.agent_id,
             slot_name=data.slot_name,
             capacity=str(data.capacity),
@@ -458,7 +474,16 @@ class ResourceSlotAdapter(BaseAdapter):
         querier = self._build_resource_allocation_querier(input)
 
         action_result = await self._resource_slot.search_resource_allocations.run(
-            GlobalSearchResourceAllocationsAction(querier=querier)
+            GlobalSearchResourceAllocationsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourceAllocationSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         return AdminSearchResourceAllocationsPayload(
@@ -473,66 +498,55 @@ class ResourceSlotAdapter(BaseAdapter):
     ) -> BatchQuerier:
         """Build a BatchQuerier for resource allocation search."""
         conditions = self._convert_resource_allocation_filter(input.filter) if input.filter else []
-        orders = (
-            self._convert_resource_allocation_orders(input.order)
-            if input.order
-            else [RESOURCE_ALLOCATION_DEFAULT_FORWARD_ORDER]
+        orders = self._convert_resource_allocation_orders(input.order) if input.order else []
+        return self._build_querier(
+            pagination_spec=_get_resource_allocation_pagination_spec(),
+            conditions=conditions,
+            orders=orders,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        orders.append(RESOURCE_ALLOCATION_TIEBREAKER_ORDER)
-        pagination = self._build_resource_allocation_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_resource_allocation_filter(
         self, filter: ResourceAllocationFilter
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter.slot_name is not None:
-            condition = self._convert_slot_name_filter_for_allocation(filter.slot_name)
-            if condition is not None:
-                conditions.append(condition)
-        if filter.kernel_id is not None:
-            condition = self._convert_kernel_id_filter(filter.kernel_id)
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
-
-    def _convert_slot_name_filter_for_allocation(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ResourceAllocationConditions.by_slot_name_contains,
-            equals_factory=ResourceAllocationConditions.by_slot_name_equals,
-            starts_with_factory=ResourceAllocationConditions.by_slot_name_starts_with,
-            ends_with_factory=ResourceAllocationConditions.by_slot_name_ends_with,
-            in_factory=ResourceAllocationConditions.by_slot_name_in,
-        )
-
-    def _convert_kernel_id_filter(self, uf: UUIDFilter) -> QueryCondition | None:
-        return self.convert_uuid_filter(
-            uf,
-            equals_factory=ResourceAllocationConditions.by_kernel_id_filter_equals,
-            in_factory=ResourceAllocationConditions.by_kernel_id_filter_in,
-        )
+        fields = ResourceAllocationSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
+        ]
 
     @staticmethod
     def _convert_resource_allocation_orders(
         orders: list[ResourceAllocationOrder],
     ) -> list[QueryOrder]:
-        return [resolve_resource_allocation_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_resource_allocation_pagination(
-        input: AdminSearchResourceAllocationsInput,
-    ) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
+        fields = ResourceAllocationSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case ResourceAllocationOrderField.KERNEL_ID:
+                    converted.append(fields.kernel_id.order.apply(ascending))
+                case ResourceAllocationOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case ResourceAllocationOrderField.REQUESTED:
+                    converted.append(fields.requested.order.apply(ascending))
+                case ResourceAllocationOrderField.USED:
+                    converted.append(fields.used.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return converted
 
     @staticmethod
     def _resource_allocation_data_to_node(data: ResourceAllocationData) -> ResourceAllocationNode:
         """Convert ResourceAllocationData to Pydantic DTO node."""
         return ResourceAllocationNode(
             id=f"{data.kernel_id}:{data.slot_name}",
+            field_id=data.id,
             kernel_id=str(data.kernel_id),
             slot_name=data.slot_name,
             requested=str(data.requested),
@@ -545,10 +559,10 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
-        resolved = await self._resource_slot.public_lookup_resource_slot_type.run(
+        resolved = await self._resource_slot.lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=slot_name)
         )
-        action_result = await self._resource_slot.public_get_resource_slot_type.run(
+        action_result = await self._resource_slot.get_resource_slot_type.run(
             GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
         return self._slot_type_data_to_node(action_result.data)

@@ -30,15 +30,17 @@ from ai.backend.manager.models.resource_usage_history import (
 )
 from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
+)
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
@@ -243,82 +245,80 @@ class ResourceUsageHistoryDBSource:
 
     async def search_kernel_usage_records(
         self,
-        querier: BatchQuerier,
+        searcher: KernelUsageRecordSearcher,
     ) -> KernelUsageRecordSearchResult:
         """Search kernel usage records with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelUsageRecordRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.KernelUsageRecordRow.to_data() for row in result.rows]
-            return KernelUsageRecordSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return KernelUsageRecordSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Domain Usage Buckets ====================
 
     async def search_domain_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: DomainUsageBucketOperationScope | None = None,
+        searcher: DomainUsageBucketSearcher,
+        scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [row.DomainUsageBucketRow.to_data() for row in result.rows]
-            return DomainUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return DomainUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Project Usage Buckets ====================
 
     async def search_project_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: ProjectUsageBucketOperationScope | None = None,
+        searcher: ProjectUsageBucketSearcher,
+        scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [row.ProjectUsageBucketRow.to_data() for row in result.rows]
-            return ProjectUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return ProjectUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== User Usage Buckets ====================
 
     async def search_user_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: UserUsageBucketOperationScope | None = None,
+        searcher: UserUsageBucketSearcher,
+        scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [row.UserUsageBucketRow.to_data() for row in result.rows]
-            return UserUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return UserUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Aggregation Queries ====================
 

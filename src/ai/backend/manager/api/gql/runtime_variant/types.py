@@ -33,6 +33,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     DeleteRuntimeVariantsPayload as DeleteRuntimeVariantsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    RuntimeVariantBulkFailureInfo as RuntimeVariantBulkFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     RuntimeVariantModelConfigInfo as RuntimeVariantModelConfigInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
@@ -50,6 +53,11 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.runtime_variant.types import (
+    RuntimeVariantUsage,
+    RuntimeVariantUsedBy,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -160,6 +168,12 @@ class RuntimeVariantModelDefinitionGQL(PydanticOutputMixin[RuntimeVariantModelDe
 )
 class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the runtime variant.",
+        ),
+    )
     name: str = gql_field(
         description="Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi')."
     )
@@ -220,6 +234,40 @@ class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
     NOT: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Entities whose use of a runtime variant narrows the read.",
+    ),
+    name="RuntimeVariantUsedBy",
+)
+class RuntimeVariantUsedByGQL(PydanticInputMixin[RuntimeVariantUsedBy]):
+    """The entities whose use of a runtime variant narrows the read."""
+
+    deployment: list[UUID] | None = gql_field(
+        default=None, description="Deployments whose revisions name the runtime variant."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only runtime variants the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+    ),
+    name="RuntimeVariantUsage",
+)
+class RuntimeVariantUsageGQL(PydanticInputMixin[RuntimeVariantUsage]):
+    """The uses that narrow a runtime variant read."""
+
+    used_by: RuntimeVariantUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the runtime variant narrows the read."
     )
 
 
@@ -297,11 +345,36 @@ class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One failed item of a partial-success bulk runtime variant operation.",
+    ),
+    model=RuntimeVariantBulkFailureInfoDTO,
+    name="RuntimeVariantBulkFailureInfo",
+)
+class RuntimeVariantBulkFailureInfoGQL(PydanticOutputMixin[RuntimeVariantBulkFailureInfoDTO]):
+    id: UUID = gql_field(description="Id of the runtime variant the failed item targeted.")
+    message: str = gql_field(description="Reason the item failed.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Payload for bulk runtime variant deletion.",
+        description="Partial-success payload for a bulk runtime variant deletion.",
     ),
     model=DeleteRuntimeVariantsPayloadDTO,
     name="DeleteRuntimeVariantsPayload",
 )
 class DeleteRuntimeVariantsPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantsPayloadDTO]):
+    items: list[UUID] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Ids of successfully deleted runtime variants.",
+        ),
+    )
+    failed: list[RuntimeVariantBulkFailureInfoGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Per-item failures, each naming the runtime variant it targeted.",
+        ),
+    )
     deleted_count: int = gql_field(description="Number of runtime variants successfully deleted.")

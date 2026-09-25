@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchObjectStoragesPayload",
@@ -26,6 +27,9 @@ class ObjectStorageNode(BaseResponseModel):
     """Node model representing an object storage entity."""
 
     id: UUID = Field(description="Object storage ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the object storage. Added in {NEXT_RELEASE_VERSION}.",
+    )
     name: str = Field(description="Object storage name")
     host: str = Field(description="Host address of the object storage")
     access_key: str = Field(description="Access key for authentication")

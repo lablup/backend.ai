@@ -24,7 +24,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     BackendAIError,
@@ -35,11 +35,13 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+    LookupProjectResourcePolicyAction,
+)
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
@@ -144,6 +146,7 @@ from ai.backend.manager.models.resource_group.row import (
     and_names,
 )
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -330,7 +333,6 @@ class GraphQueryContext:
     access_key: str
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
-    services_ctx: ServicesContext
     valkey_stat: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_image: ValkeyImageClient
@@ -1263,6 +1265,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     available_services = PaginatedConnectionField(
         AvailableServiceConnection,
         description="Added in 25.8.0.",
+        deprecation_reason="Deprecated since 26.9.0.",
     )
     service_config = graphene.Field(
         ServiceConfigNode,
@@ -1411,10 +1414,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        id: str,
+        id: ResolvedGlobalID,
         permission: DomainPermission,
     ) -> DomainNode | None:
-        return await DomainNode.get_node(info, id, permission)
+        _, domain_name = id
+        return await DomainNode.get_node_by_name(info, domain_name, permission)
 
     @staticmethod
     async def resolve_domain_nodes(
@@ -1590,8 +1594,6 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         type: list[str] | None = None,
     ) -> Group:
-        if type is None:
-            type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1621,16 +1623,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 domain_name=client_domain,
             )
             group = cast(Group, await loader.load(id))
-            loader = ctx.dataloader_manager.get_loader(
-                ctx,
-                "Group.by_user",
-            )
-            client_groups = [
-                group
-                for group in cast(Sequence[Group], await loader.load(client_user_id))
-                if group.type in type
-            ]
-            if group.id not in (g.id for g in client_groups):
+            async with ctx.db.begin_readonly_session() as db_session:
+                is_member = await db_session.scalar(
+                    sa.select(user_scope_membership_exists(ProjectEntityType(), id, client_user_id))
+                )
+            if not is_member:
                 raise InsufficientPrivilege
         else:
             raise InvalidAPIParameters("Unknown client role")
@@ -2221,6 +2218,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         name: str,
     ) -> ProjectResourcePolicy:
         ctx: GraphQueryContext = info.context
+        # Same rule as the keypair and user policies: the resolved policy answers for
+        # the read.
+        await ctx.processors.project_resource_policy.lookup.run(
+            LookupProjectResourcePolicyAction(name=name)
+        )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "ProjectResourcePolicy.by_name",
@@ -3187,6 +3189,22 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> AuditLogSchema:
         return AvailableServiceNode()
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_available_services(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[AvailableServiceNode]:
+        return AvailableServiceNode.get_connection()
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

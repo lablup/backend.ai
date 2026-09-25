@@ -114,7 +114,6 @@ from ai.backend.manager.models.specs.updater import (
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
-    GlobalEntityUpserter,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
@@ -547,39 +546,6 @@ class _PresetFieldPurger(FieldPurger[RolePresetRow, _PresetFieldData]):
 
 
 @dataclass
-class _PresetGlobalUpserter(GlobalEntityUpserter[RolePresetRow, _PresetData]):
-    target: uuid.UUID
-
-    @override
-    def entity_id(self, row: RolePresetRow) -> RolePresetID:
-        return RolePresetID(row.id)
-
-    @override
-    def row_class(self) -> type[RolePresetRow]:
-        return RolePresetRow
-
-    @override
-    def index_elements(self) -> list[str]:
-        return ["id"]
-
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def build_insert_values(self) -> dict[str, Any]:
-        return {"id": self.target, "name": "default"}
-
-    @override
-    def build_update_values(self) -> dict[str, Any]:
-        return {"name": "default"}
-
-    @override
-    def to_data(self, row: RolePresetRow) -> _PresetData:
-        return _PresetData(id=row.id, name=row.name)
-
-
-@dataclass
 class _PresetFieldUpserter(FieldUpserter[_EntityID, RolePresetRow, _PresetFieldData]):
     target: uuid.UUID
 
@@ -940,10 +906,10 @@ class _BulkCreateAction(BaseScopeAction, EntityAtomicCreateOpsAction[RolePresetR
 class _GlobalUpsertAction(
     BaseGlobalAction, GlobalEntityUpsertOpsAction[RolePresetRow, _PresetData]
 ):
-    upserter: _PresetGlobalUpserter
+    upserter: _PresetUpserter
 
     @override
-    def to_upserter(self) -> GlobalEntityUpserter[RolePresetRow, _PresetData]:
+    def to_upserter(self) -> EntityUpserter[RolePresetRow, _PresetData]:
         return self.upserter
 
     @classmethod
@@ -1344,7 +1310,6 @@ def repository(stored: _PresetData) -> MagicMock:
         "create_role_managed_entity",
         "create_role_managed_global_entity",
         "upsert_field_entity",
-        "upsert_global_entity",
         "update",
         "upsert_entity",
         "upsert_role_managed_entity",
@@ -1622,12 +1587,12 @@ async def test_global_upsert_forwards_the_action_s_upserter(
     repository: MagicMock, stored: _PresetData
 ) -> None:
     service: GlobalUpsertService[_PresetData] = GlobalUpsertService(repository)
-    upserter = _PresetGlobalUpserter(target=stored.id)
+    upserter = _PresetUpserter(target=stored.id)
 
     result = await service.execute(_GlobalUpsertAction(upserter=upserter))
 
     assert result.data == stored
-    repository.upsert_global_entity.assert_awaited_once_with(upserter)
+    repository.upsert_entity.assert_awaited_once_with(upserter)
 
 
 async def test_global_atomic_create_forwards_every_creator(

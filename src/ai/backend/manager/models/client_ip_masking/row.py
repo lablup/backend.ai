@@ -10,7 +10,6 @@ from ai.backend.manager.data.client_ip.masking import (
     ClientIPMaskingMode,
     ClientIPMaskingTarget,
 )
-from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -53,14 +52,3 @@ class ClientIPMaskingPolicyRow(LifecycleTimestampsMixin, Base):
     # How much of the address ``truncate`` leaves. NULL takes the built-in width.
     ipv4_prefix: Mapped[int | None] = mapped_column("ipv4_prefix", sa.SmallInteger, nullable=True)
     ipv6_prefix: Mapped[int | None] = mapped_column("ipv6_prefix", sa.SmallInteger, nullable=True)
-
-    def to_data(self) -> ClientIPMaskingPolicyData:
-        return ClientIPMaskingPolicyData(
-            id=self.id,
-            target_type=self.target_type,
-            mode=self.mode,
-            ipv4_prefix=self.ipv4_prefix,
-            ipv6_prefix=self.ipv6_prefix,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

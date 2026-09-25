@@ -53,6 +53,9 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.routing import RoutingRow
@@ -77,7 +80,7 @@ from ai.backend.testutils.db import with_tables
 
 @pytest.fixture
 async def db_with_referencing_tables(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     """Every table the purger's conflict checks read, plus their FK parents.
 
@@ -85,7 +88,7 @@ async def db_with_referencing_tables(
     tables, so each of them has to exist even when only one carries a row.
     """
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -126,7 +129,7 @@ async def db_with_referencing_tables(
             EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -143,7 +146,7 @@ async def existing_slot_type(
         )
         db_sess.add(row)
         await db_sess.flush()
-        return row.to_data()
+        return ResourceSlotTypeSearchableFields.own.to_data(row)
 
 
 def _creator(
@@ -184,7 +187,7 @@ class TestResourceSlotTypeCreator:
             rank=7,
         )
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-            data = await w.create_global_entity(creator)
+            data = await w.create_entity(creator)
 
         assert data.slot_name == "tpu.device"
         assert data.slot_type == "unique"
@@ -201,7 +204,7 @@ class TestResourceSlotTypeCreator:
         for name in ("cpu", "mem"):
             creator = _creator(name, SlotTypes.COUNT)
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-                data = await w.create_global_entity(creator)
+                data = await w.create_entity(creator)
                 uuids.add(data.uuid)
         assert len(uuids) == 2
 
@@ -217,7 +220,7 @@ class TestResourceSlotTypeCreator:
         )
         with pytest.raises(ResourceSlotTypeAlreadyExists):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
-                await w.create_global_entity(creator)
+                await w.create_entity(creator)
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(

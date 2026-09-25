@@ -23,7 +23,10 @@ from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -51,10 +54,11 @@ from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
@@ -256,7 +260,7 @@ class SchedulerRepository:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
         message: str = "mark_terminating success",
@@ -277,7 +281,7 @@ class SchedulerRepository:
         self,
         session_ids: list[SessionId],
         to_status: SessionStatus,
-        reason: str,
+        reason: KernelLifecycleEventReason,
     ) -> list[SessionId]:
         """
         Move sessions to ``to_status``, skipping the sessions whose current
@@ -837,21 +841,13 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def search_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: KernelSearcher,
     ) -> KernelListResult:
         """Search kernels for kernel handler execution.
 
         This method is used by KernelLifecycleHandler implementations.
-        The coordinator calls this to query kernels using BatchQuerier.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use KernelConditions for filtering by status, scaling_group, etc.
-
-        Returns:
-            KernelListResult containing KernelInfo objects with pagination info.
         """
-        return await self._db_source.search_kernels_for_handler(querier)
+        return await self._db_source.search_kernels_for_handler(searcher)
 
     @scheduler_repository_resilience.apply()
     async def update_with_history(
@@ -881,7 +877,7 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsSearchResult:
         """Search sessions with kernel data and image configs.
 
@@ -895,12 +891,12 @@ class SchedulerRepository:
         Returns:
             SessionWithKernelsSearchResult with sessions, image_configs, and pagination info
         """
-        return await self._db_source.search_sessions_with_kernels(querier)
+        return await self._db_source.search_sessions_with_kernels(searcher)
 
     @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels_and_user(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsAndUserSearchResult:
         """Search sessions with kernel data, user info, and image configs.
 
@@ -914,12 +910,12 @@ class SchedulerRepository:
         Returns:
             SessionWithKernelsAndUserSearchResult with sessions, image_configs, and pagination info
         """
-        return await self._db_source.search_sessions_with_kernels_and_user(querier)
+        return await self._db_source.search_sessions_with_kernels_and_user(searcher)
 
     @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionWithKernels]:
         """Search sessions with their kernels using SessionInfo/KernelInfo for handlers.
 
@@ -933,28 +929,18 @@ class SchedulerRepository:
         Returns:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
         """
-        return await self._db_source.search_sessions_with_kernels_for_handler(querier)
+        return await self._db_source.search_sessions_with_kernels_for_handler(searcher)
 
     @scheduler_repository_resilience.apply()
     async def search_sessions_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionInfo]:
         """Search sessions without kernel data for handlers.
 
-        This method returns only session data without loading kernels,
-        optimized for handlers that don't need kernel information.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Conditions should target SessionRow columns.
-                     Use kernel EXISTS subquery conditions for filtering
-                     (e.g., SessionConditions.all_kernels_in_statuses).
-
-        Returns:
-            List of SessionInfo objects.
+        Kernel conditions ride as EXISTS subqueries, so no kernel row is loaded.
         """
-        return await self._db_source.search_sessions_for_handler(querier)
+        return await self._db_source.search_sessions_for_handler(searcher)
 
     @scheduler_repository_resilience.apply()
     async def get_last_session_histories(

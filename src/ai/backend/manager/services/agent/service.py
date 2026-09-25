@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
 from typing import Any, Literal, cast
 from uuid import UUID
 
@@ -11,6 +10,7 @@ from async_timeout import timeout as _timeout
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import (
     AgentWatcherResponseError,
     ErrorCode,
@@ -53,10 +53,6 @@ from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
 )
-from ai.backend.manager.services.agent.actions.search_agents import (
-    SearchAgentsAction,
-    SearchAgentsActionResult,
-)
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -81,8 +77,6 @@ from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPol
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_RESOURCE_GROUP_CHANGED_REASON = "AGENT_RESOURCE_GROUP_CHANGED"
 
 
 class AgentService:
@@ -171,7 +165,7 @@ class AgentService:
             # container cleanup proceeds asynchronously in the next schedule cycle.
             mark_result = await self._scheduling_controller.mark_sessions_for_termination(
                 conflicting_session_ids,
-                reason=_RESOURCE_GROUP_CHANGED_REASON,
+                reason=KernelLifecycleEventReason.AGENT_RESOURCE_GROUP_CHANGED,
                 forced=False,
             )
             terminating_session_ids = mark_result.terminating_sessions
@@ -289,23 +283,6 @@ class AgentService:
                 )
                 for uuid in action.agent_uuids
             ]
-        )
-
-    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
-        """Searches agents, with what the caller holds on each."""
-        result = await self._agent_repository.search_agents(
-            querier=action.querier,
-        )
-        permissions = await self._permissions_on([item.agent.uuid for item in result.items])
-
-        return SearchAgentsActionResult(
-            agents=[
-                replace(item, permissions=permissions.get(item.agent.uuid, []))
-                for item in result.items
-            ],
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def bulk_load_container_counts(

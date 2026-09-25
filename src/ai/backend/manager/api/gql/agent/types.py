@@ -32,6 +32,8 @@ from ai.backend.common.dto.manager.v2.agent.response import (
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusEnum,
     AgentStatusFilter,
+    AgentUsage,
+    AgentUsedBy,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
@@ -140,6 +142,40 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities whose use of an agent narrows the read.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AgentUsedBy",
+)
+class AgentUsedByGQL(PydanticInputMixin[AgentUsedBy]):
+    """The entities whose use of an agent narrows the read."""
+
+    session: list[UUID] | None = gql_field(
+        default=None, description="Sessions running a kernel on the agent."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing an agent query; every id is AND-ed. The caller must be able to "
+            "read each listed entity, or the request is refused. Only agents the caller can "
+            "read are returned, even when a listed entity is tied to others."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AgentUsage",
+)
+class AgentUsageGQL(PydanticInputMixin[AgentUsage]):
+    """The uses that narrow an agent read."""
+
+    used_by: AgentUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the agent narrows the read."
+    )
 
 
 @gql_pydantic_input(
@@ -361,6 +397,12 @@ class AgentNetworkInfoGQL:
 )
 class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the agent.",
+        ),
+    )
     uuid: UUID = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
@@ -368,7 +410,10 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
                 "Agent UUID. The agent's primary key is its name, so rows keyed on the "
                 "agent carry this instead."
             ),
-        )
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="entityId",
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use entityId.",
     )
     resource_info: AgentResourceGQL = gql_field(
         description="Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources."
@@ -656,11 +701,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             slot_name = item.slot_name
             node = AgentResourceSlotGQL(
                 id=_strawberry.ID(item.id),
+                field_id=item.field_id,
                 slot_name=slot_name,
                 capacity=Decimal(item.capacity),
                 used=Decimal(item.used),
             )
-            cursor = encode_cursor(slot_name)
+            cursor = encode_cursor(item.field_id)
             edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
 
         return AgentResourceConnectionGQL(

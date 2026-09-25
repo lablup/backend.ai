@@ -41,8 +41,11 @@ class ContainerMetricQuerier(MetricQuerier):
         """Return the labels for the container metric query."""
         result: dict[str, LabelMatcher] = {
             "container_metric_name": LabelMatcher.exact(self.metric_name),
-            "value_type": LabelMatcher.exact(self.value_type),
         }
+        # pct is a ratio of the current and capacity series, so the template pins
+        # value_type on each side itself instead of taking it from the labels.
+        if self.value_type is not ValueType.PCT:
+            result["value_type"] = LabelMatcher.exact(self.value_type)
         if self.kernel_id is not None:
             result["kernel_id"] = LabelMatcher.exact(str(self.kernel_id))
         if self.session_id is not None:
@@ -58,9 +61,12 @@ class ContainerMetricQuerier(MetricQuerier):
     def group_by_labels(self) -> frozenset[str]:
         """Return the labels to group by in the query.
 
-        Returns labels that are set (not None), plus 'value_type' which is always included.
+        Returns labels that are set (not None), plus 'value_type' unless the query
+        derives pct from the current and capacity series.
         """
-        result: set[str] = {"value_type"}
+        result: set[str] = set()
+        if self.value_type is not ValueType.PCT:
+            result.add("value_type")
 
         if self.agent_id is not None:
             result.add("agent_id")

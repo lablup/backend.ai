@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     VFolderFilter,
 )
 from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -26,6 +27,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
     VFolderUsageData,
 )
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageActionResult,
@@ -66,10 +68,6 @@ class TestVFolderAdapterMySearch:
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
             default_mount_permission=VFolderMountPolicy.READ_WRITE,
-            max_files=0,
-            max_size=None,
-            num_files=0,
-            cur_size=0,
             creator="test@example.com",
             creator_id=uuid4(),
             unmanaged_path=None,
@@ -119,7 +117,7 @@ class TestVFolderAdapterMySearch:
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.items] == [user_data.user_id]
+        assert [item.scope_id() for item in action.searcher.scopes] == [user_data.user_id]
 
     async def test_my_search_returns_payload(
         self,
@@ -159,10 +157,6 @@ class TestVFolderAdapterProjectSearch:
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
             usage_mode=VFolderUsageMode.GENERAL,
             default_mount_permission=VFolderMountPolicy.READ_WRITE,
-            max_files=0,
-            max_size=None,
-            num_files=0,
-            cur_size=0,
             creator="test@example.com",
             creator_id=uuid4(),
             unmanaged_path=None,
@@ -212,7 +206,7 @@ class TestVFolderAdapterProjectSearch:
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.items] == [ProjectID(project_id)]
+        assert [item.scope_id() for item in action.searcher.scopes] == [ProjectID(project_id)]
 
     async def test_project_search_returns_payload(
         self,
@@ -321,3 +315,82 @@ class TestVFolderAdapterGetFolderUsage:
         dto = await adapter.get_folder_usage(uuid4())
 
         assert dto is None
+
+
+class TestVFolderAdapterBatchLoadByIds:
+    """Tests for VFolderAdapter.batch_load_by_ids()."""
+
+    @pytest.fixture
+    def readable(self) -> VFolderData:
+        return VFolderData(
+            id=VFolderUUID(uuid4()),
+            name="readable-vfolder",
+            host="local:volume1",
+            quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
+            usage_mode=VFolderUsageMode.GENERAL,
+            default_mount_permission=VFolderMountPolicy.READ_WRITE,
+            creator="test@example.com",
+            creator_id=uuid4(),
+            unmanaged_path=None,
+            ownership_type=VFolderOwnershipType.USER,
+            user=uuid4(),
+            group=None,
+            cloneable=False,
+            status=VFolderOperationStatus.READY,
+            created_at=datetime.now(tz=UTC),
+            last_used=None,
+            updated_at=datetime.now(tz=UTC),
+            domain_name="default",
+        )
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this vfolder")
+
+    @pytest.fixture
+    def mock_processors(self, readable: VFolderData, denial: GenericForbidden) -> MagicMock:
+        processors = MagicMock()
+        processors.vfolder.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[VFolderData].succeeded(readable.id, readable),
+                    PartialBulkEntityResult[VFolderData].denied(VFolderUUID(uuid4()), denial),
+                    PartialBulkEntityResult[VFolderData].nothing(VFolderUUID(uuid4())),
+                ]
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
+        return VFolderAdapter(
+            mock_processors.vfolder,
+            mock_processors.vfolder_file,
+            mock_processors.vfolder_admin,
+            mock_processors.deployment,
+            mock_processors.vfolder_mount_policy,
+        )
+
+    async def test_answers_per_id(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        readable: VFolderData,
+        denial: GenericForbidden,
+    ) -> None:
+        ids = [readable.id, VFolderUUID(uuid4()), VFolderUUID(uuid4())]
+
+        node, refused, missing = await adapter.batch_load_by_ids(ids)
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable.id
+        assert refused is denial
+        assert missing is None
+        action = mock_processors.vfolder.bulk_get.run.await_args.args[0]
+        assert list(action.ids) == ids
+
+    async def test_no_ids_read_nothing(
+        self, adapter: VFolderAdapter, mock_processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_load_by_ids([]) == []
+        mock_processors.vfolder.bulk_get.run.assert_not_awaited()

@@ -87,8 +87,8 @@ class VFSStorageProcessors:
         self.get = group.single_get_ops(GetVFSStorageAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetVFSStoragesAction)
         self.lookup = group.lookup_ops(LookupVFSStorageAction)
-        self.global_list_storages = group.global_search_ops(ListVFSStorageAction)
-        self.global_search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
+        self.global_list_storages = group.global_searcher_ops(ListVFSStorageAction)
+        self.global_search_vfs_storages = group.global_searcher_ops(SearchVFSStoragesAction)
         self.global_get_quota_scope = group.global_scope(
             GetQuotaScopeAction, service.get_quota_scope
         )

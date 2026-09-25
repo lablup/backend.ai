@@ -17,6 +17,7 @@ from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -41,6 +42,6 @@ def test_to_route_info_carries_replica_group_id() -> None:
         replica_group_id=replica_group_id,
     )
 
-    info = row.to_route_info()
+    info = ReplicaSearchableFields.own.to_route_info(row)
 
     assert info.replica_group_id == replica_group_id

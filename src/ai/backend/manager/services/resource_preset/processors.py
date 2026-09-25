@@ -1,11 +1,14 @@
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import EntityOpsResult, LookupOpsResult
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
@@ -32,7 +35,10 @@ from ai.backend.manager.services.resource_preset.actions.lookup import (
 )
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
-    SearchResourcePresetsV2ActionResult,
+)
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
+    SetResourcePresetResourceGroupActionResult,
 )
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
@@ -49,30 +55,34 @@ class ResourcePresetProcessors:
     update_preset: SingleEntityActionProcessor[
         UpdateResourcePresetAction, UpdateResourcePresetActionResult
     ]
+    set_preset_resource_group: MembershipActionProcessor[
+        SetResourcePresetResourceGroupAction, SetResourcePresetResourceGroupActionResult
+    ]
     delete_preset: SingleEntityActionProcessor[
         DeleteResourcePresetAction, DeleteResourcePresetActionResult
     ]
     get_preset: SingleEntityActionProcessor[
         GetResourcePresetAction, EntityOpsResult[ResourcePresetData]
     ]
-    list_presets: PublicActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
-    check_presets: PublicActionProcessor[
+    list_presets: ScopeActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
+    check_presets: ScopeActionProcessor[
         CheckResourcePresetsAction, CheckResourcePresetsActionResult
     ]
     search_presets_v2: GlobalActionProcessor[
-        SearchResourcePresetsV2Action, SearchResourcePresetsV2ActionResult
+        SearchResourcePresetsV2Action, BatchOpsResult[ResourcePresetData]
     ]
 
     def __init__(
         self, group: ProcessorGroup[ResourcePresetData], service: ResourcePresetService
     ) -> None:
-        self.lookup = group.public_lookup_ops(LookupResourcePresetAction)
+        self.lookup = group.lookup_ops(LookupResourcePresetAction)
         self.create_preset = group.global_scope(CreateResourcePresetAction, service.create_preset)
         self.update_preset = group.single_entity(UpdateResourcePresetAction, service.update_preset)
+        self.set_preset_resource_group = group.membership(
+            SetResourcePresetResourceGroupAction, service.set_preset_resource_group
+        )
         self.delete_preset = group.single_entity(DeleteResourcePresetAction, service.delete_preset)
         self.get_preset = group.single_get_ops(GetResourcePresetAction)
-        self.list_presets = group.public(ListResourcePresetsAction, service.list_presets)
-        self.check_presets = group.public(CheckResourcePresetsAction, service.check_presets)
-        self.search_presets_v2 = group.global_scope(
-            SearchResourcePresetsV2Action, service.search_presets_v2
-        )
+        self.list_presets = group.scope(ListResourcePresetsAction, service.list_presets)
+        self.check_presets = group.scope(CheckResourcePresetsAction, service.check_presets)
+        self.search_presets_v2 = group.global_searcher_ops(SearchResourcePresetsV2Action)

@@ -1,6 +1,6 @@
 """
-Tests for VFolderAdminRepository.search_vfolders() functionality.
-Verifies that admin-scoped vfolder search returns ALL vfolders without any scope filtering.
+Tests for the global vfolder search through ``OpsRepository.global_search``.
+Verifies that it returns every vfolder without scope filtering, narrowed only by its uses.
 """
 
 from __future__ import annotations
@@ -11,9 +11,11 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -21,6 +23,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -28,17 +31,28 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
+def _global_searcher(used_by: list[UsedBy]) -> GlobalSearcher[VFolderRow, VFolderData]:
+    return GlobalSearcher(
+        used_by=used_by,
+        searcher=VFolderSearcher(pagination=OffsetPagination(limit=100, offset=0)),
+    )
+
+
 class TestVfolderSearchVfolders:
-    """Tests for VFolderAdminRepository.search_vfolders()"""
+    """Tests for the global vfolder search."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -58,16 +72,17 @@ class TestVfolderSearchVfolders:
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
+                ModelCardRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
-    async def vfolder_admin_repository(
+    async def ops_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> VFolderAdminRepository:
-        return VFolderAdminRepository(db=db_with_cleanup)
+    ) -> OpsRepository[VFolderData]:
+        return OpsRepository[VFolderData](V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def test_data(
@@ -206,6 +221,7 @@ class TestVfolderSearchVfolders:
             await db_sess.flush()
 
         yield {
+            "user_id": user_id,
             "project_a_id": project_a_id,
             "project_b_id": project_b_id,
             "vfolder_a1_id": vfolder_a1_id,
@@ -318,15 +334,11 @@ class TestVfolderSearchVfolders:
 
     async def test_returns_all_vfolders(
         self,
-        vfolder_admin_repository: VFolderAdminRepository,
+        ops_repository: OpsRepository[VFolderData],
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """With 3 vfolders across 2 projects, search_vfolders returns all 3."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-        )
-
-        result = await vfolder_admin_repository.search_vfolders(querier=querier)
+        """With 3 vfolders across 2 projects, the global search returns all 3."""
+        result = await ops_repository.global_search(_global_searcher([]))
 
         assert result.total_count == 3
         result_ids = {item.id for item in result.items}
@@ -338,31 +350,49 @@ class TestVfolderSearchVfolders:
 
     async def test_empty_result_when_no_vfolders(
         self,
-        vfolder_admin_repository: VFolderAdminRepository,
+        ops_repository: OpsRepository[VFolderData],
         empty_test_data: dict[str, uuid.UUID],
     ) -> None:
         """With no vfolders in DB, returns empty result."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-        )
-
-        result = await vfolder_admin_repository.search_vfolders(querier=querier)
+        result = await ops_repository.global_search(_global_searcher([]))
 
         assert result.items == []
         assert result.total_count == 0
 
     async def test_pagination_fields(
         self,
-        vfolder_admin_repository: VFolderAdminRepository,
+        ops_repository: OpsRepository[VFolderData],
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """When all results fit in one page, has_next_page and has_previous_page are False."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-        )
-
-        result = await vfolder_admin_repository.search_vfolders(querier=querier)
+        result = await ops_repository.global_search(_global_searcher([]))
 
         assert result.total_count == 3
         assert result.has_next_page is False
         assert result.has_previous_page is False
+
+    async def test_used_by_narrows_to_the_vfolder_the_card_uses(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        ops_repository: OpsRepository[VFolderData],
+        test_data: dict[str, uuid.UUID],
+    ) -> None:
+        card_id = ModelCardID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ModelCardRow(
+                    id=card_id,
+                    name="card",
+                    vfolder=test_data["vfolder_a1_id"],
+                    domain="test-domain",
+                    project=test_data["project_a_id"],
+                    creator=test_data["user_id"],
+                )
+            )
+
+        result = await ops_repository.global_search(
+            _global_searcher([VFolderSearchableFields.linked.usage.model_cards.used_by(card_id)])
+        )
+
+        assert [item.id for item in result.items] == [test_data["vfolder_a1_id"]]
+        assert result.total_count == 1

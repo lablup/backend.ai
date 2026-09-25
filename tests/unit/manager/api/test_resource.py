@@ -23,6 +23,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
     UsagePerPeriodQuery,
@@ -30,6 +31,7 @@ from ai.backend.common.dto.manager.resource.request import (
 )
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.common.types import SlotQuantity
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.dto.context import RequestCtx, UserContext
@@ -53,7 +55,11 @@ def mock_root_ctx() -> MagicMock:
 @pytest.fixture
 def mock_processors() -> MagicMock:
     """Mock Processors for ResourceHandler constructor injection."""
-    return MagicMock()
+    processors = MagicMock()
+    processors.resource_group.lookup.run = AsyncMock(
+        return_value=LookupOpsResult(resolved_entity_id=ResourceGroupID(uuid.uuid4()))
+    )
+    return processors
 
 
 @pytest.fixture
@@ -61,6 +67,7 @@ def handler(mock_processors: MagicMock) -> ResourceHandler:
     """ResourceHandler instance with mock processors."""
     return ResourceHandler(
         resource_preset=mock_processors.resource_preset,
+        resource_group=mock_processors.resource_group,
         agent=mock_processors.agent,
         project=mock_processors.project,
         user=mock_processors.user,

@@ -40,6 +40,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateStrategySpecInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission
 
 __all__ = (
@@ -104,6 +105,9 @@ class RevisionNode(BaseResponseModel):
     """Node model representing a deployment revision."""
 
     id: UUID = Field(description="Revision ID")
+    field_id: UUID = Field(
+        description=f"UUID of the revision. Added in {NEXT_RELEASE_VERSION}.",
+    )
     deployment_id: UUID = Field(
         description=(
             "ID of the parent deployment that owns this revision. "
@@ -150,6 +154,9 @@ class DeploymentNode(BaseResponseModel):
     """Node model representing a deployment entity."""
 
     id: DeploymentID = Field(description="Deployment ID")
+    entity_id: UUID = Field(
+        description=f"UUID of the deployment. Added in {NEXT_RELEASE_VERSION}.",
+    )
     metadata: DeploymentMetadataInfoDTO = Field(description="Deployment metadata")
     network_access: DeploymentNetworkAccessInfoDTO = Field(
         description="Network access configuration"
@@ -185,6 +192,9 @@ class RouteNode(BaseResponseModel):
     """Node model representing a deployment route."""
 
     id: UUID = Field(description="Route ID")
+    field_id: UUID = Field(
+        description=f"UUID of the route. Added in {NEXT_RELEASE_VERSION}.",
+    )
     deployment_id: UUID = Field(description="Deployment ID")
     session_id: str | None = Field(default=None, description="Session ID")
     status: RouteStatus = Field(description="Lifecycle status of the route")
@@ -270,6 +280,9 @@ class AccessTokenNode(BaseResponseModel):
     """Node model representing a deployment access token."""
 
     id: UUID = Field(description="Access token ID")
+    field_id: UUID = Field(
+        description=f"UUID of the access token. Added in {NEXT_RELEASE_VERSION}.",
+    )
     token: str = Field(description="Token value")
     expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
     created_at: datetime = Field(description="Creation timestamp")
@@ -279,6 +292,9 @@ class AutoScalingRuleNode(BaseResponseModel):
     """Node model representing a deployment auto-scaling rule."""
 
     id: UUID = Field(description="Auto-scaling rule ID")
+    field_id: UUID = Field(
+        description=f"UUID of the auto scaling rule. Added in {NEXT_RELEASE_VERSION}.",
+    )
     deployment_id: UUID = Field(description="Parent deployment ID")
     metric_source: str = Field(description="Metric source")
     metric_name: str = Field(description="Metric name")
@@ -299,6 +315,9 @@ class DeploymentPolicyNode(BaseResponseModel):
     """Node model representing a deployment update policy."""
 
     id: UUID = Field(description="Policy ID")
+    field_id: UUID = Field(
+        description=f"UUID of the deployment policy. Added in {NEXT_RELEASE_VERSION}.",
+    )
     deployment_id: UUID = Field(description="Parent deployment ID")
     strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = Field(
         description="Deployment strategy specification"
@@ -436,6 +455,9 @@ class ReplicaNode(BaseResponseModel):
     """Node model representing a deployment replica (user-facing view of routing row)."""
 
     id: UUID = Field(description="Replica ID")
+    field_id: UUID = Field(
+        description=f"UUID of the replica. Added in {NEXT_RELEASE_VERSION}.",
+    )
     deployment_id: UUID = Field(description="ID of the deployment this replica belongs to")
     revision_id: UUID = Field(description="Associated revision ID")
     session_id: UUID | None = Field(

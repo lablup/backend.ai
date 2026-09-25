@@ -97,8 +97,12 @@ from ai.backend.manager.actions.v2.field.base import (
 )
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
+from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -243,6 +247,9 @@ from ai.backend.manager.services.image.actions.lookup_alias_owner import (
     LookupBulkImageAliasOwnerAction,
     LookupImageAliasOwnerAction,
 )
+from ai.backend.manager.services.image.actions.search_image_aliases import (
+    SearchImageAliasesAction,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
@@ -348,6 +355,8 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
+from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.mount_policy import (
@@ -364,6 +373,7 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseBulkAction,
     BaseScopeAction,
     BaseRelationAction,
+    BaseMembershipAction,
     BaseGlobalAction,
     BaseLookupAction,
     BaseBulkLookupAction,
@@ -398,7 +408,7 @@ def _ops_registry() -> ProcessorRegistry[Any]:
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(global_scope=[RefusingGlobalActionValidator()]),
             repository=OpsRepository(MagicMock()),
         )
     )
@@ -610,7 +620,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
     VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+    VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())))
     VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderInviteProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
     VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
@@ -655,12 +665,13 @@ def test_action_name_is_unique_across_v2_actions() -> None:
 
 
 def test_resource_preset_reads_keep_their_judged_gates() -> None:
-    """Pins the three preset reads BA-7710 ruled on, so a rewiring has to restate them.
+    """Pins the three preset reads, so a rewiring has to restate them.
 
-    A preset is a catalog: its name, resource slots and shared memory hold no owner
-    and no secret. The two reads a session launcher makes start from a resource group
-    name and stay public; the read the admin route makes starts from the preset's id,
-    so it is judged on that entity like the update and the delete beside it.
+    The two reads a session launcher makes name the scopes they read from -- `public`
+    for the presets bound to no resource group, the group itself for the ones bound to
+    it -- so naming a group the caller holds nothing at refuses the read. The read the
+    admin route makes starts from the preset's id, so it is judged on that entity like
+    the update and the delete beside it.
     """
     registry = _ops_registry()
     ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())
@@ -668,13 +679,13 @@ def test_resource_preset_reads_keep_their_judged_gates() -> None:
     judged = {
         ListResourcePresetsAction: (
             ResourcePresetEntityType(),
-            ActionKind.GLOBAL,
-            ActionGate.PUBLIC,
+            ActionKind.SCOPE,
+            ActionGate.PERMISSION,
         ),
         CheckResourcePresetsAction: (
             ResourcePresetEntityType(),
-            ActionKind.GLOBAL,
-            ActionGate.PUBLIC,
+            ActionKind.SCOPE,
+            ActionGate.PERMISSION,
         ),
         GetResourcePresetAction: (
             ResourcePresetEntityType(),
@@ -875,6 +886,31 @@ def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
     )
 
 
+def test_image_alias_read_is_a_scoped_permission_read() -> None:
+    """The aliases of one image are read within that image's scope, not superadmin-only."""
+    registry = _ops_registry()
+    ImageProcessors(
+        registry.group(GroupMeta(ImageEntityType())),
+        registry.group(GroupMeta(ImageEntityType())).field_group(
+            FieldGroupMeta(ImageAliasFieldType()),
+            ImageAliasData,
+            LookupImageAliasOwnerAction,
+            LookupBulkImageAliasOwnerAction,
+        ),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[SearchImageAliasesAction] == (
+        ImageEntityType(),
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
+
+
 def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     """The DataLoaders over field rows read per named row, checked per owning entity.
 
@@ -962,10 +998,9 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
     assert (LookupBulkKernelOwnerAction, ActionGate.PERMISSION) in lookup_gates
 
 
-def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:
-    """The resource group, notification, artifact, user and project DataLoaders read per
-    named entity; the domain one is public, since a regular user holds no read on domains.
-    """
+def test_entity_data_loader_reads_are_checked_per_entity() -> None:
+    """The resource group, notification, artifact, domain, user and project DataLoaders
+    read per named entity."""
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
@@ -1062,7 +1097,7 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
     assert recorded[BulkGetDomainsAction] == (
         DomainEntityType(),
         ActionKind.BULK,
-        ActionGate.PUBLIC,
+        ActionGate.PERMISSION,
     )
     assert recorded[BulkLookupDomainsAction] == (
         DomainEntityType(),
@@ -1078,6 +1113,38 @@ def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> Non
         ProjectEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
+    )
+
+
+def test_vfolder_loader_read_is_a_partial_permission_read() -> None:
+    """The vfolder DataLoader reads per named folder, not superadmin-only."""
+    registry = _ops_registry()
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetVFoldersAction] == (
+        VFolderEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_vfolder_allowed_types_read_is_public() -> None:
+    """The allowed vfolder types are read by any authenticated caller, not superadmin-only."""
+    registry = _ops_registry()
+    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[PublicListAllowedTypesAction] == (
+        VFolderEntityType(),
+        ActionKind.GLOBAL,
+        ActionGate.PUBLIC,
     )
 
 

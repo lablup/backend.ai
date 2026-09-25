@@ -1,9 +1,14 @@
 import logging
+import uuid
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -12,9 +17,9 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
-    ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -23,16 +28,23 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import (
-    BatchQuerier,
-    execute_batch_querier,
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
 )
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.models.container_registry.updaters import (
+    ContainerRegistryGlobalUpdater,
+    ContainerRegistryUpdater,
+)
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# How many images join or leave `public` per transaction when a registry is switched.
+IMAGE_MEMBERSHIP_CHUNK_SIZE = 1000
 
 container_registry_repository_resilience = Resilience(
     policies=[
@@ -53,19 +65,22 @@ container_registry_repository_resilience = Resilience(
 
 class ContainerRegistryRepository:
     _db: ExtendedAsyncSAEngine
-    _ops_provider: RelationOpsProvider
+    _ops_provider: ShareOpsProvider
+    _db_source: ContainerRegistryDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: RelationOpsProvider) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: ShareOpsProvider) -> None:
         self._db = db
         self._ops_provider = ops_provider
+        self._db_source = ContainerRegistryDBSource(ops_provider)
 
     async def create_registry(
         self,
         creator: ContainerRegistryCreator,
     ) -> ContainerRegistryData:
-        """Create a container registry with its own virtual entity."""
+        """Create a container registry with its own virtual entity, in the scopes the
+        creator names."""
         async with self._ops_provider.write_ops() as w:
-            return await w.create_global_entity(creator)
+            return await w.create_entity(creator)
 
     async def modify_registry(
         self,
@@ -85,6 +100,62 @@ class ContainerRegistryRepository:
                     )
                 ).validate()
             return data
+
+    async def set_global(self, updater: ContainerRegistryGlobalUpdater) -> ContainerRegistryData:
+        """Write `is_global` and put the registry and its images into the `public`
+        scope, or take them out.
+
+        The registry goes in before its images and comes out after them, so a run that
+        stops part way leaves `public` holding no image of a registry it cannot reach.
+        Every step is idempotent: repeating the same call finishes what was left.
+        """
+        if not updater.is_global:
+            await self._move_images(updater.registry_id, to_public=False)
+            return await self._write_global(updater)
+        data = await self._write_global(updater)
+        await self._move_images(updater.registry_id, to_public=True)
+        return data
+
+    async def _write_global(self, updater: ContainerRegistryGlobalUpdater) -> ContainerRegistryData:
+        """Write `is_global` and settle the registry's own membership of `public`, in
+        one transaction."""
+        public = global_entity_id(GlobalEntityName.PUBLIC)
+        async with self._ops_provider.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry not found (id:{updater.registry_id})"
+                )
+            if updater.is_global:
+                await w.add_membership([public], [updater.registry_id])
+            else:
+                await w.remove_membership([public], [updater.registry_id])
+            return data
+
+    async def _move_images(self, registry_id: ContainerRegistryID, *, to_public: bool) -> None:
+        """Every image of the registry joins `public` or leaves it, a chunk per
+        transaction so the row count does not bound the statement."""
+        public = global_entity_id(GlobalEntityName.PUBLIC)
+        after: uuid.UUID | None = None
+        while True:
+            async with self._db.begin_readonly_session() as sess:
+                stmt = (
+                    sa.select(ImageRow.id)
+                    .where(ImageRow.registry_id == registry_id)
+                    .order_by(ImageRow.id)
+                    .limit(IMAGE_MEMBERSHIP_CHUNK_SIZE)
+                )
+                if after is not None:
+                    stmt = stmt.where(ImageRow.id > after)
+                image_ids = [ImageID(row) for row in (await sess.scalars(stmt)).all()]
+            if not image_ids:
+                return
+            async with self._ops_provider.write_ops() as w:
+                if to_public:
+                    await w.add_membership([public], image_ids)
+                else:
+                    await w.remove_membership([public], image_ids)
+            after = image_ids[-1]
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:
         """Delete a container registry with the graph it left; its project relations go
@@ -117,7 +188,7 @@ class ContainerRegistryRepository:
             )
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
+            return [ContainerRegistrySearchableFields.own.to_data(row) for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def get_all(self) -> list[ContainerRegistryData]:
@@ -125,7 +196,7 @@ class ContainerRegistryRepository:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
+            return [ContainerRegistrySearchableFields.own.to_data(row) for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def clear_images(
@@ -184,6 +255,13 @@ class ContainerRegistryRepository:
             return result.scalars().one_or_none()
 
     @container_registry_repository_resilience.apply()
+    async def get_project_registry(self, scope_id: ProjectScope) -> ContainerRegistryData:
+        registry_id = await self._db_source.lookup_image_commit_registry_id(
+            ProjectID(scope_id.project_id)
+        )
+        return await self._db_source.fetch_by_id(registry_id)
+
+    @container_registry_repository_resilience.apply()
     async def get_registry_row_for_scanner(
         self,
         registry_name: str,
@@ -207,34 +285,6 @@ class ContainerRegistryRepository:
             return row
 
     @container_registry_repository_resilience.apply()
-    async def search_container_registries(
-        self,
-        querier: BatchQuerier,
-    ) -> ContainerRegistrySearchResult:
-        """Search container registries with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            ContainerRegistrySearchResult with items, total_count, and pagination info.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ContainerRegistryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            return ContainerRegistrySearchResult(
-                items=[row.ContainerRegistryRow.to_dataclass() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def _get_by_registry_and_project(
         self,
         session: SASession,
@@ -248,4 +298,4 @@ class ContainerRegistryRepository:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
         row: ContainerRegistryRow | None = await session.scalar(stmt)
-        return row.to_dataclass() if row else None
+        return ContainerRegistrySearchableFields.own.to_data(row) if row else None

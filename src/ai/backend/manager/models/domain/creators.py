@@ -14,12 +14,14 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.specs.creator import RoleManagedGlobalEntityCreator
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class DomainCreator(RoleManagedGlobalEntityCreator[DomainRow, DomainData]):
+class DomainCreator(CreatedInGlobal[DomainRow], RoleManagedEntityCreator[DomainRow, DomainData]):
     """Registers a domain, the top-level scope everything else is created under."""
 
     name: str
@@ -78,4 +80,4 @@ class DomainCreator(RoleManagedGlobalEntityCreator[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)

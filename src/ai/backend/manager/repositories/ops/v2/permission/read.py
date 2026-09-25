@@ -45,7 +45,7 @@ class _GroupKey:
     """Keys resolved in one round-trip: ``entity_type`` matches the graph rows,
     ``subject_entity_type`` the permission rows."""
 
-    user_id: uuid.UUID
+    user_id: UserID
     entity_type: EntityType
     subject_entity_type: EntityType
 

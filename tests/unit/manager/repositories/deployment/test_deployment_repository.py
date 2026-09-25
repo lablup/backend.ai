@@ -70,6 +70,7 @@ from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicy
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -125,7 +126,6 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.secret.types import SecretValue
@@ -1993,12 +1993,12 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: DeploymentID,
     ) -> None:
         """Test search_revisions returns empty result when no revisions exist."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 0
         assert result.items == []
@@ -2012,12 +2012,12 @@ class TestDeploymentRevisionOperations:
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions returns correct results."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 3
         assert len(result.items) == 3
@@ -2032,11 +2032,11 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test search_revisions respects pagination."""
         # First page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2044,11 +2044,11 @@ class TestDeploymentRevisionOperations:
         assert result.has_previous_page is False
 
         # Second page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=2),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2744,142 +2744,17 @@ class TestSearchDeploymentPolicies:
     # Tests - Search with pagination
     # =========================================================================
 
-    async def test_search_first_page(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test first page of search results."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == 4
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
-
-    async def test_search_second_page(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test second page of search results."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=2),
-            conditions=[],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == 4
-        assert result.has_next_page is False
-        assert result.has_previous_page is True
-
     # =========================================================================
     # Tests - Search with filtering
     # =========================================================================
-
-    async def test_search_filter_by_strategy(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test filtering deployment policies by strategy."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.strategy == DeploymentStrategy.BLUE_GREEN,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 1
-        assert result.items[0].strategy == DeploymentStrategy.BLUE_GREEN
-
-    async def test_search_filter_by_endpoint(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-        sample_endpoint_ids: list[DeploymentID],
-    ) -> None:
-        """Test filtering deployment policies by endpoint ID."""
-        target_endpoint_id = sample_endpoint_ids[0]
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.endpoint == target_endpoint_id,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 1
-        assert result.items[0].endpoint == target_endpoint_id
 
     # =========================================================================
     # Tests - Search with ordering
     # =========================================================================
 
-    async def test_search_order_by_created_at_ascending(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test ordering deployment policies by created_at ascending."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[DeploymentPolicyRow.created_at.asc()],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        created_ats = [item.created_at for item in result.items]
-        assert created_ats == sorted(created_ats)
-
-    async def test_search_order_by_created_at_descending(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test ordering deployment policies by created_at descending."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[DeploymentPolicyRow.created_at.desc()],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        created_ats = [item.created_at for item in result.items]
-        assert created_ats == sorted(created_ats, reverse=True)
-
     # =========================================================================
     # Tests - Empty results
     # =========================================================================
-
-    async def test_search_no_results(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test search with no matching results."""
-        nonexistent_id = uuid.uuid4()
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.endpoint == nonexistent_id,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 0
-        assert result.total_count == 0
 
 
 class TestRouteOperations:

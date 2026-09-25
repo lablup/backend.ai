@@ -66,9 +66,13 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -124,6 +128,7 @@ def group_processors(
     repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -151,6 +156,7 @@ def user_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = UserService(
@@ -196,7 +202,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

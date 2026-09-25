@@ -50,12 +50,15 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
     RolePresetSoftDeleteUpdater,
     RolePresetUpdater,
 )
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
@@ -65,7 +68,8 @@ from ai.backend.manager.models.specs.querier import (
     BulkFieldQuerier,
     DataQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import ScopedSearcher, Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
@@ -112,7 +116,7 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -152,7 +156,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -173,7 +177,7 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
@@ -189,7 +193,7 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 class _PresetFieldType(FieldType):
@@ -277,7 +281,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -300,7 +304,7 @@ class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -361,10 +365,10 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetView]):
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             VirtualEntityRow,
             EntityMembershipRow,
@@ -381,7 +385,7 @@ async def database(
             EntityShareRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -722,6 +726,25 @@ class _NamedScope(OperationScope):
         return ()
 
 
+@dataclass(frozen=True)
+class _NamedScopeTarget(ScopeTarget):
+    name: str
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        return lambda: RolePresetRow.name == self.name
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
 @dataclass
 class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetView]):
     """The only file a pass-through domain still writes: the action."""
@@ -794,6 +817,47 @@ class TestSearch:
         )
 
         assert [item.id for item in result.items] == [preset.id]
+
+    async def test_scoped_searcher_ands_used_by_onto_the_scopes(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.scoped_search(
+            ScopedSearcher(
+                scopes=[
+                    _NamedScopeTarget(name="default", domain_id=DomainID(uuid.uuid4())),
+                    _NamedScopeTarget(name="other", domain_id=DomainID(uuid.uuid4())),
+                ],
+                used_by=[
+                    UsedBy(
+                        target=DomainID(uuid.uuid4()),
+                        condition=lambda: RolePresetRow.name == "other",
+                    )
+                ],
+                searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id]
+        assert result.total_count == 1
+
+    async def test_scoped_searcher_with_no_scope_is_rejected(
+        self, view_repository: OpsRepository[_PresetView], preset: RolePresetData
+    ) -> None:
+        with pytest.raises(EmptyOperationScopeError):
+            await view_repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[],
+                    used_by=[],
+                    searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+                )
+            )
 
     async def test_offset_priority_orders_lead(
         self,

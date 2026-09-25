@@ -136,8 +136,10 @@ def _make_policy_node_dto(
             auto_promote=promote,
             promote_delay_seconds=delay,
         )
+    policy_id = uuid.uuid4()
     return DeploymentPolicyNodeDTO(
-        id=uuid.uuid4(),
+        id=policy_id,
+        field_id=policy_id,
         deployment_id=uuid.UUID(SAMPLE_DEPLOYMENT_ID),
         strategy_spec=strategy_spec,
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
