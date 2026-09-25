@@ -50,7 +50,13 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+from ai.backend.agent.types import (
+    Container,
+    ContainerEnumerationResult,
+    KernelOwnershipData,
+    MountInfo,
+    Port,
+)
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef, KernelFeatures
@@ -1042,42 +1048,60 @@ class KubernetesAgent(
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> ContainerEnumerationResult:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
-        result = []
-        fetch_tasks = []
-        for deployment in (await core_api.list_namespaced_pod("backend-ai")).items:
-            # Additional check to filter out real worker pods only?
+        result: list[tuple[KernelId, Container]] = []
+        fetch_errors: list[tuple[str, str, Exception]] = []
+        task_group_error: ExceptionGroup | None = None
+        deployments = (await core_api.list_namespaced_pod("backend-ai")).items
 
-            async def _fetch_container_info(pod: Any) -> None:
-                kernel_id: KernelId | str | None = "(unknown)"
-                try:
-                    kernel_id = await get_kernel_id_from_deployment(pod)
-                    if kernel_id is None or kernel_id not in self.kernel_registry:
-                        return
-                    # Is it okay to assume that only one container resides per pod?
-                    if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
-                        result.append(
-                            (
-                                kernel_id,
-                                await container_from_pod(pod),
-                            ),
-                        )
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    log.exception(
-                        "error while fetching container information (cid:{}, k:{})",
-                        pod["metadata"]["uid"],
-                        kernel_id,
-                    )
+        async def _fetch_container_info(pod: Any) -> None:
+            kernel_id: KernelId | str | None = "(unknown)"
+            try:
+                kernel_id = await get_kernel_id_from_deployment(pod)
+                if kernel_id is None or kernel_id not in self.kernel_registry:
+                    return
+                # Is it okay to assume that only one container resides per pod?
+                if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
+                    result.append((kernel_id, await container_from_pod(pod)))
+            except Exception as e:
+                fetch_errors.append((pod["metadata"]["uid"], str(kernel_id), e))
+                raise
 
-            fetch_tasks.append(_fetch_container_info(deployment))
-
-        await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        return result
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                for deployment in deployments:
+                    # Additional check to filter out real worker pods only?
+                    task_group.create_task(_fetch_container_info(deployment))
+        except ExceptionGroup as e:
+            task_group_error = e
+        complete = task_group_error is None
+        if not complete:
+            error_details = ", ".join(
+                f"(cid:{container_id}, k:{kernel_id}, error:{error!r})"
+                for container_id, kernel_id, error in fetch_errors
+            )
+            if not error_details:
+                error_details = (
+                    repr(task_group_error)
+                    if task_group_error is not None
+                    else "container inspection failed"
+                )
+            first_error = (
+                fetch_errors[0][2]
+                if fetch_errors
+                else task_group_error.exceptions[0]
+                if task_group_error is not None
+                else None
+            )
+            log.warning(
+                "incomplete container enumeration: {}",
+                error_details,
+                exc_info=first_error,
+            )
+        return ContainerEnumerationResult(containers=result, complete=complete)
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:

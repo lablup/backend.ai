@@ -146,6 +146,15 @@ class Container:
         return SessionId(uuid.UUID(raw_session_id))
 
 
+KernelIdContainerPair = tuple[KernelId, Container]
+
+
+@dataclass(frozen=True)
+class ContainerEnumerationResult:
+    containers: Sequence[KernelIdContainerPair]
+    complete: bool
+
+
 class KernelLifecycleStatus(enum.StrEnum):
     """
     The lifecycle status of `AbstractKernel` object.
