@@ -12,7 +12,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, query_expression
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
@@ -21,6 +21,7 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.service_catalog.types import ServiceCatalogEndpointRowJson
 
 __all__ = (
     "ServiceCatalogRow",
@@ -70,10 +71,9 @@ class ServiceCatalogRow(Base):
         "config_hash", sa.String(length=128), nullable=False, server_default=sa.text("''")
     )
 
-    endpoints: Mapped[list[ServiceCatalogEndpointRow]] = relationship(
-        "ServiceCatalogEndpointRow",
-        cascade="all, delete-orphan",
-    )
+    # Not a column: the endpoint rows as JSON objects, filled by the searcher's
+    # with_expression(endpoint_rows, <json_agg subquery>). None when not loaded.
+    endpoint_rows: Mapped[list[ServiceCatalogEndpointRowJson] | None] = query_expression()
 
     __table_args__ = (
         sa.UniqueConstraint(
