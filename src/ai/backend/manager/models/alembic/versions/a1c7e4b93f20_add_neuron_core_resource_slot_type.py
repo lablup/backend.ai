@@ -1,23 +1,20 @@
-"""Add the neuron.core and tt-n300.device resource slot types
+"""Add the neuron.core resource slot type
 
 Adds the ``neuron.core`` slot type for the AWS Neuron accelerator plugin.
 
-``agent_resources.slot_name`` has a hard FK to ``resource_slot_types.slot_name``
-(``fk_agent_resources_slot_name_resource_slot_types``) and the manager upserts one
-``agent_resources`` row per reported slot on *every* agent heartbeat, with no
-runtime insert path into ``resource_slot_types``. A slot type that is not seeded
-here therefore makes the heartbeat of an agent reporting it fail on the FK.
+``agent_resources.slot_name`` has a hard FK onto ``resource_slot_types.slot_name`` and
+the manager upserts one ``agent_resources`` row per reported slot on every heartbeat,
+but the heartbeat path does not register slot types. ``resource_slot_to_quantities``
+preserves zero-valued slots, so a host without Neuron hardware still reports
+``neuron.core: 0``; without this row, every agent carrying the plugin fails its
+heartbeat on the FK.
 
-Also adds the missing ``tt-n300.device`` row as a drive-by fix: the Tenstorrent
-n300 plugin has reported that slot since it was added, but it was never seeded,
-so a Tenstorrent agent hits the same FK violation today.
+The uuid is pinned to the one ``fixtures/manager/example-resource-slot-types.json``
+assigns, following ``8f21c46a0b73``, so an upgraded deployment gets the same slot
+identity a fresh install gets.
 
-The uuids are pinned to the ones ``fixtures/manager/example-resource-slot-types.json``
-assigns, following ``8f21c46a0b73``, so an upgraded deployment ends up with the
-same slot identity a fresh install gets instead of a random one per database.
-
-``downgrade`` deliberately leaves both rows in place; see the comment there.
-
+Revision ID: a1c7e4b93f20
+Revises: d0a201e9be45
 Create Date: 2026-09-12
 
 """
@@ -28,7 +25,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a1c7e4b93f20"
-down_revision = "a7d0f5b3c841"
+down_revision = "d0a201e9be45"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
@@ -44,9 +41,6 @@ def upgrade() -> None:
             (uuid, slot_name, slot_type, display_name, description,
              display_unit, display_icon, number_format, rank)
         VALUES
-            ('ef63fa11-609e-4b96-8f90-a08f97a5f04b'::uuid,
-             'tt-n300.device','count','Tenstorrent n300 Device','Tenstorrent n300',
-             'n300',   'npu_generic', '{"binary":false,"round_length":0}', 1500),
             ('7b968b58-f7cc-472d-b191-d4b19f417efd'::uuid,
              'neuron.core','count','AWS Neuron Core','AWS Neuron NeuronCore',
              'Core',   'aws',         '{"binary":false,"round_length":0}', 1600)
@@ -64,5 +58,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally a no-op: five tables carry an FK onto `resource_slot_types.slot_name`,
     # so deleting a seeded row is destructive rather than reversible.  An older manager
-    # simply never looks the rows up.  Removing them is an operator decision.
+    # simply never looks the row up.  Removing it is an operator decision.
     pass
