@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -121,27 +126,82 @@ class TestGetKernelResourceSpec:
         assert result.scratch_disk_size == 0
 
 
-class TestSaveJsonRecoveryData:
-    async def test_creates_file(
+class TestStageJsonRecoveryData:
+    async def test_commit_puts_the_record_in_place_and_leaves_nothing_else(
         self,
         config: ScratchConfig,
         config_path: Path,
         sample_scratch_data: KernelRecoveryScratchData,
     ) -> None:
-        await config.save_json_recovery_data(sample_scratch_data)
-        filepath = config_path / "recovery.json"
-        assert filepath.is_file()
-        data = json.loads(filepath.read_text())
+        staged = await config.stage_json_recovery_data(sample_scratch_data)
+        assert not config.recovery_file_exists()
+        staged.commit()
+        data = json.loads((config_path / "recovery.json").read_text())
         assert data["agent_id"] == str(sample_scratch_data.agent_id)
+        assert [p.name for p in config_path.iterdir()] == ["recovery.json"]
 
     async def test_roundtrip(
         self,
         config: ScratchConfig,
         sample_scratch_data: KernelRecoveryScratchData,
     ) -> None:
-        await config.save_json_recovery_data(sample_scratch_data)
+        (await config.stage_json_recovery_data(sample_scratch_data)).commit()
         loaded = await config.get_json_recovery_data()
         assert loaded is not None
         assert loaded.id == sample_scratch_data.id
         assert loaded.network_driver == sample_scratch_data.network_driver
         assert loaded.repl_in_port == sample_scratch_data.repl_in_port
+
+    async def test_discard_leaves_the_previous_record_untouched(
+        self,
+        config: ScratchConfig,
+        config_path: Path,
+        sample_scratch_data: KernelRecoveryScratchData,
+    ) -> None:
+        (await config.stage_json_recovery_data(sample_scratch_data)).commit()
+        newer = sample_scratch_data.model_copy(update={"repl_in_port": 3000})
+        (await config.stage_json_recovery_data(newer)).discard()
+        loaded = await config.get_json_recovery_data()
+        assert loaded is not None
+        assert loaded.repl_in_port == 2000
+        assert [p.name for p in config_path.iterdir()] == ["recovery.json"]
+
+    async def test_a_missing_config_directory_is_not_created(
+        self, tmp_path: Path, sample_scratch_data: KernelRecoveryScratchData
+    ) -> None:
+        """The directory is the kernel's own, removed with it; a save must not put it back."""
+        gone = tmp_path / "config"
+        with pytest.raises(FileNotFoundError):
+            await ScratchConfig(gone).stage_json_recovery_data(sample_scratch_data)
+        assert not gone.exists()
+
+    async def test_a_failed_serialization_touches_nothing(
+        self, config: ScratchConfig, config_path: Path
+    ) -> None:
+        broken = MagicMock()
+        broken.model_dump_json.side_effect = ValueError("not serializable")
+        with pytest.raises(ValueError):
+            await config.stage_json_recovery_data(cast(KernelRecoveryScratchData, broken))
+        assert list(config_path.iterdir()) == []
+
+    async def test_a_failed_write_leaves_no_staged_file(
+        self,
+        config: ScratchConfig,
+        config_path: Path,
+        sample_scratch_data: KernelRecoveryScratchData,
+    ) -> None:
+        """Covers cancellation too: the cleanup runs on BaseException."""
+
+        @asynccontextmanager
+        async def _open_that_fails_to_write(path: Path, mode: str) -> AsyncIterator[MagicMock]:
+            Path(path).touch()
+            file = MagicMock()
+            file.write = AsyncMock(side_effect=asyncio.CancelledError())
+            yield file
+
+        with (
+            patch("ai.backend.agent.scratch.utils.aiofiles.open", _open_that_fails_to_write),
+            pytest.raises(asyncio.CancelledError),
+        ):
+            await config.stage_json_recovery_data(sample_scratch_data)
+        assert list(config_path.iterdir()) == []
