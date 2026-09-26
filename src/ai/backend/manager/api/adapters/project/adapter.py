@@ -54,6 +54,7 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -138,6 +139,19 @@ class ProjectAdapter(BaseAdapter):
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_image_commit_registries(
+        self, project_ids: Sequence[ProjectID]
+    ) -> Sequence[ImageCommitRegistry | Exception | None]:
+        if not project_ids:
+            return []
+        result = await self._project.bulk_get.run(BulkGetProjectsAction(ids=list(project_ids)))
+        return [
+            item.value.container_registry
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_by_ids(
         self, group_ids: Sequence[ProjectID]

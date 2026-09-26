@@ -38,6 +38,7 @@ from ai.backend.manager.models.minilang import (
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project import ProjectRow, groups
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -492,7 +493,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             total_cnt = await db_session.scalar(cnt_query)
             async for row in await db_session.stream_scalars(prj_query):
                 prj_row = cast(ProjectRow, row)
-                result.append(GroupNode.from_row(graph_ctx, prj_row))
+                result.append(GroupNode.from_data(ProjectSearchableFields.own.to_data(prj_row)))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:

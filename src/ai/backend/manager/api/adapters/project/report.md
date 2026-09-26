@@ -4,6 +4,88 @@
 
 Not exercised by any scenario: admin_delete, admin_purge, admin_restore, admin_search, admin_update, batch_load_by_ids, batch_load_fields, get, scoped_search, search_by_domain_name, search_by_user, unassign_users.
 
+### image_commit_registry
+
+#### [read-targets-in-request-order](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
+
+읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다
+
+Given
+
+- image commit을 위한 Container Registry가 설정되어 있다. 일반 사용자는 프로젝트 읽기 권한이 있다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 role-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 role-1 보유
+
+When
+
+- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
+  - targets = [ImageCommitRegistry(registry_name='registry.example.com', project_name='images'), ImageCommitRegistry(registry_name='registry.example.com', project_name='images')]
+
+#### [read-unconfigured-targets](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
+
+읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다
+
+Given
+
+- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 있다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 role-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 role-1 보유
+
+When
+
+- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
+  - targets = [None, None]
+
+#### [target-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py) — pass
+
+읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다
+
+Given
+
+- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 없다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.batch_load_image_commit_registries — 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
+  - count = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
 ### project
 
 #### [a-user-granted-nothing-may-not-make-a-project](/tests/scenario/bai_scenario/manager/project/test_project.py) — pass

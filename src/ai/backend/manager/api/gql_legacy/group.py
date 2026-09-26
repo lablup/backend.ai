@@ -15,7 +15,6 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
-from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
@@ -25,6 +24,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
@@ -40,6 +40,7 @@ from ai.backend.manager.models.project import (
     groups,
 )
 from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
@@ -60,12 +61,8 @@ from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
 )
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
-from ai.backend.manager.services.rbac.actions.roster.join_project import (
-    JoinProjectAction,
-)
-from ai.backend.manager.services.rbac.actions.roster.leave_project import (
-    LeaveProjectAction,
-)
+from ai.backend.manager.services.rbac.actions.roster.join_project import JoinProjectAction
+from ai.backend.manager.services.rbac.actions.roster.leave_project import LeaveProjectAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -73,8 +70,6 @@ from .base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
-    batch_multiresult,
-    batch_result,
     generate_sql_info_for_gql_connection,
     privileged_mutation,
 )
@@ -156,27 +151,33 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     }
 
     @classmethod
-    def from_row(
+    def from_data(
         cls,
-        graph_ctx: GraphQueryContext,
-        row: ProjectRow,
+        data: ProjectData,
     ) -> Self:
         return cls(
-            id=row.id,
-            row_id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.updated_at,
-            domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,
-            resource_policy=row.resource_policy,
-            type=row.type.name,
-            container_registry=row.container_registry,
+            id=data.id,
+            row_id=data.id,
+            name=data.name,
+            description=data.description,
+            is_active=data.is_active,
+            created_at=data.created_at,
+            modified_at=data.modified_at,
+            domain_name=data.domain_name,
+            total_resource_slots=data.total_resource_slots.to_json() or {},
+            allowed_vfolder_hosts=data.allowed_vfolder_hosts.to_json(),
+            integration_id=data.integration_name,
+            resource_policy=data.resource_policy,
+            type=data.type.name,
         )
+
+    async def resolve_container_registry(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, str | None] | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry")
+        result: ImageCommitRegistry | None = await loader.load(ProjectID(self.id))
+        return result.to_json() if result is not None else None
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -260,7 +261,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             group_row = (await db_session.scalars(query)).first()
             if group_row is None:
                 raise GroupNotFound(f"Group not found: {group_id}")
-            return cls.from_row(graph_ctx, group_row)
+            return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
 
     @classmethod
     async def get_connection(
@@ -324,7 +325,9 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 group_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
-                result = [cls.from_row(graph_ctx, row) for row in group_rows]
+                result = [
+                    cls.from_data(ProjectSearchableFields.own.to_data(row)) for row in group_rows
+                ]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -377,28 +380,6 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row[Any] | None) -> Group | None:
-        if row is None:
-            return None
-        return cls(
-            id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.updated_at,
-            domain_name=row.domain_name,
-            total_resource_slots=(
-                row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
-            ),
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,
-            resource_policy=row.resource_policy,
-            type=row.type.name,
-            container_registry=row.container_registry,
-        )
-
-    @classmethod
     def from_dto(cls, dto: ProjectData | None) -> Self | None:
         if dto is None:
             return None
@@ -417,8 +398,15 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=dto.integration_name,  # ProjectData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry.to_json() if dto.container_registry else None,
         )
+
+    async def resolve_container_registry(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, str | None] | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry")
+        result: ImageCommitRegistry | None = await loader.load(ProjectID(self.id))
+        return result.to_json() if result is not None else None
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -428,6 +416,17 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         )
         sgroups = await loader.load(self.id)
         return [sg.name for sg in sgroups]
+
+    @classmethod
+    async def batch_load_image_commit_registry(
+        cls, graph_ctx: GraphQueryContext, project_ids: Sequence[ProjectID]
+    ) -> Sequence[ImageCommitRegistry | Exception | None]:
+        return await ProjectAdapter(
+            graph_ctx.processors.project,
+            graph_ctx.processors.rbac,
+            graph_ctx.processors.domain,
+            graph_ctx.processors.user,
+        ).batch_load_image_commit_registries(project_ids)
 
     @classmethod
     async def load_all(
@@ -440,16 +439,16 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Group]:
         if type is None:
             type = [ProjectType.GENERAL]
-        query = sa.select(groups).select_from(groups).where(groups.c.type.in_(type))
+        query = sa.select(ProjectRow).select_from(groups).where(groups.c.type.in_(type))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
+        async with graph_ctx.db.begin_readonly_session() as session:
             return [
                 obj
-                async for row in (await conn.stream(query))
-                if (obj := cls.from_row(graph_ctx, row)) is not None
+                for row in await session.scalars(query)
+                if (obj := cls.from_dto(ProjectSearchableFields.own.to_data(row))) is not None
             ]
 
     @classmethod
@@ -461,20 +460,17 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Group | None]:
-        query = sa.select(groups).select_from(groups).where(groups.c.id.in_(group_ids))
+        query = sa.select(ProjectRow).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
-            return await batch_result(
-                graph_ctx,
-                conn,
-                query,
-                cls,
-                group_ids,
-                lambda row: row.id,
-            )
+        async with graph_ctx.db.begin_readonly_session() as session:
+            objects = {
+                row.id: cls.from_dto(ProjectSearchableFields.own.to_data(row))
+                for row in await session.scalars(query)
+            }
+            return [objects.get(ProjectID(id)) for id in group_ids]
 
     @classmethod
     async def batch_load_by_name(
@@ -485,20 +481,16 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Sequence[Group | None]]:
-        query = sa.select(groups).select_from(groups).where(groups.c.name.in_(group_names))
+        query = sa.select(ProjectRow).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
-            return await batch_multiresult(
-                graph_ctx,
-                conn,
-                query,
-                cls,
-                group_names,
-                lambda row: row.name,
-            )
+        async with graph_ctx.db.begin_readonly_session() as session:
+            objects: dict[str, list[Group | None]] = {name: [] for name in group_names}
+            for row in await session.scalars(query):
+                objects[row.name].append(cls.from_dto(ProjectSearchableFields.own.to_data(row)))
+            return [objects[name] for name in group_names]
 
     @classmethod
     async def batch_load_by_user(
@@ -516,21 +508,20 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         ms = user_scope_membership_query(ProjectEntityType()).subquery()
         j = sa.join(groups, ms, groups.c.id == ms.c.scope_id)
         query = (
-            sa.select(groups, ms.c.user_id)
+            sa.select(
+                ProjectRow,
+                ms.c.user_id,
+            )
             .select_from(j)
             .where(ms.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
-            return await batch_multiresult(
-                graph_ctx,
-                conn,
-                query,
-                cls,
-                user_ids,
-                lambda row: row.user_id,
-            )
+        async with graph_ctx.db.begin_readonly_session() as session:
+            objects: dict[uuid.UUID, list[Group | None]] = {id: [] for id in user_ids}
+            for row, user_id in (await session.execute(query)).tuples():
+                objects[user_id].append(cls.from_dto(ProjectSearchableFields.own.to_data(row)))
+            return [objects[id] for id in user_ids]
 
     @classmethod
     async def get_groups_for_user(
@@ -538,14 +529,14 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
-        query = sa.select(groups).where(
+        query = sa.select(ProjectRow).where(
             user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_id)
         )
-        async with graph_ctx.db.begin_readonly() as conn:
+        async with graph_ctx.db.begin_readonly_session() as session:
             return [
                 obj
-                async for row in (await conn.stream(query))
-                if (obj := cls.from_row(graph_ctx, row)) is not None
+                for row in await session.scalars(query)
+                if (obj := cls.from_dto(ProjectSearchableFields.own.to_data(row))) is not None
             ]
 
 
@@ -765,6 +756,9 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
                     LeaveProjectAction(project_id=project_id, user_ids=user_ids)
                 )
         res = await graph_ctx.processors.project.update_project.run(props.to_action(gid))
+        graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry").clear(
+            ProjectID(gid)
+        )
         return cls(
             ok=True,
             msg="success",
