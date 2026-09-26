@@ -164,6 +164,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
     EndpointReplicaGroupUpdater,
 )
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
@@ -1993,18 +1994,14 @@ class DeploymentDBSource:
                 db_sess, deployment_info
             )
 
-            revision_query = (
-                sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.id == revision_id)
-                .options(selectinload(DeploymentRevisionRow.image_row))
-            )
-            revision_result = await db_sess.execute(revision_query)
-            revision_row = revision_result.scalar_one_or_none()
-            if revision_row is None or revision_row.image_row is None:
+            revision_row = await db_sess.get(DeploymentRevisionRow, revision_id)
+            if revision_row is None or revision_row.image is None:
                 raise DeploymentHasNoTargetRevision(
                     f"Revision {revision_id} not found or has no image"
                 )
-            image_row = revision_row.image_row
+            image_row = await db_sess.get(ImageRow, revision_row.image)
+            if image_row is None:
+                raise DeploymentHasNoTargetRevision(f"Revision {revision_id} has no image")
 
             # Resolve runtime variant preset values from revision
             resolved_presets: ResolvedPresetValues | None = None
@@ -2477,11 +2474,7 @@ class DeploymentDBSource:
                 .where(DeploymentRevisionRow.endpoint == endpoint_id)
                 .order_by(DeploymentRevisionRow.revision_number.desc())
                 .limit(1)
-                .options(
-                    selectinload(DeploymentRevisionRow.resource_slot_rows),
-                    selectinload(DeploymentRevisionRow.runtime_variant_row),
-                    selectinload(DeploymentRevisionRow.image_row),
-                )
+                .options(selectinload(DeploymentRevisionRow.resource_slot_rows))
             )
         ).scalar_one_or_none()
         if row is None:
