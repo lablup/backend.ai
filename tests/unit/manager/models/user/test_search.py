@@ -57,6 +57,10 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
@@ -65,6 +69,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import TableOrORM, with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 # Row imports above ensure mapper initialization (FK dependency order).
 _WITH_TABLES: list[TableOrORM] = [
@@ -94,6 +99,10 @@ _WITH_TABLES: list[TableOrORM] = [
     ReplicaGroupRow,
     RoutingRow,
     ResourcePresetRow,
+    VirtualEntityRow,
+    EntityMembershipRow,
+    EntityMembershipCapRow,
+    ScopeBindingRow,
 ]
 
 
@@ -239,7 +248,7 @@ class TestDeprecatedUserConditions:
         assert sql.count("EXISTS") == 1
         assert "domains" in sql
 
-    def test_exists_project_combined_single_exists_over_the_join(self) -> None:
+    def test_exists_project_combined_reads_the_graph_membership(self) -> None:
         def cond_is_active() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectRow.is_active == True  # noqa: E712
 
@@ -249,8 +258,8 @@ class TestDeprecatedUserConditions:
         conditions: list[QueryCondition] = [cond_is_active, cond_name_like]
         combined = DeprecatedUserConditions.exists_project_combined(conditions)
         sql = str(combined().compile(compile_kwargs={"literal_binds": True}))
-        assert sql.count("EXISTS") == 1
-        assert "association_groups_users" in sql
+        assert "entity_memberships" in sql
+        assert "association_groups_users" not in sql
 
     def test_exists_project_combined_with_no_condition_still_compiles(self) -> None:
         combined = DeprecatedUserConditions.exists_project_combined([])
@@ -268,11 +277,12 @@ class TestDeprecatedUserOrders:
         order = DeprecatedUserOrders.by_project_name(ascending=False)
         assert "DESC" in str(order).upper()
 
-    def test_by_project_name_aggregates_over_the_join(self) -> None:
+    def test_by_project_name_aggregates_over_the_graph_membership(self) -> None:
         order = DeprecatedUserOrders.by_project_name(ascending=True)
         sql = str(order.compile(compile_kwargs={"literal_binds": True}))
         assert "min" in sql.lower()
-        assert "association_groups_users" in sql
+        assert "entity_memberships" in sql
+        assert "association_groups_users" not in sql
         assert "groups" in sql
 
 
@@ -432,12 +442,11 @@ class TestUserNestedSearchIntegration:
                 )
             await session.flush()
 
-            # M:N associations
             for uid, pid in [
                 (user_active_uuid, project_alpha_id),
                 (user_inactive_uuid, project_beta_id),
             ]:
-                session.add(AssocGroupUserRow(user_id=uid, group_id=pid))
+                await VirtualEntitySeeder().enroll_user_in_project(session, pid, uid)
 
             await session.commit()
 
@@ -536,6 +545,34 @@ class TestUserNestedSearchIntegration:
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_inactive_domain
+
+    async def test_search_users_ignores_legacy_only_project_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_db_source: UserDBSource,
+        search_fixture: UserSearchFixture,
+    ) -> None:
+        """A membership left only in the legacy association table does not match."""
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                AssocGroupUserRow(
+                    user_id=search_fixture.user_in_inactive_domain,
+                    group_id=search_fixture.project_alpha_id,
+                )
+            )
+        spec = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
+        searcher = UserSearcher(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[
+                DeprecatedUserConditions.exists_project_combined([
+                    ProjectSearchableFields.own.name.filter.contains(spec)
+                ])
+            ],
+            orders=[],
+        )
+        result = await user_db_source.search_users(searcher)
+
+        assert [item.uuid for item in result.items] == [search_fixture.user_in_active_domain]
 
     # ---- Domain nested order tests ----
 

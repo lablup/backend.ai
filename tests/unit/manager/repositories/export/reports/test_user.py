@@ -2,23 +2,55 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from typing import Any
+
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base.export import ExportFieldDef
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import (
+    PasswordHashAlgorithm,
+    PasswordInfo,
+    UserRole,
+    UserRow,
+    UserStatus,
+)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.base.export import ExportFieldDef, execute_streaming_export
 from ai.backend.manager.repositories.export.reports.user import (
-    ASSOC_GROUP_USER_JOIN,
     DEFAULT_KEYPAIR_JOIN,
     PROJECT_JOIN,
     PROJECT_JOINS,
+    PROJECT_MEMBERSHIP,
+    PROJECT_MEMBERSHIP_JOIN,
     USER_FIELDS,
     USER_REPORT,
     USER_RESOURCE_POLICY_JOIN,
 )
+from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+@dataclass
+class _ProjectMembers:
+    project_id: uuid.UUID
+    graph_member_id: uuid.UUID
+    legacy_member_id: uuid.UUID
 
 
 class TestUserReportDefinition:
@@ -106,15 +138,15 @@ class TestJoinDefinitions:
         """User resource policy JOIN should use UserResourcePolicyRow table."""
         assert USER_RESOURCE_POLICY_JOIN.table is UserResourcePolicyRow.__table__
 
-    def test_project_joins_count(self) -> None:
-        """Project should have 2 JOINs (AssocGroupUser + Group)."""
-        assert len(PROJECT_JOINS) == 2
-        assert ASSOC_GROUP_USER_JOIN in PROJECT_JOINS
-        assert PROJECT_JOIN in PROJECT_JOINS
+    def test_project_joins_order(self) -> None:
+        """Project should have 2 JOINs: the graph membership, then the project."""
+        assert PROJECT_JOINS == (PROJECT_MEMBERSHIP_JOIN, PROJECT_JOIN)
 
-    def test_assoc_group_user_join_table(self) -> None:
-        """AssocGroupUser JOIN should use correct table."""
-        assert ASSOC_GROUP_USER_JOIN.table is AssocGroupUserRow.__table__
+    def test_project_membership_join_reads_the_graph_membership(self) -> None:
+        assert PROJECT_MEMBERSHIP_JOIN.table is PROJECT_MEMBERSHIP
+        membership = str(PROJECT_MEMBERSHIP.compile())
+        assert "entity_memberships" in membership
+        assert "association_groups_users" not in membership
 
     def test_project_join_table(self) -> None:
         """Project JOIN should use ProjectRow table."""
@@ -185,7 +217,6 @@ class TestFieldJoinAssignments:
             field = fields_by_key[key]
             assert field.joins is not None
             assert field.joins == PROJECT_JOINS
-            assert len(field.joins) == 2
 
     def test_main_keypair_detail_fields_have_join(
         self, fields_by_key: dict[str, ExportFieldDef]
@@ -239,7 +270,7 @@ class TestBuildUserQueryWithRealReport:
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
         assert "user_resource_policies" in compiled
         # Project and keypair tables should not be joined
-        assert "association_groups_users" not in compiled
+        assert "groups" not in compiled
         assert "keypairs" not in compiled
 
     def test_project_fields_add_two_joins(self, adapter: ExportAdapter) -> None:
@@ -254,7 +285,7 @@ class TestBuildUserQueryWithRealReport:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assert "association_groups_users" in compiled
+        assert "entity_memberships" in compiled
         assert "groups" in compiled
 
     def test_main_keypair_fields_add_one_join(self, adapter: ExportAdapter) -> None:
@@ -289,8 +320,135 @@ class TestBuildUserQueryWithRealReport:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # All 4 join tables should be present
+        # All 3 join tables should be present
         assert "user_resource_policies" in compiled
-        assert "association_groups_users" in compiled
+        assert "entity_memberships" in compiled
         assert "groups" in compiled
         assert "keypairs" in compiled
+
+
+class TestUserExportProjectMembershipDB:
+    """The project columns follow the graph membership, not the legacy association."""
+
+    @pytest.fixture
+    async def db_engine(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRow,
+                ProjectRow,
+                AssocGroupUserRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def members(self, db_engine: ExtendedAsyncSAEngine) -> _ProjectMembers:
+        """One project: one user enrolled in the graph, one only in the legacy table."""
+        domain_id = DomainID(uuid.uuid4())
+        domain_name = f"dom-{uuid.uuid4().hex[:8]}"
+        project_id = uuid.uuid4()
+        graph_member_id = uuid.uuid4()
+        legacy_member_id = uuid.uuid4()
+
+        async with db_engine.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            user_policy = UserResourcePolicyRow(
+                name=f"upol-{uuid.uuid4().hex[:8]}",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            project_policy = ProjectResourcePolicyRow(
+                name=f"ppol-{uuid.uuid4().hex[:8]}",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=0,
+            )
+            db_sess.add(user_policy)
+            db_sess.add(project_policy)
+            await db_sess.flush()
+
+            for user_id in (graph_member_id, legacy_member_id):
+                db_sess.add(
+                    UserRow(
+                        uuid=user_id,
+                        username=f"user-{user_id.hex[:8]}",
+                        email=f"{user_id.hex[:8]}@example.com",
+                        password=PasswordInfo(
+                            password="dummy",
+                            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                            rounds=100_000,
+                            salt_size=32,
+                        ),
+                        need_password_change=False,
+                        status=UserStatus.ACTIVE,
+                        status_info="active",
+                        domain_name=domain_name,
+                        role=UserRole.USER,
+                        resource_policy=user_policy.name,
+                        domain_id=domain_id,
+                    )
+                )
+            db_sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name="test-project",
+                    domain_name=domain_name,
+                    resource_policy=project_policy.name,
+                )
+            )
+            await db_sess.flush()
+
+            await VirtualEntitySeeder().enroll_user_in_project(db_sess, project_id, graph_member_id)
+            db_sess.add(AssocGroupUserRow(group_id=project_id, user_id=legacy_member_id))
+
+        return _ProjectMembers(
+            project_id=project_id,
+            graph_member_id=graph_member_id,
+            legacy_member_id=legacy_member_id,
+        )
+
+    async def test_project_id_follows_graph_membership(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        members: _ProjectMembers,
+    ) -> None:
+        query = ExportAdapter().build_user_query(
+            report=USER_REPORT,
+            fields=["uuid", "project_id"],
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Any] = []
+        async for partition in execute_streaming_export(db_engine, query):
+            rows.extend(partition)
+
+        project_by_user = {row[0]: row[1] for row in rows}
+        assert len(rows) == 2
+        assert project_by_user[members.graph_member_id] == members.project_id
+        assert project_by_user[members.legacy_member_id] is None
