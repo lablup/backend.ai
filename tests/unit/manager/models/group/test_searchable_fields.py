@@ -56,9 +56,14 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.testutils.db import TableOrORM, with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 # Row imports above ensure mapper initialization (FK dependency order).
 _WITH_TABLES: list[TableOrORM] = [
@@ -88,6 +93,10 @@ _WITH_TABLES: list[TableOrORM] = [
     ReplicaGroupRow,
     RoutingRow,
     ResourcePresetRow,
+    VirtualEntityRow,
+    EntityMembershipRow,
+    EntityMembershipCapRow,
+    ScopeBindingRow,
 ]
 
 
@@ -366,7 +375,7 @@ class TestGroupConditionsUserIdFilters:
         sql = str(condition().compile())
         assert "EXISTS" in sql
         assert "users" in sql
-        assert "association_groups_users" in sql
+        assert "entity_memberships" in sql
 
     def test_by_user_id_equals_negated(self) -> None:
         user_uuid = uuid.uuid4()
@@ -387,7 +396,7 @@ class TestGroupConditionsUserIdFilters:
         sql = str(condition().compile())
         assert "EXISTS" in sql
         assert "users" in sql
-        assert "association_groups_users" in sql
+        assert "entity_memberships" in sql
         assert "IN" in sql.upper()
 
     def test_by_user_id_in_negated(self) -> None:
@@ -412,7 +421,7 @@ class TestGroupConditionsUserNestedFilters:
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
         assert "users" in sql
-        assert "association_groups_users" in sql
+        assert "entity_memberships" in sql
 
     def test_by_user_username_contains_case_insensitive(self) -> None:
         spec = StringMatchSpec(value="alice", case_insensitive=True, negated=False)
@@ -484,7 +493,7 @@ class TestGroupConditionsUserNestedFilters:
         assert "EXISTS" in sql
         assert "status" in sql
 
-    def test_exists_user_combined_single_exists(self) -> None:
+    def test_exists_user_combined_reads_the_graph_membership(self) -> None:
         """Combined helper wraps raw column conditions into single EXISTS."""
 
         def cond_status() -> sa.sql.expression.ColumnElement[bool]:
@@ -497,8 +506,8 @@ class TestGroupConditionsUserNestedFilters:
         combined = DeprecatedProjectConditions.exists_user_combined(conditions)
         sql = str(combined().compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS" in sql
-        assert sql.count("EXISTS") == 1
-        assert "association_groups_users" in sql
+        assert "entity_memberships" in sql
+        assert "association_groups_users" not in sql
 
     def test_exists_user_combined_returns_column_element(self) -> None:
         conditions: list[QueryCondition] = []
@@ -540,7 +549,7 @@ class TestGroupOrdersUserNested:
         order_str = str(order.compile(compile_kwargs={"literal_binds": True}))
         assert "users" in order_str
         assert "min" in order_str.lower()
-        assert "association_groups_users" in order_str
+        assert "entity_memberships" in order_str
 
     def test_by_user_email_ascending(self) -> None:
         order = DeprecatedProjectOrders.by_user_email(ascending=True)
@@ -700,17 +709,9 @@ class TestGroupUserNestedSearchIntegration:
             session.add(proj_b)
             await session.flush()
 
-            assoc_a = AssocGroupUserRow(
-                group_id=proj_a_id,
-                user_id=active_user_id,
-            )
-            session.add(assoc_a)
-
-            assoc_b = AssocGroupUserRow(
-                group_id=proj_b_id,
-                user_id=inactive_user_id,
-            )
-            session.add(assoc_b)
+            seeder = VirtualEntitySeeder()
+            await seeder.enroll_user_in_project(session, proj_a_id, active_user_id)
+            await seeder.enroll_user_in_project(session, proj_b_id, inactive_user_id)
 
             await session.commit()
 
@@ -751,6 +752,33 @@ class TestGroupUserNestedSearchIntegration:
 
         assert result.total_count == 1
         assert result.items[0].id == alpha_info["project_id"]
+
+    async def test_search_ignores_legacy_only_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: ProjectDBSource,
+        projects_with_users: dict[str, dict[str, Any]],
+    ) -> None:
+        """A membership left only in the legacy association table does not match."""
+        alpha_info = projects_with_users["proj_alpha"]
+        beta_info = projects_with_users["proj_beta"]
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                AssocGroupUserRow(group_id=beta_info["project_id"], user_id=alpha_info["user_id"])
+            )
+        spec = UUIDEqualMatchSpec(value=alpha_info["user_id"], negated=False)
+        searcher = ProjectSearcher(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[
+                DeprecatedProjectConditions.exists_user_combined([
+                    UserSearchableFields.own.uuid.filter.equals(spec)
+                ])
+            ],
+            orders=[],
+        )
+        result = await group_db_source.search_projects(searcher)
+
+        assert [item.id for item in result.items] == [alpha_info["project_id"]]
 
     async def test_search_with_user_id_in_filter(
         self,
@@ -979,7 +1007,7 @@ class TestGroupUserNestedSameMember:
             await session.flush()
 
             for member_id in member_ids:
-                session.add(AssocGroupUserRow(group_id=project_id, user_id=member_id))
+                await VirtualEntitySeeder().enroll_user_in_project(session, project_id, member_id)
 
             await session.commit()
 

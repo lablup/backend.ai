@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -12,7 +13,8 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -32,11 +34,6 @@ error_log_db_source_resilience = Resilience(
         ),
     ]
 )
-
-
-# `association_groups_users` is no longer written; project membership lives in the
-# entity graph. Moving the reads below changes which users answer, so they are left
-# to a follow-up.
 
 
 class ErrorLogDBSource:
@@ -73,14 +70,12 @@ class ErrorLogDBSource:
             if is_superadmin:
                 pass
             elif is_admin:
-                j = sa.join(
-                    ProjectRow.__table__,
-                    AssocGroupUserRow.__table__,
-                    ProjectRow.id == AssocGroupUserRow.group_id,
-                )
+                membership = user_scope_membership_query(ProjectEntityType()).subquery()
                 usr_query = (
-                    sa.select(AssocGroupUserRow.user_id)
-                    .select_from(j)
+                    sa.select(membership.c.user_id)
+                    .select_from(
+                        sa.join(membership, ProjectRow, membership.c.scope_id == ProjectRow.id)
+                    )
                     .where(ProjectRow.domain_name == user_domain)
                 )
                 usr_result = await db_sess.execute(usr_query)
