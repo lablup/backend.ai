@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.session_template import SessionTemplateEntity
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.session_template.types import TemplateType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -33,7 +34,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
+from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow

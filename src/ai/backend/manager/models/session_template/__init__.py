@@ -1,6 +1,3 @@
-from .row import SessionTemplateRow, TemplateType
+from .row import SessionTemplateRow
 
-__all__ = (
-    "SessionTemplateRow",
-    "TemplateType",
-)
+__all__ = ("SessionTemplateRow",)

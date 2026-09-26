@@ -6,12 +6,12 @@ from typing import Any, Final
 
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
-from ai.backend.manager.models.session_template.row import (
+from ai.backend.manager.data.session_template.types import (
+    ClusterTemplate,
+    TaskTemplate,
     TemplateType,
-    check_cluster_template,
-    check_task_template,
 )
+from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 
 from .actions.create_cluster_template import (
@@ -84,7 +84,7 @@ class TemplateService:
 
         items: list[dict[str, Any]] = []
         for item_input in action.items:
-            template_data = check_task_template(item_input.template)
+            template_data = TaskTemplate.check(item_input.template)
             template_id = uuid.uuid4().hex
             name = (
                 item_input.name
@@ -151,7 +151,7 @@ class TemplateService:
         )
 
         for item_input in action.items:
-            template_data = check_task_template(item_input.template)
+            template_data = TaskTemplate.check(item_input.template)
             name = (
                 item_input.name
                 if item_input.name is not None
@@ -199,7 +199,7 @@ class TemplateService:
             owner_access_key=action.owner_access_key,
         )
 
-        template_data = check_cluster_template(action.template_data)
+        template_data = ClusterTemplate.check(action.template_data)
         name = template_data["metadata"]["name"]
         template_id = await self._repository.create_cluster_template(
             action.domain_name,
@@ -242,7 +242,7 @@ class TemplateService:
         exists = await self._repository.cluster_template_exists(str(action.template_id))
         if not exists:
             raise SessionTemplateNotFound
-        template_data = check_cluster_template(action.template_data)
+        template_data = ClusterTemplate.check(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
             str(action.template_id), template_data, name
