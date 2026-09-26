@@ -35,7 +35,7 @@ from ai.backend.manager.models.image.row import (
     ImagePermissionContextBuilder,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -46,8 +46,12 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 DOMAIN_NAME = "test-domain"
 REGISTRY_URL = "https://cr.test.io"
@@ -88,13 +92,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                 )
             )
             await sess.flush()
-            sess.add(
-                AssocGroupUserRow(
-                    id=uuid4(),
-                    user_id=user.uuid,
-                    group_id=project_id,
-                )
-            )
+            await VirtualEntitySeeder().enroll_user_in_project(sess, project_id, user.uuid)
             await sess.commit()
         return project_id
 
@@ -139,10 +137,12 @@ class TestImagePermissionContextNonGlobalRegistry:
                 KeyPairRow,
                 UserRow,
                 ProjectRow,
-                AssocGroupUserRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
                 ImageRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
