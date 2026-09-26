@@ -20,6 +20,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import override
 
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.health_checker.types import (
     MANAGER,
@@ -28,7 +29,6 @@ from ai.backend.common.health_checker.types import (
     ServiceGroup,
     ServiceHealth,
 )
-from ai.backend.web.clients.endpoint_pool import HealthyEndpointPool
 
 # Per-endpoint informational service group — not in any required set, so it
 # emits to the connectivity payload without affecting readiness gating.

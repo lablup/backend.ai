@@ -3018,14 +3018,18 @@ class VolumeProxyConfig(BaseConfigSchema):
         ),
     ]
     manager_api: Annotated[
-        str,
+        CommaSeparatedStrList,
         Field(
             validation_alias=AliasChoices("manager_api", "manager-api"),
             serialization_alias="manager_api",
         ),
         BackendAIConfigMeta(
             description=(
-                "Manager-facing API endpoint URL of the storage proxy. This internal URL is used "
+                "Manager-facing API endpoint URL(s) of storage proxy instances mounting the same storage. "
+                "Accepts a single URL or comma-separated URLs, for example "
+                "http://a:6022,http://b:6022. Each request selects a healthy instance using "
+                "its configured readiness path (default /readyz); failed requests are not retried. "
+                "These internal URLs are used "
                 "by the manager to perform administrative operations like creating/deleting folders, "
                 "managing quotas, and checking storage status. Should only be accessible from "
                 "the manager's network."
@@ -3034,6 +3038,93 @@ class VolumeProxyConfig(BaseConfigSchema):
             example=ConfigExample(
                 local="http://localhost:6022", prod="http://storage-internal:6022"
             ),
+        ),
+    ]
+    health_check_probe_path: Annotated[
+        str,
+        Field(
+            default="/readyz",
+            validation_alias=AliasChoices("health_check_probe_path", "health-check-probe-path"),
+            serialization_alias="health_check_probe_path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "HTTP path probed on each manager-facing storage proxy endpoint. "
+                "Must return 2xx when ready and be accessible without token authentication."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="/readyz", prod="/readyz"),
+        ),
+    ]
+    health_check_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("health_check_interval", "health-check-interval"),
+            serialization_alias="health_check_interval",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds between readiness probe rounds for this storage proxy.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    health_check_failure_threshold: Annotated[
+        int,
+        Field(
+            default=3,
+            ge=1,
+            validation_alias=AliasChoices(
+                "health_check_failure_threshold", "health-check-failure-threshold"
+            ),
+            serialization_alias="health_check_failure_threshold",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Consecutive probe or request connection failures before an endpoint is excluded. "
+                "A successful probe or request resets the count; a successful probe restores "
+                "an excluded endpoint."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+    health_check_recovery_timeout: Annotated[
+        float,
+        Field(
+            default=60.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_recovery_timeout", "health-check-recovery-timeout"
+            ),
+            serialization_alias="health_check_recovery_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Recovery timeout in seconds, reserved for future endpoint eviction policies. "
+                "Currently unused by the pool; endpoints recover on the next successful probe."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="60.0", prod="60.0"),
+        ),
+    ]
+    health_check_probe_timeout: Annotated[
+        float,
+        Field(
+            default=2.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_probe_timeout", "health-check-probe-timeout"
+            ),
+            serialization_alias="health_check_probe_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for each readiness probe, independent of operation timeouts."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="2.0", prod="2.0"),
         ),
     ]
     secret: Annotated[
@@ -3101,6 +3192,14 @@ class VolumeProxyConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+
+    @field_validator("manager_api")
+    @classmethod
+    def validate_manager_api(cls, endpoints: CommaSeparatedStrList) -> CommaSeparatedStrList:
+        normalized = [endpoint.strip() for endpoint in endpoints]
+        if not normalized or any(not endpoint for endpoint in normalized):
+            raise ValueError("manager_api must contain non-empty endpoint URLs")
+        return CommaSeparatedStrList(list(dict.fromkeys(normalized)))
 
 
 class VolumesConfig(BaseConfigSchema):

@@ -44,10 +44,9 @@ class EndpointPoolSpec:
     endpoint flips from healthy to unhealthy."""
 
     recovery_timeout: float
-    """Seconds the ``unhealthy_since`` timestamp is retained after a flip to
-    unhealthy. The endpoint itself stays in the pool and is flipped back to
-    healthy when the next probe succeeds; this field is informational for
-    operators and reserved for future eviction policies."""
+    """Reserved for future eviction policies; currently unused.
+    Endpoints recover on the next successful probe or caller request.
+    """
 
     probe_timeout: float
     """Per-endpoint HTTP probe timeout in seconds. Independent of
