@@ -41,7 +41,7 @@ class EndpointPoolSpec:
 
     failure_threshold: int
     """Consecutive probe (or caller-reported) failures required before an
-    endpoint flips from healthy to unhealthy."""
+    endpoint flips from healthy to unhealthy. A 503 probe bypasses this threshold."""
 
     recovery_timeout: float
     """Seconds the ``unhealthy_since`` timestamp is retained after a flip to

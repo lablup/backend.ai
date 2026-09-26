@@ -16,8 +16,8 @@ What this pool does:
    recovery is a zero-cost flag flip.
 2. Runs a periodic ``GET <probe_path>`` per endpoint. Consecutive failures
    past ``EndpointPoolSpec.failure_threshold`` flip the endpoint to
-   unhealthy; the next probe success (or successful caller request)
-   restores it.
+   unhealthy; a 503 probe excludes it immediately. Only a successful
+   probe restores it.
 3. Delegates "which healthy endpoint to use" to an
    :class:`EndpointSelectionStrategy` passed in at construction time.
 4. Owns the bookkeeping for caller request outcomes. The acquire context
@@ -36,6 +36,7 @@ import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from http import HTTPStatus
 
 import aiohttp
 from aiotools import cancel_and_wait
@@ -121,8 +122,8 @@ class HealthyEndpointPool:
 
         On context exit, a caller exception matching ``_CONNECTION_ERRORS``
         is recorded against the chosen endpoint and re-raised; a clean exit
-        resets that endpoint's failure counter (so a single success after
-        intermittent probe failures restores it).
+        resets the failure counter while the endpoint is healthy. Only a
+        successful probe restores an unhealthy endpoint.
 
         Raises :class:`ManagerConnectionUnavailable` when no endpoint is
         currently healthy.
@@ -167,7 +168,8 @@ class HealthyEndpointPool:
             self._mark_failure(cached, reason=f"request: {error}")
             raise
         else:
-            self._mark_success(cached)
+            if cached.is_healthy:
+                self._mark_success(cached)
 
     # --- Health-state read API -----------------------------------------
 
@@ -225,6 +227,14 @@ class HealthyEndpointPool:
         try:
             async with asyncio.timeout(self._spec.probe_timeout):
                 async with cached.probe_session.get(self._spec.probe_path) as resp:
+                    if resp.status == HTTPStatus.SERVICE_UNAVAILABLE:
+                        if cached.is_healthy:
+                            cached.is_healthy = False
+                            cached.unhealthy_since = time.perf_counter()
+                            log.info(
+                                "Endpoint {} is not ready (probe HTTP 503)", cached.entry.endpoint
+                            )
+                        return
                     # Only 2xx is treated as a healthy probe. 4xx (path
                     # missing, auth-required surface) is a failure because
                     # we cannot distinguish "endpoint up but wrong path"
