@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from decimal import Decimal
 from functools import lru_cache
 
 from ai.backend.common.api_handlers import Sentinel
@@ -525,26 +524,14 @@ class ImageAdapter(BaseAdapter):
                     result.append(ImageAliasOrders.alias(ascending))
         return result
 
-    @staticmethod
-    def _convert_max(value: Decimal | str | None) -> str | None:
-        if value is None:
-            return None
-        if isinstance(value, Decimal):
-            return None if value.is_infinite() else str(value)
-        return str(value)
-
     def _data_to_dto(self, data: ImageData) -> ImageNode:
         """Convert data layer type to Pydantic DTO."""
         status = ImageStatusType(data.status.value)
         labels = [ImageLabelInfo(key=k, value=v) for k, v in data.labels.label_data.items()]
         tags = [ImageTagInfo(key=e.key, value=e.value) for e in data.tags]
         resource_limits_flat = [
-            ImageResourceLimitInfo(
-                key=rl.key,
-                min=str(rl.min),
-                max=self._convert_max(rl.max),
-            )
-            for rl in data.resource_limits
+            ImageResourceLimitInfo.model_validate(resource_limit.to_dict())
+            for resource_limit in data.resource_limits
         ]
         accelerators = data.accelerators
         accelerator_list = (
