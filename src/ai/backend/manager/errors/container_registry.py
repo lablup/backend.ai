@@ -3,35 +3,9 @@ from typing import override
 from aiohttp import web
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
+from ai.backend.common.exception import ErrorDetail
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
-
-
-class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
 
 
 class ContainerRegistryQuotaNotSupported(EntityError, web.HTTPBadRequest):

@@ -1,7 +1,7 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, legacy is_global image visibility, update-only URL validation
+description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, legacy is_global image visibility, request-type registry validation
 scope: src/ai/backend/manager/api/adapters/container_registry
 keywords: [container registry, scenario, adapter, superadmin, scoped_search, operation scope, RBAC, allowed groups, is_global, image visibility]
 sources:
@@ -108,24 +108,24 @@ status: draft
   노드가 없는 ID는 빈 값이 아니라 권한 부족으로 거부된다. 단건 조회의 권한 검사는 슈퍼관리자를
   먼저 통과시키므로 두 검사의 결과가 다르며, 어느 쪽으로 맞출지는 아직 결정되지 않았다.
 
-## 수정 후 레지스트리의 `url` 값과 `type` 값을 검증한다
+## 수정 패치는 요청 타입이 검사한다
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | `url` 값만 수정한다 | 레지스트리가 있고 호출자가 슈퍼관리자임 | `url` 수정 | `url` 값만 바뀌고 나머지 값은 유지됨 |
 | 수정할 값을 지정하지 않는다 | 레지스트리가 있고 호출자가 슈퍼관리자임 | 빈 수정 요청 | 값이 바뀌지 않은 레지스트리 |
 | 허용 프로젝트를 지정해 수정한다 | 레지스트리와 프로젝트가 있고 호출자가 슈퍼관리자임 | 허용 프로젝트 추가와 수정 | 레지스트리 값은 유지되고 프로젝트 관계가 생성됨 |
-| 호스트가 없는 `url` 값으로 수정한다 | 레지스트리가 있고 호출자가 슈퍼관리자임 | `url` 수정 | 잘못된 입력으로 거부 |
-| Harbor 레지스트리의 `project` 값을 비운다 | Harbor 레지스트리가 있고 호출자가 슈퍼관리자임 | `project` 수정 | Harbor 레지스트리에는 `project` 값이 필요하다는 이유로 거부 |
 | 존재하지 않는 ID를 수정한다 | 다른 레지스트리만 있고 호출자가 슈퍼관리자임 | `url` 수정 | 레지스트리를 찾을 수 없어 거부 |
 | 일반 사용자가 수정한다 | 레지스트리가 있고 호출자가 슈퍼관리자가 아님 | `url` 수정 | 역할 부족으로 거부 |
 
-- `url` 검증은 호스트가 있는지만 확인하며 스킴은 제한하지 않는다.
-- `http` 또는 `https`로 시작하지 않는 `url` 값에는 `http://`를 붙인 뒤 파싱한다. 따라서
-  `ftp://reg.example`이나 공백이 포함된 문자열도 통과하며, 호스트가 비어 있는 `url` 값만 거부된다.
-- 이 검증 범위를 강화할지는 아직 결정되지 않았다.
-- 검증은 수정 후의 최종 값을 대상으로 한다. 요청에서 `url` 값이나 `project` 값을 생략하더라도
-  저장된 값이 규칙을 위반하면 수정 요청을 거부한다.
+- 주소 형식과 Harbor 프로젝트 규칙은 요청 타입(`UpdateContainerRegistryInput`)이 검사한다.
+  어댑터에 도달하기 전에 거부되므로 어댑터 시나리오에 적지 않는다.
+- 패치는 그 자체로 판단한다. 주소는 값이 있을 때만, 프로젝트는 같은 패치가 Harbor 종류를
+  지정하면서 프로젝트 값도 함께 줄 때만 검사한다.
+- 저장된 프로젝트가 없는 레지스트리를 Harbor 종류로 바꾸는 수정은 거부되지 않는다. 수정 후의
+  행을 다시 검사하지 않기 때문이다.
+- `url` 검증은 호스트가 있는지만 확인하며 스킴은 제한하지 않는다. `http` 또는 `https`로
+  시작하지 않는 `url` 값에는 `http://`를 붙인 뒤 파싱하므로 `ftp://reg.example`도 통과한다.
 
 ## 허용 프로젝트 변경은 레지스트리와 프로젝트 양쪽 스코프의 권한을 검사한다
 

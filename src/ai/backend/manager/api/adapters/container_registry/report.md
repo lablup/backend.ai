@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-Not exercised by any scenario: apply_global, batch_load_fields.
+Not exercised by any scenario: apply_global, batch_load_fields, create_registry.
 
 ### allowing_projects
 
@@ -542,30 +542,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-#### [an-address-whose-host-is-empty-is-refused-on-update](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
-
-슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다
-
-Given
-
-- 레지스트리 하나, superadmin 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ContainerRegistryAdapter.admin_update — user-1이 주소를 http://로 수정
-
-Then
-
-- 거부된다
-  - 거부: InvalidContainerRegistryURL
-
 #### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
 슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
@@ -686,30 +662,6 @@ Then
 
 - 거부된다
   - 거부: ContainerRegistryNotFound
-
-#### [turning-a-registry-into-harbor-without-a-project-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
-
-프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, harbor는 프로젝트를 요구하므로 거부된다
-
-Given
-
-- 레지스트리 하나, superadmin 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ContainerRegistryAdapter.admin_update — user-1이 종류를 harbor2로 수정
-
-Then
-
-- 거부된다
-  - 거부: InvalidContainerRegistryProject
 
 ### reading
 
