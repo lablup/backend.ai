@@ -185,6 +185,7 @@ class SokovanOrchestratorDependency(
                 fair_share_calculator=fair_share_calculator,
                 resource_usage_repository=setup_input.resource_usage_repository,
                 fair_share_repository=setup_input.fair_share_repository,
+                hook_registry=scheduler_components.hook_registry,
             )
         )
 

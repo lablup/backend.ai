@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -38,7 +38,22 @@ def mock_terminator() -> AsyncMock:
 def mock_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
+    repository.search_sessions_with_kernels_for_handler = AsyncMock(return_value=[_A_SESSION])
     return repository
+
+
+@pytest.fixture
+def mock_hook() -> AsyncMock:
+    hook = AsyncMock()
+    hook.execute = AsyncMock(return_value=None)
+    return hook
+
+
+@pytest.fixture
+def mock_hook_registry(mock_hook: AsyncMock) -> MagicMock:
+    registry = MagicMock()
+    registry.get_hook = MagicMock(return_value=mock_hook)
+    return registry
 
 
 @pytest.fixture
@@ -54,12 +69,19 @@ def handler(
     mock_terminator: AsyncMock,
     mock_repository: AsyncMock,
     mock_valkey_schedule: AsyncMock,
+    mock_hook_registry: MagicMock,
 ) -> CleanupForceTerminatedHandler:
     return CleanupForceTerminatedHandler(
         terminator=mock_terminator,
         repository=mock_repository,
         valkey_schedule=mock_valkey_schedule,
+        hook_registry=mock_hook_registry,
     )
+
+
+#: Stands in for the full session+kernel row the TERMINATED hook is handed. Its contents do not
+#: matter here -- what the handler decides is whether the hook ran and whether it raised.
+_A_SESSION = MagicMock()
 
 
 def _make_terminating_session_data(session_id: SessionId) -> TerminatingSessionData:
@@ -171,3 +193,61 @@ class TestCleanupForceTerminatedHandler:
         await handler.execute([session_id])
 
         mock_valkey_schedule.remove_force_terminated_sessions.assert_not_awaited()
+
+    async def test_execute_runs_the_terminated_hook(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_repository: AsyncMock,
+        mock_hook: AsyncMock,
+        mock_hook_registry: MagicMock,
+    ) -> None:
+        """A force-terminated session never passes the promotion pass, so its TERMINATED hook --
+        the one that gives the volatile network back -- runs here or not at all."""
+        session_id = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(session_id)
+        ]
+
+        await handler.execute([session_id])
+
+        mock_hook_registry.get_hook.assert_called_once_with(SessionStatus.TERMINATED)
+        mock_hook.execute.assert_awaited_once_with(_A_SESSION)
+
+    async def test_execute_keeps_a_session_whose_network_is_not_back_yet(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        mock_hook: AsyncMock,
+    ) -> None:
+        """The overlay teardown declines while a node still holds the VNI. Removing the id then
+        would end the retry with the allocation still claimed -- which is exactly how a forced
+        terminate used to burn a VNI and a subnet for good."""
+        session_id = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(session_id)
+        ]
+        mock_hook.execute.side_effect = RuntimeError("overlay allocation is still held")
+
+        await handler.execute([session_id])
+
+        mock_valkey_schedule.remove_force_terminated_sessions.assert_not_awaited()
+
+    async def test_execute_gives_up_on_a_session_whose_row_is_gone(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        mock_hook: AsyncMock,
+    ) -> None:
+        """Nothing names the network any more, so retrying forever would only keep the id."""
+        session_id = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(session_id)
+        ]
+        mock_repository.search_sessions_with_kernels_for_handler.return_value = []
+
+        await handler.execute([session_id])
+
+        mock_hook.execute.assert_not_awaited()
+        mock_valkey_schedule.remove_force_terminated_sessions.assert_awaited_once_with([session_id])

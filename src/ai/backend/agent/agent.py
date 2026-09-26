@@ -49,6 +49,7 @@ from uuid import UUID
 
 import aiotools
 import attrs
+import psutil
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -76,7 +77,7 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
-from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
     CollectContainerStatTask,
@@ -847,6 +848,10 @@ class AbstractAgent[
     port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
+    #: How many containers this NODE may be building at once. One semaphore for the agent, not one
+    #: per request: the number answers "what can this host start at the same time", and a
+    #: per-request one lets N concurrent sessions each run the configured number.
+    kernel_creation_sema: asyncio.Semaphore
     _local_cron: LocalCron | None
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
@@ -944,6 +949,22 @@ class AbstractAgent[
             local_config.container.port_range,
             cooldown_sec=local_config.container.port_reuse_cooldown_sec,
         )
+        if (exposed := ephemeral_overlap(local_config.container.port_range)) is not None:
+            # Said once, loudly, because the failure it causes is otherwise unattributable: a
+            # session fails to start with EADDRINUSE on a port nothing of ours is using, the next
+            # one succeeds, and the pool's own bookkeeping is correct throughout.
+            log.warning(
+                "host ports {}..{} can also be handed out by the kernel as the source port of an"
+                " outgoing connection ({} covers them and ip_local_reserved_ports does not), so a"
+                " kernel's published port may fail to bind with EADDRINUSE through no fault of"
+                " this agent. Reserve them:"
+                " sysctl -w net.ipv4.ip_local_reserved_ports={}-{}",
+                exposed[0],
+                exposed[1],
+                "net.ipv4.ip_local_port_range",
+                local_config.container.port_range[0],
+                local_config.container.port_range[1],
+            )
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)
@@ -966,6 +987,9 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        self.kernel_creation_sema = asyncio.Semaphore(
+            self.local_config.agent.kernel_creation_concurrency
+        )
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
@@ -1695,6 +1719,13 @@ class AbstractAgent[
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
     ) -> None:
+        # The manager sends the session's `status_info` as this reason, and that column is free
+        # text: `rig-cleanup`, `All kernels cancelled`, `UNKNOWN`. It is annotated as the enum but
+        # arrives over RPC as whatever string was in the database, and `_handle_clean_event` puts
+        # it straight into a pydantic event -- which refuses it, kills the lifecycle task, and so
+        # never sends `KernelTerminatedAnycastEvent`. The kernel is gone and the manager is never
+        # told. Coerced here because this is the one funnel every lifecycle event passes through.
+        reason = KernelLifecycleEventReason.from_value(reason) or KernelLifecycleEventReason.UNKNOWN
         cid: ContainerId | None = None
         try:
             kernel_obj = self.kernel_registry[kernel_id]
@@ -2317,9 +2348,48 @@ class AbstractAgent[
                         container_id=container.id,
                     )
 
+        # After the container scan above, and only after it: that scan `discard`s the ports our
+        # own live kernels hold, and those must stay out of the pool entirely rather than come
+        # back when a cooldown lapses. What is left is what the HOST holds and we do not -- a
+        # departing container's docker-proxy, a socket in TIME_WAIT -- and the pool was built
+        # with every port marked never-used, so those would be handed straight out.
+        self._defer_ports_the_host_still_holds()
+
         log.info("starting with resource allocations")
         for computer_name, computer_ctx in self.computers.items():
             log.info("{}: {!r}", computer_name, dict(computer_ctx.alloc_map.allocations))
+
+    def _defer_ports_the_host_still_holds(self) -> None:
+        """Put the cooldown back on ports the OS is still using, at startup.
+
+        The pool's whole purpose is to keep a just-released port out of circulation until the
+        kernel has finished with it, and a fresh pool has no memory of that: every port starts as
+        never-used, so the first sessions after a restart bind against ports the host has not let
+        go and fail with EADDRINUSE. Measured on a restarted node: 9 of 12 sessions failed that
+        way, against 3 of 12 once the same node had settled.
+
+        Best-effort. Reading the host's sockets can be refused, and a node that cannot read them
+        is no worse off than before this existed -- so it says so and carries on rather than
+        refusing to start.
+        """
+        try:
+            in_use = {conn.laddr.port for conn in psutil.net_connections(kind="tcp") if conn.laddr}
+        except (psutil.Error, OSError) as e:
+            log.warning(
+                "could not read the host's sockets, so the port pool starts with no cooldown"
+                " on ports the host may still hold ({})",
+                e,
+            )
+            return
+        deferred = sorted(in_use & set(self.port_pool.remaining()))
+        if not deferred:
+            return
+        self.port_pool.defer_many(deferred)
+        log.info(
+            "{} host port(s) are still in use; holding them back for the reuse cooldown ({})",
+            len(deferred),
+            f"{deferred[0]}..{deferred[-1]}" if len(deferred) > 1 else deferred[0],
+        )
 
     @abstractmethod
     async def init_kernel_context(

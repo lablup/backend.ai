@@ -1642,7 +1642,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             ),
         )
         pickle_loader = pickle_loader_writer_creator.create_loader()
-        pickle_writer = pickle_loader_writer_creator.create_writer()
         container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
             ContainerBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
@@ -1651,13 +1650,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         )
         container_loader = container_loader_writer_creator.create_loader()
         container_writer = container_loader_writer_creator.create_writer()
+        # Container-based only: the pickle is no longer a second record of what is running here.
+        # It is read once by the adapter below, to carry a snapshot an older version left behind
+        # into the per-kernel scratch records.
         self._kernel_recovery = DockerKernelRegistryRecovery(
             loader=container_loader,
-            writers=[pickle_writer, container_writer],
+            writers=[container_writer],
         )
         self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
             pickle_loader,
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+            self._live_kernel_ids,
         )
 
     @override
@@ -1776,6 +1779,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker is not None:
             await self.docker.close()
+
+    async def _live_kernel_ids(self) -> frozenset[KernelId]:
+        """The kernels this runtime actually has a container for, as the adapter's ground truth."""
+        return frozenset(kernel_id for kernel_id, _ in await self.enumerate_containers())
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
@@ -2379,12 +2386,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if (
                         e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
                     ) or e.status == HTTPStatus.NOT_FOUND:
-                        return
-                    log.exception(
-                        "unexpected docker error while deleting container (k:{}, c:{})",
-                        kernel_id,
-                        container_id,
-                    )
+                        # The container is gone, or on its way out under another deletion. That is
+                        # what this call wanted; it is not a reason to abandon the rest of the
+                        # clean. Returning here skipped `_clean_scratch` below, so every kernel
+                        # whose container died with its agent -- the whole of a SIGKILL restart --
+                        # kept its scratch directory for good. Measured: two scratch dirs left
+                        # behind per ungraceful restart, never collected by anything afterwards.
+                        # Nothing below depends on the delete having happened.
+                        log.debug(
+                            "container already gone while cleaning (k:{}, c:{}); continuing with"
+                            " the scratch",
+                            kernel_id,
+                            container_id,
+                        )
+                    else:
+                        log.exception(
+                            "unexpected docker error while deleting container (k:{}, c:{})",
+                            kernel_id,
+                            container_id,
+                        )
                 except TimeoutError:
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
