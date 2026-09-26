@@ -49,7 +49,6 @@ __all__ = (
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
-    "inference_image_label_schema",
     "login",
     "validate_image_labels",
 )
@@ -98,10 +97,8 @@ class LabelName(enum.StrEnum):
     SESSION_ID = "ai.backend.session-id"
     OWNER_AGENT = "ai.backend.owner"
 
-    # Inference image labels
+    # Marks which service ports an inference endpoint is served on.
     ENDPOINT_PORTS = "ai.backend.endpoint-ports"
-    MODEL_PATH = "ai.backend.model-path"
-    MODEL_FORMAT = "ai.backend.model-format"
 
     # Ownership
     CUSTOMIZED_OWNER = "ai.backend.customized-image.owner"
@@ -142,12 +139,6 @@ common_image_label_schema = t.Dict({
     t.Key(LabelName.ACCELERATORS, optional=True): tx.StringList(allow_blank=True),
     t.Key(LabelName.SERVICE_PORTS, optional=True): tx.StringList(allow_blank=True),
 }).allow_extra("*")
-
-inference_image_label_schema = t.Dict({
-    t.Key(LabelName.ENDPOINT_PORTS): tx.StringList(min_length=1),
-    t.Key(LabelName.MODEL_PATH): tx.PurePath(),
-    t.Key(LabelName.MODEL_FORMAT): t.String(),
-}).ignore_extra("*")
 
 
 class DockerConnectorSource(enum.Enum):
@@ -340,28 +331,11 @@ async def login(
 
 def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
     common_labels = common_image_label_schema.check(labels)
-    service_ports = {
-        item["name"]: item
-        for item in parse_service_ports(
-            common_labels.get(LabelName.SERVICE_PORTS, ""),
-            common_labels.get(LabelName.ENDPOINT_PORTS, ""),
-        )
-    }
-    match common_labels[LabelName.ROLE]:
-        case "INFERENCE":
-            inference_labels = inference_image_label_schema.check(labels)
-            for name in inference_labels[LabelName.ENDPOINT_PORTS]:
-                if name not in service_ports:
-                    raise ValueError(
-                        f"ai.backend.endpoint-ports contains an undefined service port: {name}"
-                    )
-                # inference images should launch the serving daemons when they start as a container.
-                # TODO: enforce this restriction??
-                if service_ports[name]["protocol"] != "preopen":
-                    raise ValueError(f"The endpoint-port {name} must be a preopen service-port.")
-            common_labels.update(inference_labels)
-        case _:
-            pass
+    # Called for the rejection it raises on a malformed or reserved service port.
+    parse_service_ports(
+        common_labels.get(LabelName.SERVICE_PORTS, ""),
+        common_labels.get(LabelName.ENDPOINT_PORTS, ""),
+    )
     return cast(dict[str, str], common_labels)
 
 

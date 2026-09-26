@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import (
     ImageRef,
+    KernelFeatures,
     LabelName,
     arch_name_aliases,
     validate_image_labels,
@@ -72,6 +73,9 @@ class RescanCounts:
 
 rescan_counts: ContextVar[RescanCounts] = ContextVar("rescan_counts")
 
+# The one `ai.backend.role` value that maps to a type of its own.
+_SYSTEM_ROLE: Final[str] = "SYSTEM"
+
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
@@ -85,6 +89,19 @@ def _created_in_project(
     if user_id is None:
         return None
     return personal_projects.get(user_id)
+
+
+def _image_type(labels: Mapping[str, Any]) -> ImageType:
+    """The type a scanned image is recorded as, read off its role and feature labels.
+
+    The role label's INFERENCE falls to COMPUTE: nothing reads the distinction.
+    """
+    if labels.get(LabelName.ROLE) == _SYSTEM_ROLE:
+        return ImageType.SYSTEM
+    features = labels.get(LabelName.FEATURES) or ""
+    if KernelFeatures.OPERATION.value in features.split():
+        return ImageType.SYSTEM
+    return ImageType.COMPUTE
 
 
 def _is_customized(labels: Mapping[str, Any]) -> bool:
@@ -244,6 +261,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.labels = update["labels"]
                         image_row.customized = _is_customized(update["labels"])
                         image_row.creator_id = _customized_owner_user_id(update["labels"])
+                        image_row.type = _image_type(update["labels"])
                         image_row.is_local = is_local
                         scanned_images.append(ImageSearchableFields.own.to_data(image_row))
 
@@ -286,7 +304,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             tag=parsed_img.tag,
                             config_digest=update["config_digest"],
                             size_bytes=update["size_bytes"],
-                            type=ImageType.COMPUTE,
+                            type=_image_type(update["labels"]),
                             accelerators=update.get("accels"),
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
