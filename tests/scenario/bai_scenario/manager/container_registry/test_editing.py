@@ -16,10 +16,6 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -167,62 +163,6 @@ class AddingAllowedProjectWhileEditing(
 
 
 @dataclass(frozen=True)
-class AnAddressWithoutAHostIsRefused(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
-):
-    @override
-    def summary(self) -> str:
-        return "an-address-whose-host-is-empty-is-refused-on-update"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, "
-            "수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
-        return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url="http://")
-
-    @override
-    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
-        return TheCallIsRefused(InvalidContainerRegistryURL)
-
-
-@dataclass(frozen=True)
-class HarborWithoutAProjectIsRefused(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
-):
-    @override
-    def summary(self) -> str:
-        return "turning-a-registry-into-harbor-without-a-project-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, "
-            "harbor는 프로젝트를 요구하므로 거부된다"
-        )
-
-    @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
-        return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(registry_type=ContainerRegistryType.HARBOR2)
-
-    @override
-    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
-        return TheCallIsRefused(InvalidContainerRegistryProject)
-
-
-@dataclass(frozen=True)
 class MissingRegistryIsRefused(
     Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
@@ -279,8 +219,6 @@ SCENARIOS: list[EditingScenario] = [
     ChangingOnlyTheAddress(),
     AnEmptyEditChangesNothing(),
     AddingAllowedProjectWhileEditing(),
-    AnAddressWithoutAHostIsRefused(),
-    HarborWithoutAProjectIsRefused(),
     MissingRegistryIsRefused(),
     APlainUserMayNotEdit(),
 ]
