@@ -13,10 +13,12 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 __all__ = (
     "DeprecatedUserConditions",
@@ -46,14 +48,12 @@ class DeprecatedUserConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subq = (
                 sa.select(sa.literal(1))
-                .select_from(
-                    sa.join(
-                        AssocGroupUserRow.__table__,
-                        ProjectRow.__table__,
-                        AssocGroupUserRow.group_id == ProjectRow.id,
-                    )
+                .select_from(ProjectRow)
+                .where(
+                    user_scope_membership_exists(
+                        ProjectEntityType(), ProjectRow.id, UserRow.uuid
+                    ).correlate(ProjectRow, UserRow)
                 )
-                .where(AssocGroupUserRow.user_id == UserRow.uuid)
             )
             for cond in project_conditions:
                 subq = subq.where(cond())
@@ -69,14 +69,12 @@ class DeprecatedUserOrders:
     def by_project_name(ascending: bool = True) -> QueryOrder:
         subq: sa.ScalarSelect[Any] = (
             sa.select(sa.func.min(ProjectRow.name))
-            .select_from(
-                sa.join(
-                    AssocGroupUserRow.__table__,
-                    ProjectRow.__table__,
-                    AssocGroupUserRow.group_id == ProjectRow.id,
-                )
+            .select_from(ProjectRow)
+            .where(
+                user_scope_membership_exists(
+                    ProjectEntityType(), ProjectRow.id, UserRow.uuid
+                ).correlate(ProjectRow, UserRow)
             )
-            .where(AssocGroupUserRow.user_id == UserRow.uuid)
             .correlate(UserRow)
             .scalar_subquery()
         )

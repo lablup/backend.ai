@@ -573,7 +573,9 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
-    membership_cond = user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_uuid)
+    membership_cond: sa.ColumnElement[bool] = user_scope_membership_exists(
+        ProjectEntityType(), groups.c.id, user_uuid
+    )
     if group_id is not None:
         membership_cond = sa.and_(membership_cond, groups.c.id == group_id)
     query = sa.select(groups.c.allowed_vfolder_hosts).where(
