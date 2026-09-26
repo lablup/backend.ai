@@ -9,8 +9,9 @@ from typing import Any, Self, TypeVar, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
+from sqlalchemy.orm import load_only
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.manager.data.permission.permission_defs import BasePermission
 
 from .context import ClientContext
@@ -77,8 +78,9 @@ async def _calculate_role_in_scope_for_suadmin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+    from ai.backend.manager.models.project import ProjectRow
     from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:
         case SystemScope():
@@ -94,23 +96,16 @@ async def _calculate_role_in_scope_for_suadmin(
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            project_stmt = (
-                sa.select(ProjectRow)
-                .where(ProjectRow.id == project_id)
-                .options(
-                    selectinload(ProjectRow.users),
-                    with_loader_criteria(
-                        AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
-                    ),
-                )
-            )
-            project_row = cast(ProjectRow | None, await db_session.scalar(project_stmt))
+            project_stmt = sa.select(
+                user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, ctx.user_id)
+            ).where(ProjectRow.id == project_id)
+            project_row = (await db_session.execute(project_stmt)).first()
             if project_row is None:
                 return _EMPTY_FSET
-            result = frozenset([PredefinedRole.ADMIN])
-            if project_row.users:
-                result = frozenset([PredefinedRole.OWNER])
-            return result
+            (is_member,) = project_row
+            if is_member:
+                return frozenset([PredefinedRole.OWNER])
+            return frozenset([PredefinedRole.ADMIN])
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
@@ -127,8 +122,9 @@ async def _calculate_role_in_scope_for_monitor(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+    from ai.backend.manager.models.project import ProjectRow
     from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:
         case SystemScope():
@@ -144,27 +140,19 @@ async def _calculate_role_in_scope_for_monitor(
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            project_stmt = (
-                sa.select(ProjectRow)
-                .where(ProjectRow.id == project_id)
-                .options(
-                    load_only(ProjectRow.id, ProjectRow.domain_name),
-                    selectinload(ProjectRow.users),
-                    with_loader_criteria(
-                        AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
-                    ),
-                )
-            )
-            project_row = cast(ProjectRow | None, await db_session.scalar(project_stmt))
+            project_stmt = sa.select(
+                ProjectRow.domain_name,
+                user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, ctx.user_id),
+            ).where(ProjectRow.id == project_id)
+            project_row = (await db_session.execute(project_stmt)).first()
             if project_row is None:
                 return _EMPTY_FSET
-            if project_row.domain_name == ctx.domain_name:
-                result = frozenset([PredefinedRole.ADMIN])
-            else:
+            project_domain_name, is_member = project_row
+            if project_domain_name != ctx.domain_name:
                 return _EMPTY_FSET
-            if project_row.users:
-                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
-            return result
+            if is_member:
+                return frozenset([PredefinedRole.ADMIN, PredefinedRole.PRIVILEGED_MEMBER])
+            return frozenset([PredefinedRole.ADMIN])
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
@@ -180,8 +168,9 @@ async def _calculate_role_in_scope_for_monitor(
 async def _calculate_role_in_scope_for_admin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+    from ai.backend.manager.models.project import ProjectRow
     from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:
         case SystemScope():
@@ -191,28 +180,19 @@ async def _calculate_role_in_scope_for_admin(
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            project_stmt = (
-                sa.select(ProjectRow)
-                .where(ProjectRow.id == project_id)
-                .options(
-                    load_only(ProjectRow.id, ProjectRow.domain_name),
-                    selectinload(ProjectRow.users),
-                    with_loader_criteria(
-                        AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
-                    ),
-                )
-            )
-            project_row = cast(ProjectRow | None, await db_session.scalar(project_stmt))
+            project_stmt = sa.select(
+                ProjectRow.domain_name,
+                user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, ctx.user_id),
+            ).where(ProjectRow.id == project_id)
+            project_row = (await db_session.execute(project_stmt)).first()
             if project_row is None:
                 return _EMPTY_FSET
-
-            if project_row.domain_name == ctx.domain_name:
-                result = frozenset([PredefinedRole.ADMIN])
-            else:
+            project_domain_name, is_member = project_row
+            if project_domain_name != ctx.domain_name:
                 return _EMPTY_FSET
-            if project_row.users:
-                result = frozenset([PredefinedRole.OWNER])
-            return result
+            if is_member:
+                return frozenset([PredefinedRole.OWNER])
+            return frozenset([PredefinedRole.ADMIN])
         case UserScope(user_id, domain_name):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
@@ -236,7 +216,7 @@ async def _calculate_role_in_scope_for_admin(
 async def _calculate_role_in_scope_for_user(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.project import AssocGroupUserRow
+    from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:
         case SystemScope():
@@ -246,16 +226,10 @@ async def _calculate_role_in_scope_for_user(
                 return frozenset([PredefinedRole.MEMBER])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
-                sa.select(AssocGroupUserRow)
-                .where(
-                    (AssocGroupUserRow.user_id == ctx.user_id)
-                    & (AssocGroupUserRow.group_id == project_id)
-                )
-                .options(load_only(AssocGroupUserRow.user_id))
+            stmt = sa.select(
+                user_scope_membership_exists(ProjectEntityType(), project_id, ctx.user_id)
             )
-            assoc_row = cast(AssocGroupUserRow | None, await db_session.scalar(stmt))
-            if assoc_row is not None:
+            if await db_session.scalar(stmt):
                 return frozenset([PredefinedRole.PRIVILEGED_MEMBER])
             return _EMPTY_FSET
         case UserScope(user_id):
