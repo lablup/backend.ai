@@ -25,7 +25,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.compute_schedule import (
@@ -98,7 +98,7 @@ from .validators import (
     SessionSpecValidator,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -289,10 +289,10 @@ class SchedulingController:
 
     async def _notify_session_enqueued(self, spec: SessionSpec, session_id: SessionId) -> None:
         """Post-enqueue side effects: broadcast, scheduling request, POST hook."""
-        log.info(
-            "Session {} ({}) enqueued successfully via draft path",
-            spec.resource_spec.identity.session_name,
-            session_id,
+        log.trace(
+            "session enqueued",
+            session_id=session_id,
+            session_name=spec.resource_spec.identity.session_name,
         )
 
         await self._event_producer.broadcast_events_batch([
@@ -307,11 +307,7 @@ class SchedulingController:
         try:
             await self.mark_scheduling_needed([ScheduleType.SCHEDULE])
         except Exception as e:
-            log.warning(
-                "Failed to request scheduling for session {}: {}",
-                session_id,
-                e,
-            )
+            log.warning("scheduling request failed", session_id=session_id, exc_info=e)
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
             (
@@ -484,10 +480,7 @@ class SchedulingController:
         if not schedule_types:
             return
         await self._valkey_schedule.mark_schedules_needed_batch([st.value for st in schedule_types])
-        log.debug(
-            "Requested scheduling for type(s): {}",
-            ", ".join(st.value for st in schedule_types),
-        )
+        log.debug("scheduling requested: {}", ", ".join(st.value for st in schedule_types))
 
     async def mark_sessions_for_termination(
         self,
@@ -519,13 +512,12 @@ class SchedulingController:
             message=message,
         )
         if result.has_processed():
-            log.info(
-                "Marked {} sessions for termination"
-                " (cancelled: {}, terminating: {}, force_terminated: {})",
-                result.processed_count(),
-                len(result.cancelled_sessions),
-                len(result.terminating_sessions),
-                len(result.force_terminated_sessions),
+            log.trace(
+                "sessions marked for termination",
+                session_count=result.processed_count(),
+                cancelled_count=len(result.cancelled_sessions),
+                terminating_count=len(result.terminating_sessions),
+                force_terminated_count=len(result.force_terminated_sessions),
             )
 
             # Broadcast status events for cancelled, terminating, and force-terminated sessions
@@ -604,7 +596,9 @@ class SchedulingController:
         if not marked_sessions:
             return marked_sessions
 
-        log.info("Marked {} sessions as {}", len(marked_sessions), to_status)
+        log.trace(
+            "sessions marked with status", session_count=len(marked_sessions), to_status=to_status
+        )
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,

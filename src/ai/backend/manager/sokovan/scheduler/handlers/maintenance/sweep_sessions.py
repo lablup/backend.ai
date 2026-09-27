@@ -8,7 +8,7 @@ from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
@@ -20,7 +20,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
 )
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -114,10 +114,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         if not timed_out_sessions:
             return result
 
-        log.info(
-            "Found {} sessions with pending timeout that need termination",
-            len(timed_out_sessions),
-        )
+        log.debug("pending-timeout sessions found", session_count=len(timed_out_sessions))
 
         # Build session map for getting current status
         session_map = {s.session_info.identity.id: s for s in sessions}
