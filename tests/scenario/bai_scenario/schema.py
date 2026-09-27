@@ -30,6 +30,7 @@ import ai.backend.manager.models.association_container_registries_groups
 import ai.backend.manager.models.association_container_registries_groups.row
 import ai.backend.manager.models.audit_log
 import ai.backend.manager.models.audit_log.row
+import ai.backend.manager.models.audit_log.scope_row
 import ai.backend.manager.models.base
 import ai.backend.manager.models.clauses
 import ai.backend.manager.models.client_ip_masking
@@ -59,6 +60,7 @@ import ai.backend.manager.models.event_log
 import ai.backend.manager.models.event_log.row
 import ai.backend.manager.models.fair_share
 import ai.backend.manager.models.fair_share.row
+import ai.backend.manager.models.global_entity.row
 import ai.backend.manager.models.huggingface_registry
 import ai.backend.manager.models.huggingface_registry.row
 import ai.backend.manager.models.idle_checker
@@ -89,6 +91,13 @@ import ai.backend.manager.models.prometheus_query_preset.row
 import ai.backend.manager.models.prometheus_query_preset_category
 import ai.backend.manager.models.prometheus_query_preset_category.row
 import ai.backend.manager.models.rbac_models
+import ai.backend.manager.models.rbac_models.entity_field
+import ai.backend.manager.models.rbac_models.permission.permission
+import ai.backend.manager.models.rbac_models.permission.permission_field
+import ai.backend.manager.models.rbac_models.role.row
+import ai.backend.manager.models.rbac_models.role_permission_preset.row
+import ai.backend.manager.models.rbac_models.role_preset.row
+import ai.backend.manager.models.rbac_models.user_role.row
 import ai.backend.manager.models.replica_group
 import ai.backend.manager.models.replica_group.row
 import ai.backend.manager.models.replica_group_history
@@ -125,6 +134,7 @@ import ai.backend.manager.models.session.row
 import ai.backend.manager.models.session_group
 import ai.backend.manager.models.session_group.row
 import ai.backend.manager.models.session_template
+import ai.backend.manager.models.session_template.row
 import ai.backend.manager.models.specs
 import ai.backend.manager.models.storage
 import ai.backend.manager.models.storage_namespace
@@ -139,8 +149,13 @@ import ai.backend.manager.models.vfolder.row
 import ai.backend.manager.models.vfs_storage
 import ai.backend.manager.models.vfs_storage.row
 import ai.backend.manager.models.virtual_entity
+import ai.backend.manager.models.virtual_entity.entity_membership
+import ai.backend.manager.models.virtual_entity.entity_membership_cap
+import ai.backend.manager.models.virtual_entity.entity_membership_field
+import ai.backend.manager.models.virtual_entity.scope_binding
+import ai.backend.manager.models.virtual_entity.virtual_entity
 
 
 def registered() -> int:
     """How many model modules this file names; a smoke check for the generator."""
-    return 131
+    return 146
