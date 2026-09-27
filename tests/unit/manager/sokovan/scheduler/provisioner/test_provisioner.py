@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -47,6 +48,8 @@ from .conftest import (
     SchedulingDataFactory,
     WorkloadFactory,
 )
+
+_TRACE_LEVEL = 5
 
 
 def _make_provisioner(
@@ -208,6 +211,32 @@ class TestScheduleResourceGroup:
         )
         # The allocation write still happens (with an empty batch)
         repository.allocate_sessions.assert_awaited_once_with([])
+
+    async def test_unplaceable_session_logs_below_info(
+        self,
+        provisioner: SessionProvisioner,
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A session that cannot be placed is logged at trace only; history is the record."""
+        caplog.set_level(_TRACE_LEVEL, logger="ai.backend.manager.sokovan")
+        workload = workload_factory(kernel_slots=[{"cpu": "100", "mem": "999999"}])
+        data = scheduling_data_factory(
+            workloads=[workload],
+            agents=[agent_meta_factory("agent-1", {"cpu": "4", "mem": "8192"})],
+        )
+
+        await _schedule(provisioner, data, [workload])
+
+        assert [r for r in caplog.records if r.levelno >= logging.INFO] == []
+        failures = [
+            r for r in caplog.records if r.getMessage().startswith("session scheduling failed")
+        ]
+        assert len(failures) == 1
+        assert failures[0].levelno == _TRACE_LEVEL
+        assert failures[0].__dict__["log_tag_session_id"] == str(workload.meta.session_id)
 
     async def test_partial_failure_keeps_other_sessions(
         self,

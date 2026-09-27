@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -130,10 +130,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         # Fetch scheduling data required by Provisioner
         scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
         if scheduling_data is None:
-            log.debug(
-                "No scheduling data for resource group {}. Skipping all sessions.",
-                resource_group_id,
-            )
+            log.debug("no scheduling data, all sessions skipped")
             # All sessions are skipped when no scheduling data available
             result.skipped.extend(
                 self._to_transition_info(session, message="no-scheduling-data")

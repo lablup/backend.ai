@@ -425,16 +425,12 @@ class SessionLauncher:
 
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
-                failed_agent_ids = [
-                    aid
-                    for aid, result in zip(agent_ids_ordered, results, strict=True)
-                    if isinstance(result, BaseException)
-                ]
+                failed_agent_ids: list[AgentId] = []
+                for aid, result in zip(agent_ids_ordered, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
+                        failed_agent_ids.append(aid)
                 if failed_agent_ids:
-                    log.warning(
-                        "recording failed agents",
-                        failed_agent_ids=", ".join(str(aid) for aid in failed_agent_ids),
-                    )
                     try:
                         await self._valkey_schedule.record_session_failed_agents(
                             session.session_id, failed_agent_ids

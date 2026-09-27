@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteStatus,
@@ -20,7 +20,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResu
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class AppProxySyncRouteHandler(RouteHandler):
@@ -89,16 +89,12 @@ class AppProxySyncRouteHandler(RouteHandler):
         synced = len(result.successes)
         failed = len(result.errors)
         if failed:
-            log.warning(
-                "AppProxy sync complete: {} routes synced, {} routes failed",
-                synced,
-                failed,
-            )
+            log.debug("AppProxy synced", success_count=synced, failure_count=failed)
             for error in result.errors:
                 log.warning(
-                    "Failed to sync route {} to AppProxy: {}",
-                    error.route_info.route_id,
-                    error.reason,
+                    "route AppProxy sync failed",
+                    route_id=error.route_info.route_id,
+                    failure_reason=error.reason,
                 )
         else:
-            log.trace("Successfully synced {} routes to AppProxy", synced)
+            log.trace("AppProxy synced", success_count=synced)

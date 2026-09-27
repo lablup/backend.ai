@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
@@ -28,7 +28,7 @@ from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class StartSessionsLifecycleHandler(SessionLifecycleHandler):
