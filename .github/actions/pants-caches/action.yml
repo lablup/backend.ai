@@ -1,10 +1,9 @@
 name: pants-caches
 description: >-
-  Restore or save the Pants named caches and the mypy cache. Every run restores;
-  only a push whose commit is still the tip of main or of a maintained version
-  branch saves, and then deletes the entries the save superseded. The named
-  caches are saved only when their key has no entry yet; the mypy cache is saved
-  per commit.
+  Restore or save the Pants named caches and the mypy cache. A save stores the
+  named caches only when their key has no entry yet and the mypy cache per
+  commit, then deletes the entries it superseded under the same ref. Which runs
+  save is the caller's decision.
 inputs:
   mode:
     description: "'restore' before Pants runs, 'save' after it"
@@ -53,22 +52,9 @@ runs:
         key: ${{ steps.keys.outputs.mypy }}
         restore-keys: ${{ steps.keys.outputs.mypy-prefix }}
 
-    - name: Decide whether this run saves the caches
-      id: decide
-      if: >-
-        inputs.mode == 'save'
-        && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
-      continue-on-error: true
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-        REPO: ${{ github.repository }}
-        BRANCH: ${{ github.ref_name }}
-        SHA: ${{ github.sha }}
-      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Look up the Pants named caches
       id: named-caches
-      if: steps.decide.outputs.save == 'true'
+      if: inputs.mode == 'save'
       uses: actions/cache/restore@v5
       with:
         path: |
@@ -78,7 +64,7 @@ runs:
         lookup-only: true
     - name: Save the Pants named caches
       id: save-named-caches
-      if: steps.decide.outputs.save == 'true' && steps.named-caches.outputs.cache-hit != 'true'
+      if: inputs.mode == 'save' && steps.named-caches.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: |
@@ -98,7 +84,7 @@ runs:
       run: .github/scripts/prune-ref-caches.sh "$REPO" "$REF" "$PREFIX" "$KEY"
     - name: Save the mypy cache
       id: save-mypy
-      if: steps.decide.outputs.save == 'true' && inputs.mypy == 'true'
+      if: inputs.mode == 'save' && inputs.mypy == 'true'
       uses: actions/cache/save@v5
       with:
         path: ~/.cache/pants/named_caches/mypy_cache

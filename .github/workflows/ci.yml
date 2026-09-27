@@ -153,7 +153,21 @@ jobs:
       # any file `--changed-since` would select.
       run: |
         pants test tests/unit/manager/data/permission/seed::
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      # Only a push that is still the tip of main or of a maintained version
+      # branch saves: pushes to one branch do not cancel each other, so an
+      # older commit finishing late must not save over the newer one.
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
       uses: ./.github/actions/pants-caches
       with:
         mode: save
@@ -236,7 +250,18 @@ jobs:
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
       uses: ./.github/actions/pants-caches
       with:
         mode: save
@@ -417,7 +442,18 @@ jobs:
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/unit/' -- -v
         fi
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
       uses: ./.github/actions/pants-caches
       with:
         mode: save
@@ -516,7 +552,18 @@ jobs:
           --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
           --shard='${{ matrix.shard }}' \
           ${{ steps.pick.outputs.targets }} -- -v
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
       uses: ./.github/actions/pants-caches
       with:
         mode: save
@@ -637,7 +684,18 @@ jobs:
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/component/' -- -v
         fi
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
       uses: ./.github/actions/pants-caches
       with:
         mode: save
@@ -722,7 +780,18 @@ jobs:
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/integration/' -- -v
         fi
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
     - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
       uses: ./.github/actions/pants-caches
       with:
         mode: save
