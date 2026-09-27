@@ -104,23 +104,17 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Test the release-grade classifier
       run: python ./scripts/test_determine_release_type.py
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
-      # See: github.com/pantsbuild/actions/tree/main/init-pants/
-      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        # `pants-caches` restores and saves the caches instead: init-pants
+        # saves whatever it restores, from every run.
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
     - name: Calculate base ref
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
@@ -159,6 +153,10 @@ jobs:
       # any file `--changed-since` would select.
       run: |
         pants test tests/unit/manager/data/permission/seed::
+    - name: Save the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -211,21 +209,16 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+        mypy: 'true'
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
     - name: Calculate base ref
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
@@ -243,6 +236,11 @@ jobs:
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
+    - name: Save the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
+        mypy: 'true'
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -316,25 +314,16 @@ jobs:
     - name: Check for multiple heads
       if: env.RUN_ALEMBIC_CHECK == 'true'
       run: python scripts/check-multiple-alembic-heads.py
-    - name: Set up remote cache backend (if applicable)
-      if: env.RUN_ALEMBIC_CHECK == 'true' && env.REMOTE_CACHE_BACKEND_ENDPOINT != ''
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+    - name: Restore the Pants caches
+      if: env.RUN_ALEMBIC_CHECK == 'true'
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       if: env.RUN_ALEMBIC_CHECK == 'true'
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        # ``pants export`` builds a venv into the named caches; caching the
-        # lmdb_store (process cache) here desyncs from the named-caches cache
-        # (lmdb hit + named-caches miss -> dangling venv python). The other
-        # export jobs (build-scies/wheels/supergraph) already disable it.
+        named-caches-hash: disable
         cache-lmdb-store: 'false'
     - name: Prepare DB
       if: env.RUN_ALEMBIC_CHECK == 'true'
@@ -400,21 +389,15 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
     - name: Test
       timeout-minutes: 60
       env:
@@ -434,6 +417,10 @@ jobs:
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/unit/' -- -v
         fi
+    - name: Save the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -480,21 +467,15 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
     - name: Pick which components to run
       id: pick
       env:
@@ -535,6 +516,10 @@ jobs:
           --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
           --shard='${{ matrix.shard }}' \
           ${{ steps.pick.outputs.targets }} -- -v
+    - name: Save the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
     - name: Upload the report the run produced
       uses: actions/upload-artifact@v5
       with:
@@ -620,21 +605,15 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
     - name: Test
       timeout-minutes: 60
       env:
@@ -658,6 +637,10 @@ jobs:
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/component/' -- -v
         fi
+    - name: Save the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -706,21 +689,15 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
     - name: Test
       timeout-minutes: 60
       env:
@@ -745,6 +722,10 @@ jobs:
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/integration/' -- -v
         fi
+    - name: Save the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -852,11 +833,14 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: disable
         cache-lmdb-store: 'false'
     - name: Build both lazy and fat packages
       run: |
@@ -909,11 +893,14 @@ jobs:
     - name: Install local dependencies for packaging
       run: |
         pip install -U 'packaging>=21.3'
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: disable
         cache-lmdb-store: 'false'
     - name: Build wheel packages
       run: |
@@ -958,11 +945,14 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: disable
         cache-lmdb-store: 'false'
     - name: Pants export
       run: pants export --resolve=python-default

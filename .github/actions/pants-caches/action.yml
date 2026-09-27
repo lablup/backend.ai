@@ -1,0 +1,75 @@
+name: pants-caches
+description: >-
+  Restore or save the Pants named caches and the mypy cache. Every run restores;
+  only a push whose commit is still the tip of main saves. The named caches are
+  saved only when their key has no entry yet; the mypy cache is saved per commit.
+inputs:
+  mode:
+    description: "'restore' before Pants runs, 'save' after it"
+    required: true
+  mypy:
+    description: "'true' to restore or save the mypy cache as well"
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    # The mypy cache lives inside the named caches and changes on every commit,
+    # while the named caches change only with the lockfiles, so it is kept out of
+    # them and cached on its own. A directory listed whole cannot exclude a child,
+    # hence the per-child glob.
+    - name: Restore the Pants named caches
+      if: inputs.mode == 'restore'
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ~/.cache/pants/named_caches/*
+          !~/.cache/pants/named_caches/mypy_cache
+        key: pants-named-caches-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        restore-keys: |
+          pants-named-caches-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pants.toml') }}-
+          pants-named-caches-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore the mypy cache
+      if: inputs.mode == 'restore' && inputs.mypy == 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: ~/.cache/pants/named_caches/mypy_cache
+        key: pants-mypy-${{ runner.os }}-${{ github.sha }}
+        restore-keys: pants-mypy-${{ runner.os }}-
+
+    - name: Check that this commit is still the tip of main
+      id: tip
+      if: >-
+        inputs.mode == 'save'
+        && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.sha }}
+      run: echo "tip=$(.github/scripts/check-branch-tip.sh "$REPO" main "$SHA")" >> "$GITHUB_OUTPUT"
+    - name: Look up the Pants named caches
+      id: named-caches
+      if: steps.tip.outputs.tip == 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ~/.cache/pants/named_caches/*
+          !~/.cache/pants/named_caches/mypy_cache
+        key: pants-named-caches-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        lookup-only: true
+    - name: Save the Pants named caches
+      if: steps.tip.outputs.tip == 'true' && steps.named-caches.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ~/.cache/pants/named_caches/*
+          !~/.cache/pants/named_caches/mypy_cache
+        key: pants-named-caches-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pants.toml') }}-${{ hashFiles('python*.lock', 'tools/*.lock') }}
+    - name: Save the mypy cache
+      if: steps.tip.outputs.tip == 'true' && inputs.mypy == 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ~/.cache/pants/named_caches/mypy_cache
+        key: pants-mypy-${{ runner.os }}-${{ github.sha }}
