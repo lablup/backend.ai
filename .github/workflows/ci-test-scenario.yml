@@ -8,23 +8,15 @@ on:
   workflow_call:
     inputs:
       shards:
-        description: The `--shard` values to spread the run across, as a JSON list
+        description: The `--shard` values to spread the run across, as a JSON list; `ci.yml` passes only those holding a target
         type: string
         required: true
       runner:
         description: The runner label
         type: string
         required: true
-      detect-changes-result:
-        description: The result of `ci.yml`'s detect-changes job; anything but success fails the run
-        type: string
-        required: true
-      full-run:
-        description: Check every target instead of those changed since the base revision
-        type: boolean
-        required: true
-      base-ref:
-        description: The revision a changed-only run compares against
+      targets-artifact:
+        description: The artifact holding `scenario.txt`, the tests to run, one address per line
         type: string
         required: true
       cache-branch:
@@ -45,31 +37,26 @@ jobs:
       contents: read
       # Deleting the cache entries a save superseded.
       actions: write
-    env:
-      BASE_REF: ${{ inputs.base-ref }}
     strategy:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(inputs.shards) }}
     steps:
-    - name: Verify detect-changes
-      if: inputs.detect-changes-result != 'success'
-      env:
-        RESULT: ${{ inputs.detect-changes-result }}
-      run: |
-        echo "detect-changes did not succeed: $RESULT"
-        exit 1
-    - name: Check out the revision with minimal required history
+    - name: Check out the revision
       uses: actions/checkout@v6
       with:
-        # Depth 2 holds `inputs.base-ref`.
-        fetch-depth: 2
+        fetch-depth: 1
         lfs: false
+    - name: Download the targets
+      uses: actions/download-artifact@v5
+      with:
+        name: ${{ inputs.targets-artifact }}
+        path: dist/ci-targets
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> "$GITHUB_ENV"
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v6
       with:
@@ -83,41 +70,15 @@ jobs:
       with:
         named-caches-hash: disable
         cache-lmdb-store: 'false'
-    - name: Pick which components to run
-      id: pick
-      env:
-        FULL_RUN: ${{ inputs.full-run }}
-      run: |
-        # A component runs whole or not at all: its report.md covers every scenario it
-        # holds, so a half-run component would look as though rows had disappeared.
-        # Selection is transitive, because a scenario reaches src through its seeds and
-        # a direct-dependents run would skip almost every row.
-        if [ "$FULL_RUN" == "true" ]; then
-          echo "targets=tests/scenario::" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        touched=$(pants list --changed-since="$BASE_REF" --changed-dependents=transitive \
-          2>/dev/null | grep '^tests/scenario/' || true)
-        if [ -z "$touched" ]; then
-          echo "targets=" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        components=$(echo "$touched" \
-          | sed -n 's|^tests/scenario/bai_scenario/manager/\([^/]*\)/.*|\1|p' | sort -u)
-        picked="tests/scenario/bai_scenario/setup::"
-        for one in $components; do
-          picked="$picked tests/scenario/bai_scenario/manager/$one::"
-        done
-        echo "targets=$picked" >> $GITHUB_OUTPUT
     - name: Run the scenarios and keep what each one did
-      if: steps.pick.outputs.targets != ''
       timeout-minutes: 60
+      env:
+        SHARD: ${{ matrix.shard }}
       run: |
-        mkdir -p dist
-        BACKEND_SCENARIO_LOG=$PWD/dist/scenarios.jsonl pants test \
+        BACKEND_SCENARIO_LOG=$PWD/dist/scenarios.jsonl pants \
+          --spec-files=dist/ci-targets/scenario.txt test \
           --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
-          --shard='${{ matrix.shard }}' \
-          ${{ steps.pick.outputs.targets }} -- -v
+          --shard="$SHARD" -- -v
     - name: Decide whether this run saves the caches
       id: cache-save
       if: inputs.cache-branch != ''
