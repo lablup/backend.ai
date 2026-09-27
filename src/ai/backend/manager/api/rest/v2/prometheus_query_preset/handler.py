@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     ExecuteQueryDefinitionPayload,
     QueryDefinitionExecuteDataInfo,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import PresetIdPathParam
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
         PrometheusQueryPresetAdapter,
     )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2PrometheusQueryPresetHandler:

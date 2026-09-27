@@ -29,7 +29,7 @@ from ai.backend.common.types import (
     DispatchResult,
     ImageID,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeAgentSpec,
     PurgeImagesManifest,
@@ -119,7 +119,7 @@ from .gql_relay import AsyncNode, Connection, ConnectionResolverResult, Resolved
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "AliasImage",
@@ -153,7 +153,7 @@ def _single_image(
     if not items:
         raise ImageNotFound()
     if len(items) > 1:
-        log.warning("Image key {} matched {} rows; answering with the first.", key, len(items))
+        log.warning("image key matched several rows", image_key=key, image_count=len(items))
     return items[0]
 
 
@@ -828,7 +828,7 @@ class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> ForgetImageById:
-        log.info("forget image {0} by API request", image_id)
+        log.trace("image forget requested", image_id=image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
@@ -871,7 +871,7 @@ class ForgetImage(graphene.Mutation):  # type: ignore[misc]
         reference: str,
         architecture: str | None,
     ) -> ForgetImage:
-        log.info("forget image {0} by API request", reference)
+        log.trace("image forget requested", image_ref=reference)
         ctx: GraphQueryContext = info.context
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
@@ -924,7 +924,7 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         image_id: str,
         options: PurgeImageOptions,
     ) -> PurgeImageById:
-        log.info("purge image row {0} by API request", image_id)
+        log.trace("image purge requested", image_id=image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
@@ -968,7 +968,7 @@ class UntagImageFromRegistry(graphene.Mutation):  # type: ignore[misc]
     ) -> UntagImageFromRegistry:
         image_uuid = extract_object_uuid(info, image_id, "image")
 
-        log.info("remove image from registry {0} by API request", str(image_uuid))
+        log.trace("image untag from registry requested", image_id=image_uuid)
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.untag_image_from_registry.run(
             UntagImageFromRegistryAction(
@@ -1041,9 +1041,10 @@ class RescanImages(graphene.Mutation):  # type: ignore[misc]
         registry: str | None = None,
         project: str | None = None,
     ) -> RescanImages:
-        log.info(
-            "rescanning docker registry {0} by API request",
-            f"(registry: {registry or 'all'}, project: {project or 'all'})",
+        log.trace(
+            "image registry rescan requested",
+            registry_name=registry or "all",
+            project_name=project or "all",
         )
         ctx: GraphQueryContext = info.context
 
@@ -1075,7 +1076,7 @@ class RescanImages(graphene.Mutation):  # type: ignore[misc]
                     )
                 )
                 for error in action_result.errors:
-                    log.error(error)
+                    log.trace("image rescan error", error_message=error)
                 errors.extend(action_result.errors)
                 rescanned_images.extend(action_result.images)
 
@@ -1110,7 +1111,7 @@ class AliasImage(graphene.Mutation):  # type: ignore[misc]
         target: str,
         architecture: str | None,
     ) -> AliasImage:
-        log.info("alias image {0} -> {1} by API request", alias, target)
+        log.trace("image alias requested", image_alias=alias, image_ref=target)
         ctx: GraphQueryContext = info.context
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
@@ -1140,7 +1141,7 @@ class DealiasImage(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         alias: str,
     ) -> DealiasImage:
-        log.info("dealias image {0} by API request", alias)
+        log.trace("image dealias requested", image_alias=alias)
         ctx: GraphQueryContext = info.context
 
         await ctx.processors.image.dealias_image.run(
@@ -1168,7 +1169,7 @@ class ClearImages(graphene.Mutation):  # type: ignore[misc]
         registry: str,
     ) -> ClearImages:
         ctx: GraphQueryContext = info.context
-        log.info("clear images from registry {0} by API request", registry)
+        log.trace("registry image clear requested", registry_name=registry)
 
         result = await ctx.processors.container_registry.load_container_registries.run(
             LoadContainerRegistriesAction(
@@ -1271,7 +1272,7 @@ class ModifyImage(graphene.Mutation):  # type: ignore[misc]
         props: ModifyImageInput,
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
-        log.info("modify image {0} by API request", target)
+        log.trace("image modification requested", image_ref=target)
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         await ctx.processors.image.update_image.run(
@@ -1340,7 +1341,7 @@ class PurgeImages(graphene.Mutation):  # type: ignore[misc]
             f"{key.agent_id}: [{', '.join(img.name for img in key.images)}]" for key in keys
         )
 
-        log.info("purge images ({}) by API request", agent_images)
+        log.trace("agent image purge requested", agent_images=agent_images)
 
         # Convert GraphQL input types to bgtask manifest types
         manifest_keys = [
@@ -1409,10 +1410,10 @@ class ClearImageCustomResourceLimit(graphene.Mutation):  # type: ignore[misc]
         key: ClearImageCustomResourceLimitKey,
     ) -> ClearImageCustomResourceLimitPayload:
         arch = key.architecture if key.architecture is not None else DEFAULT_IMAGE_ARCH
-        log.info(
-            'clear custom resource limits for image "{}" ({}) by API request',
-            key.image_canonical,
-            arch,
+        log.trace(
+            "image custom resource limit clear requested",
+            image_canonical=key.image_canonical,
+            architecture=arch,
         )
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.clear_image_custom_resource_limit.run(

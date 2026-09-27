@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Final
 
 from aiohttp import web
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx
 
 from .connection import GraphQLWSConnection
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
     from ai.backend.manager.api.rest.types import GQLContextDeps
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 _DEFAULT_CONNECTION_INIT_TIMEOUT: Final = 10.0  # seconds
 
@@ -79,8 +79,8 @@ class GraphQLTransportWSHandler:
                         subs.cancel(message)
                     case PingMessage() | PongMessage():
                         await sender.send_pong()
-        except Exception as e:
-            log.exception("GQL WS: unexpected error ({})", repr(e))
+        except Exception:
+            log.exception("graphql-ws connection failed")
         finally:
             await subs.cancel_all()
         return conn.handler_return

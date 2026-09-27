@@ -31,7 +31,7 @@ from ai.backend.common.dto.manager.manager_api.response import (
     ManagerStatusResponse,
 )
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -48,7 +48,7 @@ from ai.backend.manager.services.manager_admin import (
 if TYPE_CHECKING:
     from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Trafaret validators for scheduler ops arguments
 _iv_scheduler_ops_args = {
@@ -169,31 +169,27 @@ class ManagerHandler:
     # ------------------------------------------------------------------
 
     async def fetch_manager_status(self, req: RequestCtx) -> APIResponse:
-        try:
-            action = FetchManagerStatusAction()
-            result = await self._manager_admin.fetch_status.run(action)
-            nodes = [
-                {
-                    "id": result.manager_id,
-                    "num_proc": result.num_proc,
-                    "service_addr": result.service_addr,
-                    "heartbeat_timeout": result.heartbeat_timeout,
-                    "ssl_enabled": result.ssl_enabled,
-                    "active_sessions": result.active_sessions,
-                    "status": result.status,
-                    "version": __version__,
-                    "api_version": req.request["api_version"],
-                },
-            ]
-            resp = ManagerStatusResponse(
-                nodes=nodes,
-                status=result.status,
-                active_sessions=result.active_sessions,
-            )
-            return APIResponse.build(HTTPStatus.OK, resp)
-        except Exception:
-            log.exception("GET_MANAGER_STATUS: exception")
-            raise
+        action = FetchManagerStatusAction()
+        result = await self._manager_admin.fetch_status.run(action)
+        nodes = [
+            {
+                "id": result.manager_id,
+                "num_proc": result.num_proc,
+                "service_addr": result.service_addr,
+                "heartbeat_timeout": result.heartbeat_timeout,
+                "ssl_enabled": result.ssl_enabled,
+                "active_sessions": result.active_sessions,
+                "status": result.status,
+                "version": __version__,
+                "api_version": req.request["api_version"],
+            },
+        ]
+        resp = ManagerStatusResponse(
+            nodes=nodes,
+            status=result.status,
+            active_sessions=result.active_sessions,
+        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # update_manager_status (PUT /manager/status)

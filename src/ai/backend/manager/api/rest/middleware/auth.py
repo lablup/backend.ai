@@ -46,7 +46,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.errors.auth import (
@@ -76,7 +76,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 TRUSTED_PROXY_NETWORKS_KEY: Final = "_trusted_proxy_networks"
 FORWARDED_URL_HEADER: Final = "X-Forwarded-URL"
@@ -422,9 +422,7 @@ def is_from_trusted_proxy(request: web.Request) -> bool:
 @functools.cache
 def _warn_forwarded_url_without_trusted_proxies() -> None:
     log.warning(
-        "Accepting the X-Forwarded-URL header without verifying its origin because "
-        "manager.trusted-proxies is not configured. Configure manager.trusted-proxies; "
-        "this fallback will be removed in a future release."
+        "x-forwarded-url accepted without origin check; configure manager.trusted-proxies",
     )
 
 
@@ -441,9 +439,9 @@ def _resolve_forwarded_url(request: web.Request) -> str | None:
         _warn_forwarded_url_without_trusted_proxies()
         return upstream_url
     if not is_from_trusted_proxy(request):
-        log.debug(
-            "ignored the X-Forwarded-URL header sent from an untrusted peer (peer:{})",
-            _peer_address(request),
+        log.trace(
+            "x-forwarded-url header from untrusted peer ignored",
+            peer_address=_peer_address(request),
         )
         return None
     return upstream_url
@@ -458,9 +456,9 @@ def _resolve_forwarded_prefix(request: web.Request) -> str | None:
     if raw_prefix is None:
         return None
     if not is_from_trusted_proxy(request):
-        log.debug(
-            "ignored the X-Forwarded-Prefix header sent from an untrusted peer (peer:{})",
-            _peer_address(request),
+        log.trace(
+            "x-forwarded-prefix header from untrusted peer ignored",
+            peer_address=_peer_address(request),
         )
         return None
     return raw_prefix.rstrip("/")
@@ -747,13 +745,12 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in database")
         jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 
-        log.trace("JWT authentication succeeded for access_key={}", access_key)
+        log.trace("jwt authentication succeeded", access_key=access_key)
 
         await valkey_stat.increment_keypair_query_count(access_key)
         return context
 
     except JWTError as e:
-        log.warning("JWT authentication failed: {}", e)
         raise AuthorizationFailed(f"JWT validation failed: {e}") from e
 
 

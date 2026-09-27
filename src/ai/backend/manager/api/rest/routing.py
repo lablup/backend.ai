@@ -10,14 +10,14 @@ import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIStreamResponse, extract_param_value, parse_response
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import ApiHandler, CORSOptions, RouteMiddleware, WebRequestHandler
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def _handle_stream_response(
@@ -33,7 +33,7 @@ async def _handle_stream_response(
     try:
         first_chunk = await anext(body_iter, None)
     except Exception:
-        log.exception("Failed to read first chunk from stream")
+        log.exception("stream response first chunk read failed")
         raise web.HTTPInternalServerError(
             reason="Failed to initialize streaming response"
         ) from None
@@ -49,7 +49,7 @@ async def _handle_stream_response(
                 await resp.write(chunk)
         await resp.write_eof()
     except Exception:
-        log.exception("Error during streaming response body iteration")
+        log.exception("stream response body iteration failed")
         resp.force_close()
 
     return resp

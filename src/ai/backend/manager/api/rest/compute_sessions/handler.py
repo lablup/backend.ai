@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsResponse,
 )
 from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -28,7 +28,7 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 
 from .adapter import ComputeSessionsAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ComputeSessionsHandler:

@@ -10,7 +10,7 @@ from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
@@ -41,7 +41,7 @@ from .gql_relay import AsyncNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList

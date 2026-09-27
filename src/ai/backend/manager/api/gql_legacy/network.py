@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.errors.common import (
@@ -56,7 +56,7 @@ __all__ = (
     "NetworkNode",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @graphene_federation.key("id")
@@ -291,12 +291,8 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
                 )
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
-        try:
-            network_info = await network_plugin.create_network()
-            network_name = network_info.network_id
-        except Exception:
-            log.exception("Failed to create the inter-container network (plugin: {})", _driver)
-            raise
+        network_info = await network_plugin.create_network()
+        network_name = network_info.network_id
 
         async def _do_mutate() -> CreateNetwork:
             data = await graph_ctx.network_repository.create_entity(

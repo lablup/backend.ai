@@ -108,7 +108,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
 from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import (
     RequestCtx,
     UserContext,
@@ -225,7 +225,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
     from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFolderHandler:
@@ -533,12 +533,10 @@ class VFolderHandler:
         req: RequestCtx,
     ) -> APIResponse:
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.GETINFO (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
+        log.trace(
+            "vfolder info requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
         )
         result = await self._vfolder.get_vfolder.run(
             GetVFolderAction(
@@ -744,13 +742,11 @@ class VFolderHandler:
         params = body.parsed
         row = vfctx.vfolder_row
         new_name = params.new_name
-        log.debug(
-            "VFOLDER.RENAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}), new-name:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            new_name,
+        log.trace(
+            "vfolder rename requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            new_vfolder_name=new_name,
         )
 
         await self._vfolder.update_vfolder_attribute.run(
@@ -778,12 +774,10 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.UPDATE_OPTIONS (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
+        log.trace(
+            "vfolder options update requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
         )
         cloneable = (
             OptionalState[bool].update(params.cloneable)
@@ -821,13 +815,11 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.MKDIR (email:{}, ak:{}, vf:{} (resolved-from:{!r}), paths:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.path,
+        log.trace(
+            "vfolder mkdir requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            target_path=str(params.path),
         )
 
         result = await self._vfolder_file.mkdir.run(
@@ -854,13 +846,11 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.path,
+        log.trace(
+            "vfolder download session requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            target_path=params.path,
         )
         result = await self._vfolder_file.download_file.run(
             CreateDownloadSessionAction(
@@ -889,14 +879,11 @@ class VFolderHandler:
         row = vfctx.vfolder_row
         files = params.files
         filename = params.filename
-        log.debug(
-            "VFOLDER.CREATE_ARCHIVE_DOWNLOAD_SESSION"
-            "(email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            files,
+        log.trace(
+            "vfolder archive download session requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            file_count=len(files),
         )
         result = await self._vfolder_file.create_archive_download_session.run(
             CreateArchiveDownloadSessionAction(
@@ -921,13 +908,11 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.CREATE_UPLOAD_SESSION (email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.path,
+        log.trace(
+            "vfolder upload session requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            target_path=params.path,
         )
         result = await self._vfolder_file.upload_file.run(
             CreateUploadSessionAction(
@@ -953,15 +938,12 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.RENAME_FILE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), "
-            "target_path:{}, new_name:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.target_path,
-            params.new_name,
+        log.trace(
+            "vfolder file rename requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            target_path=params.target_path,
+            new_file_name=params.new_name,
         )
         await self._vfolder_file.rename_file.run(
             RenameFileAction(
@@ -1009,15 +991,12 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.DELETE_FILES (email:{}, ak:{}, vf:{} (resolved-from:{!r}), "
-            "path:{}, recursive:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.files,
-            params.recursive,
+        log.trace(
+            "vfolder file deletion requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            file_count=len(params.files),
+            recursive=params.recursive,
         )
         await self._vfolder_file.delete_files.run(
             DeleteFilesAction(
@@ -1042,15 +1021,12 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.DELETE_FILES_ASYNC (email:{}, ak:{}, vf:{} (resolved-from:{!r}), "
-            "files:{}, recursive:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.files,
-            params.recursive,
+        log.trace(
+            "vfolder async file deletion requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            file_count=len(params.files),
+            recursive=params.recursive,
         )
 
         result = await self._vfolder_file.delete_files_async.run(
@@ -1077,13 +1053,11 @@ class VFolderHandler:
     ) -> APIResponse:
         params = query.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.LIST_FILES (email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.path,
+        log.trace(
+            "vfolder file listing requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            target_path=params.path,
         )
         result = await self._vfolder_file.list_files.run(
             ListFilesAction(
@@ -1162,13 +1136,11 @@ class VFolderHandler:
         row = vfctx.vfolder_row
         perm = VFolderMountPolicy(params.permission.value)
         invitee_emails = params.emails
-        log.debug(
-            "VFOLDER.INVITE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), inv.users:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            ",".join(invitee_emails),
+        log.trace(
+            "vfolder invitation requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            invitee_emails=",".join(invitee_emails),
         )
         result = await self._vfolder_invite.invite_vfolder.run(
             InviteVFolderAction(
@@ -1268,14 +1240,12 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.SHARE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), perm:{}, users:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.permission,
-            ",".join(params.emails),
+        log.trace(
+            "vfolder share requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            permission=params.permission,
+            user_emails=",".join(params.emails),
         )
         result = await self._vfolder_sharing.share.run(
             ShareVFolderAction(
@@ -1300,13 +1270,11 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.UNSHARE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), users:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            ",".join(params.emails),
+        log.trace(
+            "vfolder unshare requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            user_emails=",".join(params.emails),
         )
         result = await self._vfolder_sharing.unshare.run(
             UnshareVFolderAction(
@@ -1364,12 +1332,10 @@ class VFolderHandler:
             )
         )
         row = resolved.row
-        log.debug(
-            "VFOLDER.DELETE_BY_NAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
-            ctx.user_email,
-            ctx.access_key,
-            row["id"],
-            folder_name,
+        log.trace(
+            "vfolder deletion by name requested",
+            vfolder_id=row["id"],
+            vfolder_name=folder_name,
         )
         try:
             await self._vfolder.move_to_trash_vfolder.run(
@@ -1402,12 +1368,10 @@ class VFolderHandler:
             )
         )
         row = resolved.row
-        log.debug(
-            "VFOLDER.GET_ID (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
-            ctx.user_email,
-            ctx.access_key,
-            row["id"],
-            folder_name,
+        log.trace(
+            "vfolder id requested",
+            vfolder_id=row["id"],
+            vfolder_name=folder_name,
         )
         dto = CompactVFolderInfoDTO(id=row["id"], name=folder_name)
         resp = VFolderGetIDResponse(dto)
@@ -1528,14 +1492,11 @@ class VFolderHandler:
         vfolder_id = row["id"]
         perm = row["permission"]
 
-        log.debug(
-            "VFOLDER.LEAVE(email:{}, ak:{}, vf:{} (resolved-from:{!r}), uid:{}, perm:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            vfolder_id,
-            req.request.match_info["name"],
-            vfctx.user_uuid,
-            perm,
+        log.trace(
+            "vfolder leave requested",
+            vfolder_id=vfolder_id,
+            vfolder_name=req.request.match_info["name"],
+            permission=perm,
         )
         if row["ownership_type"] == VFolderOwnershipType.GROUP:
             raise InvalidAPIParameters("Cannot leave a group vfolder.")
@@ -1565,17 +1526,14 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        log.debug(
-            "VFOLDER.CLONE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), "
-            "vft:{}, vfh:{}, umod:{}, perm:{})",
-            vfctx.user_email,
-            vfctx.access_key,
-            row["id"],
-            req.request.match_info["name"],
-            params.target_name,
-            params.target_host,
-            params.usage_mode.value,
-            params.permission.value,
+        log.trace(
+            "vfolder clone requested",
+            vfolder_id=row["id"],
+            vfolder_name=req.request.match_info["name"],
+            target_vfolder_name=params.target_name,
+            target_host=params.target_host,
+            usage_mode=params.usage_mode,
+            permission=params.permission,
         )
 
         result = await self._vfolder.clone_vfolder.run(

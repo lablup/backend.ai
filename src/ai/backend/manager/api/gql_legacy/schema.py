@@ -32,7 +32,7 @@ from ai.backend.common.exception import (
     PermissionDeniedError,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
@@ -311,7 +311,7 @@ from .vfolder import (
 )
 from .viewer import Viewer
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _is_legacy_mutation(mutation_cls: Any) -> bool:
@@ -3410,9 +3410,9 @@ class GQLExceptionMiddleware:
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
         if e.status_code // 100 == 4:
-            log.debug("GraphQL client error: {}", e)
+            log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
         elif e.status_code // 100 == 5:
-            log.exception("GraphQL Server error: {}", e)
+            log.exception("graphql server error", error_code=str(e.error_code()))
         return GraphQLError(
             message=str(e),
             extensions={
@@ -3421,7 +3421,7 @@ class GQLExceptionMiddleware:
         )
 
     def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
-        log.exception("GraphQL unexpected error: {}", e)
+        log.exception("graphql unexpected error")
         return GraphQLError(
             message=str(e),
             extensions={

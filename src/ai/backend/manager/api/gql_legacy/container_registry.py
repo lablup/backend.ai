@@ -13,7 +13,7 @@ from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -70,7 +70,7 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 from ai.backend.manager.models.user import UserRole
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "AllowedGroups",

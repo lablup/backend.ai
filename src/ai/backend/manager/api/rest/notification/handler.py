@@ -38,7 +38,7 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.notification_request import (
     DeleteNotificationChannelPathParam,
@@ -74,7 +74,7 @@ from ai.backend.manager.services.notification.processors import NotificationProc
 
 from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class NotificationHandler:

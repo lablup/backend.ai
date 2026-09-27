@@ -21,14 +21,14 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 )
 from ai.backend.common.dto.manager.v2.keypair.response import SearchMyKeypairsPayload
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import AccessKeyPathParam
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2KeypairHandler:

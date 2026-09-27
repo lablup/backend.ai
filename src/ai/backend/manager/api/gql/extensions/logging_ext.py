@@ -8,9 +8,9 @@ from graphql import GraphQLResolveInfo
 from strawberry.extensions.base_extension import SchemaExtension
 from strawberry.utils.await_maybe import AwaitableOrValue
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GQLLoggingExtension(SchemaExtension):
@@ -27,11 +27,11 @@ class GQLLoggingExtension(SchemaExtension):
     ) -> AwaitableOrValue[object]:
         if info.path.prev is None:
             # TODO: Log access_key when StrawberryGQLContext has user info
-            log.info(
-                "ADMIN.GQL.V2 ({}:{}, op:{})",
-                info.operation.operation,
-                info.field_name,
-                info.operation.name,
+            log.trace(
+                "graphql operation requested",
+                operation_type=info.operation.operation,
+                field_name=info.field_name,
+                operation_name=info.operation.name.value if info.operation.name else None,
             )
         result: AwaitableOrValue[object] = _next(root, info, *args, **kwargs)
         return result

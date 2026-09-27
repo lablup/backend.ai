@@ -29,7 +29,7 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainResponse,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.domain_request import (
     GetDomainPathParam,
@@ -51,7 +51,7 @@ from .adapter import DomainAdapter
 if TYPE_CHECKING:
     from ai.backend.manager.services.domain.processors import DomainProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DomainHandler:
