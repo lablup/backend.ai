@@ -33,7 +33,7 @@ from ai.backend.common.types import (
     AgentId,
     SessionTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RouteHealthStatus, RouteStatus, RoutingRow
@@ -45,7 +45,7 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SessionEventHandler:
@@ -94,7 +94,7 @@ class SessionEventHandler:
         Update the database according to the session-level lifecycle events
         published by the manager.
         """
-        log.info("handle_session_started: ev:{} s:{}", event.event_name(), event.session_id)
+        log.trace("session started", session_id=event.session_id)
         await self._valkey_live.update_session_last_access(event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
@@ -109,7 +109,7 @@ class SessionEventHandler:
         Update the database according to the session-level lifecycle events
         published by the manager.
         """
-        log.info("handle_session_cancelled: ev:{} s:{}", event.event_name(), event.session_id)
+        log.trace("session cancelled", session_id=event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
 
     async def handle_session_terminating(
@@ -207,7 +207,7 @@ class SessionEventHandler:
             | SessionFailureAnycastEvent
         ),
     ) -> None:
-        log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
+        log.trace("invoking session callback", session_id=event.session_id)
         try:
             allow_stale = isinstance(
                 event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
@@ -295,7 +295,7 @@ class SessionEventHandler:
         except NoResultFound:
             pass  # Cases when we try to create a inference session for validation (/services/_/try API)
         except Exception:
-            log.exception("error while updating route status:")
+            log.exception("route status update failed", session_id=event.session_id)
 
         if (callback_url := session.callback_url) is None:
             return
@@ -319,10 +319,8 @@ class SessionEventHandler:
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
-    log_func = log.info
-    log_msg: str = ""
-    log_fmt: str = ""
-    log_arg: Any = None
+    session_id = str(data["session_id"])
+    callback_url = str(url)
     begin = time.monotonic()
     try:
         async with aiohttp.ClientSession(
@@ -331,31 +329,38 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
             try:
                 async with session.post(url, json=data) as response:
                     if response.content_length is not None and response.content_length > 0:
-                        log_func = log.warning
-                        log_msg = "warning"
-                        log_fmt = (
-                            "{3[0]} {3[1]} - the callback response body was not empty! "
-                            "(len: {3[2]:,} bytes)"
+                        log.trace(
+                            "session lifecycle callback response body not empty",
+                            session_id=session_id,
+                            callback_url=callback_url,
+                            status_code=response.status,
+                            response_bytes=response.content_length,
                         )
-                        log_arg = (response.status, response.reason, response.content_length)
                     else:
-                        log_msg = "result"
-                        log_fmt = "{3[0]} {3[1]}"
-                        log_arg = (response.status, response.reason)
+                        log.trace(
+                            "session lifecycle callback sent",
+                            session_id=session_id,
+                            callback_url=callback_url,
+                            status_code=response.status,
+                        )
             except aiohttp.ClientError as e:
-                log_func = log.warning
-                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
+                log.trace(
+                    "session lifecycle callback failed",
+                    session_id=session_id,
+                    callback_url=callback_url,
+                    reason=repr(e),
+                )
     except asyncio.CancelledError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
+        log.trace(
+            "session lifecycle callback cancelled",
+            session_id=session_id,
+            callback_url=callback_url,
+            elapsed_sec=time.monotonic() - begin,
+        )
     except TimeoutError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    finally:
-        log_func(
-            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
-            data["event"],
-            data["session_id"],
-            url,
-            log_arg,
+        log.trace(
+            "session lifecycle callback timed out",
+            session_id=session_id,
+            callback_url=callback_url,
+            elapsed_sec=time.monotonic() - begin,
         )

@@ -13,7 +13,7 @@ from ai.backend.common.events.event_types.image.anycast import (
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -21,7 +21,7 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ImageEventHandler:
@@ -63,7 +63,7 @@ class ImageEventHandler:
         ev: ImagePullStartedEvent,
     ) -> None:
         dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
-        log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
+        log.debug("image pull started", agent_id=ev.agent_id, image_name=ev.image, started_at=dt)
 
         image_id = await self._resolve_image_id(ev.image, ev.image_ref)
         await self._schedule_coordinator.update_kernels_to_pulling_for_image(
@@ -77,7 +77,7 @@ class ImageEventHandler:
         self, _context: None, _agent_id: AgentId, ev: ImagePullFinishedEvent
     ) -> None:
         dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
-        log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
+        log.debug("image pull finished", agent_id=ev.agent_id, image_name=ev.image, finished_at=dt)
 
         image_id = await self._resolve_image_id(ev.image, ev.image_ref)
         await self._schedule_coordinator.update_kernels_to_prepared_for_image(
@@ -93,7 +93,7 @@ class ImageEventHandler:
         _agent_id: AgentId,
         ev: ImagePullFailedEvent,
     ) -> None:
-        log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
+        log.warning("image pull failed", agent_id=ev.agent_id, image_name=ev.image, reason=ev.msg)
 
         image_id = await self._resolve_image_id(ev.image, ev.image_ref)
         await self._schedule_coordinator.cancel_kernels_for_failed_image(

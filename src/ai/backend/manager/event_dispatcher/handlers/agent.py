@@ -16,7 +16,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
 )
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert
 from ai.backend.manager.errors.agent import AgentAlreadyExited, AgentNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
@@ -29,7 +29,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.types import OptionalState
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AgentEventHandler:
@@ -62,7 +62,7 @@ class AgentEventHandler:
     async def _mark_agent_running(self, agent_id: AgentId, status: AgentStatus) -> None:
         agent_uuid = await self._agent_repository.lookup_uuid(agent_id)
         if agent_uuid is None:
-            log.warning("agent {0} is not registered; skipping the status write.", agent_id)
+            log.warning("agent not registered, skipping status write", agent_id=agent_id)
             return
         await self._agent_repository.update_agent_status(
             AgentStatusUpdater(
@@ -90,9 +90,9 @@ class AgentEventHandler:
             if written is not None:
                 match status:
                     case AgentStatus.LOST:
-                        log.warning("agent {0} heartbeat timeout detected.", agent_id)
+                        log.warning("agent heartbeat timeout detected", agent_id=agent_id)
                     case AgentStatus.TERMINATED:
-                        log.info("agent {0} has terminated.", agent_id)
+                        log.info("agent terminated", agent_id=agent_id)
                     case _:
                         pass
         await self._agent_repository.cleanup_agent_caches(agent_id)
@@ -104,7 +104,7 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStartedEvent,
     ) -> None:
-        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
+        log.info("agent joined", agent_id=source, reason=event.reason)
         await self._mark_agent_running(source, AgentStatus.ALIVE)
 
     async def handle_agent_terminated(
@@ -116,7 +116,7 @@ class AgentEventHandler:
         if event.reason == "agent-lost":
             await self._mark_agent_exit(source, AgentStatus.LOST)
         elif event.reason == "agent-restart":
-            log.info("agent@{0} restarting for maintenance.", source)
+            log.info("agent restarting for maintenance", agent_id=source)
             await self._mark_agent_running(source, AgentStatus.RESTARTING)
         else:
             # On normal instance termination, kernel_terminated events were already
@@ -181,7 +181,7 @@ class AgentEventHandler:
             query = sa.select(ar.c.slot_name, ar.c.used).where(ar.c.agent_id == source)
             result = await conn.execute(query)
             used_slots = {row.slot_name: row.used for row in result}
-            log.info("agent@{0} used slots: {1}", source, used_slots)
+            log.debug("agent used slots", agent_id=source, used_slots=str(used_slots))
 
     async def handle_agent_error(
         self,
