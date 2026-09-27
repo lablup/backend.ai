@@ -7,12 +7,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner
 from ai.backend.manager.types import DistributedLockFactory
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ReconcilerFlag(ABC):
@@ -47,7 +47,7 @@ class ReconcilerCoordinator:
     async def process(self, reconcile_type: str) -> None:
         stage = self._stages.get(reconcile_type)
         if stage is None:
-            log.warning("No stage for lifecycle type: {}", reconcile_type)
+            log.warning("no stage for reconcile type", reconcile_type=reconcile_type)
             return
 
         async with AsyncExitStack() as stack:
@@ -56,11 +56,11 @@ class ReconcilerCoordinator:
                 await stack.enter_async_context(self._lock_factory(stage.lock_id, lock_lifetime))
             try:
                 await stage.run()
-            except Exception as e:
-                log.error("Error while processing lifecycle {}: {}", reconcile_type, e)
+            except Exception:
+                log.exception("reconcile stage failed", reconcile_type=reconcile_type)
 
     async def process_if_needed(self, reconcile_type: str) -> None:
         if not await self._flags.check_mark_needed(reconcile_type):
-            log.debug("Lifecycle {} not needed, skipping", reconcile_type)
+            log.debug("reconcile not needed, skipping", reconcile_type=reconcile_type)
             return
         await self.process(reconcile_type)
