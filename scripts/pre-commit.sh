@@ -14,8 +14,7 @@ trap 'cleanup TERM' SIGTERM
 # --- Hook Body ---
 set -Eeuo pipefail
 
-BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
-cd "$BASE_PATH"
+cd "$(git rev-parse --show-toplevel)"
 
 # Setup pants local execution directory
 if [ -f .pants.rc ]; then
