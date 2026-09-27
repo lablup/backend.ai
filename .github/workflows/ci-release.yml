@@ -20,6 +20,10 @@ on:
         type: string
         required: true
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
 
   build-scies:
@@ -139,6 +143,10 @@ jobs:
 
   build-sbom:
     if: inputs.release-audience != 'internal'
+    permissions:
+      contents: read
+      # `sbom.yml` requests it for one of its jobs.
+      id-token: write
     uses: ./.github/workflows/sbom.yml
 
   build-supergraph:

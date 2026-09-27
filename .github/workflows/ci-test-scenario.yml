@@ -33,10 +33,18 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
 
   scenario:
     runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      # Deleting the cache entries a save superseded.
+      actions: write
     env:
       BASE_REF: ${{ inputs.base-ref }}
     strategy:

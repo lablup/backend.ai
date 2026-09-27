@@ -23,10 +23,18 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Deleting the cache entries a save superseded.
+      actions: write
     env:
       BASE_REF: ${{ inputs.base-ref }}
     steps:

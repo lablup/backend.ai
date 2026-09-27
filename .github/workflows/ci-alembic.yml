@@ -6,6 +6,10 @@ name: ci-alembic
 on:
   workflow_call:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
 
   alembic:
