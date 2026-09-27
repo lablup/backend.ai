@@ -138,15 +138,15 @@ class ServiceMetadata(BackendAISchema):
         endpoint: ServiceEndpoint,
         labels: dict[str, str] | None = None,
     ) -> Self:
-        """Build metadata whose identity is the endpoint rather than the caller.
+        """Build metadata whose identity is the scrape address rather than the caller.
 
-        A component's worker processes share one listening socket, so an identity
-        per process registers that one endpoint once per worker. See KNOWLEDGE.md.
+        A component's worker processes share one listening socket, so an identity per
+        process registers that one endpoint once per worker. The address keyed here is
+        ``prometheus_address``, the one this entry exists to be scraped at and the only
+        one guaranteed to differ between hosts. See KNOWLEDGE.md.
         """
         return cls(
-            id=uuid.uuid5(
-                uuid.NAMESPACE_DNS, f"{service_group}/{endpoint.address}:{endpoint.port}"
-            ),
+            id=uuid.uuid5(uuid.NAMESPACE_DNS, f"{service_group}/{endpoint.prometheus_address}"),
             display_name=display_name,
             service_group=service_group,
             version=version,
