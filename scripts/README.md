@@ -56,6 +56,9 @@ current, see `AGENTS.md` in this directory.
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto — `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto — `backport-migration-check.yml` |
 | `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames; `allow:migration-edit` records an intended one | auto — `migration-edit-check.yml` |
+| `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto — `.github/actions/pants-caches` |
+| `.github/scripts/prune-ref-caches.sh` | Deletes the cache entries under a ref that a newer save of the same key prefix superseded | auto — `.github/actions/pants-caches` |
+| `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto — `cleanup-pr-caches.yml` |
 | `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto — `update-seccomp-profile.yml` (monthly); person |
 | `check-docs-label.sh` | Skips a Read the Docs PR preview build unless the PR carries `area:docs`. **Currently unreferenced** — `.readthedocs.yaml` does the same check inline | — |
 
