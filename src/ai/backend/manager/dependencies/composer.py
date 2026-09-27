@@ -8,27 +8,59 @@ from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
+from ai.backend.manager.dependencies.agents.composer import (
+    AgentsComposer,
+    AgentsInput,
+    AgentsResources,
+)
+from ai.backend.manager.dependencies.bootstrap.composer import (
+    BootstrapComposer,
+    BootstrapInput,
+    BootstrapResources,
+)
+from ai.backend.manager.dependencies.components.composer import (
+    ComponentsComposer,
+    ComponentsInput,
+    ComponentsResources,
+)
+from ai.backend.manager.dependencies.domain.composer import (
+    DomainComposer,
+    DomainInput,
+    DomainResources,
+)
+from ai.backend.manager.dependencies.infrastructure.composer import (
+    InfrastructureComposer,
+    InfrastructureInput,
+    InfrastructureResources,
+)
+from ai.backend.manager.dependencies.messaging.composer import (
+    MessagingComposer,
+    MessagingInput,
+    MessagingResources,
+)
+from ai.backend.manager.dependencies.orchestration.composer import (
+    OrchestrationComposer,
+    OrchestrationInput,
+    OrchestrationResources,
+)
+from ai.backend.manager.dependencies.plugins.composer import PluginsComposer, PluginsResources
+from ai.backend.manager.dependencies.processing.composer import (
+    ProcessingComposer,
+    ProcessingInput,
+    ProcessingResources,
+)
+from ai.backend.manager.dependencies.system.composer import (
+    SystemComposer,
+    SystemInput,
+    SystemResources,
+)
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
 )
 
-from .agents import AgentsComposer, AgentsInput, AgentsResources
-from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
-from .components import ComponentsComposer, ComponentsInput, ComponentsResources
-from .domain import DomainComposer, DomainInput, DomainResources
-from .infrastructure import (
-    InfrastructureComposer,
-    InfrastructureInput,
-    InfrastructureResources,
-)
-from .messaging import MessagingComposer, MessagingInput, MessagingResources
-from .orchestration import OrchestrationComposer, OrchestrationInput, OrchestrationResources
-from .plugins import PluginsComposer, PluginsResources
 from .plugins.base import PluginsInput
 from .plugins.monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
-from .processing import ProcessingComposer, ProcessingInput, ProcessingResources
-from .system import SystemComposer, SystemInput, SystemResources
 from .system.prometheus_client import PrometheusClientDependency
 
 

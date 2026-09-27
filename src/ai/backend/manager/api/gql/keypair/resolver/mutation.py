@@ -14,21 +14,23 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
 )
-from ai.backend.manager.api.gql.keypair.types import (
+from ai.backend.manager.api.gql.keypair.types.inputs import (
     AdminCreateKeypairInputGQL,
+    AdminRegisterSSHKeypairInputGQL,
+    AdminUpdateKeypairInputGQL,
+    RevokeMyKeypairInputGQL,
+    SwitchMyMainAccessKeyInputGQL,
+    UpdateMyKeypairInputGQL,
+)
+from ai.backend.manager.api.gql.keypair.types.payloads import (
     AdminCreateKeypairPayloadGQL,
     AdminDeleteKeypairPayloadGQL,
     AdminDeleteSSHKeypairPayloadGQL,
-    AdminRegisterSSHKeypairInputGQL,
     AdminRegisterSSHKeypairPayloadGQL,
-    AdminUpdateKeypairInputGQL,
     AdminUpdateKeypairPayloadGQL,
     IssueMyKeypairPayloadGQL,
-    RevokeMyKeypairInputGQL,
     RevokeMyKeypairPayloadGQL,
-    SwitchMyMainAccessKeyInputGQL,
     SwitchMyMainAccessKeyPayloadGQL,
-    UpdateMyKeypairInputGQL,
     UpdateMyKeypairPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext

@@ -58,20 +58,22 @@ from ai.backend.logging.otel import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
+from ai.backend.manager.dependencies.composer import (
+    DependencyInput,
+    DependencyResources,
+    ManagerDependencyComposer,
+)
 
 from . import __version__
 from .api.rest.app import _mount_registry_tree
 from .api.rest.internal.tree import build_internal_api_routes
-from .api.rest.middleware import (
-    build_auth_middleware,
-    build_exception_middleware,
-)
 from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
 from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .data.manager_status.types import ManagerStatus
-from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
 from .plugin.webapp import WebappPluginContext
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

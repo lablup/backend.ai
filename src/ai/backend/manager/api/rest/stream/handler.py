@@ -47,7 +47,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,

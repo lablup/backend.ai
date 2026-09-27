@@ -22,7 +22,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,

@@ -20,7 +20,7 @@ from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFr
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
     "AppConfigFragmentTarget",

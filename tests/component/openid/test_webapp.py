@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from aiohttp import web
 
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.openid.exceptions import InvalidSession
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient

@@ -43,7 +43,7 @@ from ai.backend.manager.dto.response import (
     SearchArtifactsResponse,
 )
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
-from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination

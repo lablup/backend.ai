@@ -42,7 +42,7 @@ from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonito
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.result import LookupActionProcessResult
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.errors.base.entity import EntityNotFoundError

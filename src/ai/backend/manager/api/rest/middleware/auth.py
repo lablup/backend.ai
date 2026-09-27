@@ -66,7 +66,7 @@ from ai.backend.manager.models.resource_policy.searchable_fields import (
     KeyPairResourcePolicySearchableFields,
     UserResourcePolicySearchableFields,
 )
-from ai.backend.manager.models.user import UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRow, UserStatus
 from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.secret.pool import KeyProviderPool
 

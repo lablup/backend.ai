@@ -19,7 +19,7 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = (

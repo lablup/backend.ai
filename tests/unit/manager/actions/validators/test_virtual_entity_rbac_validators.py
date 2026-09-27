@@ -60,28 +60,28 @@ from ai.backend.manager.data.permission.virtual_entity import (
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.row import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import ScopedSearcher, Searcher
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import ProjectVFolderTarget

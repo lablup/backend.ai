@@ -74,7 +74,9 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
     WatcherAgentStopActionResult,
 )
 from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

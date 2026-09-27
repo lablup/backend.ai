@@ -9,17 +9,17 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
 from ai.backend.manager.actions.v2.lookup.log_context import with_lookup_action_context
-from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.result import (
     LookupActionProcessResult,
     LookupActionResultMeta,
 )
-from ai.backend.manager.actions.v2.lookup.validator import (
+from ai.backend.manager.actions.v2.lookup.validator.authenticated import (
     AuthenticatedActionValidator,
-    LookupActionValidator,
 )
+from ai.backend.manager.actions.v2.lookup.validator.base import LookupActionValidator
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest

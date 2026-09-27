@@ -54,6 +54,9 @@ def build_api_routes(
     from ai.backend.manager.api.gql.schema import public_schema as public_strawberry_schema
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
+    from ai.backend.manager.api.rest.prometheus_query_preset.handler import (
+        PrometheusQueryPresetHandler,
+    )
 
     from .acl.handler import AclHandler
     from .acl.registry import register_acl_routes
@@ -106,7 +109,6 @@ def build_api_routes(
     from .notification.registry import register_notification_routes
     from .object_storage.handler import ObjectStorageHandler
     from .object_storage.registry import register_object_storage_routes
-    from .prometheus_query_preset import PrometheusQueryPresetHandler
     from .prometheus_query_preset.registry import register_prometheus_query_preset_routes
     from .quota_scope.handler import QuotaScopeHandler
     from .quota_scope.registry import register_quota_scope_routes
@@ -264,7 +266,7 @@ def build_api_routes(
     if gql_context_deps is None:
         raise RuntimeError("GQLContextDeps required for admin routes")
 
-    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
+    from ai.backend.manager.api.gql.graphql_ws.handler import GraphQLTransportWSHandler
 
     gql_ws_handler = GraphQLTransportWSHandler(
         schema=strawberry_schema,

@@ -28,7 +28,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
 )
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.data.idle_checker.types import SessionUtilizationQuery
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
     PrometheusQueryPresetSearchableFields,
 )
@@ -38,7 +38,7 @@ from ai.backend.manager.models.prometheus_query_preset.searchers import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+from ai.backend.manager.repositories.prometheus_query_preset.db_source.db_source import (
     PrometheusQueryPresetDBSource,
 )
 

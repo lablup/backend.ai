@@ -9,7 +9,7 @@ from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.log_context import with_bulk_action_context
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BasePartialBulkActionResult,
     BulkActionProcessResult,
@@ -17,7 +17,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkEntityResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
 
 __all__ = ("BulkActionProcessor",)
 

@@ -15,9 +15,9 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 __all__ = (

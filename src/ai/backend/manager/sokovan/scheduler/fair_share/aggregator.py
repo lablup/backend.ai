@@ -24,17 +24,17 @@ from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import KernelId, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainUsageBucketKey,
     ProjectUsageBucketKey,
     UsageBucketAggregationResult,
     UserUsageBucketKey,
 )
 from ai.backend.manager.data.resource_usage_history.types import KernelUsageRecordData
-from ai.backend.manager.models.resource_usage_history import KernelUsageRecordRow
 from ai.backend.manager.models.resource_usage_history.creators import (
     KernelUsageRecordCreator,
 )
+from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

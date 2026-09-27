@@ -17,12 +17,14 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.entity.types.inputs import EntityTargetGQL
-from ai.backend.manager.api.gql.entity_label.types import (
+from ai.backend.manager.api.gql.entity_label.types.filters import (
+    EntityLabelFilterGQL,
+    EntityLabelOrderByGQL,
+)
+from ai.backend.manager.api.gql.entity_label.types.node import (
     EntityLabelConnection,
     EntityLabelEdge,
-    EntityLabelFilterGQL,
     EntityLabelGQL,
-    EntityLabelOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 

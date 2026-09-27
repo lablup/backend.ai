@@ -15,11 +15,11 @@ from ai.backend.manager.actions.types import (
     ActionGate,
     ActionKind,
 )
-from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
+from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
 )
-from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     GlobalSearcherOpsAction,
     OperationScopeOpsAction,
@@ -28,9 +28,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     ScopedFieldsOpsResult,
 )
-from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
+from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
-from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
+from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.services.ops.service import (
     GlobalSearcherService,
     SearchFieldsService,

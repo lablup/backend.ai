@@ -68,6 +68,8 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Test the release-grade classifier
       run: python ./scripts/test_determine_release_type.py
+    - name: Check the manager package __init__ files hold no imports
+      run: python ./scripts/check-init-imports.py src/ai/backend/manager
     - name: Restore the Pants caches
       uses: ./.github/actions/pants-caches
       with:

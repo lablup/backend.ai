@@ -184,7 +184,7 @@ def generate_api_keypair(_cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
-    from ai.backend.manager.models.keypair import generate_keypair as _gen_keypair
+    from ai.backend.manager.models.keypair.row import generate_keypair as _gen_keypair
 
     _get_logger().info("generating a manager API keypair")
     ak, sk = _gen_keypair()
@@ -271,7 +271,7 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
 
     from ai.backend.common.validators import TimeDuration
     from ai.backend.manager.models.base import ensure_all_tables_registered
-    from ai.backend.manager.models.kernel import kernels
+    from ai.backend.manager.models.kernel.row import kernels
     from ai.backend.manager.repositories.db.engine import connect_database, vacuum_db
     from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
     from ai.backend.manager.repositories.retention.repository import RetentionRepository

@@ -24,22 +24,22 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.updaters import EndpointReplicaGroupUpdater
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.searchers import (
     ReplicaGroupDeploySchedulingViewSearcher,
     ReplicaGroupScalingSchedulingViewSearcher,
     ReplicaGroupSearcher,
 )
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
-from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.replica_group_history.searchable_fields import (
     ReplicaGroupHistorySearchableFields,
 )
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate

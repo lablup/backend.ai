@@ -16,7 +16,7 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow

@@ -26,35 +26,37 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.user.types import (
-    BulkCreateUsersV2PayloadGQL,
-    BulkCreateUsersWithKeypairV2PayloadGQL,
+from ai.backend.manager.api.gql.user.types.inputs import (
     BulkCreateUserV2InputGQL,
     BulkPurgeUsersV2InputGQL,
+    BulkUpdateUserV2InputGQL,
+    CreateUserInputGQL,
+    DeleteUsersInputGQL,
+    PurgeUserInputGQL,
+    UpdateMyAllowedClientIPInputGQL,
+    UpdateUserV2InputGQL,
+)
+from ai.backend.manager.api.gql.user.types.payloads import (
+    BulkCreateUsersV2PayloadGQL,
+    BulkCreateUsersWithKeypairV2PayloadGQL,
     BulkPurgeUsersV2PayloadGQL,
     BulkPurgeUserV2ErrorGQL,
     BulkUpdateUsersV2PayloadGQL,
-    BulkUpdateUserV2InputGQL,
-    CreateUserInputGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
-    DeleteUsersInputGQL,
     DeleteUsersPayloadGQL,
-    PurgeUserInputGQL,
     PurgeUserPayloadGQL,
     RestoreUserPayloadGQL,
-    UpdateMyAllowedClientIPInputGQL,
     UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
-    UpdateUserV2InputGQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,

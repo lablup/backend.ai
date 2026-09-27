@@ -12,7 +12,9 @@ from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from .base import PostProcessor, PostProcessorContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
 log = StructuredLogger(logging.getLogger(__name__))
 

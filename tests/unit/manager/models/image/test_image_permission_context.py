@@ -24,27 +24,27 @@ from ai.backend.manager.data.permission.permission_defs import ImagePermission
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import (
     ImagePermissionContextBuilder,
+    ImageRow,
 )
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow

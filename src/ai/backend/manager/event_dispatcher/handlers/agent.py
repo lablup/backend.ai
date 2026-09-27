@@ -17,11 +17,11 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import AgentId
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert
+from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatus
 from ai.backend.manager.errors.agent import AgentAlreadyExited, AgentNotFound
-from ai.backend.manager.models.agent import AgentStatus, agents
+from ai.backend.manager.models.agent.row import agents
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )

@@ -30,6 +30,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
 )
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -48,13 +49,13 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
     UserPurgeInProgress,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
     kernels,
@@ -66,19 +67,18 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    QueryCondition,
-    QueryOption,
     SessionRow,
     by_status,
     by_user_id,
 )
-from ai.backend.manager.models.types import join_by_related_field
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -87,11 +87,12 @@ from ai.backend.manager.models.user.purgers import (
     UserPurger,
     UserSessionGroupPurger,
 )
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,

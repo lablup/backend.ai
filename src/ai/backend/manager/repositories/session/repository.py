@@ -24,14 +24,14 @@ from ai.backend.manager.data.session.types import (
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.session.updaters import SessionUpdater
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.session.db_source import SessionDBSource
+from ai.backend.manager.repositories.session.db_source.db_source import SessionDBSource
 
 session_repository_resilience = Resilience(
     policies=[

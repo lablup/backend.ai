@@ -22,6 +22,7 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationData,
+    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -34,8 +35,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvitationNotFound,
     VFolderNotFound,
 )
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import VFolderInvitationState
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.invite import (

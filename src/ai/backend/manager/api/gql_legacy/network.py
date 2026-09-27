@@ -28,11 +28,11 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.network.creators import NetworkCreator
 from ai.backend.manager.models.network.purgers import NetworkPurger
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.network.row import NetworkRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 from .base import (

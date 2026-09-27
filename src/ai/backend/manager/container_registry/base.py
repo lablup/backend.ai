@@ -44,14 +44,15 @@ from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import (
     ImageData,
+    ImageIdentifier,
     ImageStatus,
     ImageType,
     RescanImagesResult,
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.image.creators import ImageCreator
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -73,7 +74,7 @@ class RescanCounts:
 rescan_counts: ContextVar[RescanCounts] = ContextVar("rescan_counts")
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
 
 def _created_in_project(

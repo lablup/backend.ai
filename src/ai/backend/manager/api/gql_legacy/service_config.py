@@ -8,7 +8,7 @@ from ai.backend.common.lock import EtcdLock
 from ai.backend.common.utils import deep_merge
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 

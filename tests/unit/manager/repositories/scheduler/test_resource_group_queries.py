@@ -15,8 +15,8 @@ import pytest
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource

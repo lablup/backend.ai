@@ -32,14 +32,16 @@ from ai.backend.manager.services.container_registry.actions.get_container_regist
     GetContainerRegistriesAction,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
-from ai.backend.manager.services.etcd_config import (
-    DeleteConfigAction,
-    GetConfigAction,
+from ai.backend.manager.services.etcd_config.actions.delete_config import DeleteConfigAction
+from ai.backend.manager.services.etcd_config.actions.get_config import GetConfigAction
+from ai.backend.manager.services.etcd_config.actions.get_resource_metadata import (
     GetResourceMetadataAction,
-    GetResourceSlotsAction,
-    GetVfolderTypesAction,
-    SetConfigAction,
 )
+from ai.backend.manager.services.etcd_config.actions.get_resource_slots import (
+    GetResourceSlotsAction,
+)
+from ai.backend.manager.services.etcd_config.actions.get_vfolder_types import GetVfolderTypesAction
+from ai.backend.manager.services.etcd_config.actions.set_config import SetConfigAction
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))

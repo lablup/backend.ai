@@ -7,7 +7,7 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
+from ai.backend.manager.data.prometheus_query_preset.types import ExecutePresetOptions
 
 
 @dataclass

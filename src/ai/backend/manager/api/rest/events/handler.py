@@ -34,7 +34,7 @@ from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 

@@ -4,7 +4,7 @@ import yarl
 from sqlalchemy.engine.default import DefaultDialect
 
 from ai.backend.manager.models.base import URLColumn
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 
 
 class TestKernelRowCallbackUrlColumn:

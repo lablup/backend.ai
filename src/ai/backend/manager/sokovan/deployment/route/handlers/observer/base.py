@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.deployment.types import RouteData
 
 
 @dataclass

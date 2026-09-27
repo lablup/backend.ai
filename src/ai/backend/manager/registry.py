@@ -96,6 +96,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -123,21 +124,44 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageSearcher,
     ReferenceImageSearcher,
 )
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+from ai.backend.manager.models.kernel.row import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    kernels,
+)
+from ai.backend.manager.models.keypair.row import query_bootstrap_script
+from ai.backend.manager.models.network.row import NetworkRow, NetworkType
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import (
+    PRIVATE_SESSION_TYPES,
+    KernelLoadingStrategy,
+    SessionRow,
+    handle_session_exception,
+)
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.vfolder.row import (
+    verify_vfolder_name,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
+from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .agent_cache import AgentRPCCache
-from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from .errors.agent import AgentNotAllocated, AgentNotFound
@@ -155,33 +179,11 @@ from .errors.resource import (
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
 )
-from .models.agent import AgentRow, agents
-from .models.domain import domains
-from .models.endpoint import EndpointRow
-from .models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-    kernels,
-)
-from .models.keypair import query_bootstrap_script
-from .models.network import NetworkRow, NetworkType
-from .models.resource_group import resource_groups
 from .models.runtime_variant.row import RuntimeVariantRow
-from .models.session import (
-    PRIVATE_SESSION_TYPES,
-    KernelLoadingStrategy,
-    SessionRow,
-    handle_session_exception,
-)
-from .models.user import UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     reenter_txn_session,
-)
-from .models.vfolder import (
-    verify_vfolder_name,
 )
 from .types import UserScope
 

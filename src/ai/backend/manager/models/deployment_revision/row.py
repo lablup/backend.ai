@@ -32,7 +32,7 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.image.row import ImageRow
     from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
     from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
@@ -42,7 +42,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.image.row import ImageRow
 
     return foreign(DeploymentRevisionRow.image) == ImageRow.id
 

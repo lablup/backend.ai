@@ -12,7 +12,7 @@ from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.sentinel import Undefined
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
     SessionScopeActionResult,

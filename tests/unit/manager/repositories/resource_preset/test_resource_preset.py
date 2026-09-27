@@ -14,8 +14,8 @@ from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.searchable_fields import (
     ResourcePresetSearchableFields,
 )

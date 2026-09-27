@@ -49,7 +49,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

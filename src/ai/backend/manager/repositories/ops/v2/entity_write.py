@@ -40,12 +40,12 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     GuardedEntityCreator,

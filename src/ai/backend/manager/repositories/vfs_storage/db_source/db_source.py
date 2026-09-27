@@ -9,7 +9,7 @@ from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.models.vfs_storage.searchable_fields import (
     VFSStorageSearchableFields,
 )

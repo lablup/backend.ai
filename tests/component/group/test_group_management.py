@@ -44,13 +44,17 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionTypes,
 )
+from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.image import ImageRow, ImageType
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.session import SessionRow, SessionStatus
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

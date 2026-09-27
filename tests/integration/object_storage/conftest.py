@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 ObjectStorageFixtureData = dict[str, Any]

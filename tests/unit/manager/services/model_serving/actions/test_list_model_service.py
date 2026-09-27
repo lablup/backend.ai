@@ -16,9 +16,8 @@ from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import RouteHealthStatus
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.model_serving.types import CompactServiceInfo
-from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
@@ -28,7 +27,9 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.testutils.scenario import ScenarioBase
 
 

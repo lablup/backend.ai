@@ -38,20 +38,20 @@ from ai.backend.manager.errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ReferenceImageSearcher,
 )
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.resource_group import resource_groups
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import (
     DEAD_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
@@ -61,9 +61,9 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
-from ai.backend.manager.models.session_template import SessionTemplateRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

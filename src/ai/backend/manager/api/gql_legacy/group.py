@@ -33,17 +33,17 @@ from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project import (
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
     get_permission_ctx,
     groups,
 )
-from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
@@ -198,7 +198,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[UserNode]:
-        from ai.backend.manager.models.user import UserRow
+        from ai.backend.manager.models.user.row import UserRow
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

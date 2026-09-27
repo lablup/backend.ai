@@ -101,17 +101,15 @@ def ensure_all_tables_registered() -> None:
 
     import ai.backend.manager.models
 
+    prefix = "ai.backend.manager.models."
     for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
         if module_info.name in _SKIP_SUBPACKAGES:
             continue
-        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
-        # A domain package may keep its __init__ empty (no Row re-export) and
-        # declare its table only in ``row.py``; import it so create_all sees it.
+        package = importlib.import_module(prefix + module_info.name)
+        # A domain package declares its tables in submodules, not in its __init__.
         if module_info.ispkg:
-            try:
-                importlib.import_module(f"ai.backend.manager.models.{module_info.name}.row")
-            except ModuleNotFoundError:
-                pass
+            for sub_info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+                importlib.import_module(sub_info.name)
 
 
 pgsql_connect_opts = {

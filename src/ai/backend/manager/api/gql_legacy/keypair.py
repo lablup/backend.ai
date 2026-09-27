@@ -16,11 +16,11 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
-from ai.backend.manager.models.keypair import (
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
     KeyPairRow,
     keypairs,
 )
-from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 
 from .session import ComputeSession
 
@@ -44,7 +44,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.services.user.actions.keypair_ops import AdminCreateKeypairAction
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction

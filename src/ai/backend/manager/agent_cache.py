@@ -18,9 +18,9 @@ from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
 from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.types import AgentId
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.agent.row import agents
 
 from .exceptions import AgentError, RPCError
-from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

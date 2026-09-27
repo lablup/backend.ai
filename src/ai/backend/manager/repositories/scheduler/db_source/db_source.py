@@ -46,6 +46,7 @@ from ai.backend.common.types import (
     AgentId,
     ArchName,
     ClusterMode,
+    DefaultForUnspecified,
     KernelId,
     PreemptionMode,
     PreemptionVictimScope,
@@ -81,48 +82,45 @@ from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import DomainRow, domains, query_domain_dotfiles
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow, domains, query_domain_dotfiles
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.creators import KernelCreator
+from ai.backend.manager.models.kernel.row import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
-from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.network import NetworkRow
-from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
-from ai.backend.manager.models.resource_group import ResourceGroupRow
+from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
+from ai.backend.manager.models.network.row import NetworkRow
+from ai.backend.manager.models.project.row import ProjectRow, query_group_dotfiles
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
-from ai.backend.manager.models.resource_policy import (
-    DefaultForUnspecified,
-    KeyPairResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
-    ResourceAllocationRow,
-    ResourceSlotTypeRow,
-)
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_kernel_allocations,
     kernel_requested_slots_expr,
 )
 from ai.backend.manager.models.resource_slot.creators import KernelResourceAllocationCreator
+from ai.backend.manager.models.resource_slot.row import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
+from ai.backend.manager.models.session.row import (
     PRIVATE_SESSION_TYPES,
     SessionDependencyRow,
     SessionRow,
 )
-from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,

@@ -42,6 +42,7 @@ from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
     QuotaScopeNotFoundError,
@@ -52,24 +53,22 @@ from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
-    VFolderOperationStatus,
-    VFolderOwnershipType,
     VFolderRow,
+    VFolderUserMountPolicyRow,
     ensure_quota_scope_accessible_by_user,
     get_permission_ctx,
     is_unmanaged,
     vfolders,
 )
-from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 # Re-export for backward compatibility
@@ -1000,8 +999,8 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.project import groups
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.project.row import groups
+        from ai.backend.manager.models.user.row import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
@@ -1033,8 +1032,8 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[VirtualFolder]:
-        from ai.backend.manager.models.project import groups
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.project.row import groups
+        from ai.backend.manager.models.user.row import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
@@ -1111,7 +1110,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
         # TODO: num_attached count group-by
         j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
@@ -1145,7 +1144,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
         shares = EntityShareRow.__table__
         j = vfolders.join(
@@ -1185,7 +1184,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
         shares = EntityShareRow.__table__
         j = vfolders.join(
@@ -1232,7 +1231,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.project import groups
+        from ai.backend.manager.models.project.row import groups
 
         membership_query = user_scope_membership_query(ProjectEntityType(), user_id)
 
@@ -1273,7 +1272,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.project import groups
+        from ai.backend.manager.models.project.row import groups
 
         membership_query = user_scope_membership_query(ProjectEntityType(), user_id)
         async with graph_ctx.db.begin_readonly() as conn:
@@ -1367,7 +1366,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     def _shared_join(cls) -> sa.sql.Join:
         """Folders lent to a person, with the level each is set to get."""
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
         shares = EntityShareRow.__table__
         policies = VFolderUserMountPolicyRow.__table__
@@ -1387,7 +1386,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
 
     @classmethod
     def _shared_select(cls) -> sa.sql.Select[Any]:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
         shares = EntityShareRow.__table__
         policies = VFolderUserMountPolicyRow.__table__

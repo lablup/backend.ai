@@ -8,12 +8,12 @@ from ai.backend.manager.data.object_storage.types import ObjectStorageData, Obje
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.object_storage.searchable_fields import (
     ObjectStorageSearchableFields,
 )
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 

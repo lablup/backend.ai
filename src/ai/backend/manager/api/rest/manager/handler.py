@@ -36,12 +36,16 @@ from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
-from ai.backend.manager.services.manager_admin import (
-    FetchManagerStatusAction,
-    GetAnnouncementAction,
-    GetDbCxnStatusAction,
+from ai.backend.manager.services.manager_admin.actions.fetch_status import FetchManagerStatusAction
+from ai.backend.manager.services.manager_admin.actions.get_announcement import GetAnnouncementAction
+from ai.backend.manager.services.manager_admin.actions.get_db_cxn_status import GetDbCxnStatusAction
+from ai.backend.manager.services.manager_admin.actions.perform_scheduler_ops import (
     PerformSchedulerOpsAction,
+)
+from ai.backend.manager.services.manager_admin.actions.update_announcement import (
     UpdateAnnouncementAction,
+)
+from ai.backend.manager.services.manager_admin.actions.update_status import (
     UpdateManagerStatusAction,
 )
 

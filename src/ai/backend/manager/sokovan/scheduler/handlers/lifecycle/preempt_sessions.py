@@ -20,7 +20,9 @@ from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
 log = StructuredLogger(logging.getLogger(__name__))
 

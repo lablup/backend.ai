@@ -13,7 +13,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.rbac.types import (
+from ai.backend.manager.api.gql.rbac.types.permission import (
     BulkAddRolePermissionsInputGQL,
     BulkAddRolePermissionsPayloadGQL,
     BulkRemoveRolePermissionsInputGQL,
@@ -22,7 +22,12 @@ from ai.backend.manager.api.gql.rbac.types import (
     DeletePermissionInput,
     DeletePermissionPayload,
     EntityOperationCombinationGQL,
+    MyAtomicBulkScopePermissionsInputGQL,
+    MyAtomicBulkScopePermissionsPayloadGQL,
+    MyScopePermissionsInputGQL,
+    MyScopePermissionsPayloadGQL,
     PermissionConnection,
+    PermissionEdge,
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
@@ -31,13 +36,6 @@ from ai.backend.manager.api.gql.rbac.types import (
     ScopeEntityCombinationGQL,
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
-)
-from ai.backend.manager.api.gql.rbac.types.permission import (
-    MyAtomicBulkScopePermissionsInputGQL,
-    MyAtomicBulkScopePermissionsPayloadGQL,
-    MyScopePermissionsInputGQL,
-    MyScopePermissionsPayloadGQL,
-    PermissionEdge,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only

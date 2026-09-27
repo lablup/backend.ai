@@ -17,11 +17,11 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import association_groups_users
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import association_groups_users
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.secret.types import SecretValue
 
 

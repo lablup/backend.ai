@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     NotificationChannelTypeDTO,
     WebhookSpecInfo,
 )
-from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
+from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission

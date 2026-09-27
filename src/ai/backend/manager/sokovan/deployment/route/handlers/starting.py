@@ -7,6 +7,7 @@ from typing import override
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteStatus,
     RouteStatusTransitions,
@@ -14,7 +15,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 

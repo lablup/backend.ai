@@ -7,13 +7,13 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.log_context import with_scope_action_context
-from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
+from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.result import (
     BaseScopeActionResult,
     ScopeActionProcessResult,
     ScopeActionResultMeta,
 )
-from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
+from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 
 __all__ = ("ScopeActionProcessor",)

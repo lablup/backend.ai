@@ -21,8 +21,8 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.project import ProjectRow
+    from ai.backend.manager.models.domain.row import DomainRow
+    from ai.backend.manager.models.project.row import ProjectRow
 
 __all__: Final[tuple[str, ...]] = (
     "NetworkRow",
@@ -31,13 +31,13 @@ __all__: Final[tuple[str, ...]] = (
 
 
 def _get_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.project import ProjectRow
+    from ai.backend.manager.models.project.row import ProjectRow
 
     return ProjectRow.id == foreign(NetworkRow.project)
 
 
 def _get_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.domain.row import DomainRow
 
     return DomainRow.name == foreign(NetworkRow.domain_name)
 

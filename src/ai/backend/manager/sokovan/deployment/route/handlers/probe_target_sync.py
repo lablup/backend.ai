@@ -6,6 +6,7 @@ from typing import override
 
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -13,7 +14,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTargetStatuses,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 

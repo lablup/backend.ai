@@ -10,10 +10,11 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )
-from ai.backend.manager.models.vfolder import VFolderOperationStatus, update_vfolder_status
+from ai.backend.manager.models.vfolder.row import update_vfolder_status
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

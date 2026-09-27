@@ -1,5 +1,5 @@
 from ai.backend.common.types import SessionId
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.stream.db_source.db_source import StreamDBSource
 

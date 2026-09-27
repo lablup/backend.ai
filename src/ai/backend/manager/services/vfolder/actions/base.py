@@ -23,12 +23,9 @@ from ai.backend.manager.actions.v2.lookup.base import (
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import (
-    VFolderOwnershipType,
-    VFolderStatusSet,
-)
+from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOwnershipType
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.models.vfolder.row import VFolderStatusSet
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.vfolder.types import (
     VFolderUsageInfo,

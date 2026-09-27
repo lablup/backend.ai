@@ -30,6 +30,8 @@ from ai.backend.manager.data.image.types import (
     ImageData,
     ImageLabelsData,
     ImageResourcesData,
+    ImageStatus,
+    ImageType,
     RescanImagesResult,
     ResourceLimitInput,
 )
@@ -38,13 +40,12 @@ from ai.backend.manager.errors.image import (
     ImageAliasNotFound,
     ImageNotFound,
 )
-from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import VisibleImageTarget
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,

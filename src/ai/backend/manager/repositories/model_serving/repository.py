@@ -28,20 +28,25 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ResourceSlot,
     SessionTypes,
+    VFolderUsageMode,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     RouteHealthStatus,
+    RouteStatus,
 )
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
     EndpointData,
+    EndpointLifecycle,
     ModelServiceValidationContext,
     MutationResult,
     ResourceGroupData,
@@ -59,39 +64,32 @@ from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailabl
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable, DomainNotFound
 from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
-from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-)
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import resolve_group_name_or_id
-from ai.backend.manager.models.resource_group import resource_groups
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import resolve_group_name_or_id
+from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.vfolder.row import VFolderRow, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts

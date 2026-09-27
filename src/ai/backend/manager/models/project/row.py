@@ -40,7 +40,7 @@ from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.base import (
@@ -74,8 +74,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.rbac import ContainerRegistryScope
-    from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
-    from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+    from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -624,7 +624,7 @@ class ProjectPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ProjectPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         perm_ctx = ProjectPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

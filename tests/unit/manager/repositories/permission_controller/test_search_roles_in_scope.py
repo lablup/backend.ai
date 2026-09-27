@@ -19,17 +19,17 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.role import RoleData
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.row import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleTarget
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

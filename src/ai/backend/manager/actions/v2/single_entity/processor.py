@@ -9,7 +9,7 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.actions.v2.single_entity.log_context import (
     with_single_entity_action_context,
 )
-from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
+from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.result import (
     SingleEntityActionProcessResult,
     SingleEntityActionResultMeta,
@@ -17,10 +17,10 @@ from ai.backend.manager.actions.v2.single_entity.result import (
 from ai.backend.manager.actions.v2.single_entity.trigger import (
     SingleEntityActionTriggerMeta,
 )
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.single_entity.validator.authenticated import (
     AuthenticatedActionValidator,
 )
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 
 __all__ = ("SingleEntityActionProcessor", "PublicSingleEntityActionProcessor")

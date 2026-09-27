@@ -19,20 +19,18 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageAliasListResult,
     ImageData,
+    ImageIdentifier,
     ImageStatus,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
     ResourceLimitInput,
-)
-from ai.backend.manager.models.image import (
-    ImageIdentifier,
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
     ImageStatefulSource,

@@ -18,9 +18,9 @@ from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryCreatorMeta
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
 from ai.backend.manager.models.huggingface_registry.searchers import (
     HuggingFaceRegistrySearcher,
 )

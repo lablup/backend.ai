@@ -16,7 +16,7 @@ from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.api.gql.agent.resolver import agents_v2
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 
 class ExpectedResult(Enum):

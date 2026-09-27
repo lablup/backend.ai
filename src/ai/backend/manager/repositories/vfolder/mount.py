@@ -37,7 +37,7 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ai.backend.manager.models.project import groups as groups_table
+from ai.backend.manager.models.project.row import groups as groups_table
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.user.queries import joined_project_ids_query

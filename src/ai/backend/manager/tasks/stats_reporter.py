@@ -14,11 +14,11 @@ from ai.backend.common.cron import PeriodicTask
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     kernels,
 )
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.row import keypairs
 
 if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import StatsPluginContext

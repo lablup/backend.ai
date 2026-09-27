@@ -13,9 +13,9 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.structured import StructuredLogger, with_log_context
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.views.sokovan.session import (

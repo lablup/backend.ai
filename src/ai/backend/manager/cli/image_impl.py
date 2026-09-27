@@ -17,9 +17,9 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.purgers import ImagePurger
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import (
     AliasedImageSearcher,

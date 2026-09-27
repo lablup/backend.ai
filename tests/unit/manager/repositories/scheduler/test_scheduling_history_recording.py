@@ -62,29 +62,26 @@ from ai.backend.manager.data.session.types import SchedulingResult, SessionStatu
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import (
-    EntityFieldRow,
-    RoleRow,
-    UserRoleRow,
-)
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -96,8 +93,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData

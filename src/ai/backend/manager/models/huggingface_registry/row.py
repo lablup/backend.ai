@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
+    from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -22,7 +22,7 @@ __all__ = ("HuggingFaceRegistryRow",)
 
 
 def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
+    from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 
     return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 

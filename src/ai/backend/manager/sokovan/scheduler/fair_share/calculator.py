@@ -35,7 +35,7 @@ if TYPE_CHECKING:
         UserFairShareData,
     )
 
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFactorResult,
     FairShareFactorCalculationResult,
     ProjectFactorResult,

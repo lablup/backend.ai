@@ -12,20 +12,15 @@ import pytest
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow

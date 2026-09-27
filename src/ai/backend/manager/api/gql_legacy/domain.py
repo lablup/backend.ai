@@ -32,8 +32,8 @@ from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
     ResourceGroupPermission,
 )
-from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.row import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, DomainUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -43,8 +43,8 @@ from ai.backend.manager.models.rbac import (
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_group import get_resource_groups
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.resource_group.row import get_resource_groups
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -79,7 +79,7 @@ from .gql_relay import (
 from .scaling_group import ScalingGroup, ScalingGroupConnection
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainModel
+    from ai.backend.manager.models.domain.row import DomainModel
 
     from .scaling_group import ScalingGroupNode
     from .schema import GraphQueryContext
@@ -252,7 +252,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str,
         permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
     ) -> Self | None:
-        from ai.backend.manager.models.domain import DomainModel
+        from ai.backend.manager.models.domain.row import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
@@ -285,7 +285,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
-        from ai.backend.manager.models.domain import DomainModel
+        from ai.backend.manager.models.domain.row import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

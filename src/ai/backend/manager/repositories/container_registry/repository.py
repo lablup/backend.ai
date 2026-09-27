@@ -21,13 +21,13 @@ from ai.backend.manager.data.container_registry.types import (
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
-from ai.backend.manager.models.container_registry import (
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
@@ -35,7 +35,7 @@ from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource

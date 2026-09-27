@@ -22,7 +22,7 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -30,7 +30,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
-from ai.backend.manager.repositories.project.db_source import ProjectDBSource
+from ai.backend.manager.repositories.project.db_source.db_source import ProjectDBSource
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

@@ -34,16 +34,19 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RouteHealthStatus, RouteStatus, RoutingRow
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

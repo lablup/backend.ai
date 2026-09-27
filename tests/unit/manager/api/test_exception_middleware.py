@@ -9,7 +9,7 @@ from aiohttp import web
 
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.manager.api.rest.app import api_middleware
-from ai.backend.manager.api.rest.middleware import build_exception_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.errors.common import GenericForbidden, InternalServerError
 
 _EXCEPTION_MIDDLEWARE_LOGGER = "ai.backend.manager.api.rest.middleware.exception"

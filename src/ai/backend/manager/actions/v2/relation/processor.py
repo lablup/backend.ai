@@ -6,13 +6,13 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.relation.log_context import with_relation_action_context
-from ai.backend.manager.actions.v2.relation.monitor import RelationActionMonitor
+from ai.backend.manager.actions.v2.relation.monitor.base import RelationActionMonitor
 from ai.backend.manager.actions.v2.relation.result import (
     RelationActionProcessResult,
     RelationActionResultMeta,
 )
 from ai.backend.manager.actions.v2.relation.trigger import RelationActionTriggerMeta
-from ai.backend.manager.actions.v2.relation.validator import RelationActionValidator
+from ai.backend.manager.actions.v2.relation.validator.base import RelationActionValidator
 
 __all__ = ("RelationActionProcessor",)
 

@@ -29,7 +29,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scopes import (
     AuditLogTarget,
     EntityAuditLogTarget,

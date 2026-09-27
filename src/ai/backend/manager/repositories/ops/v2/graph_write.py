@@ -27,7 +27,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import InvalidFieldPermission, VirtualEntityNotFound
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,

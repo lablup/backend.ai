@@ -8,14 +8,14 @@ from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifie
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
     BulkActionResultMeta,
     BulkEntityResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import (
+from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )

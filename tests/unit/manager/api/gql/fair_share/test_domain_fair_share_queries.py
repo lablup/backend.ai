@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.fair_share.types.domain import (
     DomainFairShareConnection,
     DomainFairShareGQL,
 )
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
     FairShareData,

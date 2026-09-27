@@ -7,15 +7,15 @@ from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.log_context import with_global_action_context
-from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
+from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.result import (
     GlobalActionProcessResult,
     GlobalActionResultMeta,
 )
-from ai.backend.manager.actions.v2.global_scope.validator import (
+from ai.backend.manager.actions.v2.global_scope.validator.authenticated import (
     AuthenticatedActionValidator,
-    GlobalActionValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 

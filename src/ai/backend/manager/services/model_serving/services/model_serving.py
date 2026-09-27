@@ -57,6 +57,7 @@ from ai.backend.manager.data.deployment.types import (
     MountMetadata,
     RevisionDraft,
     RouteHealthStatus,
+    RouteStatus,
 )
 from ai.backend.manager.data.deployment.types import (
     ResourceSpecDraft as DeploymentResourceSpecDraft,
@@ -64,6 +65,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
+    EndpointLifecycle,
     ErrorInfo,
     RouteInfo,
     ServiceInfo,
@@ -101,14 +103,12 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
-from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -169,7 +169,9 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import MountOptionModel
 
 log = StructuredLogger(logging.getLogger(__name__))

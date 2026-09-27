@@ -52,8 +52,8 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher

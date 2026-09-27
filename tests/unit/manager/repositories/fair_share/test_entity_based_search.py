@@ -26,17 +26,17 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.fair_share import (
-    DomainFairShareRow,
-    ProjectFairShareRow,
-    UserFairShareRow,
-)
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.fair_share.deprecated_search import (
     DeprecatedDomainFairShareFields,
     DeprecatedProjectFairShareFields,
     DeprecatedUserFairShareFields,
+)
+from ai.backend.manager.models.fair_share.row import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
 )
 from ai.backend.manager.models.fair_share.scopes import (
     DomainFairShareTarget,
@@ -48,35 +48,31 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_group import (
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForProjectRow,
     ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.fair_share import (
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.fair_share.repository import (
     FairShareRepository,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

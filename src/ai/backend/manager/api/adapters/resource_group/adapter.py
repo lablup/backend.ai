@@ -91,7 +91,6 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,
@@ -101,6 +100,7 @@ from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.scopes import (
     DomainResourceGroupTarget,
     ProjectResourceGroupTarget,

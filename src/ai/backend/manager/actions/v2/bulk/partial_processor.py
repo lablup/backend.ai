@@ -10,7 +10,7 @@ from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 from ai.backend.manager.actions.v2.bulk.log_context import with_bulk_action_context
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
     BulkActionResultMeta,
@@ -19,9 +19,11 @@ from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import (
-    AtomicBulkActionValidator,
+from ai.backend.manager.actions.v2.bulk.validator.authenticated import (
     AuthenticatedAtomicBulkActionValidator,
+)
+from ai.backend.manager.actions.v2.bulk.validator.base import (
+    AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError

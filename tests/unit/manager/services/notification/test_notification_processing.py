@@ -31,15 +31,15 @@ from ai.backend.common.data.notification.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
+    MatchingNotificationRuleData,
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import SendResult
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
-from ai.backend.manager.services.notification.actions import (
+from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
     ProcessNotificationActionResult,
 )

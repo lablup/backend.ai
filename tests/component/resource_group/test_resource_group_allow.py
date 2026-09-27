@@ -28,7 +28,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedResourceGroupsPayload,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData

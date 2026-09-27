@@ -12,13 +12,13 @@ from ai.backend.manager.actions.v2.field.base import (
 from ai.backend.manager.actions.v2.field.log_context import with_single_field_action_context
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import FieldOwnerLookupOpsResult
-from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
+from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.result import (
     SingleEntityActionProcessResult,
     SingleEntityActionResultMeta,
 )
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 
 __all__ = ("SingleFieldActionProcessor",)
 

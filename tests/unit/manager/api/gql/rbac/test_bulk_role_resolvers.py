@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
 )
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
-from ai.backend.manager.api.gql.rbac.types import (
+from ai.backend.manager.api.gql.rbac.types.role import (
     BulkAssignRoleInputGQL,
     BulkAssignRolePayloadGQL,
     BulkRevokeRoleInputGQL,

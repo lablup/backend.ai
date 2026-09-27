@@ -80,6 +80,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
     ResourceGroupCleanupConfig,
     RevisionSearchResult,
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteInfo,
@@ -121,16 +122,16 @@ from ai.backend.manager.errors.service import (
     NoUpdatesToApply,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.searchable_fields import (
     DeploymentPolicySearchableFields,
 )
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.searchable_fields import (
     ModelRevisionSearchableFields,
 )
@@ -141,14 +142,14 @@ from ai.backend.manager.models.deployment_revision_preset.row import (
 from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
     DeploymentPresetSearchableFields,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import (
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.creators import DeploymentCreator
+from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
+from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.endpoint.creators import DeploymentCreator
-from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
 from ai.backend.manager.models.endpoint.searchable_fields import (
     AutoScalingRuleSearchableFields,
     DeploymentAccessTokenSearchableFields,
@@ -165,20 +166,20 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointReplicaGroupUpdater,
 )
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import ProjectRow, groups
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupRevisionSwapUpdater
-from ai.backend.manager.models.resource_group import ResourceGroupRow, resource_groups
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
     PresetResourceSlotRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
@@ -187,7 +188,7 @@ from ai.backend.manager.models.runtime_variant.searchable_fields import (
     RuntimeVariantSearchableFields,
 )
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.scheduling_history import (
+from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     RouteHistoryRow,
 )
@@ -197,18 +198,17 @@ from ai.backend.manager.models.scheduling_history.searchable_fields import (
 from ai.backend.manager.models.scheduling_history.updaters import (
     DeploymentHistoryAttemptUpdater,
 )
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow, VFolderUserMountPolicyRow
-from ai.backend.manager.repositories.deployment.types import (
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
+from ai.backend.manager.repositories.deployment.types.endpoint import (
     DeploymentHistoryToCreate,
-    RouteData,
     RouteHistoryToCreate,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,

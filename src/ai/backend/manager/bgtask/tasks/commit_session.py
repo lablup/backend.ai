@@ -35,7 +35,7 @@ from ai.backend.manager.errors.kernel import SessionNotFound
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
-    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.image.row import ImageRow
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.image.repository import ImageRepository
     from ai.backend.manager.repositories.session.repository import SessionRepository

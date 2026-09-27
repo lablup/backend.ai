@@ -15,7 +15,7 @@ from ai.backend.manager.clients.container_registry.base import (
 from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
-from ai.backend.manager.container_registry import get_container_registry_cls
+from ai.backend.manager.container_registry.factory import get_container_registry_cls
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaNotConfigurable
@@ -91,7 +91,7 @@ from ai.backend.manager.services.container_registry.actions.update_registry_quot
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 

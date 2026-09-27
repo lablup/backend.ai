@@ -22,7 +22,7 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels

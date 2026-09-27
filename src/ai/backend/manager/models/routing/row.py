@@ -36,8 +36,8 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
-    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.endpoint.row import EndpointRow
+    from ai.backend.manager.models.session.row import SessionRow
 
 
 __all__ = ("RouteStatus", "RoutingRow")

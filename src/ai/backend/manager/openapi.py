@@ -25,7 +25,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.tree import build_api_routes
 from ai.backend.manager.data.common.sentinel import Undefined, undefined
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.models.vfolder import VFolderPermissionValidator
+from ai.backend.manager.models.vfolder.row import VFolderPermissionValidator
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

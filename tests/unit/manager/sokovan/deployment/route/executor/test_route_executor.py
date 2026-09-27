@@ -35,6 +35,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
@@ -42,7 +43,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 

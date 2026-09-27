@@ -37,6 +37,7 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
@@ -50,9 +51,8 @@ from ai.backend.manager.errors.deployment import (
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import (
-    RouteData,
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )

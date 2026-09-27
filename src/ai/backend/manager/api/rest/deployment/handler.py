@@ -78,11 +78,11 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revision_
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
 )
-from ai.backend.manager.services.deployment.actions.route import (
-    SearchRoutesAction,
+from ai.backend.manager.services.deployment.actions.route.search_routes import SearchRoutesAction
+from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (

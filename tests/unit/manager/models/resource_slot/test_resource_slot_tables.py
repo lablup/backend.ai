@@ -16,13 +16,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
-    NumberFormat,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

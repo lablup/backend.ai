@@ -40,8 +40,8 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
     HookExecutionResult,
     ScheduleCoordinator,
 )
-from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
-from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
+from ai.backend.manager.sokovan.scheduler.post_processors.base import PostProcessorContext
+from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
     KernelExecutionResult,
     KernelTransitionInfo,

@@ -15,7 +15,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationContext,
@@ -40,9 +41,9 @@ from ai.backend.manager.errors.resource import (
     ResourceGroupNotFound,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.agent import AgentRow, AgentStatus
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.fair_share import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
@@ -57,18 +58,18 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.resource_usage_history import (
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
     execute_batch_querier,
 )

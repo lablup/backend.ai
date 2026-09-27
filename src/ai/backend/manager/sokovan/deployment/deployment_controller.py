@@ -72,21 +72,25 @@ from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaUpdater
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.exceptions import (
     InvalidEndpointState,
 )
-from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
+from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.types import (
     ActivateRevisionResult,
     DeploymentLifecycleType,
 )
-from ai.backend.manager.sokovan.deployment.validators import (
+from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
     DeploymentRevisionValidator,
+)
+from ai.backend.manager.sokovan.deployment.validators.required_resource_slot_rule import (
     RequiredResourceSlotRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.types import OptionalState
 

@@ -13,22 +13,22 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
 # ORM cluster registration: these rows are reachable via relationships but are not
 # otherwise imported by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac import (
     PredefinedRole,
     ProjectScope,
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow

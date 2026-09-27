@@ -24,9 +24,13 @@ from ai.backend.manager.models.scheduling_history.searchers import (
     SessionSchedulingHistorySearcher,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.services.scheduling_history.actions import (
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
     SearchSessionHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors

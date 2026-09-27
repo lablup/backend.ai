@@ -20,15 +20,15 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_usage_history.types import (
     KernelUsageRecordData,
 )
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_usage_history import (
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
+from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
     DomainUsageBucketTarget,
     ProjectUsageBucketTarget,
@@ -52,7 +52,7 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-    from ai.backend.manager.data.fair_share import (
+    from ai.backend.manager.data.fair_share.types import (
         DomainUsageBucketKey,
         ProjectUsageBucketKey,
         UsageBucketAggregationResult,

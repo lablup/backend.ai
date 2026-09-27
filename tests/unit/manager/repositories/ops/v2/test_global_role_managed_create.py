@@ -19,17 +19,17 @@ from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.rbac_models import RoleRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
