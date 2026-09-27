@@ -54,6 +54,7 @@ from ai.backend.logging.otel import (
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
 from .api.rest.app import _mount_registry_tree
@@ -410,6 +411,7 @@ async def server_main(
                 max_export_batch_size=config_provider.config.otel.max_export_batch_size,
             )
             BraceStyleAdapter.apply_otel(otel_spec)
+            StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_server()
             instrument_aiohttp_client()
             root_app.middlewares.insert(0, otel_server_middleware)

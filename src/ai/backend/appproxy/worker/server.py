@@ -118,6 +118,7 @@ from ai.backend.common.types import AgentId, RedisProfileTarget, ServiceDiscover
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
 from .config import ServerConfig
@@ -543,6 +544,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             max_export_batch_size=root_ctx.local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+        StructuredOtelLogging(otel_spec).attach(root_ctx.local_config.logging.pkg_ns.keys())
 
     # Start event-based SD publishing if config has service_group set
     sd_config = root_ctx.local_config.service_discovery
