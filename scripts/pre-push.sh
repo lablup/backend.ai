@@ -14,8 +14,6 @@ trap 'cleanup TERM' SIGTERM
 # --- Hook Body ---
 set -Eeuo pipefail
 
-BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
-cd "$BASE_PATH"
 if [ -f .pants.rc ]; then
   local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
   mkdir -p "$local_exec_root_dir"
