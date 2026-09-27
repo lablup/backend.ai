@@ -2,7 +2,6 @@ python_sources(
     name="src",
     sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/cli:src",  # not auto-inferred
         ":resources",
     ],
 )
@@ -22,6 +21,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "src/ai/backend/cli:src",  # install requirement: provides the `backend.ai` console script
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

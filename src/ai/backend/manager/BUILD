@@ -2,11 +2,16 @@ python_sources(
     name="src",
     sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/cli:src",  # not auto-inferred
-        ":resources",
         "//:reqs#authlib",  # pants: no-infer-dep in plugin/openid/webapp.py
         "//:reqs#httpx",  # pants: no-infer-dep in plugin/openid/webapp.py (authlib dep)
     ],
+    # Resources read at run time, attached to the file that reads them.
+    overrides={
+        "__init__.py": {"dependencies": [":version"]},
+        "api/rest/app.py": {"dependencies": [":vendor"]},
+        "cli/dbschema.py": {"dependencies": [":revision-history"]},
+        "data/permission/seed/loader.py": {"dependencies": [":seed-roles"]},
+    },
 )
 
 # Each rule set is self-contained: the upper-layer denies come first, then the same
@@ -139,6 +144,8 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        ":resources",
+        "src/ai/backend/cli:src",  # install requirement: provides the `backend.ai` console script
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -174,6 +181,7 @@ pex_binary(
     **common_scie_config("lazy"),
     dependencies=[
         ":src",
+        ":resources",
         ":buildscript",
         "!!stubs/trafaret:stubs",
     ],
@@ -184,6 +192,7 @@ pex_binary(
     **common_scie_config("eager"),
     dependencies=[
         ":src",
+        ":resources",
         ":buildscript",
         "!!stubs/trafaret:stubs",
     ],
@@ -213,15 +222,17 @@ resources(
     ],
 )
 resources(
+    name="seed-roles",
+    sources=["data/permission/seed/roles/*.yaml"],
+)
+resources(
+    name="revision-history",
+    sources=["models/alembic/revision_history/*.json"],
+)
+resources(
     name="resources",
-    dependencies=[
-        ":version",
-        ":vendor",
-    ],
     sources=[
         "**/py.typed",
-        "**/*.yaml",
         "models/alembic/script.py.mako",
-        "models/alembic/revision_history/*.json",
     ],
 )
