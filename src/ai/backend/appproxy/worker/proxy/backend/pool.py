@@ -64,6 +64,7 @@ class RoutePool:
     _lock: asyncio.Lock
     _health_check_task: asyncio.Task[None] | None
     _spec: RoutePoolSpec
+    _no_healthy_route: bool
 
     def __init__(
         self,
@@ -74,6 +75,7 @@ class RoutePool:
         self._entries = {}
         self._lock = asyncio.Lock()
         self._spec = spec or RoutePoolSpec()
+        self._no_healthy_route = False
         if initial_routes:
             for r in initial_routes:
                 self._entries[(r.current_kernel_host, r.kernel_port)] = _PoolEntry(route=r)
@@ -118,7 +120,13 @@ class RoutePool:
                 if entry.is_healthy and entry.route.traffic_ratio > 0
             ]
         if not candidates:
+            if not self._no_healthy_route:
+                self._no_healthy_route = True
+                log.warning("no healthy route available", route_count=len(self._entries))
+            else:
+                log.trace("no healthy route available")
             raise WorkerNotAvailable
+        self._no_healthy_route = False
         if len(candidates) == 1:
             return candidates[0]
         ratios = [r.traffic_ratio for r in candidates]
@@ -131,12 +139,10 @@ class RoutePool:
         entry.failure_count += 1
         if entry.failure_count >= self._spec.failure_threshold:
             if entry.is_healthy:
-                log.debug(
-                    "route {}:{} marked unhealthy after {} failures",
-                    route.current_kernel_host,
-                    route.kernel_port,
-                    entry.failure_count,
+                log.warning(
+                    "route marked unhealthy after request failures",
                     route_id=route.route_id,
+                    failure_count=entry.failure_count,
                 )
             entry.is_healthy = False
             if entry.unhealthy_since is None:
@@ -147,12 +153,7 @@ class RoutePool:
         if entry is None or entry.route.route_id != route.route_id:
             return
         if not entry.is_healthy:
-            log.debug(
-                "route {}:{} recovered",
-                route.current_kernel_host,
-                route.kernel_port,
-                route_id=route.route_id,
-            )
+            log.debug("route recovered", route_id=route.route_id)
         entry.failure_count = 0
         entry.is_healthy = True
         entry.unhealthy_since = None
@@ -183,18 +184,13 @@ class RoutePool:
         ok = await self._tcp_probe(host, port)
         if ok:
             if not entry.is_healthy:
-                log.debug("route {}:{} recovered", host, port, route_id=entry.route.route_id)
+                log.debug("route recovered", route_id=entry.route.route_id)
             entry.is_healthy = True
             entry.failure_count = 0
             entry.unhealthy_since = None
             return
         if entry.is_healthy:
-            log.debug(
-                "route {}:{} marked unhealthy by the health check",
-                host,
-                port,
-                route_id=entry.route.route_id,
-            )
+            log.warning("route marked unhealthy by the health check", route_id=entry.route.route_id)
         entry.is_healthy = False
         if entry.unhealthy_since is None:
             entry.unhealthy_since = time.perf_counter()
@@ -206,12 +202,10 @@ class RoutePool:
                 cached = self._entries.get(hp)
                 if cached is not None and cached.route.route_id == entry.route.route_id:
                     del self._entries[hp]
-                    log.debug(
-                        "evicted unreachable route {}:{} after {}s",
-                        host,
-                        port,
-                        self._spec.recovery_timeout,
+                    log.warning(
+                        "unreachable route evicted",
                         route_id=entry.route.route_id,
+                        recovery_timeout_sec=self._spec.recovery_timeout,
                     )
 
     async def _tcp_probe(self, host: str, port: int) -> bool:

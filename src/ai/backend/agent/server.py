@@ -54,7 +54,11 @@ from ai.backend.agent.errors import (
     AgentInitializationError,
     ResourceError,
 )
-from ai.backend.agent.errors.agent import ImagePullFailedError, ImagePullTimeoutError
+from ai.backend.agent.errors.agent import (
+    ImagePullFailedError,
+    ImagePullTimeoutError,
+    KernelNotFoundError,
+)
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -223,6 +227,9 @@ class _RPCRegistryBase:
                     raise
                 except ResourceError:
                     # This is an expected scenario.
+                    raise
+                except KernelNotFoundError:
+                    log.trace("rpc target kernel not found")
                     raise
                 except Exception:
                     if log_failure or not scoped:
@@ -750,16 +757,22 @@ class AgentRPCServer(aobject):
                 )
 
         kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
-        for kid, kernel in agent.kernel_registry.items():
-            if kid not in kernel_ids:
-                # destroy kernel
-                await agent.inject_container_lifecycle_event(
-                    kid,
-                    kernel.session_id,
-                    LifecycleEvent.DESTROY,
-                    KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
-                    suppress_events=True,
-                )
+        unknown_kernels = [
+            (kid, kernel) for kid, kernel in agent.kernel_registry.items() if kid not in kernel_ids
+        ]
+        for kid, kernel in unknown_kernels:
+            log.info(
+                "kernel unknown to manager destroyed", kernel_id=kid, session_id=kernel.session_id
+            )
+            await agent.inject_container_lifecycle_event(
+                kid,
+                kernel.session_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                suppress_events=True,
+            )
+        if unknown_kernels:
+            log.info("kernel registry synced with manager", kernel_count=len(unknown_kernels))
 
     @rpc_function
     @collect_error

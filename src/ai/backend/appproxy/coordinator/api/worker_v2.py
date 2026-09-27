@@ -271,14 +271,18 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
     root_ctx: RootContext = request.app["_root.context"]
     worker_id = UUID(request.match_info["worker_id"])
 
-    async def _update(sess: SASession) -> None:
+    async def _update(sess: SASession) -> tuple[int, WorkerStatus]:
         worker = await Worker.get(sess, worker_id)
         worker.nodes -= 1
         if worker.nodes == 0:
             worker.status = WorkerStatus.LOST
+        return worker.nodes, worker.status
 
     async with root_ctx.db.connect() as db_conn:
-        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
+        node_count, status = await execute_with_txn_retry(
+            _update, root_ctx.db.begin_session, db_conn
+        )
+    log.info("worker left", worker_id=worker_id, node_count=node_count, worker_status=status)
     return PydanticResponse(StubResponseModel(success=True))
 
 
@@ -289,8 +293,9 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
 
-    async def _update(sess: SASession) -> dict[str, Any]:
+    async def _update(sess: SASession) -> tuple[dict[str, Any], WorkerStatus]:
         worker = await Worker.get(sess, worker_id)
+        prev_status = worker.status
         worker.updated_at = datetime.now(UTC)
         worker.status = WorkerStatus.ALIVE
         result = dict(worker.dump_model())
@@ -305,10 +310,18 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
             {worker.authority: str(now.timestamp())},
             ttl,
         )
-        return result
+        return result, prev_status
 
     async with root_ctx.db.connect() as db_conn:
-        result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
+        result, prev_status = await execute_with_txn_retry(
+            _update, root_ctx.db.begin_session, db_conn
+        )
+    if prev_status != WorkerStatus.ALIVE:
+        log.info(
+            "worker revived by heartbeat",
+            worker_id=worker_id,
+            prev_worker_status=prev_status,
+        )
     request["do_not_print_access_log"] = True
     return PydanticResponse(WorkerResponseModel(**result))
 

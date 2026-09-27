@@ -1819,7 +1819,7 @@ class AbstractAgent[
                             and tracked_kernel.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
-                        log.debug(
+                        log.info(
                             "dead container detected during lifecycle sync",
                             kernel_id=kernel_id,
                             container_id=container.id,
@@ -1869,7 +1869,7 @@ class AbstractAgent[
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
-                        log.debug("kernel without container detected", kernel_id=kernel_id)
+                        log.info("kernel without container detected", kernel_id=kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1881,7 +1881,7 @@ class AbstractAgent[
                     for kernel_id in alive_kernels.keys() - known_kernels.keys():
                         if kernel_id in self.restarting_kernels:
                             continue
-                        log.debug("container of unregistered kernel detected", kernel_id=kernel_id)
+                        log.info("container of unregistered kernel detected", kernel_id=kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1891,12 +1891,9 @@ class AbstractAgent[
                         )
                 finally:
                     # Enqueue the events.
-                    terminated_kernel_ids = ",".join([str(kid) for kid in terminated_kernels])
-                    if terminated_kernel_ids:
-                        log.debug(
-                            "kernel termination enqueued",
-                            kernel_count=len(terminated_kernels),
-                            kernel_ids=terminated_kernel_ids,
+                    if terminated_kernels:
+                        log.info(
+                            "kernel termination enqueued", kernel_count=len(terminated_kernels)
                         )
                     for kernel_id, ev in terminated_kernels.items():
                         await self.container_lifecycle_queue.put(ev)
@@ -3461,20 +3458,14 @@ class AbstractAgent[
         await self.anycast_event(
             ExecutionStartedAnycastEvent(session_id=session_id),
         )
+        kernel_obj = self._get_live_kernel(kernel_id)
         try:
-            kernel_obj = self.kernel_registry[kernel_id]
             result = await kernel_obj.execute(
                 run_id, mode, text, opts=opts, flush_timeout=flush_timeout, api_version=api_version
             )
         except asyncio.CancelledError:
             log.trace("execution cancelled")
             raise
-        except KeyError:
-            # This situation is handled in the lifecycle management subsystem.
-            raise RuntimeError(
-                f"The container for kernel {kernel_id} is not found! "
-                "(might be terminated--try it again)"
-            ) from None
 
         if result["status"] in ("finished", "exec-timeout"):
             log.debug("execution ended", result_status=str(result["status"]))
@@ -3500,26 +3491,36 @@ class AbstractAgent[
     async def get_completions(
         self, kernel_id: KernelId, text: str, opts: dict[str, Any]
     ) -> CodeCompletionResp:
-        return await self.kernel_registry[kernel_id].get_completions(text, opts)
+        return await self._get_live_kernel(kernel_id).get_completions(text, opts)
 
     async def get_logs(self, kernel_id: KernelId) -> dict[str, Any]:
-        return await self.kernel_registry[kernel_id].get_logs()
+        return await self._get_live_kernel(kernel_id).get_logs()
 
     async def interrupt_kernel(self, kernel_id: KernelId) -> dict[str, Any]:
-        return await self.kernel_registry[kernel_id].interrupt_kernel()
+        return await self._get_live_kernel(kernel_id).interrupt_kernel()
 
     async def start_service(
         self, kernel_id: KernelId, service: str, opts: dict[str, Any]
     ) -> dict[str, Any]:
-        return await self.kernel_registry[kernel_id].start_service(service, opts)
+        return await self._get_live_kernel(kernel_id).start_service(service, opts)
 
     async def shutdown_service(self, kernel_id: KernelId, service: str) -> None:
+        kernel_obj = self.kernel_registry.get(kernel_id)
+        if kernel_obj is None:
+            log.trace("service app shutdown skipped, kernel not found", service_name=service)
+            return
         try:
-            kernel_obj = self.kernel_registry[kernel_id]
-            if kernel_obj is not None:
-                await kernel_obj.shutdown_service(service)
-        except Exception:
-            log.exception("service app shutdown failed", service_name=service)
+            await kernel_obj.shutdown_service(service)
+        except Exception as e:
+            log.warning("service app shutdown failed", exc_info=e, service_name=service)
+
+    def _get_live_kernel(self, kernel_id: KernelId) -> AbstractKernel:
+        try:
+            return self.kernel_registry[kernel_id]
+        except KeyError:
+            raise KernelNotFoundError(
+                f"The container for kernel {kernel_id} is not found (it might be terminated)."
+            ) from None
 
     async def commit(
         self,
@@ -3533,27 +3534,27 @@ class AbstractAgent[
     ) -> None:
         if extra_labels is None:
             extra_labels = {}
-        return await self.kernel_registry[kernel_id].commit(
+        return await self._get_live_kernel(kernel_id).commit(
             kernel_id, subdir, canonical=canonical, filename=filename, extra_labels=extra_labels
         )
 
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
-        return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
+        return await self._get_live_kernel(kernel_id).check_duplicate_commit(kernel_id, subdir)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes) -> None:
-        return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
+        return await self._get_live_kernel(kernel_id).accept_file(filename, filedata)
 
     async def download_file(self, kernel_id: KernelId, filepath: str) -> bytes:
-        return await self.kernel_registry[kernel_id].download_file(filepath)
+        return await self._get_live_kernel(kernel_id).download_file(filepath)
 
     async def download_single(self, kernel_id: KernelId, filepath: str) -> bytes:
-        return await self.kernel_registry[kernel_id].download_single(filepath)
+        return await self._get_live_kernel(kernel_id).download_single(filepath)
 
     async def list_files(self, kernel_id: KernelId, path: str) -> dict[str, Any]:
-        return await self.kernel_registry[kernel_id].list_files(path)
+        return await self._get_live_kernel(kernel_id).list_files(path)
 
     async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
-        return await self.kernel_registry[kernel_id].ping()
+        return await self._get_live_kernel(kernel_id).ping()
 
     async def save_last_registry(self, force: bool = False) -> None:
         await self._write_kernel_registry_to_recovery(

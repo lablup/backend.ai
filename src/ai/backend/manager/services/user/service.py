@@ -7,7 +7,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -274,7 +274,10 @@ class UserService:
                 await self._purge_single_user(user_uuid, action, user_info_ctx)
                 purged_user_ids.append(user_uuid)
             except Exception as e:
-                log.warning("user purge failed", target_user_id=user_uuid, exc_info=e)
+                if isinstance(e, BackendAIError) and e.is_client_error():
+                    log.trace("user purge rejected: {}", e, target_user_id=user_uuid)
+                else:
+                    log.exception("user purge failed", target_user_id=user_uuid)
                 failures.append(BulkPurgeError(user_id=user_uuid, exception=e))
 
         return BulkPurgeUserActionResult(

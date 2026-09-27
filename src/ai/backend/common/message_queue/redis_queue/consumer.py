@@ -426,17 +426,15 @@ class RedisConsumer(AbstractConsumer):
 
         state = self._backoff_state[stream_key]
         state.increment()
-
-        # Calculate delay with exponential backoff
-        delay = min(
-            self._backoff_initial_delay * (2 ** (state.attempt - 1)),
-            self._backoff_max_delay,
-        )
+        delay = self._backoff_delay(state.attempt)
 
         # Add jitter (50-100% of calculated delay)
         actual_delay = delay * (0.5 + random.random() * 0.5)
 
         await asyncio.sleep(actual_delay)
+
+    def _backoff_delay(self, attempt: int) -> float:
+        return min(self._backoff_initial_delay * (2.0 ** (attempt - 1)), self._backoff_max_delay)
 
     def _reset_backoff(self, stream_key: str) -> None:
         """
@@ -473,7 +471,26 @@ class RedisConsumer(AbstractConsumer):
                     stream_key=stream_key,
                 )
         else:
-            log.error("stream read failed", exc_info=e, stream_key=stream_key)
+            state = self._backoff_state.get(stream_key)
+            attempt_count = (state.attempt if state is not None else 0) + 1
+            if (
+                self._backoff_delay(attempt_count)
+                >= self._backoff_max_delay
+                > self._backoff_delay(attempt_count - 1)
+            ):
+                log.error(
+                    "stream read keeps failing, backoff reached its cap",
+                    exc_info=e,
+                    stream_key=stream_key,
+                    attempt_count=attempt_count,
+                )
+            else:
+                log.warning(
+                    "stream read failed",
+                    exc_info=e,
+                    stream_key=stream_key,
+                    attempt_count=attempt_count,
+                )
 
 
 def _generate_consumer_id(node_id: str | None) -> str:

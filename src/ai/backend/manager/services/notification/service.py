@@ -7,9 +7,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+import aiohttp
+
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
+from ai.backend.common.data.notification.types import NotificationChannelType
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
+from ai.backend.manager.errors.notification import (
+    NotificationProcessingFailure,
+    NotificationTemplateRenderingFailure,
+)
 from ai.backend.manager.notification.types import ProcessRuleParams
 from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
@@ -191,6 +198,17 @@ class NotificationService:
             errors=result.errors,
         )
 
+    def _is_user_side_failure(
+        self, channel_type: NotificationChannelType, error: BaseException
+    ) -> bool:
+        if isinstance(error, NotificationTemplateRenderingFailure):
+            return True
+        if channel_type == NotificationChannelType.WEBHOOK:
+            return isinstance(
+                error, (NotificationProcessingFailure, aiohttp.ClientError, TimeoutError)
+            )
+        return False
+
     async def _process_rules(
         self,
         matches: Sequence[MatchingNotificationRuleData],
@@ -233,12 +251,20 @@ class NotificationService:
         for match, result in zip(matches, results, strict=True):
             if isinstance(result, BaseException):
                 errors.append(result)
-                log.error(
-                    "notification rule processing failed",
-                    rule_name=match.rule.name,
-                    notification_rule_id=match.rule.id,
-                    exc_info=result,
-                )
+                if self._is_user_side_failure(match.channel.channel_type, result):
+                    log.trace(
+                        "notification rule processing failed: {}",
+                        result,
+                        rule_name=match.rule.name,
+                        notification_rule_id=match.rule.id,
+                    )
+                else:
+                    log.error(
+                        "notification rule processing failed",
+                        rule_name=match.rule.name,
+                        notification_rule_id=match.rule.id,
+                        exc_info=result,
+                    )
                 continue
             successes.append(
                 ProcessedRuleSuccess(

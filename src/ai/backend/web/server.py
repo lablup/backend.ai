@@ -62,6 +62,7 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
@@ -665,7 +666,11 @@ async def token_login_handler(request: web.Request) -> web.Response:
         raise AlreadyLoggedInError()
 
     # Check if auth token is delivered via request body or cookie.
-    rqst_data: dict[str, Any] = await request.json()
+    try:
+        rqst_data: dict[str, Any] = await request.json()
+    except json.JSONDecodeError as e:
+        log.trace("token login request body is not valid JSON: {}", e)
+        raise MalformedRequestBody() from e
     auth_token_name = config.api.auth_token_name
     auth_token = rqst_data.get(auth_token_name)
     if not auth_token:

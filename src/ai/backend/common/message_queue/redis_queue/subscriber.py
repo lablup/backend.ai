@@ -16,6 +16,10 @@ from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+_RETRY_DELAY_SEC = 1.0
+# About 30 seconds of consecutive failures at `_RETRY_DELAY_SEC`.
+_ERROR_FAILURE_COUNT = 30
+
 
 class RedisSubscriber(AbstractSubscriber):
     """
@@ -118,16 +122,26 @@ class RedisSubscriber(AbstractSubscriber):
         """
         log.debug("broadcast read loop started", channels=str(self._channels))
 
+        failure_count = 0
         while not self._closed:
             try:
                 await self._read_broadcast_messages()
+                failure_count = 0
             except glide.ClosingError:
                 log.debug("broadcast read loop stopped on client close")
                 break
-            except Exception:
-                log.exception("broadcast read failed")
+            except Exception as e:
+                failure_count += 1
+                if failure_count == _ERROR_FAILURE_COUNT:
+                    log.error(
+                        "broadcast read keeps failing", exc_info=e, attempt_count=failure_count
+                    )
+                elif failure_count == 1:
+                    log.warning("broadcast read failed", exc_info=e, attempt_count=failure_count)
+                else:
+                    log.debug("broadcast read failed", attempt_count=failure_count)
                 # Add a small delay to avoid tight error loops
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(_RETRY_DELAY_SEC)
 
     async def _read_broadcast_messages(self) -> None:
         """

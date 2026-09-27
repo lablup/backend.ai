@@ -107,8 +107,8 @@ class AgentClientPool:
         client = await self._get_or_create(agent_id)
         try:
             yield client
-        except CONNECTION_ERRORS:
-            self._record_failure(agent_id)
+        except CONNECTION_ERRORS as e:
+            self._record_failure(agent_id, e)
             raise
         except Exception:
             # Non-connection errors don't increment failure count
@@ -230,7 +230,7 @@ class AgentClientPool:
             deserializer=msgpack.unpackb,
         )
 
-    def _record_failure(self, agent_id: AgentId) -> None:
+    def _record_failure(self, agent_id: AgentId, error: BaseException) -> None:
         """Record connection error and mark unhealthy if threshold exceeded."""
         entry = self._entries.get(agent_id)
         if entry is None:
@@ -238,22 +238,29 @@ class AgentClientPool:
 
         entry.failure_count += 1
         if entry.failure_count >= self._spec.failure_threshold:
+            if entry.is_healthy:
+                log.warning(
+                    "agent connection marked unhealthy",
+                    exc_info=error,
+                    agent_id=agent_id,
+                    failure_count=entry.failure_count,
+                )
             entry.is_healthy = False
             if entry.unhealthy_since is None:
                 entry.unhealthy_since = time.perf_counter()
-            log.debug(
-                "agent connection marked unhealthy",
-                agent_id=agent_id,
-                failure_count=entry.failure_count,
-            )
 
     def _record_success(self, agent_id: AgentId) -> None:
         """Reset state on success."""
         entry = self._entries.get(agent_id)
         if entry is not None:
-            entry.failure_count = 0
-            entry.is_healthy = True
-            entry.unhealthy_since = None
+            self._mark_recovered(agent_id, entry)
+
+    def _mark_recovered(self, agent_id: AgentId, entry: _CachedEntry) -> None:
+        if not entry.is_healthy:
+            log.debug("agent connection recovered", agent_id=agent_id)
+        entry.failure_count = 0
+        entry.is_healthy = True
+        entry.unhealthy_since = None
 
     async def _health_check_loop(self) -> None:
         """Periodically check all connection health."""
@@ -279,16 +286,15 @@ class AgentClientPool:
         try:
             async with asyncio.timeout(5.0):
                 await entry.client.ping()
-            # Ping success → recover
-            entry.is_healthy = True
-            entry.failure_count = 0
-            entry.unhealthy_since = None
-        except Exception:
-            # Ping failure → mark unhealthy
+            self._mark_recovered(agent_id, entry)
+        except Exception as e:
+            if entry.is_healthy:
+                log.warning("agent connection health check failed", exc_info=e, agent_id=agent_id)
+            else:
+                log.debug("agent connection health check failed", agent_id=agent_id)
             entry.is_healthy = False
             if entry.unhealthy_since is None:
                 entry.unhealthy_since = time.perf_counter()
-                log.debug("agent connection health check failed", agent_id=agent_id)
 
         # Delete if recovery_timeout exceeded
         if (
