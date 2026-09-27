@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import smtplib
 from email.mime.text import MIMEText
 from functools import partial
 from typing import override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
@@ -51,8 +51,7 @@ class EmailChannel(AbstractNotificationChannel):
             lines = message.message.split("\n", 1)
             subject = lines[0] if lines else _DEFAULT_NOTIFICATION_SUBJECT
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             partial(self._send_email, subject, message.message),
         )

@@ -2,6 +2,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import ClassVar
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
@@ -63,6 +64,23 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
         for existing_handler in logger.handlers:
             existing_handler.setFormatter(json_formatter)
     log.info("opentelemetry logging initialized")
+
+
+class LegacyOtelLogging:
+    """Sends records of loggers wrapped by the deprecated `BraceStyleAdapter` to OTel."""
+
+    _loggers: ClassVar[set[logging.Logger]] = set()
+    _spec: OpenTelemetrySpec
+
+    def __init__(self, spec: OpenTelemetrySpec) -> None:
+        self._spec = spec
+
+    @classmethod
+    def register(cls, logger: logging.Logger) -> None:
+        cls._loggers.add(logger)
+
+    def attach(self) -> None:
+        apply_otel_loggers(self._loggers, self._spec)
 
 
 def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:

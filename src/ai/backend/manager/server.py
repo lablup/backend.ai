@@ -48,9 +48,11 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
+    LegacyOtelLogging,
     OpenTelemetrySpec,
+    apply_otel_tracer,
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
@@ -411,7 +413,8 @@ async def server_main(
                 max_queue_size=config_provider.config.otel.max_queue_size,
                 max_export_batch_size=config_provider.config.otel.max_export_batch_size,
             )
-            BraceStyleAdapter.apply_otel(otel_spec)
+            LegacyOtelLogging(otel_spec).attach()
+            apply_otel_tracer(otel_spec)
             StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_server()
             instrument_aiohttp_client()

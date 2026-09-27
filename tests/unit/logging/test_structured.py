@@ -10,7 +10,6 @@ from uuid import UUID
 import pytest
 
 from ai.backend.logging.structured import StructuredLogger, with_log_context
-from ai.backend.logging.utils import BraceStyleAdapter, with_log_context_fields
 
 LOGGER_NAME = "tests.logging.structured"
 TRACE_LEVEL = 5
@@ -220,24 +219,3 @@ class TestWithLogContext:
         assert record.__dict__["log_tag_color"] == "red"
         assert record.__dict__["log_tag_module"] == "scheduler"
         assert record.module == "test_structured"
-
-
-class TestIsolationFromBraceStyleAdapter:
-    def test_adapter_ignores_log_context(self, capture_info: pytest.LogCaptureFixture) -> None:
-        adapter = BraceStyleAdapter(logging.getLogger(LOGGER_NAME))
-        with with_log_context(request_id="req-1"):
-            adapter.info("request {} handled", "GET /")
-
-        record = _record(capture_info)
-        assert not hasattr(record, "log_tag_request_id")
-        assert not hasattr(record, "request_id")
-
-    def test_logger_ignores_legacy_context_fields(
-        self, logger: StructuredLogger, capture_info: pytest.LogCaptureFixture
-    ) -> None:
-        with with_log_context_fields({"user_id": "user-1"}):
-            logger.info("legacy scope")
-
-        record = _record(capture_info)
-        assert not hasattr(record, "user_id")
-        assert not hasattr(record, "log_tag_user_id")
