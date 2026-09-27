@@ -23,11 +23,11 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import TusLeaseHeldError, TusLeaseLostError, TusSessionNotFoundError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 valkey_tus_resilience = Resilience(
     policies=[

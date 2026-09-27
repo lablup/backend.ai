@@ -16,9 +16,9 @@ from typing import Any, override
 
 from prometheus_client import Counter, Gauge, Histogram
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # ---------------------------------------------------------------------------
 # Global circuit-breaker state
@@ -52,10 +52,7 @@ def _trip(error: Exception) -> None:
         _trip_error_message = f"{type(error).__name__}: {error}"
     if not _error_logged:
         _error_logged = True
-        log.warning(
-            "Prometheus metric recording disabled due to error: {}",
-            error,
-        )
+        log.warning("prometheus metric recording disabled", exc_info=error)
 
 
 # ---------------------------------------------------------------------------

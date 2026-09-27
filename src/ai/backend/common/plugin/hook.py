@@ -8,11 +8,11 @@ from typing import Any, Final, Protocol
 
 import attrs
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import AbstractPlugin, BasePluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ALL_COMPLETED",
@@ -183,8 +183,8 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                 await hook_handler(*args)
             except Exception:
                 log.exception(
-                    "HookPluginContext.notify({}): skipping error in hook handler from {}",
-                    event_name,
-                    plugin_name,
+                    "hook handler failed, skipped",
+                    event_name=event_name,
+                    plugin_name=plugin_name,
                 )
                 continue

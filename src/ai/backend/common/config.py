@@ -18,7 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
@@ -26,7 +26,7 @@ from .exception import BackendAIError, ConfigurationError, ModelDefinitionValida
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ConfigurationError",
@@ -70,9 +70,9 @@ class BaseConfigSchema(BackendAISchema):
         if extra:
             keys = sorted(extra)
             log.warning(
-                "Unknown config field(s) in {}: {}",
-                type(self).__name__,
-                ", ".join(keys),
+                "unknown config fields ignored",
+                config_type=type(self).__name__,
+                unknown_fields=", ".join(keys),
             )
         return self
 

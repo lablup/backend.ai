@@ -15,7 +15,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from ai.backend.logging.formatter import CustomJsonFormatter
-from ai.backend.logging.structured import StructuredMessage
+from ai.backend.logging.structured import StructuredLogger, StructuredMessage
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -60,7 +62,7 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
         # Apply JSON formatter to existing handlers for extra fields
         for existing_handler in logger.handlers:
             existing_handler.setFormatter(json_formatter)
-    logging.info("open telemetry logging initialized successfully.")
+    log.info("opentelemetry logging initialized")
 
 
 def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
@@ -73,14 +75,14 @@ def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
     )
     tracer_provider.add_span_processor(span_processor)
     trace.set_tracer_provider(tracer_provider)
-    logging.info("OpenTelemetry tracing initialized successfully.")
+    log.info("opentelemetry tracing initialized")
 
 
 def instrument_aiohttp_server() -> None:
     AioHttpServerInstrumentor().instrument()
-    logging.info("OpenTelemetry tracing for aiohttp server initialized successfully.")
+    log.info("opentelemetry aiohttp server instrumentation initialized")
 
 
 def instrument_aiohttp_client() -> None:
     AioHttpClientInstrumentor().instrument()
-    logging.info("OpenTelemetry tracing for aiohttp client initialized successfully.")
+    log.info("opentelemetry aiohttp client instrumentation initialized")

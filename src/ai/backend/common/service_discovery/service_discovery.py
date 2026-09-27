@@ -10,7 +10,7 @@ from typing import Any, Final, Self, override
 from pydantic import Field
 
 from ai.backend.common.types import BackendAISchema, ServiceDiscoveryType
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
 _DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minutes
@@ -19,7 +19,7 @@ _DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minutes
 MODEL_SERVICE_ROUTE_TTL: Final[int] = 60 * 5  # 5 minutes
 MODEL_SERVICE_GROUP: Final[str] = "model-services"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ServiceEndpoint(BackendAISchema):
@@ -320,15 +320,15 @@ class ServiceDiscoveryLoop:
                             service_id=service.id,
                         )
             except Exception as e:
-                log.error("Error sweeping unhealthy services: {}", e)
+                log.warning("unhealthy service sweep failed", exc_info=e)
             await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
 
     async def _run_service_loop(self) -> None:
         log.info(
-            "Registering service {} with ID {} in group {}",
-            self._metadata.display_name,
-            self._metadata.id,
-            self._metadata.service_group,
+            "service discovery registering",
+            service_display_name=self._metadata.display_name,
+            service_id=self._metadata.id,
+            service_group=self._metadata.service_group,
         )
         await self._service_discovery.register(self._metadata)
         while not self._closed:
@@ -337,7 +337,7 @@ class ServiceDiscoveryLoop:
                     service_meta=self._metadata,
                 )
             except Exception as e:
-                log.error("Error sending heartbeat: {}", e)
+                log.warning("service discovery heartbeat failed", exc_info=e)
             await asyncio.sleep(self._interval_seconds)
         await self._service_discovery.unregister(
             service_group=self._metadata.service_group,

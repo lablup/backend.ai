@@ -12,9 +12,9 @@ from ai.backend.common.message_queue.abc import AbstractSubscriber
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
 from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RedisSubscriber(AbstractSubscriber):
@@ -107,25 +107,25 @@ class RedisSubscriber(AbstractSubscriber):
             try:
                 await self._loop_task
             except asyncio.CancelledError:
-                log.debug("Subscriber loop task cancelled")
+                log.debug("subscriber loop task cancelled")
 
         await self._client.close()
-        log.debug("RedisSubscriber closed")
+        log.debug("redis subscriber closed")
 
     async def _read_broadcast_messages_loop(self) -> None:
         """
         Background task to read broadcast messages from subscribed channels.
         """
-        log.debug("Starting read broadcast messages loop for channels {}", self._channels)
+        log.debug("broadcast read loop started", channels=str(self._channels))
 
         while not self._closed:
             try:
                 await self._read_broadcast_messages()
             except glide.ClosingError:
-                log.info("Client connection closed, stopping read broadcast messages loop")
+                log.debug("broadcast read loop stopped on client close")
                 break
-            except Exception as e:
-                log.error("Error while reading broadcast messages: {}", e)
+            except Exception:
+                log.exception("broadcast read failed")
                 # Add a small delay to avoid tight error loops
                 await asyncio.sleep(1.0)
 
@@ -139,6 +139,6 @@ class RedisSubscriber(AbstractSubscriber):
         try:
             payload = await self._client.receive_broadcast_message()
         except InvalidMessagePayloadError as e:
-            log.warning("Dropping malformed broadcast message: {}", e)
+            log.warning("malformed broadcast message dropped", exc_info=e)
             return
         await self._subscribe_queue.put(payload)
