@@ -4,11 +4,11 @@ Dotfiles stage for kernel lifecycle.
 This stage handles processing and installation of dotfiles in containers.
 """
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
 from .utils import ChownUtil, PathOwnerDeterminer
@@ -79,9 +79,7 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
 
     @override
     async def setup(self, spec: DotfilesSpec) -> DotfilesResult:
-        loop = asyncio.get_running_loop()
-
-        result = await loop.run_in_executor(None, self._process_dotfiles, spec)
+        result = await run_in_executor_with_context(None, self._process_dotfiles, spec)
         return DotfilesResult(processed_dotfiles=result)
 
     def _process_dotfiles(self, spec: DotfilesSpec) -> list[DotfileProcResult]:

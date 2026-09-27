@@ -43,7 +43,7 @@ from ai.backend.agent.stats import (
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.agent.utils import read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController, CgroupResolutionFailed
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
@@ -60,11 +60,11 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.common.utils import nmget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 # The list of pruned fstype when checking the filesystem usage statistics.
@@ -152,12 +152,8 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
         if "event loop is closed" in msg or "session is closed" in msg:
             return None
         raise
-    except (DockerError, aiohttp.ClientError) as e:
-        log.error(
-            "cannot read stats (cid:{}): client error: {!r}.",
-            short_cid,
-            e,
-        )
+    except (DockerError, aiohttp.ClientError):
+        log.exception("container stats read failed", container_id=short_cid)
         return None
     else:
         entry = {"read": "0001-01-01"}
@@ -169,11 +165,7 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
                 entry = ret
             case _:
                 # The API may return an empty result upon container termination.
-                log.warning(
-                    "cannot read stats (cid:{}): got an empty result: {}",
-                    short_cid,
-                    ret,
-                )
+                log.debug("container stats result empty", container_id=short_cid)
                 return None
         if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
@@ -309,9 +301,9 @@ class CPUPlugin(AbstractComputePlugin):
                         return None
             except (OSError, CgroupResolutionFailed) as e:
                 log.warning(
-                    "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
-                    container_id[:7],
-                    e,
+                    "container cpu stats sysfs unreadable",
+                    exc_info=e,
+                    container_id=container_id[:7],
                 )
                 return None
             return cpu_used
@@ -377,7 +369,7 @@ class CPUPlugin(AbstractComputePlugin):
                 p = psutil.Process(pid)
                 cpu_times = p.cpu_times()
             except psutil.NoSuchProcess:
-                log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
+                log.debug("process for cpu stats not found", pid=pid, container_id=cid)
             else:
                 return Decimal(cpu_times.user + cpu_times.system) * 1000
             return None
@@ -641,9 +633,9 @@ class MemoryPlugin(AbstractComputePlugin):
                     dstat = os.statvfs(disk_info.mountpoint)
                 except OSError as e:
                     log.debug(
-                        "get_disk_stat(): skipping the unreadable mountpoint {}: {}",
-                        disk_info.mountpoint,
-                        e,
+                        "unreadable disk mountpoint skipped",
+                        mountpoint=disk_info.mountpoint,
+                        error_repr=repr(e),
                     )
                     continue
                 disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
@@ -653,8 +645,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 total_disk_capacity += disk_capacity
             return total_disk_usage, total_disk_capacity, per_disk_stat
 
-        loop = current_loop()
-        total_disk_usage, total_disk_capacity, per_disk_stat = await loop.run_in_executor(
+        total_disk_usage, total_disk_capacity, per_disk_stat = await run_in_executor_with_context(
             None, get_disk_stat
         )
         return [
@@ -745,8 +736,8 @@ class MemoryPlugin(AbstractComputePlugin):
                                     mem_cur_bytes -= int(value)
                                 except ValueError:
                                     log.warning(
-                                        "MemoryPlugin: cannot parse inactive stat. container: {0}",
-                                        container_id[:7],
+                                        "container memory inactive stat unparsable",
+                                        container_id=container_id[:7],
                                     )
                                 break
 
@@ -778,8 +769,8 @@ class MemoryPlugin(AbstractComputePlugin):
                                     mem_cur_bytes -= int(value)
                                 except ValueError:
                                     log.warning(
-                                        "MemoryPlugin: cannot parse inactive stat. container: {0}",
-                                        container_id[:7],
+                                        "container memory inactive stat unparsable",
+                                        container_id=container_id[:7],
                                     )
                                 break
 
@@ -798,9 +789,9 @@ class MemoryPlugin(AbstractComputePlugin):
                         return None
             except (OSError, CgroupResolutionFailed) as e:
                 log.warning(
-                    "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
-                    container_id[:7],
-                    e,
+                    "container memory stats sysfs unreadable",
+                    exc_info=e,
+                    container_id=container_id[:7],
                 )
                 return None
             container = DockerContainer(self._docker, id=container_id)
@@ -810,44 +801,44 @@ class MemoryPlugin(AbstractComputePlugin):
                     container_pid: int = data.get("State", {}).get("Pid", _INVALID_PID)
             except TimeoutError:
                 log.warning(
-                    "MemoryPlugin: timeout reading container info for container {0}",
-                    container_id[:7],
+                    "container info read timed out",
+                    container_id=container_id[:7],
                 )
                 return None
             net_stat = ContainerNetStat(rx_bytes=0, tx_bytes=0)
-            loop = current_loop()
             if container_pid > 0:
                 try:
-                    net_stat = await loop.run_in_executor(None, read_proc_net_dev, container_pid)
+                    net_stat = await run_in_executor_with_context(
+                        None, read_proc_net_dev, container_pid
+                    )
                 except OSError as e:
                     log.warning(
-                        "MemoryPlugin: cannot read net stats for container {0} (pid={1}): {2!r}",
-                        container_id[:7],
-                        container_pid,
-                        e,
+                        "container net stats unreadable",
+                        exc_info=e,
+                        container_id=container_id[:7],
+                        pid=container_pid,
                     )
             else:
                 sandbox_key = data.get("NetworkSettings", {}).get("SandboxKey", "")
                 ns_path = Path(sandbox_key) if sandbox_key else None
                 if ns_path and ns_path.exists():
                     try:
-                        net_stat = await loop.run_in_executor(None, read_netns_net_dev, ns_path)
+                        net_stat = await run_in_executor_with_context(
+                            None, read_netns_net_dev, ns_path
+                        )
                     except OSError as e:
                         log.warning(
-                            "MemoryPlugin: cannot read net stats via netns for"
-                            " container {0} (sandbox_key={1!r}): {2!r}",
-                            container_id[:7],
-                            sandbox_key,
-                            e,
+                            "container net stats via netns unreadable",
+                            exc_info=e,
+                            container_id=container_id[:7],
+                            sandbox_key=sandbox_key,
                         )
                 else:
-                    log.warning(
-                        "MemoryPlugin: container {0} has no PID and no valid SandboxKey,"
-                        " skipping net stat collection",
-                        container_id[:7],
+                    log.debug(
+                        "container net stats skipped without pid and sandbox key",
+                        container_id=container_id[:7],
                     )
-            loop = current_loop()
-            scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
+            scratch_sz = await run_in_executor_with_context(None, get_scratch_size, container_id)
             return ContainerStatResult(
                 mem_cur_bytes=mem_cur_bytes,
                 mem_capacity_bytes=mem_max_bytes,
@@ -883,8 +874,7 @@ class MemoryPlugin(AbstractComputePlugin):
             for name, stat in ret["networks"].items():
                 net_rx_bytes += stat["rx_bytes"]
                 net_tx_bytes += stat["tx_bytes"]
-            loop = current_loop()
-            scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
+            scratch_sz = await run_in_executor_with_context(None, get_scratch_size, container_id)
             return ContainerStatResult(
                 mem_cur_bytes=mem_cur_bytes,
                 mem_capacity_bytes=mem_capacity_bytes,
@@ -920,7 +910,9 @@ class MemoryPlugin(AbstractComputePlugin):
                 continue
             if isinstance(result, Exception):
                 log.warning(
-                    "gather_container_measures: error collecting stats for {}: {}", cid, result
+                    "container stats collection failed",
+                    exc_info=result,
+                    container_id=cid,
                 )
                 continue
             if isinstance(result, BaseException):
@@ -987,11 +979,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 p = psutil.Process(pid)
                 stats = p.as_dict(attrs=["memory_info", "io_counters"])
             except psutil.NoSuchProcess:
-                log.debug(
-                    "Process not found for memory stats (pid:{0}, container id:{1})",
-                    pid,
-                    cid,
-                )
+                log.debug("process for memory stats not found", pid=pid, container_id=cid)
             else:
                 mem_cur_bytes = io_read_bytes = io_write_bytes = None
                 if stats["memory_info"] is not None:
@@ -1256,7 +1244,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
             if port_name in ("sshd", "ttyd"):
                 intrinsic_ports[port_name] = host_ports[index + 2]
 
-        await current_loop().run_in_executor(
+        await run_in_executor_with_context(
             None,
             lambda: (config_dir / "intrinsic-ports.json").write_bytes(dump_json(intrinsic_ports)),
         )

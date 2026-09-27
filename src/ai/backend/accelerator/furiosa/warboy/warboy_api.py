@@ -1,7 +1,8 @@
-import asyncio
 import glob
 from collections.abc import AsyncIterable, Mapping
 from pathlib import Path
+
+from ai.backend.common.asyncio import run_in_executor_with_context
 
 
 class WarboyAPI:
@@ -13,17 +14,15 @@ class WarboyAPI:
         if not (platform_type_path.exists() and platform_type_path.is_file()):
             return False
 
-        contents = await asyncio.get_running_loop().run_in_executor(
-            None, platform_type_path.read_text
-        )
+        contents = await run_in_executor_with_context(None, platform_type_path.read_text)
         return contents in ["FuriosaAI", "VITIS"]
 
     @classmethod
     async def list_devices(cls) -> AsyncIterable[Mapping[str, str]]:
         async def _read_prop(path: Path) -> str:
-            return await asyncio.get_running_loop().run_in_executor(None, path.read_text)
+            return await run_in_executor_with_context(None, path.read_text)
 
-        candidates = await asyncio.get_running_loop().run_in_executor(None, glob.glob, "/dev/npu?")
+        candidates = await run_in_executor_with_context(None, glob.glob, "/dev/npu?")
         for idx in range(len(candidates)):
             if not await cls.is_furiosa_device(idx):
                 continue

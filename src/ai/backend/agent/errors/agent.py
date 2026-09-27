@@ -47,6 +47,21 @@ class ImagePullTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
         )
 
 
+class ImagePullFailedError(BackendAIError, web.HTTPBadGateway):
+    """Raised when the container runtime reports an image pull failure."""
+
+    error_type = "https://api.backend.ai/probs/agent/image-pull-failed"
+    error_title = "Image pull failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
     """Raised when container creation fails (final error to return to client)."""
 
