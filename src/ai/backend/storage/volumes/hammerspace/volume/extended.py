@@ -17,7 +17,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.types import CapacityUsage, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_QUOTA,
@@ -46,7 +46,7 @@ METRIC_PRECEDING_DURATION = "1h"
 METRIC_INTERVAL_DURATION = "5m"
 
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -275,7 +275,7 @@ class HammerspaceVolume(BaseHammerspaceVolume):
     async def get_fs_usage(self) -> CapacityUsage:
         site_id = await self._get_site_id()
         if site_id is None:
-            log.warning("No sites found in the Hammerspace cluster")
+            log.warning("no sites found in the Hammerspace cluster")
             return CapacityUsage(
                 capacity_bytes=-1,
                 used_bytes=-1,
@@ -288,7 +288,7 @@ class HammerspaceVolume(BaseHammerspaceVolume):
                 used_bytes=valid_row.used,
             )
 
-        log.warning("No valid metric series rows found in the site (id:{})", site_id)
+        log.warning("no valid metric series rows found in site", site_id=str(site_id))
         return CapacityUsage(
             capacity_bytes=-1,
             used_bytes=-1,

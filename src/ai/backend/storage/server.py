@@ -40,6 +40,7 @@ from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.storage.context_types import ArtifactVerifierContext
 
@@ -66,7 +67,7 @@ from .plugin import (
 )
 from .watcher import main_job
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _is_root() -> bool:
@@ -142,7 +143,7 @@ async def aiomonitor_ctx(
         m.start()
         aiomon_started = True
     except Exception as e:
-        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+        log.warning("aiomonitor start failed, continuing without it", exc_info=e)
     try:
         yield m
     finally:
@@ -164,7 +165,7 @@ async def api_ctx(
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             if pid == 0:
-                log.info("Loading storage webapp plugin: {0}", plugin_name)
+                log.info("storage webapp plugin loaded", plugin_name=plugin_name)
             subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)  # type: ignore[attr-defined]
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
         try:
@@ -390,16 +391,16 @@ async def server_main(
                 )
                 os.setgid(gid)
                 os.setuid(uid)
-            log.info("Changed process uid:gid to {}:{}", uid, gid)
+            log.info("process uid and gid changed", uid=uid, gid=gid)
 
-        log.info("Started the storage-proxy service.")
+        log.info("storage-proxy started")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed, shutting down")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
-        log.info("Shutting down...")
+        log.info("storage-proxy shutting down")
         await storage_init_stack.__aexit__(None, None, None)
 
 
@@ -471,9 +472,9 @@ def main(
             )
             with logger:
                 setproctitle("backend.ai: storage-proxy")
-                log.info("Backend.AI Storage Proxy", VERSION)
-                log.info("Runtime: {0}", env_info())
-                log.info("Node ID: {0}", local_config.storage_proxy.node_id)
+                log.info("Backend.AI Storage Proxy starting", version=VERSION)
+                log.info("runtime environment", runtime_info=env_info())
+                log.info("storage-proxy node", node_id=local_config.storage_proxy.node_id)
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")
@@ -488,7 +489,7 @@ def main(
                                 "uvloop is not installed. Install it with: pip install uvloop"
                             )
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 insock_path_prefix = local_config.storage_proxy.watcher_insock_path_prefix
@@ -530,7 +531,7 @@ def main(
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
-                log.info("exit.")
+                log.info("storage-proxy exited")
         finally:
             if local_config.storage_proxy.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

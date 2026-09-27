@@ -17,9 +17,10 @@ import aiofiles.os
 import janus
 import trafaret as t
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidQuotaScopeError,
@@ -55,7 +56,7 @@ from ai.backend.storage.volumes.abc import (
 )
 from ai.backend.storage.watcher import DeletePathTask, WatcherClient
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BaseQuotaModel(AbstractQuotaModel):
@@ -98,9 +99,8 @@ class BaseQuotaModel(AbstractQuotaModel):
         extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None,
                 lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
             )
@@ -144,8 +144,7 @@ class BaseQuotaModel(AbstractQuotaModel):
             raise QuotaDirectoryNotEmptyError(
                 f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
             )
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             lambda: shutil.rmtree(qspath),
         )
@@ -166,9 +165,8 @@ class SetGIDQuotaModel(BaseQuotaModel):
         extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None,
                 lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
             )
@@ -213,8 +211,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
             raise QuotaDirectoryNotEmptyError(
                 f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
             )
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             lambda: shutil.rmtree(qspath),
         )
@@ -235,8 +232,7 @@ class BaseFSOpModel(AbstractFSOpModel):
         src_path: Path,
         dst_path: Path,
     ) -> None:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             functools.partial(
                 shutil.copytree,
@@ -252,8 +248,7 @@ class BaseFSOpModel(AbstractFSOpModel):
         src_path: Path,
         dst_path: Path,
     ) -> None:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             lambda: shutil.move(str(src_path), str(dst_path)),
         )
@@ -263,9 +258,8 @@ class BaseFSOpModel(AbstractFSOpModel):
         self,
         path: Path,
     ) -> None:
-        loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
+            await run_in_executor_with_context(None, lambda: shutil.rmtree(path))
         except FileNotFoundError:
             pass
 
@@ -277,7 +271,6 @@ class BaseFSOpModel(AbstractFSOpModel):
         recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
-        loop = asyncio.get_running_loop()
 
         def _scandir(path: Path, q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
             count = 0
@@ -329,7 +322,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
         async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
             try:
-                await loop.run_in_executor(None, _scandir, path, q.sync_q)
+                await run_in_executor_with_context(None, _scandir, path, q.sync_q)
             finally:
                 await q.async_q.put(SENTINEL)
 
@@ -384,9 +377,8 @@ class BaseFSOpModel(AbstractFSOpModel):
                             if time.monotonic() - start_time > _timeout:
                                 raise TimeoutError
 
-        loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, _calc_usage, path)
+            await run_in_executor_with_context(None, _calc_usage, path)
         except TimeoutError:
             # -1 indicates "too many"
             total_size = -1
@@ -507,7 +499,6 @@ class BaseVolume(AbstractVolume):
             await self.fsop_model.copy_tree(src_vfpath, dst_vfpath)
         except Exception as e:
             await self.delete_vfolder(dst_vfid)
-            log.exception("clone_vfolder: error during copy_tree()")
             raise ProcessExecutionError("Copying files from source directories failed.") from e
 
     @final
@@ -520,19 +511,17 @@ class BaseVolume(AbstractVolume):
     async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, metadata_path.write_bytes, payload)
+        await run_in_executor_with_context(None, metadata_path.write_bytes, payload)
 
     @override
     async def get_metadata(self, vfid: VFolderID) -> bytes:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
-        loop = asyncio.get_running_loop()
         try:
-            stat = await loop.run_in_executor(None, metadata_path.stat)
+            stat = await run_in_executor_with_context(None, metadata_path.stat)
             if stat.st_size > 10 * (2**20):
                 raise MetadataTooLargeError("Too large metadata (more than 10 MiB)")
-            return await loop.run_in_executor(None, metadata_path.read_bytes)
+            return await run_in_executor_with_context(None, metadata_path.read_bytes)
         except FileNotFoundError:
             return b""
         # Other IO errors should be bubbled up.
@@ -543,8 +532,7 @@ class BaseVolume(AbstractVolume):
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:
-        loop = asyncio.get_running_loop()
-        stat = await loop.run_in_executor(None, os.statvfs, self.mount_path)
+        stat = await run_in_executor_with_context(None, os.statvfs, self.mount_path)
         return CapacityUsage(
             capacity_bytes=BinarySize(stat.f_frsize * stat.f_blocks),
             used_bytes=BinarySize(stat.f_frsize * (stat.f_blocks - stat.f_bavail)),
@@ -604,8 +592,7 @@ class BaseVolume(AbstractVolume):
             for created in (target_path, *missing_parents):
                 created.chmod(DEFAULT_VFOLDER_PERMISSION_MODE)
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, _mkdir)
+        await run_in_executor_with_context(None, _mkdir)
 
     @override
     async def rmdir(
@@ -616,8 +603,7 @@ class BaseVolume(AbstractVolume):
         recursive: bool = False,
     ) -> None:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, target_path.rmdir)
+        await run_in_executor_with_context(None, target_path.rmdir)
 
     @override
     async def move_file(
@@ -656,8 +642,7 @@ class BaseVolume(AbstractVolume):
         if not src_path.is_file():
             raise InvalidAPIParameters(extra_msg=f"source path {src_path!s} is not a file")
         dst_path = self.sanitize_vfpath(vfid, dst)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             lambda: dst_path.parent.mkdir(parents=True, exist_ok=True),
         )
@@ -674,8 +659,7 @@ class BaseVolume(AbstractVolume):
             upload_target_path = upload_base_path / session_id
             upload_target_path.touch()
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, _create_target)
+        await run_in_executor_with_context(None, _create_target)
         return session_id
 
     @override
@@ -699,8 +683,7 @@ class BaseVolume(AbstractVolume):
                     finally:
                         q.task_done()
 
-        loop = asyncio.get_running_loop()
-        write_fut = loop.run_in_executor(None, _write, q.sync_q)
+        write_fut = run_in_executor_with_context(None, _write, q.sync_q)
         try:
             async for buf in payload:
                 await q.async_q.put(buf)
@@ -719,7 +702,6 @@ class BaseVolume(AbstractVolume):
     ) -> AsyncIterator[bytes]:
         target_path = self.sanitize_vfpath(vfid, relpath)
         q: janus.Queue[bytes | Exception] = janus.Queue()
-        loop = asyncio.get_running_loop()
 
         def _read(
             q: janus._SyncQueueProxy[bytes | Exception],
@@ -741,13 +723,13 @@ class BaseVolume(AbstractVolume):
             nonlocal chunk_size
             if chunk_size == 0:
                 # get the preferred io block size
-                _vfs_stat = await loop.run_in_executor(
+                _vfs_stat = await run_in_executor_with_context(
                     None,
                     os.statvfs,
                     self.mount_path,
                 )
                 chunk_size = _vfs_stat.f_bsize
-            read_fut = loop.run_in_executor(None, _read, q.sync_q, chunk_size)
+            read_fut = run_in_executor_with_context(None, _read, q.sync_q, chunk_size)
             await asyncio.sleep(0)
             try:
                 while True:

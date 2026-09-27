@@ -9,7 +9,9 @@ from aiohttp import ClientTimeout, web
 from aiohttp.test_utils import TestClient
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
+from ai.backend.common.contexts.request_id import with_request_context
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
     StorageProxyClientArgs,
@@ -53,6 +55,25 @@ def storage_proxy_client_factory(
 
 
 class TestStorageProxyClient:
+    @pytest.mark.parametrize("request_id", ["req-from-manager", None])
+    async def test_request_id_header_follows_the_request_context(
+        self, storage_proxy_client_factory: StorageProxyClientFactory, request_id: str | None
+    ) -> None:
+        received: list[str | None] = []
+
+        async def handler(request: web.Request) -> web.Response:
+            received.append(request.headers.get(REQUEST_ID_HEADER))
+            return web.Response(status=204)
+
+        client = await storage_proxy_client_factory("echo", handler)
+        if request_id is None:
+            await client.request(method="GET", url="echo", request_timeout=DEFAULT_TIMEOUT)
+        else:
+            with with_request_context(request_id):
+                await client.request(method="GET", url="echo", request_timeout=DEFAULT_TIMEOUT)
+
+        assert received == [request_id]
+
     async def test_client_gracefully_handle_non_json_response(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:

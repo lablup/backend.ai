@@ -9,9 +9,9 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import safe_print_redis_config
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RedisConfigProvider(NonMonitorableDependencyProvider[AsyncEtcd, RedisConfig]):
@@ -28,5 +28,5 @@ class RedisConfigProvider(NonMonitorableDependencyProvider[AsyncEtcd, RedisConfi
         # TODO: Override UnifiedConfig with etcd values
         raw_redis_config = await setup_input.get_prefix("config/redis")
         redis_config = RedisConfig.model_validate(raw_redis_config)
-        log.info("configured redis_config: {0}", safe_print_redis_config(redis_config))
+        log.info("redis config applied", redis_config=safe_print_redis_config(redis_config))
         yield redis_config

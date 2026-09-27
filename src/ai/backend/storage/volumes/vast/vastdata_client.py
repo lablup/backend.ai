@@ -14,7 +14,7 @@ import aiohttp
 import jwt
 from yarl import URL
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     QuotaScopeAlreadyExists,
@@ -31,7 +31,7 @@ from .exceptions import (
     VASTUnknownError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 TOKEN_EXPIRATION_BUFFER = timedelta(minutes=1)
 
@@ -284,9 +284,7 @@ class VASTAPIClient:
             VASTUnknownError,
             VASTInvalidParameterError,
         ) as e:
-            log.warning(
-                "Error occurs during communicating with Vast data API. Login and retry (e:{!r})", e
-            )
+            log.warning("VAST API request failed, logging in and retrying", exc_info=e)
             await self._login()
             return await func(
                 real_rel_path,
@@ -457,7 +455,7 @@ class VASTAPIClient:
                     )
                     return result
                 case 404:
-                    log.warning("Cluster with id {} not found in VAST data.", cluster_id)
+                    log.warning("VAST cluster not found", cluster_id=str(cluster_id))
                     return None
                 case _:
                     raise VASTUnknownError(

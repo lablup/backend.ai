@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from collections.abc import Mapping
 from dataclasses import asdict
@@ -8,11 +7,12 @@ from typing import Any, Final, Literal, cast, override
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
@@ -34,7 +34,7 @@ from .config import config_iv
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
 from .vastdata_client import VASTAPIClient, VASTQuota, VASTQuotaID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 VAST_QUOTA_ID_FILE_NAME: Final = ".vast-quota-id"
@@ -59,7 +59,7 @@ class VASTQuotaModel(BaseQuotaModel):
             except FileNotFoundError:
                 return None
 
-        return await asyncio.get_running_loop().run_in_executor(None, _read)
+        return await run_in_executor_with_context(None, _read)
 
     async def _set_vast_quota_id(
         self, quota_scope_id: QuotaScopeID, vast_quota_id: VASTQuotaID
@@ -71,7 +71,7 @@ class VASTQuotaModel(BaseQuotaModel):
             with (qs_path / VAST_QUOTA_ID_FILE_NAME).open("w") as f:
                 f.write(str(vast_quota_id))
 
-        await asyncio.get_running_loop().run_in_executor(None, _write)
+        await run_in_executor_with_context(None, _write)
 
     async def _rm_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> None:
         qs_path = self.mangle_qspath(quota_scope_id)
@@ -79,7 +79,7 @@ class VASTQuotaModel(BaseQuotaModel):
         try:
             await aiofiles.os.remove(qs_path / VAST_QUOTA_ID_FILE_NAME)
         except FileNotFoundError:
-            log.warning("vast quota id file not found (qid: {}). skip", quota_scope_id)
+            log.trace("VAST quota id file not found for quota scope {}, skipping", quota_scope_id)
 
     async def _modify_quota_scope(
         self,
@@ -125,11 +125,6 @@ class VASTQuotaModel(BaseQuotaModel):
                         existing_quota = q
                         break
                 else:
-                    log.error(
-                        "Got invalid parameter error but no quota exists with given quota name ({}). Raise error (orig:{!s})",
-                        quota_name,
-                        e,
-                    )
                     raise InvalidQuotaConfig(
                         f"No existing quota found with name {quota_name}"
                     ) from e
@@ -186,11 +181,10 @@ class VASTQuotaModel(BaseQuotaModel):
             return None
         if quota.used_capacity < 0 or quota.hard_limit < 0:
             log.warning(
-                "Data from VAST API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from VAST API = {}",
-                quota.used_capacity,
-                quota.hard_limit,
-                quota_scope_id,
-                quota,
+                "negative quota usage reported",
+                used_bytes=quota.used_capacity,
+                limit_bytes=quota.hard_limit,
+                response_body=str(quota),
             )
         return QuotaUsage(
             used_bytes=quota.used_capacity,

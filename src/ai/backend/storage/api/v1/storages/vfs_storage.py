@@ -27,7 +27,7 @@ from ai.backend.common.dto.storage.response import (
     VFSDeleteResponse,
     VFSUploadResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.services.storages.vfs_storage import VFSStorageService
 from ai.backend.storage.types import MultipartFileUploadStreamReader
 from ai.backend.storage.utils import log_client_api_entry
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_CONTENT_TYPE: Final[str] = "application/octet-stream"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFSStorageAPIHandler:

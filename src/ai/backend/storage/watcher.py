@@ -16,6 +16,7 @@ import zmq
 import zmq.asyncio
 
 from ai.backend.common import msgpack
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -23,11 +24,11 @@ from ai.backend.common.events.event_types.volume.broadcast import (
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .errors import InvalidDataLengthError, InvalidSocketPathError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
@@ -287,9 +288,8 @@ class DeletePathTask(AbstractTask):
     @override
     async def run(self) -> Any:
         if self.path.is_dir():
-            loop = asyncio.get_running_loop()
             try:
-                await loop.run_in_executor(None, lambda: shutil.rmtree(self.path))
+                await run_in_executor_with_context(None, lambda: shutil.rmtree(self.path))
             except FileNotFoundError:
                 pass
         else:
@@ -412,7 +412,7 @@ class WatcherProcess:
                     task = self._deserialize_from_request(client_request)
                     result = await task.run()
                 except Exception as e:
-                    log.exception("Error in watcher task. (e: {})", e)
+                    log.exception("watcher task failed")
                     await self.respond(False, repr(e))
                 else:
                     if result is not None:

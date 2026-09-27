@@ -7,13 +7,14 @@ from pathlib import Path
 from typing import cast
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.errors import StorageTransferError
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class StorageTransferManager:
@@ -50,7 +51,7 @@ class StorageTransferManager:
         resolved_source = source_storage.resolve_storage(self._storage_pool)
         resolved_dest = dest_storage.resolve_storage(self._storage_pool)
 
-        log.info(
+        log.debug(
             "Transferring file from {} to {}: {} -> {}",
             source_storage_name,
             dest_storage_name,
@@ -66,7 +67,7 @@ class StorageTransferManager:
                 # Generic storage-to-storage transfer via streaming
                 await self._copy_via_stream(resolved_source, resolved_dest, source_path, dest_path)
 
-            log.info(
+            log.debug(
                 "Successfully transferred file from {} to {}: {} -> {}",
                 source_storage_name,
                 dest_storage_name,
@@ -112,13 +113,13 @@ class StorageTransferManager:
             if isinstance(resolved_source, VFSStorage) and isinstance(resolved_dest, VFSStorage):
                 file_count = len(await self._list_files_with_prefix(resolved_source, source_prefix))
                 if file_count == 0:
-                    log.warning("No files found with prefix: {}", source_prefix)
+                    log.debug("No files found with prefix: {}", source_prefix)
                     return 0
 
                 await self._move_vfs_directory(
                     resolved_source, resolved_dest, source_prefix, dest_prefix
                 )
-                log.info(
+                log.debug(
                     "Successfully moved directory from {} to {}: {} -> {} ({} files)",
                     source_storage_name,
                     dest_storage_name,
@@ -132,10 +133,10 @@ class StorageTransferManager:
             file_list = await self._list_files_with_prefix(resolved_source, source_prefix)
 
             if not file_list:
-                log.warning("No files found with prefix: {}", source_prefix)
+                log.debug("No files found with prefix: {}", source_prefix)
                 return 0
 
-            log.info(
+            log.debug(
                 "Transferring {} files from {} to {}",
                 len(file_list),
                 source_storage_name,
@@ -160,7 +161,7 @@ class StorageTransferManager:
             # Execute transfers concurrently
             await asyncio.gather(*[_transfer_single_file(path) for path in file_list])
 
-            log.info(
+            log.debug(
                 "Successfully transferred {} files from {} to {}",
                 len(file_list),
                 source_storage_name,
@@ -189,26 +190,16 @@ class StorageTransferManager:
             raise StorageTransferError(f"Source path does not exist: {source_path}")
 
         if dest_path.exists():
-            await asyncio.get_event_loop().run_in_executor(None, shutil.rmtree, str(dest_path))
+            await run_in_executor_with_context(None, shutil.rmtree, str(dest_path))
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        await asyncio.get_event_loop().run_in_executor(
-            None, shutil.move, str(source_path), str(dest_path)
-        )
+        await run_in_executor_with_context(None, shutil.move, str(source_path), str(dest_path))
 
         # Ensure cleanup for cross-filesystem moves
         if source_path.exists():
-            try:
-                await asyncio.get_event_loop().run_in_executor(
-                    None, shutil.rmtree, str(source_path)
-                )
-                log.warning(
-                    "Cross-filesystem move fallback: manually removed source {}", source_path
-                )
-            except Exception as e:
-                log.error("Failed to cleanup source after move: {}", e)
-                raise
+            await run_in_executor_with_context(None, shutil.rmtree, str(source_path))
+            log.debug("Cross-filesystem move fallback: manually removed source {}", source_path)
 
         # Cleanup empty artifact directories
         self._cleanup_empty_parents(source_path.parent, source_storage.base_path)
@@ -239,13 +230,13 @@ class StorageTransferManager:
 
         # Remove destination if it exists to avoid conflicts
         if dest_full_path.exists():
-            await asyncio.get_event_loop().run_in_executor(None, shutil.rmtree, str(dest_full_path))
+            await run_in_executor_with_context(None, shutil.rmtree, str(dest_full_path))
 
         # Ensure parent directory exists
         dest_full_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Move file or directory (automatically removes source)
-        await asyncio.get_event_loop().run_in_executor(
+        await run_in_executor_with_context(
             None, shutil.move, str(source_full_path), str(dest_full_path)
         )
 
@@ -295,7 +286,7 @@ class StorageTransferManager:
         try:
             return await storage.list_objects_with_prefix(prefix)
         except Exception as e:
-            log.warning("Failed to list objects with prefix '{}': {!s}", prefix, e)
+            log.warning("object listing failed", exc_info=e, path_prefix=prefix)
             return []
 
     async def verify_transfer(
@@ -332,6 +323,8 @@ class StorageTransferManager:
             # If size comparison is not available, assume success
             return True
 
-        except Exception as e:
-            log.error("Failed to verify transfer: {} -> {}: {}", source_path, dest_path, e)
+        except Exception:
+            log.exception(
+                "transfer verification failed", source_path=source_path, dest_path=dest_path
+            )
             return False

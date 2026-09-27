@@ -11,7 +11,7 @@ from typing import override
 
 from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     PureStorageCommandFailedError,
     SubprocessStdoutNotAvailableError,
@@ -21,7 +21,7 @@ from ai.backend.storage.types import DirEntry, DirEntryType, Stat, TreeUsage
 from ai.backend.storage.utils import fstime2datetime
 from ai.backend.storage.volumes.vfs import BaseFSOpModel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RapidFileToolsFSOpModel(BaseFSOpModel):
