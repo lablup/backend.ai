@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -21,7 +22,11 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
-from ai.backend.manager.errors.storage import StorageProxyTimeoutError
+from ai.backend.manager.errors.storage import (
+    StorageProxyTimeoutError,
+    VFolderNotFound,
+    VFolderOperationFailed,
+)
 
 type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
 type StorageProxyClientFactory = Callable[
@@ -104,6 +109,48 @@ class TestStorageProxyClient:
         assert error_code.domain == ErrorDomain.STORAGE_PROXY
         assert error_code.operation == ErrorOperation.REQUEST
         assert error_code.error_detail == ErrorDetail.CONTENT_TYPE_MISMATCH
+
+    @pytest.mark.parametrize(
+        ("status", "log_level", "error_type", "extra_msg"),
+        [
+            (404, 5, VFolderNotFound, "Requested resource not found"),
+            (
+                500,
+                logging.WARNING,
+                VFolderOperationFailed,
+                "Internal server error from storage proxy",
+            ),
+        ],
+    )
+    async def test_error_response_code_is_logged_not_exposed(
+        self,
+        storage_proxy_client_factory: StorageProxyClientFactory,
+        caplog: pytest.LogCaptureFixture,
+        status: int,
+        log_level: int,
+        error_type: type[Exception],
+        extra_msg: str,
+    ) -> None:
+        async def handler(_request: web.Request) -> web.Response:
+            return web.json_response(
+                {"error_code": "vfolder_read_internal-error", "title": "Disk failure"},
+                status=status,
+            )
+
+        client = await storage_proxy_client_factory("failing", handler)
+        with (
+            caplog.at_level(5, logger="ai.backend.manager.clients.storage_proxy.base"),
+            pytest.raises(error_type) as exc_info,
+        ):
+            await client.request(method="GET", url="failing", request_timeout=DEFAULT_TIMEOUT)
+
+        assert getattr(exc_info.value, "extra_msg", None) == extra_msg
+        records = [r for r in caplog.records if r.getMessage() == "storage proxy error response"]
+        assert len(records) == 1
+        assert records[0].levelno == log_level
+        assert records[0].__dict__["log_tag_error_code"] == "vfolder_read_internal-error"
+        assert records[0].__dict__["log_tag_error_title"] == "Disk failure"
+        assert records[0].__dict__["log_tag_response_status"] == status
 
     async def test_request_timeout_expiration(
         self, storage_proxy_client_factory: StorageProxyClientFactory

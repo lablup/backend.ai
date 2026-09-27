@@ -8,11 +8,14 @@ tests/component/notification/test_notification.py and exercise the HTTP API laye
 
 from __future__ import annotations
 
+import dataclasses
+import logging
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 
 from ai.backend.common.contexts.user import with_user_context
@@ -36,6 +39,7 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import SendResult
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
@@ -255,3 +259,70 @@ class TestNotificationProcessing:
         assert result.rules_matched >= 2
         assert len(result.successes) >= 1
         assert len(result.errors) >= 1
+
+
+_TRACE_LEVEL = 5
+
+
+class TestRuleFailureLogLevel:
+    """Failures of a user-configured webhook are the user's; mail server and internal ones are not."""
+
+    @pytest.mark.parametrize(
+        ("channel_type", "error", "log_level"),
+        [
+            (NotificationChannelType.WEBHOOK, aiohttp.ClientConnectionError(), _TRACE_LEVEL),
+            (NotificationChannelType.WEBHOOK, TimeoutError(), _TRACE_LEVEL),
+            (
+                NotificationChannelType.WEBHOOK,
+                NotificationProcessingFailure("Webhook delivery failed with status 500"),
+                _TRACE_LEVEL,
+            ),
+            (
+                NotificationChannelType.EMAIL,
+                NotificationProcessingFailure("SMTP authentication failed"),
+                logging.ERROR,
+            ),
+            (NotificationChannelType.WEBHOOK, RuntimeError("bug"), logging.ERROR),
+        ],
+    )
+    async def test_failure_level_follows_channel_and_cause(
+        self,
+        notification_processors: NotificationProcessors,
+        superadmin: UserData,
+        notification_center: NotificationCenter,
+        mock_repository: MagicMock,
+        sample_channel_data: NotificationChannelData,
+        sample_rule_data: NotificationRuleData,
+        caplog: pytest.LogCaptureFixture,
+        channel_type: NotificationChannelType,
+        error: BaseException,
+        log_level: int,
+    ) -> None:
+        channel = dataclasses.replace(sample_channel_data, channel_type=channel_type)
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[MatchingNotificationRuleData(rule=sample_rule_data, channel=channel)]
+        )
+        action = ProcessNotificationAction(
+            rule_type=NotificationRuleType.SESSION_STARTED,
+            timestamp=datetime.now(UTC),
+            notification_data=SessionStartedMessage(
+                session_id=str(uuid.uuid4()),
+                session_name="failing-session",
+                session_type="batch",
+                cluster_mode="single-node",
+                status="RUNNING",
+            ),
+        )
+        with (
+            patch.object(notification_center, "process_rule", new=AsyncMock(side_effect=error)),
+            caplog.at_level(_TRACE_LEVEL, logger="ai.backend.manager.services.notification"),
+            with_user_context(superadmin),
+        ):
+            await notification_processors.process_notification.run(action)
+
+        failures = [
+            r
+            for r in caplog.records
+            if r.getMessage().startswith("notification rule processing failed")
+        ]
+        assert [r.levelno for r in failures] == [log_level]

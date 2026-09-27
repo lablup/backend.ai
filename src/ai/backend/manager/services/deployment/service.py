@@ -18,6 +18,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
@@ -587,11 +588,12 @@ class DeploymentService:
                 )
                 succeeded += 1
             except Exception as exc:
-                log.warning(
-                    "deployment revision refresh failed",
-                    deployment_id=deployment_id,
-                    exc_info=exc,
-                )
+                if isinstance(exc, BackendAIError) and exc.is_client_error():
+                    log.trace(
+                        "deployment revision refresh rejected: {}", exc, deployment_id=deployment_id
+                    )
+                else:
+                    log.exception("deployment revision refresh failed", deployment_id=deployment_id)
                 results.append(
                     RevisionRefreshResult(
                         deployment_id=deployment_id,

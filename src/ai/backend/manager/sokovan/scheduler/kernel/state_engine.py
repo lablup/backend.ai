@@ -217,14 +217,6 @@ class KernelStateEngine:
         :param image_ref: Optional image reference
         :param image_id: Optional image UUID for precise matching
         """
-        log.warning(
-            "cancelling kernels for failed image",
-            agent_id=agent_id,
-            image_name=image,
-            image_id=image_id,
-            error_message=error_msg,
-        )
-
         await self._repository.cancel_kernels_for_failed_image(
             agent_id, image, error_msg, image_ref, image_id=image_id
         )

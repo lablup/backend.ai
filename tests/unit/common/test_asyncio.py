@@ -4,7 +4,7 @@ from contextvars import ContextVar
 
 import pytest
 
-from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.asyncio import ConsecutiveFailures, run_in_executor_with_context
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 LOGGER_NAME = "tests.common.asyncio"
@@ -53,3 +53,24 @@ class TestRunInExecutorWithContext:
             assert _marker.get() == "caller"
         finally:
             _marker.reset(token)
+
+
+class TestConsecutiveFailures:
+    def test_only_the_first_failure_starts_a_streak(self) -> None:
+        failures = ConsecutiveFailures()
+
+        assert [failures.record_failure() for _ in range(3)] == [True, False, False]
+        assert failures.record_success() == 3
+        assert failures.record_failure() is True
+
+    def test_success_without_a_streak_reports_zero(self) -> None:
+        assert ConsecutiveFailures().record_success() == 0
+
+    def test_delay_doubles_up_to_the_cap(self) -> None:
+        failures = ConsecutiveFailures(initial_delay_sec=1.0, max_delay_sec=30.0)
+        delays = [failures.delay_sec()]
+        for _ in range(7):
+            failures.record_failure()
+            delays.append(failures.delay_sec())
+
+        assert delays == [1.0, 1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 30.0]

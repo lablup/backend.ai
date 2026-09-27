@@ -1,3 +1,4 @@
+import contextvars
 import logging
 import smtplib
 from concurrent.futures import ThreadPoolExecutor
@@ -39,7 +40,7 @@ class SMTPSender:
         self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
 
     def send_email(self, subject: str, email_body: str) -> None:
-        self._executor.submit(self._send_email, subject, email_body)
+        self._executor.submit(contextvars.copy_context().run, self._send_email, subject, email_body)
 
     def _send_email(self, subject: str, email_body: str) -> None:
         message = MIMEText(email_body, "plain", "utf-8")

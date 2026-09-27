@@ -397,6 +397,9 @@ class BackendAIError(web.HTTPError, metaclass=ErrorMeta):
         self.body_dict = body
         self.body = dump_json(body)
 
+    def is_client_error(self) -> bool:
+        return 400 <= self.status_code < 500
+
     @override
     def __str__(self) -> str:
         lines = []

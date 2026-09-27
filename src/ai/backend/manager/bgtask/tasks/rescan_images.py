@@ -10,7 +10,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -94,18 +94,18 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
         rescanned_images = []
         errors = []
         for registry_data in loaded_registries:
-            action_result = await self._container_registry_service.rescan_images(
-                RescanImagesAction(
-                    registry=registry_data.registry_name,
-                    project=registry_data.project,
-                    progress_reporter=None,  # TODO: Handle progress reporting in new pattern
+            with with_log_context(
+                registry_name=registry_data.registry_name, project_name=registry_data.project
+            ):
+                action_result = await self._container_registry_service.rescan_images(
+                    RescanImagesAction(
+                        registry=registry_data.registry_name,
+                        project=registry_data.project,
+                        progress_reporter=None,  # TODO: Handle progress reporting in new pattern
+                    )
                 )
-            )
-
-            for error in action_result.errors:
-                log.trace(
-                    "image rescan failed", registry_name=registry_data.registry_name, reason=error
-                )
+                for error in action_result.errors:
+                    log.trace("image rescan failed", reason=error)
 
             errors.extend(action_result.errors)
             rescanned_images.extend(action_result.images)

@@ -138,9 +138,29 @@ class HealthProbe:
                 )
                 continue
             results[service_group] = result_or_exc
+            self._log_transitions(service_group, result_or_exc)
 
         self._results.update(results)
         return AllServicesHealth(results=results)
+
+    def _log_transitions(self, service_group: ServiceGroup, current: ServiceHealth) -> None:
+        previous = self._results.get(service_group)
+        for component_id, status in current.results.items():
+            prev_status = previous.results.get(component_id) if previous is not None else None
+            was_healthy = prev_status is None or prev_status.is_healthy
+            if was_healthy and not status.is_healthy:
+                log.warning(
+                    "component became unhealthy",
+                    service_group=service_group,
+                    component_id=component_id,
+                    reason=status.error_message,
+                )
+            elif not was_healthy and status.is_healthy:
+                log.info(
+                    "component recovered",
+                    service_group=service_group,
+                    component_id=component_id,
+                )
 
     async def _run_loop(self) -> None:
         log.debug("health probe loop started", check_interval_sec=self._options.check_interval)

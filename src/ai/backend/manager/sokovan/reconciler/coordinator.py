@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner
 from ai.backend.manager.types import DistributedLockFactory
@@ -49,7 +49,10 @@ class ReconcilerCoordinator:
         if stage is None:
             log.warning("no stage for reconcile type", reconcile_type=reconcile_type)
             return
+        with with_log_context(reconcile_type=reconcile_type, handler_name=stage.handler_name):
+            await self._run_stage(stage)
 
+    async def _run_stage(self, stage: ReconcilerStageRunner) -> None:
         async with AsyncExitStack() as stack:
             if stage.lock_id is not None:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
@@ -57,7 +60,7 @@ class ReconcilerCoordinator:
             try:
                 await stage.run()
             except Exception:
-                log.exception("reconcile stage failed", reconcile_type=reconcile_type)
+                log.exception("reconcile stage failed")
 
     async def process_if_needed(self, reconcile_type: str) -> None:
         if not await self._flags.check_mark_needed(reconcile_type):

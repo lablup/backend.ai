@@ -8,9 +8,15 @@ from typing import cast, override
 import pytest
 
 from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.reporter import (
+    AbstractEventReporter,
+    CompleteEventReportArgs,
+    PrepareEventReportArgs,
+)
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     AbstractBroadcastEvent,
+    AbstractEvent,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -325,3 +331,55 @@ class TestHandlerFailureLog:
         assert record.__dict__["log_tag_event_name"] == "test_anycast"
         assert record.__dict__["log_tag_handler_name"] == "failing-handler"
         assert record.__dict__["log_tag_request_id"] == "req-from-producer"
+
+
+class FailingStartReporter(AbstractEventReporter):
+    @override
+    async def prepare_event_report(self, event: AbstractEvent, arg: PrepareEventReportArgs) -> None:
+        raise RuntimeError("reporter failed")
+
+    @override
+    async def complete_event_report(
+        self, event: AbstractEvent, arg: CompleteEventReportArgs
+    ) -> None:
+        pass
+
+
+class TestFailureOutsideHandler:
+    """A failure outside the handler call is logged by the dispatcher, since no one awaits it."""
+
+    @pytest.fixture
+    def mq(self) -> StubMessageQueue:
+        return StubMessageQueue(
+            anycast_messages=[_make_anycast_mq_message(DummyAnycastEvent(value=1))],
+        )
+
+    @pytest.fixture
+    async def dispatcher(self, mq: StubMessageQueue) -> EventDispatcher:
+        dispatcher = EventDispatcher(cast(AbstractMessageQueue, mq))
+
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            pass
+
+        dispatcher.consume(
+            DummyAnycastEvent,
+            object(),
+            handler,
+            name="reported-handler",
+            start_reporters=[FailingStartReporter()],
+        )
+        return dispatcher
+
+    async def test_reporter_failure_is_logged_once_with_the_scope(
+        self, dispatcher: EventDispatcher, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.ERROR, logger="ai.backend.common.events.dispatcher"):
+            await dispatcher.start()
+            await asyncio.sleep(0.1)
+            await dispatcher.close()
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert errors[0].getMessage() == "event handling failed"
+        assert errors[0].exc_info is not None
+        assert errors[0].__dict__["log_tag_handler_name"] == "reported-handler"

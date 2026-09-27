@@ -54,7 +54,7 @@ class CephDirQuotaModel(BaseQuotaModel):
                         limit_bytes = 0
                     case _:
                         limit_bytes = -1  # unset
-                log.warning("ceph.quota.max_bytes read failed", exc_info=e)
+                        log.warning("ceph.quota.max_bytes read failed", exc_info=e)
             if used_bytes < 0 or limit_bytes < 0:
                 log.warning(
                     "negative quota usage reported",

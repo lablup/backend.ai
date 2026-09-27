@@ -17,7 +17,7 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
@@ -593,7 +593,11 @@ async def web_plugin_handler(
                 if frontend_rqst.body_exists:
                     content = frontend_rqst.content
                     if path == "auth/signup":
-                        body = await frontend_rqst.json()
+                        try:
+                            body = await frontend_rqst.json()
+                        except json.JSONDecodeError as e:
+                            log.trace("signup request body is not valid JSON: {}", e)
+                            raise MalformedRequestBody() from e
                         body["domain"] = config.api.domain
                         content = json.dumps(body).encode("utf8")
                 request_api_version = frontend_rqst.headers.get("X-BackendAI-Version", None)

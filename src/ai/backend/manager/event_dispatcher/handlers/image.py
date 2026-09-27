@@ -93,7 +93,7 @@ class ImageEventHandler:
         _agent_id: AgentId,
         ev: ImagePullFailedEvent,
     ) -> None:
-        log.warning("image pull failed", agent_id=ev.agent_id, image_name=ev.image, reason=ev.msg)
+        log.trace("image pull failed", agent_id=ev.agent_id, image_name=ev.image, reason=ev.msg)
 
         image_id = await self._resolve_image_id(ev.image, ev.image_ref)
         await self._schedule_coordinator.cancel_kernels_for_failed_image(

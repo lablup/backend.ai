@@ -97,7 +97,7 @@ class SessionEventHandler:
         Update the database according to the session-level lifecycle events
         published by the manager.
         """
-        log.trace("session started", session_id=event.session_id)
+        log.trace("session started")
         await self._valkey_live.update_session_last_access(event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
@@ -112,7 +112,7 @@ class SessionEventHandler:
         Update the database according to the session-level lifecycle events
         published by the manager.
         """
-        log.trace("session cancelled", session_id=event.session_id)
+        log.trace("session cancelled")
         await self._handle_started_or_cancelled(None, source, event)
 
     async def handle_session_terminating(
@@ -210,7 +210,7 @@ class SessionEventHandler:
             | SessionFailureAnycastEvent
         ),
     ) -> None:
-        log.trace("invoking session callback", session_id=event.session_id)
+        log.trace("invoking session callback")
         try:
             allow_stale = isinstance(
                 event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
@@ -298,7 +298,7 @@ class SessionEventHandler:
         except NoResultFound:
             pass  # Cases when we try to create a inference session for validation (/services/_/try API)
         except Exception:
-            log.exception("route status update failed", session_id=event.session_id)
+            log.exception("route status update failed")
 
         if (callback_url := session.callback_url) is None:
             return

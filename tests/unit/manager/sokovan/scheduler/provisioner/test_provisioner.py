@@ -55,12 +55,14 @@ _TRACE_LEVEL = 5
 def _make_provisioner(
     repository: AsyncMock,
     valkey_schedule: AsyncMock,
+    validator: SchedulingValidator | None = None,
 ) -> SessionProvisioner:
     config_provider = MagicMock()
     config_provider.config.manager.agent_selection_resource_priority = ["cpu", "mem"]
     return SessionProvisioner(
         SessionProvisionerArgs(
-            validator=SchedulingValidator([
+            validator=validator
+            or SchedulingValidator([
                 DependenciesValidator(),
                 ReservedBatchSessionValidator(),
                 ResourcePolicyValidator(),
@@ -236,6 +238,37 @@ class TestScheduleResourceGroup:
         ]
         assert len(failures) == 1
         assert failures[0].levelno == _TRACE_LEVEL
+        assert failures[0].__dict__["log_tag_session_id"] == str(workload.meta.session_id)
+
+    async def test_server_fault_logs_error_with_traceback(
+        self,
+        repository: AsyncMock,
+        valkey_schedule: AsyncMock,
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A failure that is not a scheduling rejection is a server fault, logged as an error."""
+        caplog.set_level(_TRACE_LEVEL, logger="ai.backend.manager.sokovan")
+        broken_validator = MagicMock(spec=SchedulingValidator)
+        broken_validator.validate.side_effect = RuntimeError("validator bug")
+        provisioner = _make_provisioner(repository, valkey_schedule, broken_validator)
+        workload = workload_factory(kernel_slots=[{"cpu": "1", "mem": "1024"}])
+        data = scheduling_data_factory(
+            workloads=[workload],
+            agents=[agent_meta_factory("agent-1", {"cpu": "4", "mem": "8192"})],
+        )
+
+        result = await _schedule(provisioner, data, [workload])
+
+        assert [f.session_id for f in result.scheduling_failures] == [workload.meta.session_id]
+        failures = [
+            r for r in caplog.records if r.getMessage().startswith("session scheduling failed")
+        ]
+        assert len(failures) == 1
+        assert failures[0].levelno == logging.ERROR
+        assert failures[0].exc_info is not None
         assert failures[0].__dict__["log_tag_session_id"] == str(workload.meta.session_id)
 
     async def test_partial_failure_keeps_other_sessions(

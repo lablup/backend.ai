@@ -204,12 +204,19 @@ class RedisConsumer(AbstractConsumer):
 
         # Note: We acknowledge on the first stream key as the message could be from any stream
         # In practice, msg_id should be unique across streams so this should work
+        last_error: Exception | None = None
         for stream_key in self._stream_keys:
             try:
                 await self._client.done_stream_message(stream_key, self._group_name, msg_id)
-                break
-            except Exception:
-                continue  # Try next stream if this one fails
+                return
+            except Exception as e:
+                last_error = e
+        log.warning(
+            "stream message ack failed",
+            exc_info=last_error,
+            message_id=msg_id.decode(),
+            group_name=self._group_name,
+        )
 
     @override
     async def close(self) -> None:
@@ -375,9 +382,20 @@ class RedisConsumer(AbstractConsumer):
                 continue
             retried = MQMessage(msg_id=msg.msg_id, payload=payload).retry()
             if retried is not None:
+                log.debug(
+                    "stream message redelivered",
+                    message_id=msg.msg_id.decode(),
+                    event_name=payload.name,
+                    retry_count=retried.payload.retry_count,
+                )
                 await self._retry_message(stream_key, retried)
                 continue
-            # Discard the message if retry limit exceeded
+            log.warning(
+                "stream message discarded after retry limit",
+                message_id=msg.msg_id.decode(),
+                event_name=payload.name,
+                retry_count=payload.retry_count,
+            )
             await self._client.done_stream_message(stream_key, self._group_name, msg.msg_id)
 
         return autoclaim_start_id, len(message.messages) > 0
@@ -408,17 +426,15 @@ class RedisConsumer(AbstractConsumer):
 
         state = self._backoff_state[stream_key]
         state.increment()
-
-        # Calculate delay with exponential backoff
-        delay = min(
-            self._backoff_initial_delay * (2 ** (state.attempt - 1)),
-            self._backoff_max_delay,
-        )
+        delay = self._backoff_delay(state.attempt)
 
         # Add jitter (50-100% of calculated delay)
         actual_delay = delay * (0.5 + random.random() * 0.5)
 
         await asyncio.sleep(actual_delay)
+
+    def _backoff_delay(self, attempt: int) -> float:
+        return min(self._backoff_initial_delay * (2.0 ** (attempt - 1)), self._backoff_max_delay)
 
     def _reset_backoff(self, stream_key: str) -> None:
         """
@@ -455,7 +471,26 @@ class RedisConsumer(AbstractConsumer):
                     stream_key=stream_key,
                 )
         else:
-            log.error("stream read failed", exc_info=e, stream_key=stream_key)
+            state = self._backoff_state.get(stream_key)
+            attempt_count = (state.attempt if state is not None else 0) + 1
+            if (
+                self._backoff_delay(attempt_count)
+                >= self._backoff_max_delay
+                > self._backoff_delay(attempt_count - 1)
+            ):
+                log.error(
+                    "stream read keeps failing, backoff reached its cap",
+                    exc_info=e,
+                    stream_key=stream_key,
+                    attempt_count=attempt_count,
+                )
+            else:
+                log.warning(
+                    "stream read failed",
+                    exc_info=e,
+                    stream_key=stream_key,
+                    attempt_count=attempt_count,
+                )
 
 
 def _generate_consumer_id(node_id: str | None) -> str:

@@ -9,6 +9,7 @@ from aiohttp import web
 
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
+    WorkerNotAvailable,
 )
 from ai.backend.appproxy.common.types import RouteInfo, SerializableCircuit
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
@@ -147,6 +148,8 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             try:
                 metrics.proxy.observe_downstream_tcp_start()
                 await backend.bind(reader, writer)
+            except WorkerNotAvailable:
+                log.trace("no healthy route for the TCP connection")
             except Exception:
                 log.exception("failed to proxy a TCP connection")
             finally:

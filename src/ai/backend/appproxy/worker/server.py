@@ -241,26 +241,48 @@ async def exception_middleware(
 
 async def request_counter_marker(root_ctx: RootContext) -> None:
     """Request counter marker function using the valkey client."""
+    failure_count = 0
     while True:
+        redis_key = await root_ctx.request_counter_redis_queue.get()
         try:
-            redis_key = await root_ctx.request_counter_redis_queue.get()
             await root_ctx.valkey_live.incr_live_data(redis_key)
-        except Exception:
-            # log errors and keep going on
-            log.exception("failed to increase the request counter")
+        except Exception as e:
+            # Warn once per streak of failures and keep going on.
+            failure_count += 1
+            if failure_count == 1:
+                log.warning("request counter increase failed", exc_info=e, redis_key=redis_key)
+            else:
+                log.debug(
+                    "request counter increase failed",
+                    redis_key=redis_key,
+                    failure_count=failure_count,
+                )
+            continue
+        failure_count = 0
 
 
 async def last_used_time_marker(root_ctx: RootContext) -> None:
     """Last used time marker function using the valkey client."""
+    failure_count = 0
     while True:
+        keys, last_used = await root_ctx.last_used_time_marker_redis_queue.get()
         try:
-            keys, last_used = await root_ctx.last_used_time_marker_redis_queue.get()
             data = {key: str(last_used) for key in keys}
             ttl = get_default_redis_key_ttl()
             await root_ctx.valkey_live.store_multiple_live_data(data, ex=ttl)
-        except Exception:
-            # log errors and keep going on
-            log.exception("failed to store the last-used times")
+        except Exception as e:
+            # Warn once per streak of failures and keep going on.
+            failure_count += 1
+            if failure_count == 1:
+                log.warning("last-used time store failed", exc_info=e, key_count=len(keys))
+            else:
+                log.debug(
+                    "last-used time store failed",
+                    key_count=len(keys),
+                    failure_count=failure_count,
+                )
+            continue
+        failure_count = 0
 
 
 @asynccontextmanager

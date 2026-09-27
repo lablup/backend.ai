@@ -618,14 +618,26 @@ async def on_reconcile_traefik_routes(
         circuits = await Circuit.list_circuits(db_sess, load_worker=True, load_endpoint=True)
         workers = await Worker.list_workers(db_sess)
     reconciled = 0
+    failed = 0
+    first_error: Exception | None = None
     for circuit in circuits:
-        try:
-            await context.circuit_manager.update_circuit_routes(
-                circuit, list(circuit.route_info or [])
-            )
-            reconciled += 1
-        except Exception:
-            log.exception("failed to reconcile traefik routes", circuit_id=circuit.id)
+        with with_log_context(circuit_id=circuit.id):
+            try:
+                await context.circuit_manager.update_circuit_routes(
+                    circuit, list(circuit.route_info or [])
+                )
+                reconciled += 1
+            except Exception as e:
+                failed += 1
+                first_error = first_error or e
+                log.debug("circuit traefik route reconcile failed", reason=repr(e))
+    if failed:
+        log.warning(
+            "traefik route reconcile failed for some circuits",
+            exc_info=first_error,
+            failed_count=failed,
+            circuit_count=len(circuits),
+        )
     try:
         await context.circuit_manager.reconcile_traefik_etcd_state(circuits, workers)
     except Exception:

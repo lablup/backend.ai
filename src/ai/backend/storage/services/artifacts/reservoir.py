@@ -6,10 +6,12 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Final, cast, override
 
 import aiofiles
+import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.asyncio import run_in_executor_with_context
@@ -568,6 +570,13 @@ class ReservoirService:
                             idx,
                             model_count,
                         )
+                    except aiohttp.ClientResponseError as e:
+                        failed_models += 1
+                        if e.status == HTTPStatus.NOT_FOUND:
+                            log.trace("model not found on the remote reservoir", model_id=model_id)
+                        else:
+                            log.exception("model import in batch failed", model_id=model_id)
+                        errors.append(str(e))
                     except Exception as e:
                         failed_models += 1
                         log.exception("model import in batch failed", model_id=model_id)

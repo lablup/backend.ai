@@ -506,6 +506,9 @@ class ExportHandler:
                 async for chunk in body_iter:
                     await resp.write(chunk)
             await resp.write_eof()
+        except ConnectionError as e:
+            log.trace("client disconnected during stream response", reason=repr(e))
+            resp.force_close()
         except Exception:
             log.exception("export stream response body iteration failed")
             resp.force_close()

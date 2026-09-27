@@ -95,7 +95,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -1432,6 +1432,13 @@ class AgentRegistry:
         self,
         session_id: SessionId,
     ) -> None:
+        with with_log_context(session_id=session_id):
+            await self._clean_session_in_scope(session_id)
+
+    async def _clean_session_in_scope(
+        self,
+        session_id: SessionId,
+    ) -> None:
         async def _fetch_session() -> tuple[SessionRow, str | None]:
             async with self.db.begin_readonly_session() as db_sess:
                 sess = await SessionRow.get_session_by_id(
@@ -1473,6 +1480,7 @@ class AgentRegistry:
                             log.exception(
                                 "agent-local network destroy failed",
                                 network_ref_name=network_ref_name,
+                                agent_id=agent_id,
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:

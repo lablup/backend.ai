@@ -618,7 +618,10 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
-            log.exception("model card parse failed", vfolder_id=vfolder_row.id)
+            if isinstance(e, (ModelCardParseError, UnicodeDecodeError)):
+                log.trace("model card parse failed: {}", e, vfolder_id=vfolder_row.id)
+            else:
+                log.warning("model card load failed", exc_info=e, vfolder_id=vfolder_row.id)
             if (
                 graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
                 or vfolder_row.creator == graph_ctx.user["email"]

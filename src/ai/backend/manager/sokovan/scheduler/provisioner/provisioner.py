@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     SessionId,
 )
@@ -19,6 +20,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.sokovan.recorder.context import (
     RecorderContext,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduler.results import (
     PreemptionPlanEntry,
     ScheduleResult,
@@ -254,13 +256,21 @@ class SessionProvisioner:
         session_workload: SessionWorkload,
         error: Exception,
     ) -> None:
-        log.trace("session scheduling failed: {}", error)
+        if self._is_rejection(error):
+            log.trace("session scheduling failed: {}", error)
+        else:
+            log.exception("session scheduling failed")
         scheduling_failures.append(
             SchedulingFailure(
                 session_id=session_workload.meta.session_id,
                 msg=str(error),
             )
         )
+
+    def _is_rejection(self, error: Exception) -> bool:
+        if isinstance(error, SchedulingError):
+            return True
+        return isinstance(error, BackendAIError) and error.is_client_error()
 
     def _skips_behind(
         self,
