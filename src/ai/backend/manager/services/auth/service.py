@@ -55,13 +55,13 @@ from ai.backend.manager.models.keypair.row import (
     generate_ssh_keypair,
 )
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import (
     INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
     compare_to_hashed_password,
 )
-from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.client_ip_masking.repository import (

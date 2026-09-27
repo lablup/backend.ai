@@ -52,7 +52,7 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
     MergeResourceGroupDefaultsRule,
 )

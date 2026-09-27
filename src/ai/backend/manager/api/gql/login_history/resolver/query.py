@@ -14,13 +14,13 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.login_history.types import (
-    LoginHistoryFilterGQL,
-    LoginHistoryOrderByGQL,
+from ai.backend.manager.api.gql.login_history.types.filter import LoginHistoryFilterGQL
+from ai.backend.manager.api.gql.login_history.types.node import (
     LoginHistoryV2ConnectionGQL,
     LoginHistoryV2EdgeGQL,
     LoginHistoryV2GQL,
 )
+from ai.backend.manager.api.gql.login_history.types.order import LoginHistoryOrderByGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 

@@ -51,8 +51,8 @@ from ai.backend.manager.models.fair_share.row import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_groups
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import resource_groups, sgroups_for_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow

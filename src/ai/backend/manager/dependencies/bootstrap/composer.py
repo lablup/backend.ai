@@ -10,7 +10,10 @@ from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.dependencies.config import ConfigProviderDependency, ConfigProviderInput
+from ai.backend.manager.dependencies.config.provider import (
+    ConfigProviderDependency,
+    ConfigProviderInput,
+)
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .config import BootstrapConfigDependency, BootstrapConfigInput

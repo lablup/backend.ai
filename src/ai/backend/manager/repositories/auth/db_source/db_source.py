@@ -40,7 +40,7 @@ from ai.backend.manager.errors.auth import (
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import (
@@ -51,7 +51,8 @@ from ai.backend.manager.models.keypair.row import (
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
@@ -59,7 +60,6 @@ from ai.backend.manager.models.user import (
     compare_to_hashed_password,
     users,
 )
-from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

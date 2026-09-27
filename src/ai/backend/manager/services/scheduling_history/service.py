@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
+from ai.backend.manager.repositories.scheduling_history.repository import (
+    SchedulingHistoryRepository,
+)
 
 from .actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,

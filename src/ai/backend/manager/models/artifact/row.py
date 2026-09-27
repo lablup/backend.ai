@@ -18,11 +18,11 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
+from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -30,7 +30,7 @@ __all__ = ("ArtifactRow",)
 
 
 def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 

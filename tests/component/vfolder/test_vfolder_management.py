@@ -28,8 +28,8 @@ from ai.backend.common.dto.manager.vfolder import (
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.vfolder import VFolderUserMountPolicyRow, vfolders
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow, vfolders
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]

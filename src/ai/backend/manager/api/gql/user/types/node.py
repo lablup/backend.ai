@@ -23,9 +23,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.user import UserFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.user_usage import (
     UserUsageBucketConnection,
     UserUsageBucketFilter,
     UserUsageBucketOrderBy,
@@ -165,7 +165,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.user_usage import (
             UserUsageBucketEdge,
             UserUsageBucketGQL,
         )

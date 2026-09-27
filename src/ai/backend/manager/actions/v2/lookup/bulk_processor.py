@@ -6,13 +6,13 @@ from datetime import UTC, datetime
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
 from ai.backend.manager.actions.v2.lookup.bulk_base import (
     BaseBulkLookupAction,
     BaseBulkLookupActionResult,
     BulkLookupKeyResult,
 )
-from ai.backend.manager.actions.v2.lookup.bulk_monitor import BulkLookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_result import (
     BulkLookupActionProcessResult,
     BulkLookupActionResultMeta,

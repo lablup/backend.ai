@@ -170,13 +170,13 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
-from ai.backend.manager.api.gql.entity_label.types import (
-    EntityLabelConnection,
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
     EntityLabelNestedFilterGQL,
     EntityLabelOrderByGQL,
-    resolve_entity_labels,
 )
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext

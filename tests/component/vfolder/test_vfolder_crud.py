@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.vfolder import (
     VFolderListResponse,
 )
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]

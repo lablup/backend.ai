@@ -25,10 +25,10 @@ from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource

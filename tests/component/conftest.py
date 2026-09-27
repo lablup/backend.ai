@@ -87,7 +87,8 @@ from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDepend
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
-from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.server_status import (
     ALL_ALLOWED,
@@ -116,31 +117,34 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.project import (
+from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
     association_groups_users,
 )
-from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupOpts,
+    resource_groups,
+    sgroups_for_domains,
+)
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

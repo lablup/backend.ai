@@ -53,7 +53,7 @@ from ai.backend.manager.models.minilang.ordering import (
     QueryOrderParser,
 )
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser, WhereClauseType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .gql_relay import (
@@ -533,7 +533,7 @@ def privileged_query(required_role: UserRole) -> Callable[..., Any]:
             *args: Any,
             **kwargs: Any,
         ) -> Any:
-            from ai.backend.manager.models.user import UserRole
+            from ai.backend.manager.models.user.row import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
@@ -569,7 +569,7 @@ def scoped_query(
             *args: Any,
             **kwargs: Any,
         ) -> Any:
-            from ai.backend.manager.models.user import UserRole
+            from ai.backend.manager.models.user.row import UserRole
 
             ctx: GraphQueryContext = info.context
             client_role = ctx.user["role"]
@@ -629,8 +629,8 @@ def privileged_mutation(
         async def wrapped(
             cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any
         ) -> Any:
-            from ai.backend.manager.models.project import groups  # , association_groups_users
-            from ai.backend.manager.models.user import UserRole
+            from ai.backend.manager.models.project.row import groups  # , association_groups_users
+            from ai.backend.manager.models.user.row import UserRole
 
             ctx: GraphQueryContext = info.context
             permitted = False

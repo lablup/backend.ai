@@ -30,10 +30,10 @@ from ai.backend.manager.errors.resource import (
     PersonalProjectMemberAdditionError,
     ProjectNotFound,
 )
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps

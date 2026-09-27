@@ -22,20 +22,9 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.agent import AgentStatus
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.resource_group import (
-    ResourceGroupForDomainRow,
-    ResourceGroupForKeypairsRow,
-    ResourceGroupForProjectRow,
-    ResourceGroupOpts,
-    ResourceGroupRow,
-    resource_groups,
-    sgroups_for_domains,
-    sgroups_for_groups,
-    sgroups_for_keypairs,
-)
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,
@@ -47,8 +36,19 @@ from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForKeypairRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForKeypairsRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupOpts,
+    ResourceGroupRow,
+    resource_groups,
+    sgroups_for_domains,
+    sgroups_for_groups,
+    sgroups_for_keypairs,
+)
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
@@ -467,7 +467,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             return None
         from ai.backend.manager.data.agent.types import AgentStatus
         from ai.backend.manager.models.agent.row import AgentRow
-        from ai.backend.manager.models.resource_slot import AgentResourceRow
+        from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 
         graph_ctx = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -502,7 +502,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
     ) -> dict[str, Any]:
         from ai.backend.manager.data.agent.types import AgentStatus
         from ai.backend.manager.models.agent.row import AgentRow
-        from ai.backend.manager.models.resource_slot import AgentResourceRow
+        from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 
         # TODO: Allow admins to set which value to return here among "min", "max", "custom"
         graph_ctx: GraphQueryContext = info.context
@@ -533,8 +533,8 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
         from ai.backend.manager.models.agent.row import AgentRow
-        from ai.backend.manager.models.kernel import KernelRow
-        from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+        from ai.backend.manager.models.kernel.row import KernelRow
+        from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user

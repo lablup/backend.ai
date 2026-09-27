@@ -14,7 +14,7 @@ from ai.backend.common.events.event_types.kernel.types import (
 )
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

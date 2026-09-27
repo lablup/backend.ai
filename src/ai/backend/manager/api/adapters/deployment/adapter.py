@@ -239,12 +239,12 @@ from ai.backend.manager.models.deployment_policy.searchable_fields import (
 )
 from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.searchable_fields import (
     ModelRevisionSearchableFields,
 )
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
-from ai.backend.manager.models.endpoint import (
+from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
@@ -271,12 +271,12 @@ from ai.backend.manager.models.resource_slot.searchable_fields import (
     RevisionResourceSlotSearchableFields,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher, RouteInfoSearcher
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
 )
@@ -375,7 +375,7 @@ from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas im
 from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
     BulkGetReplicaGroupsAction,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (

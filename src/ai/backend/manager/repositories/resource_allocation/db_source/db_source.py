@@ -33,14 +33,14 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
     ResourceGroupNotFound,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,

@@ -15,9 +15,9 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.resource_slot.lookups import AgentResourceOwnerLookup
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.scopes import AgentResourceTarget
 from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination

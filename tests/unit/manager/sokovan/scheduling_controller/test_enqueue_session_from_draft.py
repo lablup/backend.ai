@@ -80,7 +80,7 @@ from ai.backend.manager.data.session.options import (
 )
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,

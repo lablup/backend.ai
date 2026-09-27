@@ -45,7 +45,7 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.kernel.types import (
     Metrics as KernelMetrics,
 )
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,

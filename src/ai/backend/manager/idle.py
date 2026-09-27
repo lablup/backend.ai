@@ -67,17 +67,17 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.kernel.row import LIVE_STATUS, kernels
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
+from ai.backend.manager.models.user.row import users
 
 from .defs import DEFAULT_ROLE, LockID
 from .errors.kernel import IdlePolicyNotFound
-from .models.kernel import LIVE_STATUS, kernels
-from .models.keypair import keypairs
-from .models.resource_policy import keypair_resource_policies
 from .models.resource_slot.aggregates import (
     kernel_requested_slots_expr,
     kernel_used_slots_expr,
 )
-from .models.user import users
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:

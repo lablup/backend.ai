@@ -19,15 +19,15 @@ from ai.backend.common.data.entity.resource_policy import (
 )
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
     project_resource_policies,
     user_resource_policies,
 )
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -525,7 +525,7 @@ class UserResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
     ) -> Sequence[UserResourcePolicy]:
-        from ai.backend.manager.models.user import UserRow
+        from ai.backend.manager.models.user.row import UserRow
 
         query = (
             sa.select(UserRow)
@@ -790,7 +790,7 @@ class ProjectResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
-        from ai.backend.manager.models.project import ProjectRow
+        from ai.backend.manager.models.project.row import ProjectRow
 
         query = (
             sa.select(ProjectRow)

@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
     SearchQueryDefinitionsRequest,
     SearchQueryDefinitionsResponse,
 )
-from ai.backend.manager.data.prometheus_query_preset import (
+from ai.backend.manager.data.prometheus_query_preset.types import (
     ExecutePresetOptions,
 )
 from ai.backend.manager.models.prometheus_query_preset.creators import (

@@ -33,27 +33,27 @@ from ai.backend.manager.container_registry.base import (
     rescan_counts,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.image.types import ImageData, ImageStatus, ImageType
+from ai.backend.manager.data.image.types import ImageData, ImageIdentifier, ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ai.backend.manager.models.image.creators import ImageCreator
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (

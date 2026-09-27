@@ -36,7 +36,7 @@ from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.searchers import UserSearcher
@@ -48,7 +48,7 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
-from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.repositories.user.db_source.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

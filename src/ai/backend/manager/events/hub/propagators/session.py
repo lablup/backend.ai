@@ -33,9 +33,9 @@ from ai.backend.common.events.hub import WILDCARD, EventPropagator
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole
 
 if TYPE_CHECKING:
     from aiohttp_sse import EventSourceResponse

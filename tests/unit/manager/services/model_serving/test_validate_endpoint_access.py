@@ -17,7 +17,7 @@ from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
 )
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
 

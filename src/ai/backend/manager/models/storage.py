@@ -19,6 +19,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.user.row import UserRow
 
 from .rbac import (
     AbstractPermissionContext,
@@ -30,8 +32,6 @@ from .rbac import (
     get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .resource_policy import KeyPairResourcePolicyRow
-from .user import UserRow
 
 # Left this for compatibility with existing code
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -135,7 +135,7 @@ class PermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> PermissionContext:
-        from .domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         perm_ctx = PermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -150,7 +150,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> PermissionContext:
-        from .domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
@@ -179,7 +179,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> PermissionContext:
-        from .project import ProjectRow
+        from ai.backend.manager.models.project.row import ProjectRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
@@ -208,7 +208,7 @@ class PermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> PermissionContext:
-        from .keypair import KeyPairRow
+        from ai.backend.manager.models.keypair.row import KeyPairRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:

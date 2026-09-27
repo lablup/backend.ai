@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

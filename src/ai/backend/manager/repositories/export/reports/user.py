@@ -8,10 +8,10 @@ from typing import Any
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,

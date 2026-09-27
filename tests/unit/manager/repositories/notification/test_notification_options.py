@@ -25,18 +25,21 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.notification import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
@@ -48,33 +51,28 @@ from ai.backend.manager.models.notification.searchers import (
     NotificationChannelSearcher,
     NotificationRuleSearcher,
 )
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
 )
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables

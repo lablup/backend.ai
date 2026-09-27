@@ -40,7 +40,7 @@ from ai.backend.manager.models.base import (
     EnumValueType,
     IPColumn,
 )
-from ai.backend.manager.models.hasher import PasswordHasherFactory
+from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.types import (
@@ -51,9 +51,9 @@ from ai.backend.manager.models.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+    from ai.backend.manager.models.domain.row import DomainRow
+    from ai.backend.manager.models.keypair.row import KeyPairRow
+    from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -83,19 +83,19 @@ INACTIVE_USER_STATUSES = (
 
 # Defined for avoiding circular import
 def _get_domain_join_condition() -> Any:
-    from ai.backend.manager.models.domain import DomainRow
+    from ai.backend.manager.models.domain.row import DomainRow
 
     return DomainRow.name == foreign(UserRow.domain_name)
 
 
 def _get_resource_policy_join_condition() -> Any:
-    from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+    from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
     return UserResourcePolicyRow.name == foreign(UserRow.resource_policy)
 
 
 def _get_keypairs_join_condition() -> Any:
-    from ai.backend.manager.models.keypair import KeyPairRow
+    from ai.backend.manager.models.keypair.row import KeyPairRow
 
     return foreign(KeyPairRow.user) == UserRow.uuid
 
@@ -215,7 +215,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
 
     @classmethod
     def load_keypairs(cls) -> _AbstractLoad:
-        from ai.backend.manager.models.keypair import KeyPairRow
+        from ai.backend.manager.models.keypair.row import KeyPairRow
 
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
 

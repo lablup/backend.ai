@@ -43,14 +43,38 @@ from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import DeploymentHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import DeploymentHistoryToCreate
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import DeploymentHistoryToCreate
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
+from ai.backend.manager.sokovan.deployment.handlers.base import DeploymentHandler
+from ai.backend.manager.sokovan.deployment.handlers.deploying_draining import (
+    DeployingDrainingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_finalizing import (
+    DeployingFinalizingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_initializing import (
+    DeployingInitializingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_promoting import (
+    DeployingPromotingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioned import (
+    DeployingProvisionedHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioning import (
+    DeployingProvisioningHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_rolling_back import (
+    DeployingRollingBackHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.destroying import DestroyingDeploymentHandler
+from ai.backend.manager.sokovan.deployment.handlers.replica import CheckReplicaDeploymentHandler
+from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
@@ -61,18 +85,6 @@ from ai.backend.manager.types import DistributedLockFactory
 
 from .deployment_controller import DeploymentController
 from .executor import DeploymentExecutor
-from .handlers import (
-    CheckReplicaDeploymentHandler,
-    DeployingDrainingHandler,
-    DeployingFinalizingHandler,
-    DeployingInitializingHandler,
-    DeployingPromotingHandler,
-    DeployingProvisionedHandler,
-    DeployingProvisioningHandler,
-    DeployingRollingBackHandler,
-    DeploymentHandler,
-    DestroyingDeploymentHandler,
-)
 from .types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,

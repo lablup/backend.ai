@@ -8,15 +8,15 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
-from ai.backend.manager.models.image import (
+from ai.backend.manager.data.image.types import (
     ImageIdentifier,
+    ImageStatus,
 )
+from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.updaters import ImageUpdater
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (

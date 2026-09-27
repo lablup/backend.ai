@@ -89,11 +89,11 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-from ai.backend.manager.models.network import NetworkRow, NetworkType
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.network.row import NetworkRow, NetworkType
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -117,7 +117,7 @@ from ai.backend.manager.models.utils import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -352,7 +352,7 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 # Defined for avoiding circular import
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
@@ -1359,7 +1359,7 @@ class ComputeSessionPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ComputeSessionPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         perm_ctx = ComputeSessionPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

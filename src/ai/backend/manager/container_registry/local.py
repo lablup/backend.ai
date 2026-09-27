@@ -13,7 +13,7 @@ from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.common.json import pretty_json_str
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 
 from .base import (
     BaseContainerRegistry,

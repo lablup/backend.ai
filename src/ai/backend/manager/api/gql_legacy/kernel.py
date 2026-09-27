@@ -31,8 +31,8 @@ from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConve
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
     LIVE_STATUS,
@@ -45,11 +45,11 @@ from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
 )
-from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_kernel_allocations,
 )
-from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.user.row import UserRole, users
 from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
     BatchGetKernelLiveStatsAction,
 )
@@ -289,7 +289,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
 
         if row is None:
             raise DataTransformationFailed("Kernel row is None")
-        from ai.backend.manager.models.user import UserRole
+        from ai.backend.manager.models.user.row import UserRole
 
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:
@@ -753,7 +753,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
 
         if row is None:
             raise DataTransformationFailed("Legacy compute session row is None")
-        from ai.backend.manager.models.user import UserRole
+        from ai.backend.manager.models.user.row import UserRole
 
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:

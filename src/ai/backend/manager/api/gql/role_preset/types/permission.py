@@ -58,14 +58,12 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
-from ai.backend.manager.api.gql.rbac.types import (
-    PermissionBitFilterGQL,
-    PermissionBitGQL,
-)
 from ai.backend.manager.api.gql.rbac.types.permission import (
     OperationTypeFilterGQL,
     OperationTypeGQL,
+    PermissionBitFilterGQL,
 )
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 
 _REMOVED_OPERATION_REASON = (
     f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; this field is always null."

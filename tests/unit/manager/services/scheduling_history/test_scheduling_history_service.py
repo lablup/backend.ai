@@ -57,7 +57,9 @@ from ai.backend.manager.models.scheduling_history.searchers import (
     SessionSchedulingHistorySearcher,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
+from ai.backend.manager.repositories.scheduling_history.repository import (
+    SchedulingHistoryRepository,
+)
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
 )

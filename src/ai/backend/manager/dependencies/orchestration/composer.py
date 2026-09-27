@@ -13,7 +13,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.leader import ValkeyLeaderElection
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.common.types import ValkeyProfileTarget
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -21,23 +21,25 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
-from ai.backend.manager.repositories.resource_usage_history import (
+from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.types import DistributedLockFactory
 

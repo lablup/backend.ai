@@ -20,35 +20,37 @@ from ai.backend.common.exception import (
     PrometheusQueryPresetNotFound,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.data.prometheus_query_preset import (
+from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetData,
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
 from ai.backend.manager.models.prometheus_query_preset.purgers import (
     PrometheusQueryPresetPurger,
 )
-from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
+from ai.backend.manager.models.prometheus_query_preset.row import (
+    PresetOptions,
+    PrometheusQueryPresetRow,
+)
 from ai.backend.manager.models.prometheus_query_preset.searchers import (
     PrometheusQueryPresetSearcher,
 )
 from ai.backend.manager.models.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdater,
 )
-from ai.backend.manager.models.prometheus_query_preset_category import (
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -61,7 +63,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.types import OptionalState, TriState

@@ -25,19 +25,17 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.fair_share.row import DEFAULT_LOOKBACK_DAYS
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.sokovan.scheduler.fair_share import (
-    FairShareAggregator,
-    FairShareFactorCalculator,
-)
+from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import FairShareAggregator
+from ai.backend.manager.sokovan.scheduler.fair_share.calculator import FairShareFactorCalculator
 
 from .base import KernelObserver, ObservationResult
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.fair_share import FairShareRepository
-    from ai.backend.manager.repositories.resource_usage_history import (
+    from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+    from ai.backend.manager.repositories.resource_usage_history.repository import (
         ResourceUsageHistoryRepository,
     )
-    from ai.backend.manager.repositories.scheduler import SchedulerRepository
+    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

@@ -11,7 +11,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,

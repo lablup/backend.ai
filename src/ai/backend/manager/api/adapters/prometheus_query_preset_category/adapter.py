@@ -27,16 +27,16 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.types imp
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryRow,
-)
 from ai.backend.manager.models.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreator,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.scopes import (
     PublicPrometheusQueryPresetCategoryTarget,

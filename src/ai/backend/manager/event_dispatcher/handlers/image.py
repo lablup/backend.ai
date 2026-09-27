@@ -14,7 +14,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )

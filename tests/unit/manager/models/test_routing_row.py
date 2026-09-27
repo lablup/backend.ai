@@ -7,10 +7,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the

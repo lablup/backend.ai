@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.sokovan.recorder import RecorderContext
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
 from ai.backend.manager.views.sokovan.session import TerminatingSessionData
 

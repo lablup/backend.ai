@@ -30,26 +30,24 @@ from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
-from ai.backend.manager.services.vfs_storage.actions import (
-    CreateVFSStorageAction,
-    GetVFSStorageAction,
-    ListVFSStorageAction,
-    PurgeVFSStorageAction,
-    SearchVFSStoragesAction,
-    UpdateVFSStorageAction,
-)
+from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
     GetQuotaScopeAction,
 )
+from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.lookup import (
     LookupVFSStorageAction,
 )
+from ai.backend.manager.services.vfs_storage.actions.purge import PurgeVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.set_quota_scope import (
     SetQuotaScopeAction,
 )
 from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import (
     UnsetQuotaScopeAction,
 )
+from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.types import OptionalState
 

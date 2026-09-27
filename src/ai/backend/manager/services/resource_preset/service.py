@@ -8,7 +8,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.resource_preset.updaters import (
     ResourcePresetResourceGroupUpdater,
 )
-from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
+from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,

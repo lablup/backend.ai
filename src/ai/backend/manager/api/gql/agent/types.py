@@ -48,13 +48,13 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.entity_label.types import (
-    EntityLabelConnection,
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
     EntityLabelNestedFilterGQL,
     EntityLabelOrderByGQL,
-    resolve_entity_labels,
 )
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,

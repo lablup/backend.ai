@@ -16,13 +16,9 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.domain_v2.types import (
-    DomainScopeGQL,
-    DomainV2Connection,
-    DomainV2Filter,
-    DomainV2GQL,
-    DomainV2OrderBy,
-)
+from ai.backend.manager.api.gql.domain_v2.types.filters import DomainV2Filter, DomainV2OrderBy
+from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2Connection, DomainV2GQL
+from ai.backend.manager.api.gql.domain_v2.types.scopes import DomainScopeGQL
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 

@@ -26,7 +26,7 @@ from ai.backend.manager.data.prometheus_query_preset.types import (
 )
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+from ai.backend.manager.repositories.prometheus_query_preset.db_source.db_source import (
     PrometheusQueryPresetDBSource,
 )
 

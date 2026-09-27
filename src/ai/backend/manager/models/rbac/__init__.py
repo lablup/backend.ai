@@ -54,7 +54,7 @@ async def get_predefined_roles_in_scope(
     scope: ScopeType,
     db_session: AsyncSession | None = None,
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.user import UserRole
+    from ai.backend.manager.models.user.row import UserRole
 
     async def _calculate_role(db_session: AsyncSession) -> frozenset[PredefinedRole]:
         match ctx.user_role:
@@ -77,9 +77,9 @@ async def get_predefined_roles_in_scope(
 async def _calculate_role_in_scope_for_suadmin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.project import ProjectRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.domain.row import DomainRow
+    from ai.backend.manager.models.project.row import ProjectRow
+    from ai.backend.manager.models.user.row import UserRow
     from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:
@@ -121,9 +121,9 @@ async def _calculate_role_in_scope_for_suadmin(
 async def _calculate_role_in_scope_for_monitor(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.project import ProjectRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.domain.row import DomainRow
+    from ai.backend.manager.models.project.row import ProjectRow
+    from ai.backend.manager.models.user.row import UserRow
     from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:
@@ -168,8 +168,8 @@ async def _calculate_role_in_scope_for_monitor(
 async def _calculate_role_in_scope_for_admin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.project import ProjectRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.project.row import ProjectRow
+    from ai.backend.manager.models.user.row import UserRow
     from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
     match scope:

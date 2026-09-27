@@ -29,26 +29,22 @@ from ai.backend.common.types import (
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.agent.types import AgentDetailData
+from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.models.agent import (
-    AgentRow,
-    AgentStatus,
-    agents,
-)
+from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.user.row import UserRole, users
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.services.agent.actions.bulk_load_permissions import (

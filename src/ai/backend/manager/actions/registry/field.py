@@ -16,12 +16,12 @@ from ai.backend.manager.actions.types import (
     ActionGate,
     ActionKind,
 )
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.processor import (
     AtomicEntityResultJudge,
     BulkActionProcessor,
 )
-from ai.backend.manager.actions.v2.bulk.validator import (
+from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )
@@ -46,11 +46,11 @@ from ai.backend.manager.actions.v2.field.processor import (
     SingleFieldActionProcessor,
 )
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
+from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
 )
-from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateFieldOpsAction,
     BulkGetOwnedFieldOpsAction,
@@ -70,15 +70,15 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
-from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
+from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
-from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
+from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
+from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.services.ops.service import (
     BulkOwnedFieldGetService,
     DeleteService,

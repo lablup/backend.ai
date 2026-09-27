@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ai.backend.common.data.entity.notification import NotificationChannelID
 from ai.backend.common.data.notification import NotificationRuleType
-from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
+from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.notification.creators import NotificationRuleCreator
 from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo

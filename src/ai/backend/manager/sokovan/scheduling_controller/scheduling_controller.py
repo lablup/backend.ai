@@ -49,7 +49,7 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
@@ -62,40 +62,81 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.compute_kernel_resources_rule import (
+    ComputeKernelResourcesRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.expand_kernel_groups_rule import (
+    ExpandKernelGroupsRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
+    MergeResourceGroupDefaultsRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.session_spec_preparer import (
+    SessionSpecPreparer,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_container_user_mapping_rule import (
+    AssignContainerUserMappingRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_network_config_rule import (
+    AssignNetworkConfigRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_user_identity_rule import (
+    AssignUserIdentityRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.build_internal_data_rule import (
+    BuildInternalDataRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.inject_session_environ_rule import (
+    InjectSessionEnvironRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.resolve_vfolder_mounts_rule import (
+    ResolveVFolderMountsRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit_rule import (
+    ContainerLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.dotfile_vfolder_conflict_rule import (
+    DotfileVFolderConflictRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.image_slot_type_rule import (
+    ImageSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
+    InferenceModelFolderRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
+    MountNameValidationRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_count_limit_rule import (
+    PendingSessionCountLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_resource_limit_rule import (
+    PendingSessionResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.priority_limit_rule import (
+    PriorityLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
+    RequestedSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.required_resource_slot_rule import (
+    RequiredResourceSlotRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
+    ResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
+    ServicePortRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
+    SessionSpecValidator,
+)
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
 from ai.backend.manager.views.sokovan.workload import (
     ResourceRequest,
-)
-
-from .preparers import (
-    AssignContainerUserMappingRule,
-    AssignNetworkConfigRule,
-    AssignUserIdentityRule,
-    BuildInternalDataRule,
-    ComputeKernelResourcesRule,
-    ExpandKernelGroupsRule,
-    InjectSessionEnvironRule,
-    MergeResourceGroupDefaultsRule,
-    ResolveVFolderMountsRule,
-    SessionSpecPreparer,
-)
-from .validators import (
-    ContainerLimitRule,
-    DotfileVFolderConflictRule,
-    ImageSlotTypeRule,
-    InferenceModelFolderRule,
-    MountNameValidationRule,
-    PendingSessionCountLimitRule,
-    PendingSessionResourceLimitRule,
-    PriorityLimitRule,
-    RequestedSlotTypeRule,
-    RequiredResourceSlotRule,
-    ResourceLimitRule,
-    ServicePortRule,
-    SessionSpecValidator,
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

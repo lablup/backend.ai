@@ -14,9 +14,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.recorder import (
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.recorder.context import (
     RecorderContext,
 )
 from ai.backend.manager.sokovan.scheduler.results import (

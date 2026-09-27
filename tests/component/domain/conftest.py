@@ -25,8 +25,8 @@ from ai.backend.manager.api.rest.domain.handler import DomainHandler
 from ai.backend.manager.api.rest.domain.registry import register_domain_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository

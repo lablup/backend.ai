@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.types import KernelId
-from ai.backend.manager.clients.prometheus import (
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
 )

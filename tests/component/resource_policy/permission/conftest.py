@@ -67,16 +67,16 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import ProjectRow, association_groups_users
+from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.user import UserRole, UserStatus, users
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository

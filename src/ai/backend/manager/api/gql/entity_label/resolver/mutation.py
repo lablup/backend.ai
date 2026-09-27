@@ -12,9 +12,9 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
 )
-from ai.backend.manager.api.gql.entity_label.types import (
+from ai.backend.manager.api.gql.entity_label.types.inputs import UpsertEntityLabelInputGQL
+from ai.backend.manager.api.gql.entity_label.types.payloads import (
     PurgeEntityLabelPayloadGQL,
-    UpsertEntityLabelInputGQL,
     UpsertEntityLabelPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext

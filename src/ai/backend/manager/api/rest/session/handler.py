@@ -98,7 +98,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAP
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
 )

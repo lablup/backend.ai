@@ -11,7 +11,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 
 if TYPE_CHECKING:
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool

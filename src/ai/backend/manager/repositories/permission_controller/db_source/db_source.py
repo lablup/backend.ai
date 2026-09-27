@@ -37,8 +37,8 @@ from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
     PermissionSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry

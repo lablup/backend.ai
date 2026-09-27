@@ -46,7 +46,7 @@ from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -91,9 +91,11 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
+from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
     UpsertDeploymentPolicyAction,
     UpsertDeploymentPolicyActionResult,
 )
@@ -125,11 +127,11 @@ from ai.backend.manager.services.deployment.actions.replace_deployment_options i
     ReplaceDeploymentOptionsAction,
     ReplaceDeploymentOptionsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
 )
-from ai.backend.manager.services.deployment.actions.route import (
+from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
@@ -145,7 +147,7 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
     UpdateDeploymentActionResult,
 )
-from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 log = StructuredLogger(logging.getLogger(__name__))

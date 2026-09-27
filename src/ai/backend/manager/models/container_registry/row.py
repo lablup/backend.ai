@@ -30,7 +30,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.association_container_registries_groups import (
+    from ai.backend.manager.models.association_container_registries_groups.row import (
         AssociationContainerRegistriesGroupsRow,
     )
 
@@ -98,7 +98,7 @@ class ContainerRegistryValidator:
 
 
 def _get_association_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.association_container_registries_groups import (
+    from ai.backend.manager.models.association_container_registries_groups.row import (
         AssociationContainerRegistriesGroupsRow,
     )
 

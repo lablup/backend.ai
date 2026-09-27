@@ -11,20 +11,24 @@ from ai.backend.common.data.notification import NotifiableMessage, NotificationR
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.notification.types import ProcessRuleParams
-
-from .actions import (
+from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
     ProcessNotificationActionResult,
+)
+from ai.backend.manager.services.notification.actions.validate_channel import (
     ValidateChannelAction,
     ValidateChannelActionResult,
+)
+from ai.backend.manager.services.notification.actions.validate_rule import (
     ValidateRuleAction,
     ValidateRuleActionResult,
 )
+
 from .actions.process_notification import ProcessedRuleSuccess
 
 if TYPE_CHECKING:
-    from ai.backend.manager.notification import NotificationCenter
-    from ai.backend.manager.repositories.notification import NotificationRepository
+    from ai.backend.manager.notification.notification_center import NotificationCenter
+    from ai.backend.manager.repositories.notification.repository import NotificationRepository
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

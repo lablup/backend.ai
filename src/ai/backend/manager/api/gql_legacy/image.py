@@ -38,6 +38,7 @@ from ai.backend.manager.bgtask.tasks.purge_images import (
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.image.types import (
     ImageData,
+    ImageIdentifier,
     ImageStatus,
     ImageType,
     ImageWithAgentInstallStatus,
@@ -46,12 +47,7 @@ from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.image import (
-    ImageIdentifier,
-    ImageLoadFilter,
-    ImageRow,
-    get_permission_ctx,
-)
+from ai.backend.manager.models.image.row import ImageLoadFilter, ImageRow, get_permission_ctx
 from ai.backend.manager.models.image.scopes import (
     ImageTarget,
     VisibleImageTarget,
@@ -68,7 +64,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 from ai.backend.manager.models.rbac import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -377,7 +373,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         items: Sequence[Image],
         domain_name: str,
     ) -> Sequence[Image]:
-        from ai.backend.manager.models.domain import domains
+        from ai.backend.manager.models.domain.row import domains
 
         async with ctx.db.begin() as conn:
             query = (

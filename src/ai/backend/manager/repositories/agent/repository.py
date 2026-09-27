@@ -27,12 +27,12 @@ from ai.backend.manager.data.agent.types import (
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.errors.agent import AgentNotFound
-from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource

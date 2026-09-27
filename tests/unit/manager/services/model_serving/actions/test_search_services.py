@@ -33,7 +33,9 @@ from ai.backend.manager.services.model_serving.actions.search_services import (
 from ai.backend.manager.services.model_serving.adapter import ServiceSearchAdapter
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 
 class TestSearchServices:

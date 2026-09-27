@@ -33,9 +33,9 @@ from ai.backend.manager.errors.auth import OpenIDAuthenticationFailed
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
-from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.lookups import UserEmailLookup
+from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.plugin.webapp import WebappPlugin
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 

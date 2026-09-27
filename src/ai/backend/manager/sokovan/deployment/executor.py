@@ -41,7 +41,7 @@ from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
 )
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.repositories.deployment.repository import (
@@ -53,7 +53,9 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .types import (
     DeploymentExecutionError,

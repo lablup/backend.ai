@@ -12,12 +12,12 @@ from sqlalchemy.exc import NoResultFound
 from ai.backend.common.exception import DeprecatedAPI
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.errors.service import RoutingNotFound
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 
 from .base import InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
+    from ai.backend.manager.models.endpoint.row import EndpointRow
 
     from .schema import GraphQueryContext
 

@@ -97,7 +97,7 @@ from ai.backend.manager.api.gql.role_preset.types.node import RolePresetGQL
 from ai.backend.manager.api.gql.runtime_variant.resolver import runtime_variants
 from ai.backend.manager.api.gql.runtime_variant_preset.resolver import runtime_variant_presets
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _PAGE_SIZE = 2

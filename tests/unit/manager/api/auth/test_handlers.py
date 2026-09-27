@@ -46,7 +46,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
 )
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairActionResult,

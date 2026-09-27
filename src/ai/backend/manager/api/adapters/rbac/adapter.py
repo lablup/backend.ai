@@ -176,11 +176,11 @@ from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
 )
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.deprecated_search import (
     DeprecatedRoleConditions,
 )
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import (
     HeldRoleTarget,
     RoleTarget,
@@ -190,10 +190,10 @@ from ai.backend.manager.models.rbac_models.role.searchable_fields import (
 )
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
     DeprecatedRoleAssignmentConditions,
 )
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
     RoleAssignmentTarget,
     RoleRoleAssignmentTarget,

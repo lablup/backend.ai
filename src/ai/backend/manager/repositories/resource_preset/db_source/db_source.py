@@ -40,18 +40,18 @@ from ai.backend.manager.errors.resource import (
     ResourceGroupNotFound,
     ResourcePresetNotFound,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
 from ai.backend.manager.models.resource_preset.queriers import ResourcePresetQuerier
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.searchable_fields import (
     ResourcePresetSearchableFields,
 )
@@ -59,12 +59,12 @@ from ai.backend.manager.models.resource_preset.updaters import (
     ResourcePresetResourceGroupUpdater,
     ResourcePresetUpdater,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider

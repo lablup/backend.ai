@@ -56,9 +56,27 @@ from ai.backend.manager.repositories.scheduler.types.session import SessionHisto
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
+from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import KernelLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.observer.base import KernelObserver
+from ai.backend.manager.sokovan.scheduler.kernel.state_engine import KernelStateEngine
+from ai.backend.manager.sokovan.scheduler.post_processors.base import (
+    KernelPostProcessor,
+    KernelPostProcessorContext,
+    PostProcessor,
+    PostProcessorContext,
+)
+from ai.backend.manager.sokovan.scheduler.post_processors.factory import (
+    create_kernel_post_processors,
+    create_session_post_processors,
+)
+from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.manager.views.sokovan.lifecycle import (
     LastPhase,
@@ -67,21 +85,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 from .factory import CoordinatorHandlers
-from .handlers import SessionLifecycleHandler
-from .handlers.cleanup import CleanupHandler
-from .handlers.kernel import KernelLifecycleHandler
-from .handlers.observer import KernelObserver
 from .hooks.registry import HookRegistry
-from .kernel import KernelStateEngine
-from .post_processors import (
-    KernelPostProcessor,
-    KernelPostProcessorContext,
-    PostProcessor,
-    PostProcessorContext,
-    create_kernel_post_processors,
-    create_session_post_processors,
-)
-from .recorder import SessionRecorderContext
 from .results import (
     KernelExecutionResult,
     KernelStatusTransitions,

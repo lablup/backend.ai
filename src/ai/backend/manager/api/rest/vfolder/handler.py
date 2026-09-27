@@ -109,6 +109,7 @@ from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.dto.context import (
     RequestCtx,
     UserContext,
@@ -128,13 +129,8 @@ from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.row import (
     UserRole,
-)
-from ai.backend.manager.models.vfolder import (
-    VFolderOwnershipType,
-    VFolderStatusSet,
-    vfolder_status_map,
 )
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
@@ -143,6 +139,7 @@ from ai.backend.manager.models.vfolder.creators import (
     UnmanagedProjectVFolderCreator,
     VFolderBaseCreator,
 )
+from ai.backend.manager.models.vfolder.row import VFolderStatusSet, vfolder_status_map
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderTarget,
     UserVFolderTarget,

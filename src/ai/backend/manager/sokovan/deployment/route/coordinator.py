@@ -33,28 +33,36 @@ from ai.backend.manager.models.routing.searchers import RouteDataSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteHistoryToCreate
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import RouteHistoryToCreate
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
-from ai.backend.manager.sokovan.deployment.route.handlers import (
+from ai.backend.manager.sokovan.deployment.route.handlers.appproxy_sync import (
     AppProxySyncRouteHandler,
-    DrainingRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.base import RouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.draining import DrainingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.health_check import (
     HealthCheckRouteHandler,
-    ProvisioningRouteHandler,
-    ReplicaProbeTargetSyncHandler,
-    RouteEvictionHandler,
-    RouteHandler,
-    RunningRouteHandler,
-    ServiceDiscoverySyncHandler,
-    StartingRouteHandler,
-    TerminatingRouteHandler,
-    WarmingUpRouteHandler,
 )
-from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
+from ai.backend.manager.sokovan.deployment.route.handlers.observer.base import RouteObserver
+from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
-    RouteObserver,
 )
-from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
+from ai.backend.manager.sokovan.deployment.route.handlers.probe_target_sync import (
+    ReplicaProbeTargetSyncHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.provisioning import (
+    ProvisioningRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.route_eviction import RouteEvictionHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.service_discovery_sync import (
+    ServiceDiscoverySyncHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.starting import StartingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.terminating import TerminatingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.warming_up import WarmingUpRouteHandler
+from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionResult,
     RouteLifecycleType,

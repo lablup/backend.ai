@@ -23,8 +23,8 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from .base import RouteObservationResult, RouteObserver
 

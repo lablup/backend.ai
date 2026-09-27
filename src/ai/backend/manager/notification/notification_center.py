@@ -14,7 +14,7 @@ from ai.backend.common.data.notification import (
 )
 from ai.backend.common.data.notification.types import EmailSpec, WebhookSpec
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.notification import NotificationChannelData
+from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.errors.notification import (
     InvalidNotificationChannelType,
     NotificationTemplateRenderingFailure,

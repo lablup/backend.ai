@@ -11,7 +11,7 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.auth.request import AuthorizeRequest
 from ai.backend.common.dto.manager.auth.response import AuthorizeResponse
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 from .conftest import AuthUserFixtureData
 

@@ -20,13 +20,13 @@ from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdent
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
-from ai.backend.manager.models.agent import AgentRow, agents
+from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider

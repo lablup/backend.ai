@@ -5,7 +5,9 @@ import logging
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.services.notification.actions import ProcessNotificationAction
+from ai.backend.manager.services.notification.actions.process_notification import (
+    ProcessNotificationAction,
+)
 from ai.backend.manager.services.notification.service import NotificationService
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

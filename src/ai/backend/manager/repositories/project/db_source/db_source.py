@@ -22,6 +22,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
@@ -29,15 +30,14 @@ from ai.backend.manager.errors.resource import (
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,
     ProjectKernelPurger,
@@ -47,6 +47,7 @@ from ai.backend.manager.models.project.purgers import (
 )
 from ai.backend.manager.models.project.row import (
     ProjectRow,
+    groups,
 )
 from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
@@ -56,10 +57,10 @@ from ai.backend.manager.models.project.searchable_fields import ProjectSearchabl
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,

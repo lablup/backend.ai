@@ -20,8 +20,8 @@ from ai.backend.common.dto.manager.session.response import (
     GetContainerLogsResponse,
     StartServiceResponse,
 )
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.resource_group import resource_groups
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.resource_group.row import resource_groups
 
 from .conftest import SessionSeedData
 

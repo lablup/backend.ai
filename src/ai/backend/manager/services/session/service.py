@@ -100,7 +100,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.row import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
@@ -241,7 +241,9 @@ from ai.backend.manager.services.session.types import (
     overwritten_param_check,
 )
 from ai.backend.manager.services.session.utils import drop_undefined
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import UserScope
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

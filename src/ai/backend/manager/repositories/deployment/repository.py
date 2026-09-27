@@ -76,6 +76,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     ResourceGroupCleanupConfig,
     RevisionSearchResult,
+    RouteData,
     RouteHandlerCategory,
     RouteInfo,
     RouteSearchResult,
@@ -86,6 +87,7 @@ from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, Rout
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
@@ -103,16 +105,18 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.repositories.deployment.types import (
+from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
+from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
+    DeploymentStorageSource,
+)
+from ai.backend.manager.repositories.deployment.types.endpoint import (
     DeploymentHistoryToCreate,
-    RouteData,
     RouteHistoryToCreate,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -123,9 +127,6 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
-
-from .db_source import DeploymentDBSource
-from .storage_source import DeploymentStorageSource
 
 log = StructuredLogger(logging.getLogger(__name__))
 

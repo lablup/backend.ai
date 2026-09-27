@@ -80,7 +80,7 @@ set_input_object_type_default_value(Undefined)
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.rbac import ContainerRegistryScope
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 
 from .container_registry import (
     ContainerRegistry,
@@ -145,7 +145,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
-from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.vfolder.row import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool

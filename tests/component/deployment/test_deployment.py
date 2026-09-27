@@ -67,7 +67,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.processors import Processors
 from ai.backend.testutils.fixtures import DomainFixtureData
