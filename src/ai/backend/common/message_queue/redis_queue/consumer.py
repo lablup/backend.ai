@@ -20,11 +20,11 @@ from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadErro
 from ai.backend.common.message_queue.message import MessageId, MQMessage
 from ai.backend.common.message_queue.payload import AnycastMessagePayload
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import MessageQueueClosedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 300_000  # 5 minutes
 _DEFAULT_AUTOCLAIM_INTERVAL = 60_000
@@ -229,10 +229,10 @@ class RedisConsumer(AbstractConsumer):
             try:
                 await task
             except asyncio.CancelledError:
-                log.debug("Task {} cancelled", task.get_name())
+                log.debug("consumer task cancelled", task_name=task.get_name())
 
         await self._client.close()
-        log.debug("RedisConsumer closed")
+        log.debug("redis consumer closed")
 
     async def _read_messages_loop(self, stream_key: str) -> None:
         """
@@ -241,7 +241,7 @@ class RedisConsumer(AbstractConsumer):
         Args:
             stream_key: The Redis stream key to read from
         """
-        log.info("Starting read messages loop for stream {}", stream_key)
+        log.debug("stream read loop started", stream_key=stream_key)
         target = self._redis_target.to_valkey_target()
         # Set the request timeout to be longer than the read block time
         target.request_timeout = (_DEFAULT_READ_BLOCK_MS // 1000) + 1  # add 1 second buffer
@@ -258,16 +258,13 @@ class RedisConsumer(AbstractConsumer):
                     await self._read_messages(client, stream_key)
                     self._reset_backoff(stream_key)
                 except glide.ClosingError:
-                    log.info(
-                        "Client connection closed, stopping read messages loop for stream {}",
-                        stream_key,
-                    )
+                    log.debug("stream read loop stopped on client close", stream_key=stream_key)
                     break
                 except glide.GlideError as e:
                     await self._failover_consumer(stream_key, e)
                     await self._handle_backoff(stream_key)
-                except Exception as e:
-                    log.error("Error while reading messages from stream {}: {}", stream_key, e)
+                except Exception:
+                    log.exception("stream read failed", stream_key=stream_key)
                     await self._handle_backoff(stream_key)
         finally:
             await client.close()
@@ -296,7 +293,9 @@ class RedisConsumer(AbstractConsumer):
                 anycast_payload = AnycastMessagePayload.from_stream_fields(msg.payload)
             except InvalidMessagePayloadError as e:
                 # Leave it unacked: the auto-claim loop discards it once retries run out.
-                log.warning("Skipping malformed message {}: {}", msg.msg_id, e)
+                log.warning(
+                    "malformed stream message skipped", exc_info=e, message_id=msg.msg_id.decode()
+                )
                 continue
             await self._consume_queue.put(MQMessage(msg_id=msg.msg_id, payload=anycast_payload))
 
@@ -311,7 +310,7 @@ class RedisConsumer(AbstractConsumer):
             autoclaim_start_id: Starting ID for auto-claim
             autoclaim_idle_timeout: Timeout for considering messages idle (ms)
         """
-        log.debug("Starting auto claim loop for stream {}", stream_key)
+        log.debug("stream auto claim loop started", stream_key=stream_key)
 
         while not self._closed:
             try:
@@ -326,18 +325,14 @@ class RedisConsumer(AbstractConsumer):
                 # If the auto claim times out, we just continue to the next iteration
                 pass
             except glide.ClosingError:
-                log.info(
-                    "Client connection closed, stopping auto claim loop for stream {}", stream_key
-                )
+                log.debug("stream auto claim loop stopped on client close", stream_key=stream_key)
                 break
             except glide.GlideError as e:
                 await self._failover_consumer(stream_key, e)
                 await self._handle_backoff(stream_key)
                 continue
-            except Exception as e:
-                log.exception(
-                    "Error while auto claiming messages from stream {}: {}", stream_key, e
-                )
+            except Exception:
+                log.exception("stream auto claim failed", stream_key=stream_key)
                 await self._handle_backoff(stream_key)
                 continue
 
@@ -373,7 +368,9 @@ class RedisConsumer(AbstractConsumer):
                 payload = AnycastMessagePayload.from_stream_fields(msg.payload)
             except InvalidMessagePayloadError as e:
                 # A malformed message can never be handled, so discard it right away.
-                log.warning("Discarding malformed message {}: {}", msg.msg_id, e)
+                log.warning(
+                    "malformed stream message discarded", exc_info=e, message_id=msg.msg_id.decode()
+                )
                 await self._client.done_stream_message(stream_key, self._group_name, msg.msg_id)
                 continue
             retried = MQMessage(msg_id=msg.msg_id, payload=payload).retry()
@@ -444,21 +441,21 @@ class RedisConsumer(AbstractConsumer):
         # If the group does not exist, create it
         if "NOGROUP" in str(e):
             log.warning(
-                "Consumer group does not exist. Creating group {} for stream {}",
-                self._group_name,
-                stream_key,
+                "consumer group missing, creating it",
+                group_name=self._group_name,
+                stream_key=stream_key,
             )
             try:
                 await self._client.make_consumer_group(stream_key, self._group_name)
             except Exception as internal_exception:
-                log.exception(
-                    "Error while creating consumer group {} for stream {}: {}",
-                    self._group_name,
-                    stream_key,
-                    internal_exception,
+                log.error(
+                    "consumer group creation failed",
+                    exc_info=internal_exception,
+                    group_name=self._group_name,
+                    stream_key=stream_key,
                 )
         else:
-            log.exception("Error while reading messages from stream {}: {}", stream_key, e)
+            log.error("stream read failed", exc_info=e, stream_key=stream_key)
 
 
 def _generate_consumer_id(node_id: str | None) -> str:

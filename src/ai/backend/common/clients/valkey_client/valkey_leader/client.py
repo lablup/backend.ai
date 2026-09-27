@@ -22,9 +22,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_leader layer
 valkey_leader_resilience = Resilience(
@@ -189,5 +189,5 @@ class ValkeyLeaderClient:
             )
         released = bool(result == 1)
         if released:
-            log.info("Server {} released leadership for {}", server_id, leader_key)
+            log.info("leadership released", server_id=server_id, leader_key=leader_key)
         return released

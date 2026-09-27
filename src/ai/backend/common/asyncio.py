@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import inspect
 from collections.abc import Awaitable, Callable, Collection, Sequence
+from concurrent.futures import Executor
 from contextlib import AbstractAsyncContextManager
 from typing import (
     Any,
@@ -16,6 +18,7 @@ __all__ = (
     "AsyncBarrier",
     "cancel_tasks",
     "current_loop",
+    "run_in_executor_with_context",
     "run_through",
 )
 
@@ -57,6 +60,14 @@ if hasattr(asyncio, "get_running_loop"):
     current_loop = asyncio.get_running_loop
 else:
     current_loop = asyncio.get_event_loop
+
+
+def run_in_executor_with_context[T, *Ts](
+    executor: Executor | None, fn: Callable[[*Ts], T], *args: *Ts
+) -> asyncio.Future[T]:
+    """`loop.run_in_executor()` that runs `fn` in a copy of the caller's contextvars."""
+    context = contextvars.copy_context()
+    return asyncio.get_running_loop().run_in_executor(executor, context.run, fn, *args)
 
 
 async def run_through(

@@ -18,7 +18,6 @@ from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.logging.utils import BraceStyleAdapter
 
 PKG_NS = "tests.logging.otel_pkg"
-LEGACY_INIT_MESSAGE = "open telemetry logging initialized successfully."
 
 
 class _CollectingExporter(LogRecordExporter):
@@ -37,7 +36,7 @@ class _CollectingExporter(LogRecordExporter):
         pass
 
     def delivered(self) -> list[ReadableLogRecord]:
-        return [r for r in self._records if r.log_record.body != LEGACY_INIT_MESSAGE]
+        return list(self._records)
 
 
 @pytest.fixture

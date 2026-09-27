@@ -31,9 +31,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import KernelId, SessionId, ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_live layer
 valkey_live_resilience = Resilience(
@@ -104,7 +104,7 @@ class ValkeyLiveClient:
         Close the ValkeyLiveClient connection.
         """
         if self._closed:
-            log.debug("ValkeyLiveClient is already closed.")
+            log.debug("valkey live client already closed")
             return
         self._closed = True
         await self._client.disconnect()
@@ -262,7 +262,7 @@ class ValkeyLiveClient:
         :param values: Mapping of field names to new values.
         """
         if not values:
-            log.warning("No values provided to replace schedule data.")
+            log.warning("schedule data replace skipped with no values")
             return
 
         # Use batch to set all fields atomically

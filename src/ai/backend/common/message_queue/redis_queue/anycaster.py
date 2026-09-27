@@ -7,11 +7,11 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.message_queue.abc import AbstractAnycaster
 from ai.backend.common.message_queue.payload import AnycastMessagePayload
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import MessageQueueClosedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RedisAnycaster(AbstractAnycaster):
@@ -78,7 +78,7 @@ class RedisAnycaster(AbstractAnycaster):
             raise MessageQueueClosedError("Anycaster is closed")
 
         await self._client.enqueue_stream_message(self._stream_key, payload)
-        log.debug("Message sent to stream {}", self._stream_key)
+        log.trace("message sent to stream", stream_key=self._stream_key)
 
     @override
     async def close(self) -> None:
@@ -92,4 +92,4 @@ class RedisAnycaster(AbstractAnycaster):
 
         self._closed = True
         await self._client.close()
-        log.debug("RedisAnycaster closed")
+        log.debug("redis anycaster closed")
