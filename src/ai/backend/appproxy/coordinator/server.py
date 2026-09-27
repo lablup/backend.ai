@@ -87,6 +87,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.contexts.request_id import with_request_context
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.etcd import ConfigScopes
@@ -107,6 +108,7 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
@@ -129,6 +131,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
@@ -157,7 +160,7 @@ from .types import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 global_subapp_pkgs: Final[list[str]] = [
     ".circuit_v1",
@@ -177,11 +180,11 @@ global_subapp_pkgs: Final[list[str]] = [
 async def request_context_aware_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
-    request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
+    request_id = request.headers.get(REQUEST_ID_HEADER) or str(uuid.uuid4())
+    # The access log is written after the request scope has closed.
     request["request_id"] = request_id
-    if _current_task := asyncio.current_task():
-        setattr(_current_task, "request_id", request_id)
-    return await handler(request)
+    with with_request_context(request_id):
+        return await handler(request)
 
 
 @web.middleware
@@ -224,6 +227,8 @@ async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
+    method = request.method
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
     # The inner block turns every exception into a BackendAIError; the outer one renders
     # it, so no error can escape through aiohttp's default rendering.
     try:
@@ -233,15 +238,29 @@ async def exception_middleware(
             # ``ValidationError`` covers plain ``BaseModel`` subclasses that
             # skip the ``BackendAISchema`` auto-conversion override.
             log.exception(
-                "Failed to create response model: {}",
-                json.dumps(ex.errors(), indent=2, default=str),
+                "failed to create response model",
+                http_method=method,
+                route_path=endpoint,
+                validation_errors=json.dumps(ex.errors(), default=str),
             )
             raise InternalServerError() from ex
         except BackendAIError as ex:
             if ex.status_code >= 500:
-                log.exception("Server error raised inside handlers")
+                log.exception(
+                    "request failed with server error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
+                    error_code=str(ex.error_code()),
+                )
             else:
-                log.warning("Client error: {0!r}", ex)
+                log.trace(
+                    "request failed with client error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
+                    error_code=str(ex.error_code()),
+                )
             raise
         except web.HTTPException as ex:
             if ex.status_code == 404:
@@ -252,15 +271,22 @@ async def exception_middleware(
                     extra_msg=f"Method {concrete_ex.method} not allowed",
                     extra_data={"allowed_methods": list(concrete_ex.allowed_methods)},
                 ) from ex
-            log.warning("Bad request: {0!r}", ex)
+            log.trace(
+                "request failed with client error",
+                http_method=method,
+                route_path=endpoint,
+                http_status=ex.status_code,
+            )
             raise GenericBadRequest from ex
         except asyncio.CancelledError as e:
             # The server is closing or the client has disconnected in the middle of
             # request.  Atomic requests are still executed to their ends.
-            log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
+            log.trace("request cancelled", http_method=method, route_path=endpoint)
             raise e
         except Exception as e:
-            log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+            log.exception(
+                "request failed with uncaught exception", http_method=method, route_path=endpoint
+            )
             if root_ctx.local_config.debug.enabled:
                 raise InternalServerError(traceback.format_exc()) from e
             raise InternalServerError() from e
@@ -301,7 +327,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db_id=REDIS_LIVE_DB,
         human_readable_name="appproxy-schedule",
     )
-    log.info("ValkeyScheduleClient initialized for health status updates")
+    log.debug("valkey schedule client initialized")
     try:
         yield
     finally:
@@ -500,18 +526,18 @@ async def on_worker_lost_event(
     _worker_id: AgentId,
     event: WorkerLostEvent,
 ) -> None:
-    log.warning("detected termination of proxy worker {}", event.worker_id)
-
     async def _update(sess: SASession) -> None:
         try:
             worker = await Worker.find_by_authority(sess, event.worker_id)
             worker.status = WorkerStatus.LOST
             await sess.flush()
         except ObjectNotFound:
-            log.warning("worker {} not found in database", event.worker_id)
+            log.warning("lost worker not found in database")
 
-    async with context.db.connect() as db_conn:
-        await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
+    with with_log_context(worker_id=event.worker_id):
+        log.warning("proxy worker lost")
+        async with context.db.connect() as db_conn:
+            await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
 async def _reconcile_worker_occupied_slots(
@@ -547,10 +573,10 @@ async def _reconcile_worker_occupied_slots(
         for worker, expected in drifted:
             fresh = await Worker.get(sess, worker.id)
             log.info(
-                "occupied_slots reconcile: worker={} {} -> {}",
-                fresh.authority,
-                fresh.occupied_slots,
-                expected,
+                "worker occupied slots corrected",
+                worker_id=fresh.authority,
+                previous_slot_count=fresh.occupied_slots,
+                slot_count=expected,
             )
             fresh.occupied_slots = expected
 
@@ -558,7 +584,7 @@ async def _reconcile_worker_occupied_slots(
         async with context.db.connect() as db_conn:
             await execute_with_txn_retry(_fix, context.db.begin_session, db_conn)
     except Exception:
-        log.exception("Failed to reconcile worker occupied_slots")
+        log.exception("failed to reconcile worker occupied slots")
 
 
 async def on_reconcile_traefik_routes(
@@ -599,13 +625,13 @@ async def on_reconcile_traefik_routes(
             )
             reconciled += 1
         except Exception:
-            log.exception("Failed to reconcile traefik routes for circuit {}", circuit.id)
+            log.exception("failed to reconcile traefik routes", circuit_id=circuit.id)
     try:
         await context.circuit_manager.reconcile_traefik_etcd_state(circuits, workers)
     except Exception:
-        log.exception("Failed to reconcile stale traefik etcd state")
+        log.exception("failed to reconcile stale traefik etcd state")
     await _reconcile_worker_occupied_slots(context, circuits, workers)
-    log.debug("reconcile_traefik_routes cycle completed: {} circuits reconciled", reconciled)
+    log.debug("traefik routes reconciled", circuit_count=reconciled)
 
 
 @asynccontextmanager
@@ -642,67 +668,56 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @asynccontextmanager
 async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _collect(_context: None, _src: AgentId, _event: DoCheckUnusedPortEvent) -> None:
-        try:
+        async def _update(sess: SASession) -> list[Circuit]:
+            non_inference_http_circuits = [
+                c
+                for c in (await Circuit.list_circuits(sess))
+                if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
+            ]
+            if len(non_inference_http_circuits) == 0:
+                return []
+            last_access = await root_ctx.valkey_live.get_multiple_live_data([
+                f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
+            ])
+            unused_circuits: list[Circuit] = []
 
-            async def _update(sess: SASession) -> list[Circuit]:
-                non_inference_http_circuits = [
-                    c
-                    for c in (await Circuit.list_circuits(sess))
-                    if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
-                ]
-                if len(non_inference_http_circuits) == 0:
-                    return []
-                last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                    f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
-                ])
-                unused_circuits: list[Circuit] = []
+            for idx in range(len(last_access)):
+                access = last_access[idx]
+                last_access_time: float = 0
+                current_time = time.time()
+                if access:
+                    last_access_time = current_time - float(access.decode("utf-8"))
+                else:
+                    circuit_created_at = non_inference_http_circuits[idx].created_at
+                    last_access_time = (
+                        current_time - circuit_created_at.timestamp() if circuit_created_at else 0.0
+                    )
+                if (
+                    last_access_time
+                    > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
+                ):
+                    unused_circuits.append(non_inference_http_circuits[idx])
+            if len(unused_circuits) == 0:
+                return []
 
-                for idx in range(len(last_access)):
-                    access = last_access[idx]
-                    last_access_time: float = 0
-                    current_time = time.time()
-                    if access:
-                        last_access_time = current_time - float(access.decode("utf-8"))
-                    else:
-                        circuit_created_at = non_inference_http_circuits[idx].created_at
-                        last_access_time = (
-                            current_time - circuit_created_at.timestamp()
-                            if circuit_created_at
-                            else 0.0
-                        )
-                    if (
-                        last_access_time
-                        > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
-                    ):
-                        unused_circuits.append(non_inference_http_circuits[idx])
-                if len(unused_circuits) == 0:
-                    return []
+            log.info("collecting unused circuits", circuit_count=len(unused_circuits))
+            log.debug("unused circuits: {}", [str(c.id) for c in unused_circuits])
 
-                log.info(
-                    "collecting {} unused circuits: {}",
-                    len(unused_circuits),
-                    [str(c.id) for c in unused_circuits],
-                )
+            worker_map: dict[UUID, Worker] = {}
+            for circuit in unused_circuits:
+                if circuit.worker not in worker_map:
+                    worker_map[circuit.worker] = await Worker.get(sess, circuit.worker)
 
-                worker_map: dict[UUID, Worker] = {}
-                for circuit in unused_circuits:
-                    if circuit.worker not in worker_map:
-                        worker_map[circuit.worker] = await Worker.get(sess, circuit.worker)
+                worker_map[circuit.worker].occupied_slots -= 1
+                await sess.delete(circuit)
 
-                    worker_map[circuit.worker].occupied_slots -= 1
-                    await sess.delete(circuit)
+            return unused_circuits
 
-                return unused_circuits
-
-            async with root_ctx.db.connect() as db_conn:
-                unused_circuits = await execute_with_txn_retry(
-                    _update, root_ctx.db.begin_session, db_conn
-                )
-            await root_ctx.circuit_manager.unload_circuits(unused_circuits)
-
-        except Exception:
-            log.exception("")
-            raise
+        async with root_ctx.db.connect() as db_conn:
+            unused_circuits = await execute_with_txn_retry(
+                _update, root_ctx.db.begin_session, db_conn
+            )
+        await root_ctx.circuit_manager.unload_circuits(unused_circuits)
 
     unused_port_collection_evh = root_ctx.event_dispatcher.consume(
         DoCheckUnusedPortEvent,
@@ -801,7 +816,7 @@ async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.proxy_coordinator.enable_traefik:
         async with root_ctx.db.begin_readonly_session() as session:
             circuits = await Circuit.list_circuits(session, load_worker=True, load_endpoint=True)
-            log.info("Injecting traefik configuration of {} circuits", len(circuits))
+            log.info("injecting traefik configuration", circuit_count=len(circuits))
             await root_ctx.circuit_manager.initialize_traefik_circuits(circuits)
 
     yield
@@ -911,10 +926,10 @@ def handle_loop_error(
     msg = context.get("message", "(empty message)")
     if exception is not None:
         if sys.exc_info()[0] is not None:
-            log.exception("Error inside event loop: {0}", msg)
+            log.exception("error inside the event loop", loop_error_message=str(msg))
         else:
             exc_info = (type(exception), exception, exception.__traceback__)
-            log.error("Error inside event loop: {0}", msg, exc_info=exc_info)
+            log.error("error inside the event loop", loop_error_message=str(msg), exc_info=exc_info)
 
 
 def _init_subapp(
@@ -1044,7 +1059,7 @@ def build_root_app(
             try:
                 await cctx_instance.shutdown()
             except Exception:
-                log.exception("error while shutting down a cleanup context")
+                log.exception("failed to shut down a cleanup context")
 
     app.on_shutdown.append(_trigger_shutdown)
     app.cleanup_ctx.append(_cleanup_context_wrapper)
@@ -1056,7 +1071,7 @@ def build_root_app(
     app.on_response_prepare.append(make_error_cors_fallback(app))
     for pkg_name in subapp_pkgs:
         if pidx == 0:
-            log.info("Loading module: {0}", pkg_name[1:])
+            log.info("loading module", module_name=pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.coordinator.api")
         init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
@@ -1143,16 +1158,16 @@ async def server_main(
             ])
             os.setgid(gid)
             os.setuid(uid)
-            log.info("changed process uid and gid to {}:{}", uid, gid)
+            log.info("changed the process uid and gid", uid=uid, gid=gid)
 
-        log.info("Started the app-proxy coordinator service.")
+        log.info("started the app-proxy coordinator service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
-        log.info("shutting down...")
+        log.info("shutting down")
         await proxy_init_stack.__aexit__(None, None, None)
 
 
@@ -1246,19 +1261,19 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
             )
             with logger:
                 setproctitle("backend.ai: proxy-coordinator")
-                log.info("Backend.AI AppProxy Coordinator {0}", __version__)
-                log.info("runtime: {0}", env_info())
+                log.info("Backend.AI AppProxy Coordinator starting", version=__version__)
+                log.info("runtime environment", runtime_info=env_info())
                 if server_config.profiling.enable_pyroscope:
-                    log.info("Pyroscope tracing enabled")
+                    log.info("pyroscope tracing enabled")
                 if server_config.profiling.enable_memray:
-                    log.info("Memray tracing enabled")
+                    log.info("memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
                 runner: Callable[..., Any]
                 match server_config.proxy_coordinator.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
@@ -1271,7 +1286,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if server_config.proxy_coordinator.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

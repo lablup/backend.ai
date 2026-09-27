@@ -29,13 +29,13 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import Subdomain
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
 from .circuit import Circuit
 from .subdomain import SubdomainGenerator
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = [
     "Worker",
