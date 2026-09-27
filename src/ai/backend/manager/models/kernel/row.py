@@ -35,7 +35,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -86,7 +86,7 @@ __all__ = (
     "kernels",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
+log = StructuredLogger(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
 # statuses to consider when calculating current resource usage

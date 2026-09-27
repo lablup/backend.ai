@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.models.base import (
     GUID,
@@ -19,7 +19,7 @@ from ai.backend.manager.models.base import (
     StrEnumType,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("AuditLogRow",)
 

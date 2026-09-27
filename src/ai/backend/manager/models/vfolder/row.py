@@ -42,7 +42,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 from ai.backend.manager.data.permission.permission_defs import (
@@ -126,7 +126,7 @@ __all__: Sequence[str] = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -674,9 +674,9 @@ async def update_vfolder_status(
     await execute_with_retry(_update)
     if do_log:
         log.debug(
-            "Successfully updated status of VFolder(s) {} to {}",
-            [str(x) for x in vfolder_ids],
-            update_status.name,
+            "vfolder status updated",
+            vfolder_ids=", ".join(str(x) for x in vfolder_ids),
+            vfolder_status=update_status,
         )
 
 

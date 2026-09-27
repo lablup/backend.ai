@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -16,7 +16,7 @@ from ai.backend.manager.models.base import (
 if TYPE_CHECKING:
     from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ReservoirRegistryRow",)
 

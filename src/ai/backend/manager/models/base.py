@@ -52,7 +52,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -63,7 +63,7 @@ from ai.backend.manager.secret.types import SecretValue
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -1145,7 +1145,7 @@ async def populate_fixture(
             raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
             continue
-        log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
+        log.debug("fixture table loading", table_name=table_name, op_mode=op_mode.name)
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:

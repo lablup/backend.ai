@@ -17,7 +17,7 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 from ai.backend.common.types import (
     VFolderHostPermission,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 
 from .rbac import (
@@ -34,7 +34,7 @@ from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRow
 
 # Left this for compatibility with existing code
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 # RBAC

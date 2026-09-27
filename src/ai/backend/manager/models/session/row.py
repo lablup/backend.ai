@@ -52,7 +52,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
@@ -119,7 +119,7 @@ from ai.backend.manager.models.utils import (
 if TYPE_CHECKING:
     from ai.backend.manager.models.user import UserRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -135,7 +135,7 @@ __all__ = (
     "handle_session_exception",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
+log = StructuredLogger(logging.getLogger("ai.backend.manager.models.session"))
 
 
 FOLLOWING_SESSION_STATUSES = (

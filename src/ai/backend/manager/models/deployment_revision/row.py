@@ -19,7 +19,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 __all__ = ("DeploymentRevisionRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:

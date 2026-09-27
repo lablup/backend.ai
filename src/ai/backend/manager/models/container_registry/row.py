@@ -17,7 +17,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
         AssociationContainerRegistriesGroupsRow,
     )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ContainerRegistryRow",
