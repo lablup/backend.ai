@@ -137,7 +137,21 @@ Levels:
 | warning | A transient server-side failure, a retry, degradation |
 | info | Server lifecycle events an operator needs (start, stop, config applied, leader change) |
 | debug | Per-cycle summaries of periodic work, progress steps |
-| trace | Outcomes of user requests (scheduling failure, resource exhaustion, quota exceeded, 4xx). History and the API are the record |
+| trace | Outcomes of user and admin requests (scheduling failure, resource exhaustion, quota exceeded, 4xx, bulk-operation results). History, the audit log and the API are the record |
+
+Use `info` only when all three hold:
+
+1. An operator needs to know it without looking for it
+2. It does not occur in proportion to requests or time
+3. No other record holds it (history, the audit log, the API)
+
+| `info` target | Examples |
+|---|---|
+| Process lifecycle | Startup finished and the listen address, shutdown |
+| Config applied | Config loaded, an etcd config change applied, a plugin loaded |
+| Role change | Leader election won or lost, service discovery registered or deregistered |
+| Membership change | A new agent's first registration, a volume mounted |
+| State changed by the system without a request | Rows removed by a retention purge, stuck sessions cleaned up. A cycle that changed nothing is `debug` |
 
 Writing rules:
 
