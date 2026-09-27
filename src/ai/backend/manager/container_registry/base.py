@@ -41,7 +41,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import read_json
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.data.image.types import (
     ImageData,
     ImageIdentifier,
@@ -180,7 +180,16 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         reporter: ProgressReporter | None = None,
     ) -> RescanImagesResult:
-        log.debug("registry rescan starting", registry_name=self.registry_name)
+        with with_log_context(
+            registry_name=self.registry_name, project_name=self.registry_info.project
+        ):
+            return await self._rescan_single_registry_in_scope(reporter)
+
+    async def _rescan_single_registry_in_scope(
+        self,
+        reporter: ProgressReporter | None,
+    ) -> RescanImagesResult:
+        log.debug("registry rescan starting")
         errors: list[str] = []
 
         all_updates_token = all_updates.set({})
@@ -212,7 +221,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             counts = rescan_counts.get()
             log.trace(
                 "registry rescanned",
-                registry_name=self.registry_name,
                 scanned_count=counts.scanned,
                 skipped_count=counts.skipped,
                 updated_count=len(scanned_images),

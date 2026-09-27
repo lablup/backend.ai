@@ -90,6 +90,24 @@ class StorageProxyHTTPClient:
                     extra_msg=f"Unexpected error {status_code} from storage proxy",
                 )
 
+    def _log_error_response(self, status: int, data: Mapping[str, Any]) -> None:
+        error_code = str(data.get("error_code", ""))
+        error_title = str(data.get("title", ""))
+        if 400 <= status < 500:
+            log.trace(
+                "storage proxy error response",
+                response_status=status,
+                error_code=error_code,
+                error_title=error_title,
+            )
+        else:
+            log.warning(
+                "storage proxy error response",
+                response_status=status,
+                error_code=error_code,
+                error_title=error_title,
+            )
+
     async def _handle_exceptional_response(self, resp: aiohttp.ClientResponse) -> None:
         data = None
         try:
@@ -112,6 +130,7 @@ class StorageProxyHTTPClient:
                 ),
                 error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
             ) from e
+        self._log_error_response(resp.status, data)
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain

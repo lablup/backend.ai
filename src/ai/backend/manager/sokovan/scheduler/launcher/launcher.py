@@ -143,11 +143,14 @@ class SessionLauncher:
         async def pull_for_agent(
             agent_id: AgentId, images: dict[str, ImageConfig]
         ) -> Mapping[str, str]:
-            async with self._agent_client_pool.acquire(agent_id) as client:
-                return await client.check_and_pull(images)
+            with with_log_context(agent_id=agent_id):
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    return await client.check_and_pull(images)
 
+        pull_agent_ids: list[AgentId] = []
         pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
+            pull_agent_ids.append(agent_id)
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
@@ -159,7 +162,10 @@ class SessionLauncher:
                     "check_and_pull_images",
                     success_detail="Image pull triggered",
                 ):
-                    await asyncio.gather(*pull_tasks, return_exceptions=True)
+                    results = await asyncio.gather(*pull_tasks, return_exceptions=True)
+            for agent_id, result in zip(pull_agent_ids, results, strict=True):
+                if isinstance(result, Exception):
+                    log.warning("image pull request failed", exc_info=result, agent_id=agent_id)
 
     async def start_sessions_for_handler(
         self,

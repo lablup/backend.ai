@@ -104,7 +104,7 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStartedEvent,
     ) -> None:
-        log.info("agent joined", agent_id=source, reason=event.reason)
+        log.info("agent joined", reason=event.reason)
         await self._mark_agent_running(source, AgentStatus.ALIVE)
 
     async def handle_agent_terminated(
@@ -116,7 +116,7 @@ class AgentEventHandler:
         if event.reason == "agent-lost":
             await self._mark_agent_exit(source, AgentStatus.LOST)
         elif event.reason == "agent-restart":
-            log.info("agent restarting for maintenance", agent_id=source)
+            log.info("agent restarting for maintenance")
             await self._mark_agent_running(source, AgentStatus.RESTARTING)
         else:
             # On normal instance termination, kernel_terminated events were already
@@ -181,7 +181,7 @@ class AgentEventHandler:
             query = sa.select(ar.c.slot_name, ar.c.used).where(ar.c.agent_id == source)
             result = await conn.execute(query)
             used_slots = {row.slot_name: row.used for row in result}
-            log.debug("agent used slots", agent_id=source, used_slots=str(used_slots))
+            log.debug("agent used slots", used_slots=str(used_slots))
 
     async def handle_agent_error(
         self,

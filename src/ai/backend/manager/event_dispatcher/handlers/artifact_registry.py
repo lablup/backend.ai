@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
@@ -7,7 +8,7 @@ from ai.backend.common.events.event_types.artifact_registry.anycast import (
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
@@ -67,23 +68,32 @@ class ArtifactRegistryEventHandler:
         for registry in registries:
             if registry.type != ArtifactRegistryType.RESERVOIR:
                 continue
+            with with_log_context(
+                artifact_registry_id=registry.id, reservoir_registry_id=registry.registry_id
+            ):
+                await self._scan_reservoir_registry(registry.registry_id)
 
-            try:
-                # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.
-                await self._artifact_service.scan(
-                    ScanArtifactsAction(
-                        registry_id=registry.registry_id,
-                        # TODO: Support other artifact types in the future
-                        artifact_type=ArtifactType.MODEL,
-                        # Fetch all artifacts without limit
-                        limit=None,
-                        order=None,
-                        search=None,
-                    )
+    async def _scan_reservoir_registry(self, registry_id: uuid.UUID) -> None:
+        try:
+            # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.
+            await self._artifact_service.scan(
+                ScanArtifactsAction(
+                    registry_id=registry_id,
+                    # TODO: Support other artifact types in the future
+                    artifact_type=ArtifactType.MODEL,
+                    # Fetch all artifacts without limit
+                    limit=None,
+                    order=None,
+                    search=None,
                 )
-                log.debug("reservoir registry scanned", registry_id=registry.registry_id)
-            except ReservoirConnectionError:
-                log.warning("reservoir registry scan failed", registry_id=registry.registry_id)
+            )
+        except ReservoirConnectionError as e:
+            log.warning("reservoir registry scan failed", exc_info=e)
+            return
+        except Exception:
+            log.exception("reservoir registry scan failed")
+            return
+        log.debug("reservoir registry scanned")
 
     async def _resolve_storage_data(self, storage_name: str) -> ObjectStorageData | VFSStorageData:
         try:

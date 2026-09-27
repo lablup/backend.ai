@@ -65,7 +65,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.kernel.row import LIVE_STATUS, kernels
 from ai.backend.manager.models.keypair.row import keypairs
@@ -292,50 +292,57 @@ class IdleCheckerHost:
             result = await conn.execute(query)
             rows = result.fetchall()
             for kernel in rows:
-                grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                # The idle policy is resolved through the user's default keypair
-                # instead of the kernel's own access key, which may be left
-                # orphaned by a keypair deletion.
-                default_access_key = cast(AccessKey | None, kernel.default_access_key)
-                if default_access_key not in policy_cache:
-                    policy = (
-                        await self._fetch_idle_policy(conn, default_access_key)
-                        if default_access_key is not None
-                        else None
-                    )
+                with with_log_context(session_id=kernel.session_id, kernel_id=kernel.id):
+                    grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
+                    # The idle policy is resolved through the user's default keypair
+                    # instead of the kernel's own access key, which may be left
+                    # orphaned by a keypair deletion.
+                    default_access_key = cast(AccessKey | None, kernel.default_access_key)
+                    if default_access_key not in policy_cache:
+                        policy = (
+                            await self._fetch_idle_policy(conn, default_access_key)
+                            if default_access_key is not None
+                            else None
+                        )
+                        if policy is None:
+                            log.warning(
+                                "idle policy not found, skipping its kernels in this cycle",
+                                access_key=default_access_key,
+                            )
+                        policy_cache[default_access_key] = policy
+                    policy = policy_cache[default_access_key]
                     if policy is None:
-                        log.warning(
-                            "idle policy not found, skipping its kernels in this cycle",
-                            access_key=default_access_key,
-                        )
-                    policy_cache[default_access_key] = policy
-                policy = policy_cache[default_access_key]
-                if policy is None:
-                    continue
+                        continue
 
-                check_tasks = [
-                    checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
-                    for checker in self._checkers
-                ]
-                check_results = await aiotools.gather_safe(check_tasks)
-                terminated = False
-                for checker, check_result in zip(self._checkers, check_results, strict=True):
-                    if isinstance(check_result, BaseExceptionGroup):
-                        errors.extend(check_result.exceptions)
-                        continue
-                    if isinstance(check_result, BaseException):
-                        # mark to be destroyed afterwards
-                        errors.append(check_result)
-                        continue
-                    if not check_result:
-                        log.info(
-                            "idle checker triggered session termination",
-                            checker_name=checker.name,
-                            session_id=kernel.session_id,
+                    check_tasks = [
+                        checker.check_idleness(
+                            kernel, conn, policy, grace_period_end=grace_period_end
                         )
-                        if not terminated:
-                            terminated = True
-                            await checker.callback_idle_session(kernel.session_id)
+                        for checker in self._checkers
+                    ]
+                    check_results = await aiotools.gather_safe(check_tasks)
+                    terminated = False
+                    for checker, check_result in zip(self._checkers, check_results, strict=True):
+                        if isinstance(check_result, BaseException):
+                            log.warning(
+                                "idle checker failed",
+                                exc_info=check_result,
+                                checker_name=checker.name,
+                            )
+                            if isinstance(check_result, BaseExceptionGroup):
+                                errors.extend(check_result.exceptions)
+                            else:
+                                # mark to be destroyed afterwards
+                                errors.append(check_result)
+                            continue
+                        if not check_result:
+                            log.info(
+                                "idle checker triggered session termination",
+                                checker_name=checker.name,
+                            )
+                            if not terminated:
+                                terminated = True
+                                await checker.callback_idle_session(kernel.session_id)
         if errors:
             raise IdleCheckerError("idle checker(s) raise errors", errors)
 

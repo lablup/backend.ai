@@ -109,7 +109,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelPreparingAnycastEvent,
     ) -> None:
-        log.trace("kernel preparing", kernel_id=event.kernel_id)
+        log.trace("kernel preparing")
 
         await self._schedule_coordinator.handle_kernel_preparing(event)
 
@@ -119,7 +119,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelPullingAnycastEvent,
     ) -> None:
-        log.trace("kernel pulling", kernel_id=event.kernel_id)
+        log.trace("kernel pulling")
 
         await self._schedule_coordinator.handle_kernel_pulling(event)
 
@@ -129,7 +129,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelCreatingAnycastEvent,
     ) -> None:
-        log.trace("kernel creating", kernel_id=event.kernel_id)
+        log.trace("kernel creating")
 
         await self._schedule_coordinator.handle_kernel_creating(event)
 
@@ -139,7 +139,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelStartedAnycastEvent,
     ) -> None:
-        log.trace("kernel started", kernel_id=event.kernel_id)
+        log.trace("kernel started")
 
         await self._schedule_coordinator.handle_kernel_running(event)
 
@@ -149,7 +149,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelCancelledAnycastEvent,
     ) -> None:
-        log.trace("kernel cancelled", kernel_id=event.kernel_id)
+        log.trace("kernel cancelled")
 
         await self._schedule_coordinator.handle_kernel_cancelled(event)
 

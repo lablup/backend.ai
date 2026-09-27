@@ -223,4 +223,4 @@ class TestRouteHealthObserverProbePolicy:
         await observer.observe([route])
 
         call = observer._http_health_check.call_args
-        assert call.args == ("10.0.0.1", 8000, "/livez", 42.0, 204)
+        assert call.args == (route.route_id, "10.0.0.1", 8000, "/livez", 42.0, 204)

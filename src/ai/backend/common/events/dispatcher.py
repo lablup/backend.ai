@@ -42,7 +42,7 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from .exceptions import EventPayloadDecodingError
 from .message import EventMessage
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
-from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
+from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent, LogScopedEvent
 
 __all__ = (
     "EventCallback",
@@ -489,6 +489,7 @@ class EventDispatcher(EventDispatcherGroup):
         message: EventMessage,
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
+        delivery: MQMessage | None = None,
     ) -> None:
         if self._closed:
             return
@@ -496,6 +497,13 @@ class EventDispatcher(EventDispatcherGroup):
         with with_log_context(event_name=event_type, handler_name=evh.name):
             try:
                 with ExitStack() as stack:
+                    if delivery is not None:
+                        stack.enter_context(
+                            with_log_context(
+                                message_id=delivery.msg_id.decode(),
+                                retry_count=delivery.payload.retry_count,
+                            )
+                        )
                     if metadata:
                         stack.enter_context(metadata.apply_context())
                     await self._handle_in_scope(evh, source, message, post_callbacks)
@@ -510,9 +518,6 @@ class EventDispatcher(EventDispatcherGroup):
         message: EventMessage,
         post_callbacks: Sequence[PostCallback],
     ) -> None:
-        coalescing_opts = evh.coalescing_opts
-        coalescing_state = evh.coalescing_state
-        cb = evh.callback
         evh_type = evh.handler_type
         event_cls = evh.event_cls
         event_type = event_cls.event_name()
@@ -531,6 +536,24 @@ class EventDispatcher(EventDispatcherGroup):
             for post_callback in post_callbacks:
                 await post_callback.done()
             return
+        with with_log_context(
+            **(event.log_fields(source) if isinstance(event, LogScopedEvent) else {})
+        ):
+            await self._handle_decoded(evh, source, event, post_callbacks, start)
+
+    async def _handle_decoded(
+        self,
+        evh: EventHandler[Any, AbstractEvent],
+        source: AgentId,
+        event: AbstractEvent,
+        post_callbacks: Sequence[PostCallback],
+        start: float,
+    ) -> None:
+        coalescing_opts = evh.coalescing_opts
+        coalescing_state = evh.coalescing_state
+        cb = evh.callback
+        evh_type = evh.handler_type
+        event_type = evh.event_cls.event_name()
         for start_reporter in evh.event_start_reporters:
             await start_reporter.prepare_event_report(event, PrepareEventReportArgs())
         try:
@@ -595,6 +618,7 @@ class EventDispatcher(EventDispatcherGroup):
                     message,
                     [post_callback],
                     payload.metadata,
+                    mq_msg,
                 ),
             )
             await asyncio.sleep(0)

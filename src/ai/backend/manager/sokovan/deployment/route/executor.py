@@ -32,7 +32,7 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -64,6 +64,7 @@ from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionError,
     RouteExecutionResult,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -134,21 +135,27 @@ class RouteExecutor:
 
         # Phase 2: Create sessions (per-route)
         for route in routes:
-            try:
-                session_id = await self._provision_route(route, deployment_map, session_group_map)
-                if session_id is not None:
-                    route_session_ids[route.route_id] = session_id
-                successes.append(route)
-            except Exception as e:
-                log.trace("route provisioning failed: {}", e, route_id=route.route_id)
-                errors.append(
-                    RouteExecutionError(
-                        route_info=route,
-                        reason="Failed to provision",
-                        error_detail=str(e),
-                        error_code=_extract_error_code(e),
+            with with_log_context(route_id=route.route_id, deployment_id=route.deployment_id):
+                try:
+                    session_id = await self._provision_route(
+                        route, deployment_map, session_group_map
                     )
-                )
+                    if session_id is not None:
+                        route_session_ids[route.route_id] = session_id
+                    successes.append(route)
+                except Exception as e:
+                    if self._is_rejection(e):
+                        log.trace("route provisioning failed: {}", e)
+                    else:
+                        log.exception("route provisioning failed")
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="Failed to provision",
+                            error_detail=str(e),
+                            error_code=_extract_error_code(e),
+                        )
+                    )
 
         # Phase 3: Link sessions to routes (only for successful routes)
         if route_session_ids:
@@ -1119,6 +1126,11 @@ class RouteExecutor:
         )
 
     # Private helper methods
+
+    def _is_rejection(self, error: Exception) -> bool:
+        if isinstance(error, SchedulingError):
+            return True
+        return isinstance(error, BackendAIError) and error.is_client_error()
 
     async def _provision_route(
         self,
