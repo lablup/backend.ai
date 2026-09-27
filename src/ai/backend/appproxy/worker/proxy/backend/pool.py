@@ -9,9 +9,9 @@ from dataclasses import dataclass
 
 from ai.backend.appproxy.common.errors import WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(slots=True)
@@ -130,20 +130,29 @@ class RoutePool:
             return
         entry.failure_count += 1
         if entry.failure_count >= self._spec.failure_threshold:
+            if entry.is_healthy:
+                log.debug(
+                    "route {}:{} marked unhealthy after {} failures",
+                    route.current_kernel_host,
+                    route.kernel_port,
+                    entry.failure_count,
+                    route_id=route.route_id,
+                )
             entry.is_healthy = False
             if entry.unhealthy_since is None:
                 entry.unhealthy_since = time.perf_counter()
-            log.debug(
-                "Route {}:{} marked unhealthy after {} failures",
-                route.current_kernel_host,
-                route.kernel_port,
-                entry.failure_count,
-            )
 
     def record_success(self, route: RouteInfo) -> None:
         entry = self._entries.get((route.current_kernel_host, route.kernel_port))
         if entry is None or entry.route.route_id != route.route_id:
             return
+        if not entry.is_healthy:
+            log.debug(
+                "route {}:{} recovered",
+                route.current_kernel_host,
+                route.kernel_port,
+                route_id=route.route_id,
+            )
         entry.failure_count = 0
         entry.is_healthy = True
         entry.unhealthy_since = None
@@ -155,7 +164,7 @@ class RoutePool:
                 try:
                     await self._check_all()
                 except Exception:
-                    log.exception("RoutePool health check iteration failed")
+                    log.exception("route health check failed")
         except asyncio.CancelledError:
             raise
 
@@ -173,10 +182,19 @@ class RoutePool:
         host, port = hp
         ok = await self._tcp_probe(host, port)
         if ok:
+            if not entry.is_healthy:
+                log.debug("route {}:{} recovered", host, port, route_id=entry.route.route_id)
             entry.is_healthy = True
             entry.failure_count = 0
             entry.unhealthy_since = None
             return
+        if entry.is_healthy:
+            log.debug(
+                "route {}:{} marked unhealthy by the health check",
+                host,
+                port,
+                route_id=entry.route.route_id,
+            )
         entry.is_healthy = False
         if entry.unhealthy_since is None:
             entry.unhealthy_since = time.perf_counter()
@@ -188,11 +206,12 @@ class RoutePool:
                 cached = self._entries.get(hp)
                 if cached is not None and cached.route.route_id == entry.route.route_id:
                     del self._entries[hp]
-                    log.info(
-                        "Evicted unreachable route {}:{} after {}s",
+                    log.debug(
+                        "evicted unreachable route {}:{} after {}s",
                         host,
                         port,
                         self._spec.recovery_timeout,
+                        route_id=entry.route.route_id,
                     )
 
     async def _tcp_probe(self, host: str, port: int) -> bool:
