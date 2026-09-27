@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from ai.backend.common.typed_validators import HostPortPair
@@ -14,8 +16,8 @@ def test_config_validation_supports_field_name_and_alias() -> None:
     assert config.address == HostPortPair(host="127.0.0.1", port=9090)
 
 
-def _unknown_field_warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
-    return [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER]
+def _unknown_field_warnings(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.name == CONFIG_LOGGER]
 
 
 class TestUnknownFieldWarning:
@@ -32,7 +34,11 @@ class TestUnknownFieldWarning:
             config = ManagerConfig.model_validate({unknown_key: True}, by_name=True)
 
         warnings = _unknown_field_warnings(caplog)
-        assert any(unknown_key in m and "ManagerConfig" in m for m in warnings)
+        assert any(
+            unknown_key in r.__dict__["log_tag_unknown_fields"]
+            and r.__dict__["log_tag_config_type"] == "ManagerConfig"
+            for r in warnings
+        )
         assert config.model_dump()[unknown_key] is True
         assert unknown_key in config.model_fields_set
 
