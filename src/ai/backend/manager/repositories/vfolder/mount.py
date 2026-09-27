@@ -25,7 +25,7 @@ from ai.backend.common.types import (
     VFolderMountRequest,
     VFolderUsageMode,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
@@ -58,7 +58,7 @@ from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchabl
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.types import UserScope
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("HeldPermissions", "prepare_vfolder_mounts", "query_reachable_vfolders")
 
@@ -294,8 +294,9 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             if vfolder["name"].startswith("."):
-                log.warning(
-                    "Skipping auto-mount VFolder '{}': it mounts to nobody", vfolder["name"]
+                log.trace(
+                    "auto-mount vfolder skipped, mount policy is none",
+                    vfolder_name=vfolder["name"],
                 )
                 continue
             raise VFolderPermissionError(f"VFolder {vfolder_name} is not permitted to be mounted.")
@@ -312,9 +313,9 @@ async def prepare_vfolder_mounts(
             )
         except InsufficientStoragePermission as e:
             if vfolder["name"].startswith("."):
-                log.warning(
-                    "Skipping auto-mount VFolder '{}' due to insufficient permission",
-                    vfolder["name"],
+                log.trace(
+                    "auto-mount vfolder skipped, insufficient permission",
+                    vfolder_name=vfolder["name"],
                 )
                 continue
             raise InsufficientStoragePermission(

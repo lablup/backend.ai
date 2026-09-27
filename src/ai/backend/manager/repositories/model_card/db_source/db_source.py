@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import VFolderID, VFolderUsageMode
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteFailure,
     BulkModelCardDeleteResultData,
@@ -53,7 +53,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.types import TriState
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ModelCardDBSource:
@@ -119,10 +119,10 @@ class ModelCardDBSource:
                 Decimal(entry.min_quantity)
             except (InvalidOperation, ValueError):
                 log.warning(
-                    "model card update: skipping invalid min_quantity {!r} for card {} slot {}",
-                    entry.min_quantity,
-                    card_id,
-                    entry.slot_name,
+                    "model card resource requirement with invalid min quantity skipped",
+                    model_card_id=card_id,
+                    slot_name=entry.slot_name,
+                    min_quantity=str(entry.min_quantity),
                 )
                 continue
             creations.append(
@@ -193,11 +193,10 @@ class ModelCardDBSource:
                 # -- surface that for ops/debugging since the caller only asked
                 # for a single id.
                 log.debug(
-                    "model card delete: cascaded {} sibling card(s) on vfolder {} "
-                    "alongside target {}",
-                    len(siblings),
-                    vfolder_id,
-                    deleted.id,
+                    "model card delete cascaded to sibling cards",
+                    model_card_id=deleted.id,
+                    vfolder_id=vfolder_id,
+                    sibling_count=len(siblings),
                 )
             await w.update_data(VFolderSoftDeleteUpdater(vfolder_id=vfolder_id))
         return deleted.id

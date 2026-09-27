@@ -6,9 +6,9 @@ import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @contextmanager
@@ -28,7 +28,9 @@ def suppress_with_log(
     try:
         yield
     except tuple(exceptions) as e:
-        if message:
-            log.log(log_level, "{}: {}", message, e)
+        if log_level >= logging.ERROR:
+            log.error("exception suppressed", failure_reason=message, exc_info=e)
+        elif log_level >= logging.WARNING:
+            log.warning("exception suppressed", failure_reason=message, exc_info=e)
         else:
-            log.log(log_level, "Suppressed exception: {}", e)
+            log.debug("exception suppressed: {}", e, failure_reason=message)

@@ -12,14 +12,14 @@ from pydantic import (
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: tuple[str, ...] = (
     "RedisObjectConnectionInfo",

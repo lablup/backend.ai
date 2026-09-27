@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import AccessKey, VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
@@ -112,7 +112,7 @@ from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 from ai.backend.manager.secret.pool import KeyProviderPool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserDBSource:
@@ -241,7 +241,7 @@ class UserDBSource:
                             )
                         )
                 except Exception as e:
-                    log.warning("Failed to create user {}: {}", item.creator.email, str(e))
+                    log.trace("user creation failed: {}", e, user_email=item.creator.email)
                     failures.append(BulkCreateFailure(index=idx, exception=e))
 
         return BulkUserCreateResultData(successes=successes, failures=failures)
@@ -270,7 +270,7 @@ class UserDBSource:
                         updated_user = await self._update_single_user_validated(session, item)
                         successes.append(updated_user)
                 except Exception as e:
-                    log.warning("Failed to update user {}: {}", item.user_id, str(e))
+                    log.trace("user update failed: {}", e, target_user_id=item.user_id)
                     failures.append(BulkUpdateFailure(index=idx, exception=e))
 
         return BulkUserUpdateResultData(successes=successes, failures=failures)

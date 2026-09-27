@@ -16,7 +16,7 @@ from sqlalchemy.engine import CursorResult
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_usage_history.types import (
     KernelUsageRecordData,
 )
@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ResourceUsageHistoryDBSource",)
 
@@ -194,21 +194,19 @@ class ResourceUsageHistoryDBSource:
             Tuple of (created records data, number of kernels with updated observation times)
         """
         log.debug(
-            "[DBSource] record_fair_share_observation: specs_count={}, "
-            "kernel_observation_times_count={}, user_deltas={}, project_deltas={}, "
-            "domain_deltas={}",
-            len(creations),
-            len(kernel_observation_times),
-            len(aggregation_result.user_usage_deltas),
-            len(aggregation_result.project_usage_deltas),
-            len(aggregation_result.domain_usage_deltas),
+            "fair share observation recording",
+            usage_record_count=len(creations),
+            observed_kernel_count=len(kernel_observation_times),
+            user_delta_count=len(aggregation_result.user_usage_deltas),
+            project_delta_count=len(aggregation_result.project_usage_deltas),
+            domain_delta_count=len(aggregation_result.domain_usage_deltas),
         )
 
         async with self._db.begin_session() as db_sess:
             # Step 1: Bulk create kernel usage records
             records = await self._add_usage_records(db_sess, creations)
 
-            log.debug("[DBSource] Created {} kernel usage records", len(records))
+            log.debug("kernel usage records created", usage_record_count=len(records))
 
             # Step 2: Update last_observed_at for kernels
             updated_count = 0
@@ -226,7 +224,7 @@ class ResourceUsageHistoryDBSource:
                     update_result = await db_sess.execute(update_stmt)
                     updated_count += cast(CursorResult[Any], update_result).rowcount
 
-            log.debug("[DBSource] Updated last_observed_at for {} kernels", updated_count)
+            log.debug("kernel last observation time updated", kernel_count=updated_count)
 
             # Step 3: Increment usage buckets
             await self._increment_user_usage_buckets(
@@ -239,7 +237,7 @@ class ResourceUsageHistoryDBSource:
                 db_sess, aggregation_result.domain_usage_deltas, decay_unit_days
             )
 
-            log.debug("[DBSource] Incremented usage buckets successfully")
+            log.debug("usage buckets incremented")
 
             return records, updated_count
 
