@@ -22,13 +22,13 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
 )
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.replica import ReplicaID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 
 from .base import RouteObservationResult, RouteObserver
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -131,7 +131,7 @@ class RouteHealthObserver(RouteObserver):
         ]
         await self._valkey_schedule.record_route_health_statuses_batch(health_results)
 
-        log.debug("Health observer: checked {} routes", len(plans))
+        log.debug("route health observed", route_count=len(plans))
         return RouteObservationResult(observed_count=len(plans))
 
     @staticmethod
@@ -151,5 +151,5 @@ class RouteHealthObserver(RouteObserver):
                 ) as resp:
                     return resp.status == expected_status_code
         except Exception:
-            log.debug("Health check failed for {}", url)
+            log.trace("route health check failed: {}", url)
             return False

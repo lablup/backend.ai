@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteHealthStatus,
@@ -19,7 +19,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResu
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ReplicaProbeTargetSyncHandler(RouteHandler):
@@ -81,8 +81,8 @@ class ReplicaProbeTargetSyncHandler(RouteHandler):
     @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         if result.errors:
-            log.warning(
-                "Probe target sync: {} succeeded, {} failed",
-                len(result.successes),
-                len(result.errors),
+            log.debug(
+                "probe targets synced",
+                success_count=len(result.successes),
+                failure_count=len(result.errors),
             )

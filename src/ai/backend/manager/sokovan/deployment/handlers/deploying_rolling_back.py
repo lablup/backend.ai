@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentInfo,
@@ -39,7 +39,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 from .base import DeploymentHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class DeployingRollingBackHandler(DeploymentHandler):

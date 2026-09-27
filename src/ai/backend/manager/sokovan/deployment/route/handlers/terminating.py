@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteHealthStatus,
@@ -22,7 +22,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResu
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class TerminatingRouteHandler(RouteHandler):
@@ -91,15 +91,14 @@ class TerminatingRouteHandler(RouteHandler):
         whose termination grace period has elapsed, so this handler just
         delegates to it.
         """
-        log.debug("Terminating {} routes", len(routes))
         return await self._route_executor.terminate_routes(routes)
 
     @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after terminating routes."""
-        log.info(
-            "Terminated {} routes successfully, {} failed, {} cooling down",
-            len(result.successes),
-            len(result.errors),
-            len(result.stale),
+        log.debug(
+            "routes terminated",
+            success_count=len(result.successes),
+            failure_count=len(result.errors),
+            cooling_down_count=len(result.stale),
         )

@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteStatus,
@@ -20,7 +20,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResu
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class StartingRouteHandler(RouteHandler):
@@ -79,13 +79,12 @@ class StartingRouteHandler(RouteHandler):
 
     @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        log.debug("Checking {} starting routes for host/port readiness", len(routes))
         return await self._route_executor.check_starting_routes(routes)
 
     @override
     async def post_process(self, result: RouteExecutionResult) -> None:
-        log.info(
-            "Starting check: {} routes ready (→ warming_up), {} failed",
-            len(result.successes),
-            len(result.errors),
+        log.debug(
+            "starting routes checked",
+            ready_count=len(result.successes),
+            failure_count=len(result.errors),
         )

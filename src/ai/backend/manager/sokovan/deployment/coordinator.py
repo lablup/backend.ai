@@ -25,7 +25,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleIfNeededEvent,
 )
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -407,11 +407,14 @@ class DeploymentCoordinator:
             return
 
         lock_id = handler.lock_id
-        async with AsyncExitStack() as stack:
-            if lock_id is not None:
-                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-                await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
-            await self._run_handler(handler)
+        with with_log_context(lifecycle_type=lifecycle_type, handler_name=handler.name()):
+            async with AsyncExitStack() as stack:
+                if lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
+                await self._run_handler(handler)
 
     @staticmethod
     def _build_deployment_searcher(target: DeploymentTargetStatuses) -> DeploymentInfoSearcher:
@@ -445,14 +448,10 @@ class DeploymentCoordinator:
             category=handler.category(),
         )
         if not deployments:
-            log.trace("no deployments to process", handler_name=handler_name)
+            log.trace("no deployments to process")
             return
 
-        log.debug(
-            "deployment handler processing",
-            handler_name=handler_name,
-            deployment_count=len(deployments),
-        )
+        log.debug("deployment handler processing", deployment_count=len(deployments))
 
         deployment_ids = [deployment.deployment_info.id for deployment in deployments]
 
@@ -460,7 +459,7 @@ class DeploymentCoordinator:
             try:
                 result = await handler.execute(deployments)
             except Exception:
-                log.exception("deployment handler execute failed", handler_name=handler_name)
+                log.exception("deployment handler execute failed")
                 result = DeploymentExecutionResult(
                     failures=[
                         DeploymentExecutionError(
@@ -476,12 +475,8 @@ class DeploymentCoordinator:
 
         try:
             await handler.post_process(result)
-        except Exception as e:
-            log.error(
-                "deployment handler post-processing failed",
-                handler_name=handler.name(),
-                exc_info=e,
-            )
+        except Exception:
+            log.exception("deployment handler post-processing failed")
 
     async def _handle_status_transitions(
         self,
@@ -543,9 +538,8 @@ class DeploymentCoordinator:
                 if policy.is_timed_out(started_at, current_dbtime):
                     timed_out.append(deployment)
             if timed_out:
-                log.warning(
+                log.trace(
                     "skipped deployments timed out, transitioning to expired",
-                    handler_name=handler_name,
                     deployment_count=len(timed_out),
                 )
                 transition = self._build_success_transition(
@@ -613,8 +607,8 @@ class DeploymentCoordinator:
         for event in notification_events:
             try:
                 await self._event_producer.anycast_event(event)
-            except Exception as e:
-                log.warning("lifecycle notification failed", exc_info=e)
+            except Exception:
+                log.exception("lifecycle notification failed")
 
     def _build_lifecycle_updater(
         self,
