@@ -43,7 +43,7 @@ from ai.backend.common.metrics.metric import (
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
 from ai.backend.common.types import AgentId, BackendAISchema, RedisConnectionInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .config import ServerConfig
 from .defs import LockID
@@ -54,7 +54,7 @@ from .models.worker import Worker
 if TYPE_CHECKING:
     from .services.endpoint import EndpointService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class CoordinatorMetricRegistry:
@@ -263,7 +263,7 @@ class CircuitManager:
                     else:
                         await self.unload_legacy_circuit(circuit)
             except Exception:
-                log.exception("Failed to unload circuit {}", circuit.id)
+                log.exception("failed to unload circuit", circuit_id=circuit.id)
             finally:
                 self._release_circuit_lock(circuit.id)
 
@@ -334,8 +334,7 @@ class CircuitManager:
                     existing = await self.traefik_etcd.get_prefix(services_prefix)
                 except Exception:
                     log.exception(
-                        "reconcile_traefik_etcd_state: failed to list etcd services at {}",
-                        services_prefix,
+                        "failed to list traefik etcd services", etcd_prefix=services_prefix
                     )
                     continue
 
@@ -372,19 +371,18 @@ class CircuitManager:
                             await self.traefik_etcd.delete_prefix(prefix)
                         except Exception:
                             log.exception(
-                                "reconcile_traefik_etcd_state: delete_prefix {} failed",
-                                prefix,
+                                "failed to delete stale traefik etcd prefix", etcd_prefix=prefix
                             )
                     log.info(
-                        "reconcile_traefik_etcd_state: dropped stale circuit {} from worker={} protocol={}",
-                        stale_id,
-                        worker.authority,
-                        protocol,
+                        "stale circuit dropped from traefik etcd",
+                        circuit_id=stale_id,
+                        worker_id=worker.authority,
+                        protocol_type=protocol,
                     )
                     dropped += 1
 
         if dropped:
-            log.info("reconcile_traefik_etcd_state: dropped {} stale circuit(s)", dropped)
+            log.debug("stale traefik etcd circuits dropped", circuit_count=dropped)
 
     async def unload_legacy_circuit(self, circuit: Circuit) -> None:
         event = AppProxyCircuitRemovedEvent(

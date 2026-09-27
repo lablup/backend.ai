@@ -36,7 +36,7 @@ from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId, BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
@@ -44,7 +44,7 @@ from .utils import auth_required
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class WorkerModel(BackendAISchema):
@@ -254,7 +254,7 @@ async def update_worker(
         result["slots"] = [
             SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots(sess))
         ]
-        log.info("Worker {} joined", worker.authority)
+        log.info("worker joined", worker_id=worker.authority)
         return result
 
     async with root_ctx.db.connect() as db_conn:
@@ -355,7 +355,7 @@ async def check_worker_lost(
                     WorkerLostEvent(worker_id=worker_id_str, reason="heartbeat timeout")
                 )
     except Exception:
-        log.exception("check_worker_lost(): exception:")
+        log.exception("failed to check lost workers")
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

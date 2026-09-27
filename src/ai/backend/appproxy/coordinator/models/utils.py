@@ -41,9 +41,9 @@ from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.types import Sentinel
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -71,11 +71,9 @@ class ExtendedAsyncSAEngine(SAEngine):
             and self._generic_txn_count >= self._txn_concurrency_threshold
         ):
             log.warning(
-                "The number of concurrent generic transactions ({}) "
-                "looks too high (warning threshold: {}).",
-                self._generic_txn_count,
-                self._txn_concurrency_threshold,
-                stack_info=False,
+                "concurrent generic transactions reached the threshold",
+                transaction_count=self._generic_txn_count,
+                threshold_count=self._txn_concurrency_threshold,
             )
 
     def _check_readonly_txn_cnt(self) -> None:
@@ -84,11 +82,9 @@ class ExtendedAsyncSAEngine(SAEngine):
             and self._readonly_txn_count >= self._txn_concurrency_threshold
         ):
             log.warning(
-                "The number of concurrent read-only transactions ({}) "
-                "looks too high (warning threshold: {}).",
-                self._readonly_txn_count,
-                self._txn_concurrency_threshold,
-                stack_info=False,
+                "concurrent read-only transactions reached the threshold",
+                transaction_count=self._readonly_txn_count,
+                threshold_count=self._txn_concurrency_threshold,
             )
 
     @actxmgr
@@ -237,7 +233,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
                     except sa.exc.InterfaceError:
                         log.warning(
-                            f"DB Connnection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
+                            "advisory lock connection already closed; skipping unlock",
+                            lock_id=lock_id,
                         )
 
 
