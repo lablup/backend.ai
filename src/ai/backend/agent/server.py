@@ -138,6 +138,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__ as VERSION
 from .config.unified import (
@@ -1594,6 +1595,7 @@ async def service_discovery_ctx(
             max_export_batch_size=local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+        StructuredOtelLogging(otel_spec).attach(local_config.logging.pkg_ns.keys())
 
     # Start event-based SD publishing if config has service_group set
     sd_config = local_config.service_discovery

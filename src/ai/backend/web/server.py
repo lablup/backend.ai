@@ -78,6 +78,7 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
@@ -1153,6 +1154,7 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             max_export_batch_size=config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+        StructuredOtelLogging(otel_spec).attach(config.logging.pkg_ns.keys())
     yield
 
 

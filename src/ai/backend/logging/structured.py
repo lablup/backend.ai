@@ -16,6 +16,7 @@ __all__ = (
     "LogFieldNormalizer",
     "LogValue",
     "StructuredLogger",
+    "StructuredMessage",
     "with_log_context",
 )
 
@@ -34,6 +35,10 @@ _TRACE_LEVEL = 5
 _log_context: ContextVar[Mapping[str, _NormalizedLogValue]] = ContextVar(
     "structured_log_context", default=MappingProxyType({})
 )
+
+
+class StructuredMessage(str):
+    """The message type of records emitted by `StructuredLogger`."""
 
 
 class LogFieldNormalizer:
@@ -118,7 +123,7 @@ class StructuredLogger:
         if not self._logger.isEnabledFor(level):
             return
         extra = {**_log_context.get(), **self._normalizer.normalize(fields)}
-        message = msg.format(*args) if args else msg
+        message = StructuredMessage(msg.format(*args) if args else msg)
         # +2 skips this method and the level method.
         self._logger.log(level, message, exc_info=exc_info, extra=extra, stacklevel=stacklevel + 2)
 
