@@ -127,6 +127,25 @@ API Handler → Processor → Service → Repository → DB
 **After implementing new API endpoints, verify with the live server** — check both admin and non-admin. For the server restart, `./bai`
 test, and log-checking procedures, see the `/local-dev`, `/bai-cli`, and `/observability` skills.
 
+## Logging
+
+Levels:
+
+| Level | Use for |
+|---|---|
+| error | A server fault. Logged once, where it happens. Where an exception is caught, log it with `exception()` so the traceback is kept |
+| warning | A transient server-side failure, a retry, degradation |
+| info | Server lifecycle events an operator needs (start, stop, config applied, leader change) |
+| debug | Per-cycle summaries of periodic work, progress steps |
+| trace | Outcomes of user requests (scheduling failure, resource exhaustion, quota exceeded, 4xx). History and the API are the record |
+
+Writing rules:
+
+- New code and touched log lines use `StructuredLogger` (`ai.backend.logging.structured`).
+- At `info` and above, the message is a constant and values are keyword fields. Field names follow BEP-1066 section 4.
+- A layer that re-raises does not log.
+- Unit-of-work identifiers are set once at the entry point with `with_log_context`, not repeated on every line.
+
 ## Development guidelines
 
 **Document-first:** Before making changes, read the `AGENTS.md` in the relevant directory, and if you need more context, search the `KNOWLEDGE.md` documents (`/knowledge`).

@@ -81,15 +81,24 @@ class StructuredLogger:
 | Conflict with scope | On the same name, the call-site value wins |
 | Level disabled | Fields are not normalized (`isEnabledFor` first) |
 
+#### Log levels
+
+| Level | Use for |
+|---|---|
+| error | A server fault. Logged once, where it happens. Where an exception is caught, log it with `exception()` so the traceback is kept |
+| warning | A transient server-side failure, a retry, degradation |
+| info | Server lifecycle events an operator needs (start, stop, config applied, leader change) |
+| debug | Per-cycle summaries of periodic work, progress steps |
+| trace | Outcomes of user requests (scheduling failure, resource exhaustion, quota exceeded, 4xx). History and the API are the record |
+
 #### Guardrail — no formatting at `info` and above
 
 | Means | What it catches |
 |---|---|
 | Signature | mypy rejects positional arguments passed to `info`/`warning`/`error`/`exception` |
-| Enable ruff `G001`–`G004` | Calls that build the message with `.format()`, `%`, `+`, or an f-string. Applies to every level (`debug`/`trace` format through positional arguments only) |
-| Logger recognition | Check in phase 2 whether ruff recognizes `log.<level>()` as a logger call. If not, set `logger-objects` |
+| Message type | The message is a `LiteralString`, so mypy rejects a message built with an f-string, `.format()`, `%` or `+` |
 
-The `G` rules are currently off. Enabling them flags these existing calls (as of origin/main): 21 f-strings, 1 `.format()`, 17 `+` concatenations. They are fixed in the change that enables the rules.
+ruff `G001`–`G004` stay off. The `StructuredLogger` signature is the guardrail; `BraceStyleAdapter` call sites stay as they are until they are migrated.
 
 `StructuredLogger` shares nothing with `BraceStyleAdapter`. `BraceStyleAdapter` and `with_log_context_fields` stay as is and do not receive `with_log_context` fields; both are removed once their call sites move to `StructuredLogger` and `with_log_context`. New code and any log line being touched use `StructuredLogger`.
 
@@ -118,7 +127,7 @@ with with_log_context(action_id=action_id, action_name=action_name):
 | `with_request_context` | `request_id` | `contexts.request_id` |
 | `with_user_context` | `user_id`, `triggered_user_id` (only when acting on behalf of another user) | `contexts.user`, `contexts.triggered_user` |
 
-Values that do not change for the process lifetime (`agent_id`, component name, node) go into OTel Resource attributes, not into a scope.
+Values that do not change for the process lifetime (component name, node) go into OTel Resource attributes (`service.name`, `host.name`), not into a scope. `agent_id` is not a Resource attribute: one agent process can run several agents, so it goes in with `with_log_context`.
 
 ### 3. OTel delivery contract
 
@@ -126,8 +135,10 @@ Values that do not change for the process lifetime (`agent_id`, component name, 
 |---|---|
 | body | The message string only |
 | attributes | Scope fields + call-site fields + SDK automatic attributes (`code.*`, `trace_id`, `span_id`) |
-| Formatter | Detach `CustomJsonFormatter` from the OTel handler. Do not overwrite the formatters of other handlers |
-| Coverage | Attach the handler to the `pkg-ns` loggers (propagation boundary) instead of a snapshot of loggers |
+| Handler split | A new OTel handler sends `StructuredLogger` records, told apart by the message type (`StructuredMessage`). The legacy handler filters them out and otherwise stays as is until it is removed |
+| Formatter | The new handler has no formatter and does not overwrite the formatters of other handlers |
+| Coverage | The new handler is attached to the root and the `pkg-ns` loggers (propagation boundary) instead of a snapshot of loggers |
+| Resource | The new handler's Resource adds `host.name` |
 | Explicit field count | At most 10 per line, `with_log_context` and call-site fields combined. Automatic attributes are not counted |
 
 ### 4. Field naming rules
@@ -202,7 +213,7 @@ Conversion examples:
 
 | Current | After |
 |---|---|
-| `"Processing {} allocations, {} reservations, {} failures and {} skips in resource group {}"` | `"resource group scheduled"`, `allocation_count`, `reservation_count`, `failure_count`, `skip_count` (`resource_group_id` comes from the scope) |
+| `"Processing {} allocations, {} reservations, {} failures and {} skips in resource group {}"` | A per-cycle summary, so `debug`: `"resource group scheduled"`, `allocation_count`, `reservation_count`, `failure_count`, `skip_count` (`resource_group_id` comes from the scope). Per-session scheduling outcomes (failure, skip, deprioritize) are `trace` |
 | `"Evicted unreachable route {} after {}s"` | `"unreachable route evicted"`, `route_address`, `unreachable_sec` |
 
 ### 6. Interface verification
@@ -223,14 +234,15 @@ Conversion examples:
 | Wrappers | Log fields equal the matching `contexts.*` values |
 | | Carried through `create_task`/`gather`, and into executors through the context-copy helper |
 | `BraceStyleAdapter` | Existing tests kept; does not receive `with_log_context` fields, and `StructuredLogger` does not receive `with_log_context_fields` fields |
-| OTel | Without the formatter, body = message and attributes = fields. Loggers created after the handler is attached also arrive |
+| OTel | New handler: body = message and attributes = fields. Loggers created after the handler is attached also arrive. `BraceStyleAdapter` records are not sent |
+| | Legacy handler: `StructuredLogger` records are not sent; `BraceStyleAdapter` records are sent as before |
 
 ## Migration / Compatibility
 
 | Item | Impact |
 |---|---|
 | Existing call sites | No change. Scope fields reach a log line once its call site moves to `StructuredLogger` |
-| OTel body | JSON string → message string. Queries relying on fields inside the body move to attributes |
+| OTel body | JSON string → message string, for each line once its call site moves to `StructuredLogger`. Queries relying on fields inside the body move to attributes. Two OTel log exporters run during the transition |
 | console/file/logstash/graylog | No change. The relay not forwarding fields stays as is |
 | `with_log_context_fields`, `BraceStyleAdapter` | Removed after their call sites move to `with_log_context` or a wrapper and to `StructuredLogger` |
 
@@ -239,17 +251,27 @@ Conversion examples:
 | Phase | Content |
 |---|---|
 | 1 (this BEP PR) | Commit 1: the BEP. Commit 2: `StructuredLogger`, `LogValue` and normalization, the field name prefix, `with_log_context`, and the section 6 tests |
-| 2 | Enable ruff `G001`–`G004` and fix the 39 existing violations |
-| 3 | Remove the OTel formatter and fix coverage (section 3) |
+| 2 | `AGENTS.md` logging rules |
+| 3 | The `StructuredLogger` OTel handler and the record split with the legacy handler (section 3) |
 | 4 | The 2 wrappers, 5.1 injection-point wiring |
 | 5 | 5.2 boundary propagation — RPC metadata, HTTP headers, executor helper migration |
-| 6 | `AGENTS.md` logging rules, call-site migration to `StructuredLogger` starting from the 5.3 files (ongoing), then removal of `BraceStyleAdapter` and `with_log_context_fields` |
+| 6 | Per-family issues move every call site to `StructuredLogger`, then `BraceStyleAdapter`, `with_log_context_fields` and the legacy OTel handler are removed |
 
 The core contract of the interface is its signature (types), so it is reviewed as code in the same PR as the BEP.
 
 ## Open Questions
 
-1. Whether the 162 executor helper migrations are bundled into one phase 5 issue
+None.
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-09-27 | The 162 executor helper migrations are bundled into one phase 5 issue | The helper and its first consumer land together; the rest of the migration is mechanical |
+| 2026-09-27 | Per-cycle summaries are `debug`; per-session scheduling outcomes are `trace` | History and the API are the record of user-request outcomes |
+| 2026-09-27 | `agent_id` goes in with `with_log_context`, not as a Resource attribute | One agent process can run several agents |
+| 2026-09-27 | ruff `G001`–`G004` stay off | The `StructuredLogger` signature already prevents it, and existing call sites go away as they are migrated |
+| 2026-09-27 | A new OTel handler is added and the legacy handler is kept until removal | Existing logs reach OTel unchanged; the legacy handler is removed once every call site is replaced |
 
 ## References
 
