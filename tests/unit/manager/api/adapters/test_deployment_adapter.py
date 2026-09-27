@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -204,7 +204,7 @@ class TestDeploymentSearchGates:
         scope_gate: _RecordingScopeValidator,
         regular_user: UserData,
     ) -> None:
-        with with_user(regular_user):
+        with with_user_context(regular_user):
             payload = await adapter.my_search(AdminSearchDeploymentsInput(limit=10, offset=0))
 
         assert payload.total_count == 0
@@ -217,7 +217,7 @@ class TestDeploymentSearchGates:
         regular_user: UserData,
     ) -> None:
         project_id = uuid4()
-        with with_user(regular_user):
+        with with_user_context(regular_user):
             payload = await adapter.project_search(
                 project_id, AdminSearchDeploymentsInput(limit=10, offset=0)
             )
@@ -230,7 +230,7 @@ class TestDeploymentSearchGates:
         adapter: DeploymentAdapter,
         regular_user: UserData,
     ) -> None:
-        with with_user(regular_user), pytest.raises(InsufficientPrivilege):
+        with with_user_context(regular_user), pytest.raises(InsufficientPrivilege):
             await adapter.admin_search(AdminSearchDeploymentsInput(limit=10, offset=0))
 
 

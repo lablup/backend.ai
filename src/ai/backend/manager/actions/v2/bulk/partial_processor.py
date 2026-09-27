@@ -1,15 +1,15 @@
 import logging
-import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import UnreachableError
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
+from ai.backend.manager.actions.v2.bulk.log_context import with_bulk_action_context
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BulkActionProcessResult,
@@ -31,7 +31,7 @@ __all__ = (
     "PublicPartialBulkActionProcessor",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 type PartialBulkFunc[TAction, TData] = Callable[[TAction], Awaitable[PartialBulkResult[TData]]]
 
@@ -75,7 +75,7 @@ class PartialBulkActionProcessor[TAction: BasePartialBulkAction, TData]:
             try:
                 await monitor.prepare(trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(
         self, trigger_meta: BulkActionTriggerMeta, meta: BulkActionResultMeta
@@ -85,58 +85,58 @@ class PartialBulkActionProcessor[TAction: BasePartialBulkAction, TData]:
             try:
                 await monitor.done(trigger_meta, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def run(self, action: TAction) -> PartialBulkResult[TData]:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = BulkActionTriggerMeta(
-            action_id=action_id,
-            started_at=started_at,
-            entity_ids=action.entity_ids(),
-            operation_type=action.operation_type(),
-            action_name=action.action_name(),
-        )
-
-        entity_results: Sequence[BulkEntityResult] = []
-
-        # Validation runs inside the monitor lifecycle so a rejected action is
-        # recorded too; monitors that only wrapped execution missed every denial.
-        await self._prepare_monitors(trigger_meta)
-        try:
-            denied: dict[EntityIdentifier, Exception] = {}
-            try:
-                for atomic_validator in self._atomic_validators:
-                    await atomic_validator.validate(trigger_meta)
-                for partial_validator in self._partial_validators:
-                    denied.update(await partial_validator.validate(trigger_meta))
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
-                raise
-            allowed = [
-                entity_id for entity_id in trigger_meta.entity_ids if entity_id not in denied
-            ]
-            try:
-                result = await self._func(action.narrowed_to(allowed))
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
-                raise
-            else:
-                answer = self._complete(trigger_meta, result, denied)
-                entity_results = [self._recorded(item) for item in answer.items]
-                return answer
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = BulkActionResultMeta(
+        with with_bulk_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = BulkActionTriggerMeta(
                 action_id=action_id,
-                entity_results=entity_results,
                 started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
+                entity_ids=action.entity_ids(),
+                operation_type=action.operation_type(),
+                action_name=action.action_name(),
             )
-            await self._finalize_monitors(trigger_meta, meta)
+
+            entity_results: Sequence[BulkEntityResult] = []
+
+            # Validation runs inside the monitor lifecycle so a rejected action is
+            # recorded too; monitors that only wrapped execution missed every denial.
+            await self._prepare_monitors(trigger_meta)
+            try:
+                denied: dict[EntityIdentifier, Exception] = {}
+                try:
+                    for atomic_validator in self._atomic_validators:
+                        await atomic_validator.validate(trigger_meta)
+                    for partial_validator in self._partial_validators:
+                        denied.update(await partial_validator.validate(trigger_meta))
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
+                    raise
+                allowed = [
+                    entity_id for entity_id in trigger_meta.entity_ids if entity_id not in denied
+                ]
+                try:
+                    result = await self._func(action.narrowed_to(allowed))
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
+                    raise
+                else:
+                    answer = self._complete(trigger_meta, result, denied)
+                    entity_results = [self._recorded(item) for item in answer.items]
+                    return answer
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = BulkActionResultMeta(
+                    action_id=action_id,
+                    entity_results=entity_results,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                )
+                await self._finalize_monitors(trigger_meta, meta)
 
     def _complete(
         self,

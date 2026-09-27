@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -190,20 +190,20 @@ class TestEveryEndMustPermitTheRun:
 
     async def test_both_ends_permitted_passes(self, user: UserData) -> None:
         validator = self._validator({_RG_ID, _DOMAIN_ID})
-        with with_user(user):
+        with with_user_context(user):
             await validator.validate(self._meta(_action(_rg(), _domain())))
 
     async def test_one_end_alone_is_not_enough(self, user: UserData) -> None:
         # The hole a single-scope shape leaves: it would ask about the domain and never
         # about the resource group.
         validator = self._validator({_DOMAIN_ID})
-        with with_user(user):
+        with with_user_context(user):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(self._meta(_action(_rg(), _domain())))
 
     async def test_the_other_end_alone_is_not_enough(self, user: UserData) -> None:
         validator = self._validator({_RG_ID})
-        with with_user(user):
+        with with_user_context(user):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(self._meta(_action(_rg(), _domain())))
 
@@ -218,5 +218,5 @@ class TestEveryEndMustPermitTheRun:
             domain_id=MagicMock(),
         )
         validator = self._validator(set())
-        with with_user(superadmin):
+        with with_user_context(superadmin):
             await validator.validate(self._meta(_action(_rg(), _domain())))

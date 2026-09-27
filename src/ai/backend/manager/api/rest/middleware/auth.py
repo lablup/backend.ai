@@ -24,7 +24,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from contextlib import ExitStack
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
@@ -38,7 +38,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from sqlalchemy.orm import aliased, load_only
 
-from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -47,7 +47,6 @@ from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.utils import with_log_context_fields
 from ai.backend.manager.api.rest.types import WebRequestHandler
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.errors.auth import (
@@ -867,17 +866,9 @@ async def _resolve_effective_user(
 def _setup_user_context(
     effective_user: UserData | None,
     trigger_user: UserData | None,
-) -> ExitStack:
+) -> AbstractContextManager[None]:
     """Push the already-resolved identities into the context (no I/O)."""
-    stack = ExitStack()
-
-    if effective_user is not None:
-        stack.enter_context(with_user(effective_user))
-        stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
-    if trigger_user is not None:
-        stack.enter_context(with_triggered_user(trigger_user))
-
-    return stack
+    return with_user_context(effective_user, trigger_user)
 
 
 # ---------------------------------------------------------------------------

@@ -7,9 +7,9 @@ import logging
 from typing import Final, override
 
 from ai.backend.common.cron.base import Cron, PeriodicTask
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LocalCron(Cron):
@@ -36,6 +36,10 @@ class LocalCron(Cron):
 
     async def _run_task(self, task: PeriodicTask) -> None:
         """Run a single task periodically until the cron is stopped or cancelled."""
+        with with_log_context(task_name=task.name):
+            await self._run_task_in_scope(task)
+
+    async def _run_task_in_scope(self, task: PeriodicTask) -> None:
         try:
             await asyncio.sleep(task.initial_delay)
             while not self._stopped:
@@ -46,12 +50,12 @@ class LocalCron(Cron):
                     else:
                         await task.run()
                 except TimeoutError:
-                    log.warning("Task {} timed out after {}s", task.name, task.run_timeout)
+                    log.warning("periodic task timed out", timeout_sec=task.run_timeout)
                 except Exception:
-                    log.exception("Error running task {}", task.name)
+                    log.exception("periodic task failed")
                 await asyncio.sleep(task.interval)
         except asyncio.CancelledError:
-            log.debug("Task {} cancelled", task.name)
+            log.debug("periodic task cancelled")
             raise
 
     @override

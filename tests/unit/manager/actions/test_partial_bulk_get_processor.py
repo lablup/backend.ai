@@ -14,7 +14,7 @@ from typing import Self, override
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -210,7 +210,7 @@ async def test_the_public_path_denies_nothing(action: _Action) -> None:
     reader = _Reader(present=list(action.ids))
     processor = PublicPartialBulkActionProcessor[_Action, str](_Action, reader.run)
 
-    with with_user(_user()):
+    with with_user_context(_user()):
         result = await processor.run(action)
 
     assert reader.asked_for == list(action.ids)

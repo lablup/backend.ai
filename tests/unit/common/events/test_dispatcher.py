@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
-from typing import override
+from typing import cast, override
 
 import pytest
 
@@ -15,7 +16,8 @@ from ai.backend.common.events.types import (
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.message import MQMessage
 from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
-from ai.backend.common.message_queue.types import MessageName
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import MessageMetadata, MessageName
 from ai.backend.common.types import AgentId
 
 
@@ -276,3 +278,50 @@ class TestUndecodablePayload:
 
         assert received == []
         assert mq.done_calls == [b"test-msg-id"]
+
+
+class TestHandlerFailureLog:
+    """A failing handler is logged once, inside the handler scope and the restored metadata."""
+
+    @pytest.fixture
+    def mq(self) -> StubMessageQueue:
+        message = DummyAnycastEvent(value=1).to_message()
+        return StubMessageQueue(
+            anycast_messages=[
+                MQMessage(
+                    msg_id=b"test-msg-id",
+                    payload=AnycastMessagePayload(
+                        name=message.name,
+                        source="i-test",
+                        payload=message.payload,
+                        metadata=MessageMetadata(request_id="req-from-producer"),
+                    ),
+                )
+            ],
+        )
+
+    @pytest.fixture
+    async def dispatcher(self, mq: StubMessageQueue) -> EventDispatcher:
+        dispatcher = EventDispatcher(cast(AbstractMessageQueue, mq))
+
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            raise RuntimeError("handler failed")
+
+        dispatcher.consume(DummyAnycastEvent, object(), handler, name="failing-handler")
+        return dispatcher
+
+    async def test_one_error_line_carries_the_scope(
+        self, dispatcher: EventDispatcher, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.ERROR, logger="ai.backend.common.events.dispatcher"):
+            await dispatcher.start()
+            await asyncio.sleep(0.1)
+            await dispatcher.close()
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        record = errors[0]
+        assert record.getMessage() == "event handler failed"
+        assert record.__dict__["log_tag_event_name"] == "test_anycast"
+        assert record.__dict__["log_tag_handler_name"] == "failing-handler"
+        assert record.__dict__["log_tag_request_id"] == "req-from-producer"

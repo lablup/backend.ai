@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -409,7 +409,7 @@ class TestModifyEndpointModelDefinitionRefresh:
         )
 
         with (
-            with_user(user_context),
+            with_user_context(user_context),
             patch.object(
                 repository,
                 "_check_inference_resource_group",

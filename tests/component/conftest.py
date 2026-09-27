@@ -45,7 +45,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -1696,7 +1696,7 @@ def acting_superadmin() -> Iterator[None]:
     one; this supplies the equivalent so the test exercises the gate rather than
     tripping over its absence.
     """
-    with with_user(
+    with with_user_context(
         UserData(
             user_id=uuid.uuid4(),
             is_authorized=True,

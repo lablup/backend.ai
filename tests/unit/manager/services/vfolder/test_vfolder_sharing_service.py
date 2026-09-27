@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -78,7 +78,7 @@ def requester_context(user_uuid: uuid.UUID) -> Iterator[None]:
         domain_name="default",
         domain_id=DomainID(uuid.uuid4()),
     )
-    with with_user(user):
+    with with_user_context(user):
         yield
 
 

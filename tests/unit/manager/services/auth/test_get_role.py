@@ -3,7 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -80,7 +80,7 @@ async def test_get_role_simple_cases(
     action = GetRoleAction(user_id=UserID(user_id), group_id=None)
 
     user = acting_user(user_id, is_superadmin=is_superadmin, is_admin=is_admin)
-    with with_user(user):
+    with with_user_context(user):
         result = await auth_service.get_role(action)
 
     assert result.global_role == expected_global
@@ -104,7 +104,7 @@ async def test_get_role_with_valid_group_membership(
 
     action = GetRoleAction(user_id=UserID(user_id), group_id=group_id)
 
-    with with_user(acting_user(user_id, is_superadmin=False, is_admin=False)):
+    with with_user_context(acting_user(user_id, is_superadmin=False, is_admin=False)):
         result = await auth_service.get_role(action)
 
     assert result.global_role == "user"
@@ -127,7 +127,7 @@ async def test_get_role_without_group_membership_raises_error(
 
     action = GetRoleAction(user_id=UserID(user_id), group_id=invalid_group_id)
 
-    with with_user(acting_user(user_id, is_superadmin=False, is_admin=False)):
+    with with_user_context(acting_user(user_id, is_superadmin=False, is_admin=False)):
         with pytest.raises(ObjectNotFound):
             await auth_service.get_role(action)
 
@@ -147,7 +147,7 @@ async def test_get_role_verifies_correct_parameters(
         "user_id": user_id,
     }
 
-    with with_user(acting_user(user_id, is_superadmin=False, is_admin=True)):
+    with with_user_context(acting_user(user_id, is_superadmin=False, is_admin=True)):
         result = await auth_service.get_role(action)
 
     # Verify repository was called with correct parameters

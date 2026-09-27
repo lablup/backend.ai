@@ -8,6 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Coroutine, Sequence
+from contextlib import ExitStack
 from typing import (
     Any,
     Protocol,
@@ -35,7 +36,7 @@ from ai.backend.common.message_queue.types import MessageMetadata
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .exceptions import EventPayloadDecodingError
 from .message import EventMessage
@@ -49,7 +50,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class _EventHandlerType(enum.StrEnum):
@@ -380,7 +381,7 @@ class EventDispatcher(EventDispatcherGroup):
             cancel_task(self._subscriber_loop_task)
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
         except Exception:
-            log.exception("unexpected error while closing event dispatcher")
+            log.exception("event dispatcher close failed")
 
     @override
     def with_reporters(
@@ -482,19 +483,33 @@ class EventDispatcher(EventDispatcherGroup):
 
     async def _handle(
         self,
-        evh: EventHandler,  # type: ignore[type-arg]
+        evh: EventHandler[Any, AbstractEvent],
         source: AgentId,
         message: EventMessage,
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
+    ) -> None:
+        if self._closed:
+            return
+        event_type = evh.event_cls.event_name()
+        with ExitStack() as stack:
+            stack.enter_context(with_log_context(event_name=event_type, handler_name=evh.name))
+            if metadata:
+                stack.enter_context(metadata.apply_context())
+            await self._handle_in_scope(evh, source, message, post_callbacks)
+
+    async def _handle_in_scope(
+        self,
+        evh: EventHandler[Any, AbstractEvent],
+        source: AgentId,
+        message: EventMessage,
+        post_callbacks: Sequence[PostCallback],
     ) -> None:
         coalescing_opts = evh.coalescing_opts
         coalescing_state = evh.coalescing_state
         cb = evh.callback
         evh_type = evh.handler_type
         event_cls = evh.event_cls
-        if self._closed:
-            return
         event_type = event_cls.event_name()
         start = time.perf_counter()
         try:
@@ -502,12 +517,7 @@ class EventDispatcher(EventDispatcherGroup):
         except EventPayloadDecodingError as e:
             # A body this consumer cannot read will never become readable, so ack it via
             # the post callbacks instead of leaving it to be redelivered until discarded.
-            log.exception(
-                "EventDispatcher.{}(ev:{}, evh:{}): undecodable-payload",
-                evh_type.name,
-                event_type,
-                evh.name,
-            )
+            log.exception("event payload undecodable", handler_type=evh_type)
             self._metric_observer.observe_event_failure(
                 event_type=event_type,
                 duration=time.perf_counter() - start,
@@ -521,43 +531,27 @@ class EventDispatcher(EventDispatcherGroup):
         try:
             if await coalescing_state.rate_control(coalescing_opts):
                 if self._closed:  # _closed can change during await
-                    return  # type: ignore[unreachable]
+                    return
                 if self._log_events:
-                    log.debug("DISPATCH_{}(evh:{})", evh_type.name, evh.name)
-
-                # Apply all context variables from metadata if available
-                if metadata:
-                    with metadata.apply_context():
-                        if asyncio.iscoroutinefunction(cb):
-                            # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                            await cb(evh.context, source, event)
-                        else:
-                            cb(evh.context, source, event)
-                        for post_callback in post_callbacks:
-                            await post_callback.done()
-                        self._metric_observer.observe_event_success(
-                            event_type=event_type,
-                            duration=time.perf_counter() - start,
-                        )
+                    log.debug("event dispatched", handler_type=evh_type)
+                if asyncio.iscoroutinefunction(cb):
+                    # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                    await cb(evh.context, source, event)
                 else:
-                    if asyncio.iscoroutinefunction(cb):
-                        # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                        await cb(evh.context, source, event)
-                    else:
-                        cb(evh.context, source, event)
-                    for post_callback in post_callbacks:
-                        await post_callback.done()
-                    self._metric_observer.observe_event_success(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                    )
+                    cb(evh.context, source, event)
+                for post_callback in post_callbacks:
+                    await post_callback.done()
+                self._metric_observer.observe_event_success(
+                    event_type=event_type,
+                    duration=time.perf_counter() - start,
+                )
         except Exception as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,
                 duration=time.perf_counter() - start,
                 exception=e,
             )
-            log.exception("EventDispatcher.{}(): unexpected-error", evh_type)
+            log.exception("event handler failed", handler_type=evh_type)
             raise
         except BaseException as e:
             self._metric_observer.observe_event_failure(
@@ -585,7 +579,7 @@ class EventDispatcher(EventDispatcherGroup):
             await post_callback.done()
             return
         if self._log_events:
-            log.debug("DISPATCH_CONSUMERS(ev:{})", event_name)
+            log.debug("event dispatched to consumers", event_name=event_name)
         payload = mq_msg.payload
         message = EventMessage(name=payload.name, payload=payload.payload)
         for consumer in consumer_handlers.copy():
@@ -609,7 +603,7 @@ class EventDispatcher(EventDispatcherGroup):
         if not subscriber_handlers:
             return
         if self._log_events:
-            log.debug("DISPATCH_SUBSCRIBERS(ev:{})", event_name)
+            log.debug("event dispatched to subscribers", event_name=event_name)
         message = EventMessage(name=payload.name, payload=payload.payload)
         for subscriber in subscriber_handlers.copy():
             self._subscriber_taskgroup.create_task(
@@ -630,11 +624,8 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 await self._dispatch_consumers(cast(MQMessage, msg))
-            except Exception as e:
-                log.exception(
-                    "EventDispatcher._consume_loop: unexpected-error, {}",
-                    repr(e),
-                )
+            except Exception:
+                log.exception("event consume loop failed")
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
@@ -645,11 +636,8 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 await self._dispatch_subscribers(cast(BroadcastMessagePayload, msg))
-            except Exception as e:
-                log.exception(
-                    "EventDispatcher._subscribe_loop: unexpected-error, {}",
-                    repr(e),
-                )
+            except Exception:
+                log.exception("event subscribe loop failed")
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 

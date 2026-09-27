@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.types import EntityType
@@ -115,7 +115,7 @@ def monitor_user(
 
 @pytest.fixture()
 def superadmin_context(superadmin: UserData) -> Iterator[None]:
-    with with_user(superadmin):
+    with with_user_context(superadmin):
         yield
 
 
@@ -140,7 +140,7 @@ async def grant_global_role(
     created: list[RoleID] = []
 
     async def _grant(entity_type: EntityType, permission: Permission) -> RoleID:
-        with with_user(superadmin):
+        with with_user_context(superadmin):
             created_role = await permission_controller_processors.create_role.run(
                 CreateRoleAction(
                     creator=RoleCreator(
@@ -168,7 +168,7 @@ async def grant_global_role(
 
     yield _grant
 
-    with with_user(superadmin):
+    with with_user_context(superadmin):
         for role_id in reversed(created):
             await permission_controller_processors.purge_role.run(PurgeRoleAction(role_id=role_id))
 
@@ -187,7 +187,7 @@ class TestGlobalReadGate:
         permission_controller_processors: PermissionControllerProcessors,
         monitor_user: UserData,
     ) -> None:
-        with with_user(monitor_user):
+        with with_user_context(monitor_user):
             result = await permission_controller_processors.global_search_roles.run(_search_roles())
 
         assert result.total_count >= 0
@@ -197,7 +197,7 @@ class TestGlobalReadGate:
         permission_controller_processors: PermissionControllerProcessors,
         regular_user: UserData,
     ) -> None:
-        with with_user(regular_user):
+        with with_user_context(regular_user):
             with pytest.raises(InsufficientPrivilege):
                 await permission_controller_processors.global_search_roles.run(_search_roles())
 
@@ -209,7 +209,7 @@ class TestGlobalReadGate:
     ) -> None:
         granted_role = await grant_global_role(RoleEntityType(), Permission.READ)
 
-        with with_user(regular_user):
+        with with_user_context(regular_user):
             result = await permission_controller_processors.global_search_roles.run(_search_roles())
 
         assert granted_role in {RoleID(item.id) for item in result.items}
@@ -222,6 +222,6 @@ class TestGlobalReadGate:
     ) -> None:
         await grant_global_role(UserEntityType(), Permission.READ)
 
-        with with_user(regular_user):
+        with with_user_context(regular_user):
             with pytest.raises(InsufficientPrivilege):
                 await permission_controller_processors.global_search_roles.run(_search_roles())

@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
@@ -177,7 +177,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
         )
     )
 
-    with with_user(regular_user), pytest.raises(NotEnoughPermission):
+    with with_user_context(regular_user), pytest.raises(NotEnoughPermission):
         await processors.scoped_search.run(action)
 
     assert [seen.scope_targets() for seen in denying_scope.seen] == [[resource_group_id]]
@@ -197,7 +197,7 @@ async def test_route_search_is_answered_for_the_deployment(
         searcher=RouteInfoSearcher(pagination=NoPagination(), conditions=[]),
     )
 
-    with with_user(regular_user), pytest.raises(NotEnoughPermission):
+    with with_user_context(regular_user), pytest.raises(NotEnoughPermission):
         await processors.search_routes.run(action)
 
     assert [list(seen) for seen in denying_bulk.seen] == [[deployment_id]]
@@ -217,7 +217,7 @@ async def test_auto_scaling_rule_search_is_answered_for_the_deployment(
         searcher=AutoScalingRuleSearcher(pagination=NoPagination(), conditions=[]),
     )
 
-    with with_user(regular_user), pytest.raises(NotEnoughPermission):
+    with with_user_context(regular_user), pytest.raises(NotEnoughPermission):
         await processors.search_auto_scaling_rules.run(action)
 
     assert [list(seen) for seen in denying_bulk.seen] == [[deployment_id]]
@@ -239,7 +239,7 @@ async def test_role_assignment_search_is_answered_for_the_role(
         searcher=RoleAssignmentSearcher(pagination=NoPagination(), conditions=[]),
     )
 
-    with with_user(regular_user), pytest.raises(NotEnoughPermission):
+    with with_user_context(regular_user), pytest.raises(NotEnoughPermission):
         await processors.scoped_search_role_assignments.run(action)
 
     assert [seen.scope_targets() for seen in denying_scope.seen] == [[role_id]]
@@ -260,7 +260,7 @@ async def test_namespace_search_is_answered_for_the_object_storage(
         )
     )
 
-    with with_user(regular_user), pytest.raises(NotEnoughPermission):
+    with with_user_context(regular_user), pytest.raises(NotEnoughPermission):
         await processors.get_namespaces.run(action)
 
     assert [seen.scope_targets() for seen in denying_scope.seen] == [[storage_id]]
@@ -288,7 +288,7 @@ async def test_domain_usage_bucket_search_is_answered_for_the_resource_group(
         searcher=DomainUsageBucketSearcher(pagination=NoPagination(), conditions=[]),
     )
 
-    with with_user(regular_user), pytest.raises(NotEnoughPermission):
+    with with_user_context(regular_user), pytest.raises(NotEnoughPermission):
         await processors.search_domain_usage_buckets.run(action)
 
     assert [seen.scope_targets() for seen in denying_scope.seen] == [[resource_group_id]]

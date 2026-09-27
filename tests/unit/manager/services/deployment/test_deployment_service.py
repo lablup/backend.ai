@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -400,7 +400,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, requester: UserData) -> Iterator[None]:
-        with with_user(requester):
+        with with_user_context(requester):
             yield
 
     async def test_add_model_revision_delegates_to_controller(
