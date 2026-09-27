@@ -599,7 +599,7 @@ class DeploymentService:
                     )
                 )
                 failed += 1
-        log.info(
+        log.trace(
             "deployment revisions refreshed",
             deployment_count=len(deployment_ids),
             succeeded_count=succeeded,
