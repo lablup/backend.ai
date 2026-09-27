@@ -38,8 +38,8 @@ from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.storage.context_types import ArtifactVerifierContext
@@ -369,7 +369,8 @@ async def server_main(
                 max_queue_size=local_config.otel.max_queue_size,
                 max_export_batch_size=local_config.otel.max_export_batch_size,
             )
-            BraceStyleAdapter.apply_otel(otel_spec)
+            LegacyOtelLogging(otel_spec).attach()
+            apply_otel_tracer(otel_spec)
             StructuredOtelLogging(otel_spec).attach(local_config.logging.pkg_ns.keys())
 
         (

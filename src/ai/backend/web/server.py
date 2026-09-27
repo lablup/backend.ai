@@ -77,8 +77,8 @@ from ai.backend.common.web.session import (
 )
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
@@ -1154,7 +1154,8 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             max_queue_size=config.otel.max_queue_size,
             max_export_batch_size=config.otel.max_export_batch_size,
         )
-        BraceStyleAdapter.apply_otel(otel_spec)
+        LegacyOtelLogging(otel_spec).attach()
+        apply_otel_tracer(otel_spec)
         StructuredOtelLogging(otel_spec).attach(config.logging.pkg_ns.keys())
     yield
 

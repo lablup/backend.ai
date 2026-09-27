@@ -4,6 +4,7 @@ import socket
 from typing import Any, Final, override
 
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cron import LocalCron
 from ai.backend.logging.structured import StructuredLogger
 
@@ -84,7 +85,7 @@ class TCPBackend(BaseBackend):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
             try:
-                await asyncio.get_running_loop().run_in_executor(
+                await run_in_executor_with_context(
                     None, sock.connect, (route.current_kernel_host, route.kernel_port)
                 )
             except OSError as e:

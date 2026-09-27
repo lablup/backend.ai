@@ -129,8 +129,8 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
@@ -782,7 +782,8 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             max_queue_size=root_ctx.local_config.otel.max_queue_size,
             max_export_batch_size=root_ctx.local_config.otel.max_export_batch_size,
         )
-        BraceStyleAdapter.apply_otel(otel_spec)
+        LegacyOtelLogging(otel_spec).attach()
+        apply_otel_tracer(otel_spec)
         StructuredOtelLogging(otel_spec).attach(root_ctx.local_config.logging.pkg_ns.keys())
 
     # Start event-based SD publishing if config has service_group set

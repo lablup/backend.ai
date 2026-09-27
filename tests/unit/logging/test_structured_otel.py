@@ -15,7 +15,6 @@ from ai.backend.logging import otel, structured_otel
 from ai.backend.logging.otel import OpenTelemetrySpec, apply_otel_loggers
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
-from ai.backend.logging.utils import BraceStyleAdapter
 
 PKG_NS = "tests.logging.otel_pkg"
 
@@ -113,8 +112,8 @@ class TestStructuredOtelLogging:
         [record] = attached.delivered()
         assert record.log_record.body == "late"
 
-    def test_brace_style_records_are_not_delivered(self, attached: _CollectingExporter) -> None:
-        BraceStyleAdapter(logging.getLogger(f"{PKG_NS}.brace")).info("started {}", "sess-1")
+    def test_unstructured_records_are_not_delivered(self, attached: _CollectingExporter) -> None:
+        logging.getLogger(f"{PKG_NS}.unstructured").info("started %s", "sess-1")
 
         assert attached.delivered() == []
 
@@ -153,7 +152,7 @@ class TestLegacyOtelLoggers:
 
         assert legacy_exporter.delivered() == []
 
-    def test_brace_style_records_are_delivered(
+    def test_unstructured_records_are_delivered(
         self,
         pkg_logger: logging.Logger,
         legacy_exporter: _CollectingExporter,
@@ -161,6 +160,6 @@ class TestLegacyOtelLoggers:
     ) -> None:
         apply_otel_loggers([pkg_logger], spec)
 
-        BraceStyleAdapter(pkg_logger).info("started {}", "sess-1")
+        pkg_logger.info("started %s", "sess-1")
 
         assert len(legacy_exporter.delivered()) == 1
