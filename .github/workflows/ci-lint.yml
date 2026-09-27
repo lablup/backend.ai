@@ -1,0 +1,122 @@
+name: ci-lint
+
+# BUILD-file and lint checks, called by `ci.yml`.
+
+on:
+  workflow_call:
+    inputs:
+      detect-changes-result:
+        description: The result of `ci.yml`'s detect-changes job; anything but success fails the run
+        type: string
+        required: true
+      full-run:
+        description: Check every target instead of those changed since the base revision
+        type: boolean
+        required: true
+      base-ref:
+        description: The revision a changed-only run compares against
+        type: string
+        required: true
+      annotate:
+        description: Register the problem matchers that annotate the pull request (off for a fork)
+        type: boolean
+        required: true
+      cache-branch:
+        description: The branch this run may save the Pants caches for, if `decide-cache-save.sh` agrees; empty to never save
+        type: string
+        required: false
+        default: ''
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      BASE_REF: ${{ inputs.base-ref }}
+    steps:
+    - name: Verify detect-changes
+      if: inputs.detect-changes-result != 'success'
+      env:
+        RESULT: ${{ inputs.detect-changes-result }}
+      run: |
+        echo "detect-changes did not succeed: $RESULT"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1, where `inputs.base-ref` points.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Test the release-grade classifier
+      run: python ./scripts/test_determine_release_type.py
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        # `pants-caches` restores and saves the caches instead: init-pants
+        # saves whatever it restores, from every run.
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Check BUILD files
+      env:
+        FULL_RUN: ${{ inputs.full-run }}
+      run: |
+        if [ "$FULL_RUN" == "true" ]; then
+          pants tailor --check update-build-files --check '::'
+        else
+          pants tailor --check update-build-files --check --changed-since=$BASE_REF
+        fi
+    - name: Lint
+      env:
+        ANNOTATE: ${{ inputs.annotate }}
+      run: |
+        if [ "$ANNOTATE" == "true" ]; then
+          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+        else
+          echo "(skipping matchers for fork pull request)"
+        fi
+        pants lint --changed-since=$BASE_REF
+    - name: Check the seed role declaration
+      # Always, not only when the declaration changed: the entity types it answers
+      # for are read at run time, so adding one changes the answer without touching
+      # any file `--changed-since` would select.
+      run: |
+        pants test tests/unit/manager/data/permission/seed::
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: inputs.cache-branch != ''
+      # Only a push that is still the tip of main or of a maintained version
+      # branch saves: pushes to one branch do not cancel each other, so an
+      # older commit finishing late must not save over the newer one.
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ inputs.cache-branch }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
+    - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.check-build-and-lint.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.

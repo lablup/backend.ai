@@ -1,0 +1,98 @@
+name: ci-typecheck
+
+# mypy through `pants check`, called by `ci.yml`.
+
+on:
+  workflow_call:
+    inputs:
+      detect-changes-result:
+        description: The result of `ci.yml`'s detect-changes job; anything but success fails the run
+        type: string
+        required: true
+      base-ref:
+        description: The revision a changed-only run compares against
+        type: string
+        required: true
+      annotate:
+        description: Register the problem matchers that annotate the pull request (off for a fork)
+        type: boolean
+        required: true
+      cache-branch:
+        description: The branch this run may save the Pants caches for, if `decide-cache-save.sh` agrees; empty to never save
+        type: string
+        required: false
+        default: ''
+
+jobs:
+
+  typecheck:
+    runs-on: ubuntu-latest
+    env:
+      BASE_REF: ${{ inputs.base-ref }}
+    steps:
+    - name: Verify detect-changes
+      if: inputs.detect-changes-result != 'success'
+      env:
+        RESULT: ${{ inputs.detect-changes-result }}
+      run: |
+        echo "detect-changes did not succeed: $RESULT"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1, where `inputs.base-ref` points.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+        mypy: 'true'
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Typecheck
+      env:
+        ANNOTATE: ${{ inputs.annotate }}
+      run: |
+        if [ "$ANNOTATE" == "true" ]; then
+          echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        else
+          echo "(skipping matchers for fork pull request)"
+        fi
+        pants check --changed-since=$BASE_REF --changed-dependents=transitive
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: inputs.cache-branch != ''
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ inputs.cache-branch }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
+    - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
+        mypy: 'true'
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.typecheck.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.

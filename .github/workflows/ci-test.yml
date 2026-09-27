@@ -1,0 +1,274 @@
+name: ci-test
+
+# The pytest suites under tests/, sharded, called by `ci.yml` once per suite. The
+# scenario suite also checks the entity reports against what its shards recorded.
+
+on:
+  workflow_call:
+    inputs:
+      suite:
+        description: "The directory under tests/ to run: unit, component, integration or scenario"
+        type: string
+        required: true
+      shards:
+        description: The `--shard` values to spread the run across, as a JSON list
+        type: string
+        required: true
+      runner:
+        description: The runner label
+        type: string
+        required: true
+      changed-dependents:
+        description: The `--changed-dependents` mode for a changed-only run; empty to leave it out
+        type: string
+        required: false
+        default: ''
+      sentinel-hosts:
+        description: Map the redis sentinel hostnames to 127.0.0.1 first
+        type: boolean
+        required: false
+        default: false
+      detect-changes-result:
+        description: The result of `ci.yml`'s detect-changes job; anything but success fails the run
+        type: string
+        required: true
+      full-run:
+        description: Check every target instead of those changed since the base revision
+        type: boolean
+        required: true
+      base-ref:
+        description: The revision a changed-only run compares against
+        type: string
+        required: true
+      cache-branch:
+        description: The branch this run may save the Pants caches for, if `decide-cache-save.sh` agrees; empty to never save
+        type: string
+        required: false
+        default: ''
+
+jobs:
+
+  test:
+    if: inputs.suite != 'scenario'
+    name: ${{ inputs.suite }} (${{ matrix.shard }})
+    runs-on: ${{ inputs.runner }}
+    env:
+      BASE_REF: ${{ inputs.base-ref }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.shards) }}
+    steps:
+    - name: Verify detect-changes
+      if: inputs.detect-changes-result != 'success'
+      env:
+        RESULT: ${{ inputs.detect-changes-result }}
+      run: |
+        echo "detect-changes did not succeed: $RESULT"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1, where `inputs.base-ref` points.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Configure the redis sentinel hostnames
+      if: inputs.sentinel-hosts
+      run: |
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+    - name: Test
+      timeout-minutes: 60
+      env:
+        FULL_RUN: ${{ inputs.full-run }}
+        SUITE: ${{ inputs.suite }}
+        SHARD: ${{ matrix.shard }}
+        CHANGED_DEPENDENTS: ${{ inputs.changed-dependents }}
+      run: |
+        if [ "$FULL_RUN" == "true" ]; then
+          pants test --shard="$SHARD" "tests/$SUITE/::" -- -v
+        else
+          pants test --changed-since=$BASE_REF \
+            ${CHANGED_DEPENDENTS:+--changed-dependents=$CHANGED_DEPENDENTS} \
+            --shard="$SHARD" \
+            --filter-address-regex="tests/$SUITE/" -- -v
+        fi
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: inputs.cache-branch != ''
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ inputs.cache-branch }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
+    - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.test-${{ inputs.suite }}.${{ strategy.job-index }}.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  scenario:
+    if: inputs.suite == 'scenario'
+    name: scenario (${{ matrix.shard }})
+    runs-on: ${{ inputs.runner }}
+    env:
+      BASE_REF: ${{ inputs.base-ref }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.shards) }}
+    steps:
+    - name: Verify detect-changes
+      if: inputs.detect-changes-result != 'success'
+      env:
+        RESULT: ${{ inputs.detect-changes-result }}
+      run: |
+        echo "detect-changes did not succeed: $RESULT"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # Depth 2 holds `inputs.base-ref`.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Pick which components to run
+      id: pick
+      env:
+        FULL_RUN: ${{ inputs.full-run }}
+      run: |
+        # A component runs whole or not at all: its report.md covers every scenario it
+        # holds, so a half-run component would look as though rows had disappeared.
+        # Selection is transitive, because a scenario reaches src through its seeds and
+        # a direct-dependents run would skip almost every row.
+        if [ "$FULL_RUN" == "true" ]; then
+          echo "targets=tests/scenario::" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        touched=$(pants list --changed-since="$BASE_REF" --changed-dependents=transitive \
+          2>/dev/null | grep '^tests/scenario/' || true)
+        if [ -z "$touched" ]; then
+          echo "targets=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        components=$(echo "$touched" \
+          | sed -n 's|^tests/scenario/bai_scenario/manager/\([^/]*\)/.*|\1|p' | sort -u)
+        picked="tests/scenario/bai_scenario/setup::"
+        for one in $components; do
+          picked="$picked tests/scenario/bai_scenario/manager/$one::"
+        done
+        echo "targets=$picked" >> $GITHUB_OUTPUT
+    - name: Run the scenarios and keep what each one did
+      if: steps.pick.outputs.targets != ''
+      timeout-minutes: 60
+      run: |
+        mkdir -p dist
+        BACKEND_SCENARIO_LOG=$PWD/dist/scenarios.jsonl pants test \
+          --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
+          --shard='${{ matrix.shard }}' \
+          ${{ steps.pick.outputs.targets }} -- -v
+    - name: Decide whether this run saves the caches
+      id: cache-save
+      if: inputs.cache-branch != ''
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ inputs.cache-branch }}
+        SHA: ${{ github.sha }}
+      run: echo "save=$(.github/scripts/decide-cache-save.sh "$REPO" "$BRANCH" "$SHA")" >> "$GITHUB_OUTPUT"
+    - name: Save the Pants caches
+      if: steps.cache-save.outputs.save == 'true'
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: save
+    - name: Upload the report the run produced
+      uses: actions/upload-artifact@v5
+      with:
+        name: scenario-report.${{ strategy.job-index }}
+        path: dist/scenarios.jsonl
+      if: always()
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.test-scenario.${{ strategy.job-index }}.log
+        path: .pants.d/workdir/pants.log
+      if: always()
+
+  verify-scenario-report:
+    needs: scenario
+    if: always() && needs.scenario.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+        lfs: false
+    - name: Collect what every shard recorded
+      uses: actions/download-artifact@v5
+      with:
+        pattern: scenario-report.*
+        path: dist
+        merge-multiple: false
+    - name: Check each entity's report against the run
+      run: |
+        # A shard holds only part of a component, so the check needs every shard's
+        # record together. A component that did not run at all is not checked here;
+        # it is checked by the run that does hold it.
+        # download-artifact leaves no dist/ when the run matched no artifact, and
+        # this step runs under `set -e`, so an unguarded find would abort before the
+        # nothing-ran check below.
+        found=$(find dist -name scenarios.jsonl 2>/dev/null || true)
+        if [ -z "$found" ]; then
+          echo "no scenario ran; nothing to check"
+          exit 0
+        fi
+        python scripts/scenario-report.py $found \
+          --verify src/ai/backend/manager/api/adapters
