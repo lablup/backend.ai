@@ -128,6 +128,35 @@ class ServiceMetadata(BackendAISchema):
     )
 
     @classmethod
+<<<<<<< HEAD
+=======
+    def for_endpoint(
+        cls,
+        *,
+        display_name: str,
+        service_group: str,
+        version: str,
+        endpoint: ServiceEndpoint,
+        labels: dict[str, str] | None = None,
+    ) -> Self:
+        """Build metadata whose identity is the scrape address rather than the caller.
+
+        A component's worker processes share one listening socket, so an identity per
+        process registers that one endpoint once per worker. The address keyed here is
+        ``prometheus_address``, the one this entry exists to be scraped at and the only
+        one guaranteed to differ between hosts. See KNOWLEDGE.md.
+        """
+        return cls(
+            id=uuid.uuid5(uuid.NAMESPACE_DNS, f"{service_group}/{endpoint.prometheus_address}"),
+            display_name=display_name,
+            service_group=service_group,
+            version=version,
+            endpoint=endpoint,
+            labels=labels or {},
+        )
+
+    @classmethod
+>>>>>>> 5ea5a7963 (fix(BA-8108): key a registered service on the address it is scraped at (#15024))
     def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(**data)
 
