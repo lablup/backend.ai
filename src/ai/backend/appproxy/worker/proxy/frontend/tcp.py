@@ -18,11 +18,11 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class TCPFrontend(BaseFrontend[TCPBackend, int]):
@@ -59,10 +59,10 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             self.servers.append(server)
             self.server_tasks.append(asyncio.create_task(self._listen_task(port, server)))
         log.info(
-            "accepting proxy requests from {}:{}~{}",
-            port_proxy_config.bind_host,
-            port_start,
-            port_end,
+            "accepting proxy requests",
+            bind_host=port_proxy_config.bind_host,
+            port_range_start=port_start,
+            port_range_end=port_end,
         )
 
     async def _listen_task(self, circuit_key: int, server: asyncio.Server) -> None:
@@ -70,7 +70,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             async with server:
                 await server.serve_forever()
         except Exception:
-            log.exception("TCPFrontend._listen_task(c: {}): exception:", circuit_key)
+            log.exception("TCP proxy listener failed", port=circuit_key)
             raise
 
     @override
@@ -94,15 +94,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             return True
         peername = writer.get_extra_info("peername")
         if not peername:
-            log.debug("rejecting TCP connection with unknown peer for circuit {}", circuit.id)
+            log.trace("rejecting a TCP connection with an unknown peer")
             return False
         peer_ip = peername[0]
         if not validator.is_allowed(peer_ip):
-            log.debug(
-                "rejecting TCP client {} for circuit {} (not in allowed_client_ips)",
-                peer_ip,
-                circuit.id,
-            )
+            log.trace("rejecting TCP client {} (not in allowed_client_ips)", peer_ip)
             return False
         return True
 
@@ -142,22 +138,20 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             await self._close_writer(writer)
             return
 
-        if not self._is_peer_allowed(writer, backend.circuit):
-            await self._close_writer(writer)
-            return
+        with with_log_context(circuit_id=backend.circuit.id):
+            if not self._is_peer_allowed(writer, backend.circuit):
+                await self._close_writer(writer)
+                return
 
-        circuit_id = str(backend.circuit.id)
-
-        start = time.monotonic()
-        try:
-            metrics.proxy.observe_downstream_tcp_start()
-            await backend.bind(reader, writer)
-        except Exception:
-            log.exception("TCPFrontend.pipe(k: {}, c: {}):", circuit_key, circuit_id)
-            raise
-        finally:
-            end = time.monotonic()
-            metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
+            start = time.monotonic()
+            try:
+                metrics.proxy.observe_downstream_tcp_start()
+                await backend.bind(reader, writer)
+            except Exception:
+                log.exception("failed to proxy a TCP connection")
+            finally:
+                end = time.monotonic()
+                metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
 
     @override
     def get_circuit_key(self, circuit: Circuit) -> int:

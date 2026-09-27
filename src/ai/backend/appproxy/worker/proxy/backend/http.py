@@ -21,13 +21,13 @@ from ai.backend.common.clients.http_client.client_pool import (
     tcp_client_session_factory,
 )
 from ai.backend.common.cron import LocalCron
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import BaseBackend, HttpRequest
 from .last_access_marker import LastAccessMarkerTask
 from .pool import RoutePool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Connection", 1),
@@ -185,11 +185,12 @@ class HTTPBackend(BaseBackend):
         await self.mark_last_used_time(route)
         await self.increase_request_counter()
         log.trace(
-            "proxying {} {} HTTP Request to {}:{}",
+            "proxying {} {} HTTP request to {}:{}",
             frontend_request.method,
             frontend_request.rel_url,
             route.current_kernel_host,
             route.kernel_port,
+            route_id=route.route_id,
         )
         try:
             async with self.request_http(route, backend_request) as backend_response:
@@ -216,12 +217,12 @@ class HTTPBackend(BaseBackend):
                         recv_len += len(data)
                         await frontend_response.write(data)
                 except aiohttp.ClientPayloadError as e:
-                    log.exception(
-                        "{!r} (recv-len: {}, content-length: {}, headers: {!r})",
+                    log.trace(
+                        "app response payload broken: {!r} (recv-len: {}, content-length: {})",
                         e,
                         recv_len,
                         backend_response.content_length,
-                        frontend_resp_hdrs,
+                        route_id=route.route_id,
                     )
                 finally:
                     await frontend_response.write_eof()
@@ -229,13 +230,12 @@ class HTTPBackend(BaseBackend):
                 return frontend_response
         except aiohttp.ServerDisconnectedError as e:
             self._pool.record_failure(route)
-            log.debug(
-                "Backend container disconnected unexpectedly: {}:{}, method={}, path={}, error={}",
-                route.current_kernel_host,
-                route.kernel_port,
+            log.trace(
+                "app disconnected unexpectedly: {} {} ({!r})",
                 frontend_request.method,
                 frontend_request.rel_url,
                 e,
+                route_id=route.route_id,
             )
             raise
         except ConnectionResetError as e:
@@ -243,9 +243,10 @@ class HTTPBackend(BaseBackend):
             raise asyncio.CancelledError() from e
         except aiohttp.ClientOSError as e:
             self._pool.record_failure(route)
+            log.trace("app refused the connection: {!r}", e, route_id=route.route_id)
             raise ContainerConnectionRefused from e
-        except:
-            log.exception("Unhandled exception while proxying HTTP request")
+        except Exception:
+            log.exception("failed to proxy an HTTP request", route_id=route.route_id)
             raise
 
     async def proxy_ws(self, request: web.Request) -> web.WebSocketResponse:
@@ -280,29 +281,29 @@ class HTTPBackend(BaseBackend):
                         case aiohttp.WSMsgType.PONG:
                             await right.pong(msg.data)
                         case aiohttp.WSMsgType.CLOSE:
-                            log.debug("{}: websocket closed", tag)
+                            log.trace("{}: websocket closed", tag)
                             await right.close(code=msg.data)
                         case aiohttp.WSMsgType.ERROR:
-                            log.debug("{}: websocket closed with error", tag)
+                            log.trace("{}: websocket closed with error", tag)
                             await right.close()
                         case _:
-                            log.debug("{}: Unhandled message type {}", tag, msg.type)
+                            log.trace("{}: unhandled message type {}", tag, msg.type)
             except ConnectionResetError:
                 pass
             except Exception:
-                log.exception("")
+                log.exception("failed to relay websocket messages", route_id=route.route_id)
                 raise
             finally:
-                log.debug("setting stop event")
                 stop_event.set()
 
         route = await self._pool.select()
         log.trace(
-            "Proxying {} {} WS Request to {}:{}",
+            "proxying {} {} websocket request to {}:{}",
             request.method,
             request.path or "/",
             route.current_kernel_host,
             route.kernel_port,
+            route_id=route.route_id,
         )
 
         if "Sec-WebSocket-Protocol" in request.headers:
@@ -330,7 +331,6 @@ class HTTPBackend(BaseBackend):
                         group.create_task(
                             _proxy_task(downstream_ws, upstream_ws, tag="(down -> up)")
                         )
-                        log.debug("created tasks, now waiting until one of two tasks end")
                         await stop_event.wait()
                 finally:
                     await marker_cron.stop()
@@ -339,9 +339,9 @@ class HTTPBackend(BaseBackend):
                     if not upstream_ws.closed:
                         await upstream_ws.close()
             log.trace("websocket connection closed")
-        except ClientConnectorError:
+        except ClientConnectorError as e:
             self._pool.record_failure(route)
-            log.trace("upstream connection closed")
+            log.trace("app refused the websocket connection: {!r}", e, route_id=route.route_id)
             if not downstream_ws.closed:
                 await downstream_ws.close()
         finally:

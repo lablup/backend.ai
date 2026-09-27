@@ -11,11 +11,11 @@ from aiohttp.typedefs import Handler
 from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PortFrontend(BaseHTTPFrontend[int]):
@@ -81,10 +81,10 @@ class PortFrontend(BaseHTTPFrontend[int]):
             await site.start()
             self.sites.append(site)
         log.info(
-            "accepting proxy requests from {}:{}~{}",
-            port_proxy_config.bind_host,
-            port_start,
-            port_end,
+            "accepting proxy requests",
+            bind_host=port_proxy_config.bind_host,
+            port_range_start=port_start,
+            port_range_end=port_end,
         )
 
     @override
@@ -100,12 +100,13 @@ class PortFrontend(BaseHTTPFrontend[int]):
         circuit = self.circuits.get(port, None)
         if circuit is None:
             raise GenericBadRequest(f"Unregistered slot {port}")
-        self.ensure_allowed_ip(request, circuit)
-        self.ensure_credential(request, circuit)
-        backend = self.backends[port]
-        request["circuit"] = circuit
-        request["backend"] = backend
-        return await handler(request)
+        with with_log_context(circuit_id=circuit.id):
+            self.ensure_allowed_ip(request, circuit)
+            self.ensure_credential(request, circuit)
+            backend = self.backends[port]
+            request["circuit"] = circuit
+            request["backend"] = backend
+            return await handler(request)
 
     @override
     def get_circuit_key(self, circuit: Circuit) -> int:

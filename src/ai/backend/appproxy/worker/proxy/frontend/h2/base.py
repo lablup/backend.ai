@@ -7,9 +7,9 @@ from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import Circuit
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKeyType]):
@@ -43,4 +43,4 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         except asyncio.CancelledError:
             raise  # process did not terminate before task cleanup
         else:
-            log.exception("E20010: nghttpx terminated unexpectedly")
+            log.error("E20010: nghttpx terminated unexpectedly", exit_code=proc.returncode)
