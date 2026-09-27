@@ -5,9 +5,10 @@ from datetime import UTC, datetime
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
+from ai.backend.manager.actions.v2.lookup.log_context import with_lookup_action_context
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.result import (
     LookupActionProcessResult,
@@ -26,7 +27,7 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 
 __all__ = ("LookupActionProcessor",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupActionResult]:
@@ -69,7 +70,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
             try:
                 await monitor.prepare(action, trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(self, action: TAction, meta: LookupActionResultMeta) -> None:
         process_result = LookupActionProcessResult(meta=meta)
@@ -77,7 +78,7 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
             try:
                 await monitor.done(action, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def _validate_resolved(
         self,
@@ -110,56 +111,56 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         return GenericBadRequest(f"Cannot resolve the given {action.entity_type()} key")
 
     async def run(self, action: TAction) -> TResult:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
+        with with_lookup_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        run_status = ActionRunStatus.unknown()
-        entity_id: EntityIdentifier | None = None
+            run_status = ActionRunStatus.unknown()
+            entity_id: EntityIdentifier | None = None
 
-        # Validation runs inside the monitor lifecycle so a rejected action is
-        # recorded too; monitors that only wrapped execution missed every denial.
-        await self._prepare_monitors(action, trigger_meta)
-        try:
+            # Validation runs inside the monitor lifecycle so a rejected action is
+            # recorded too; monitors that only wrapped execution missed every denial.
+            await self._prepare_monitors(action, trigger_meta)
             try:
-                for validator in self._validators:
-                    await validator.validate(action, trigger_meta)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                raise
-            try:
-                result = await self._func(action)
-            except NotFoundError as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                if not self._post_validators or self._caller_is_superadmin():
-                    raise
-                raise self._unresolvable(action) from e
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                raise
-            else:
-                entity_id = result.entity_id()
                 try:
-                    await self._validate_resolved(action, action_id, started_at, entity_id)
-                except NotEnoughPermission as e:
-                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                    raise self._unresolvable(action) from e
+                    for validator in self._validators:
+                        await validator.validate(action, trigger_meta)
                 except BaseException as e:
                     run_status = ActionRunStatus.of_failure(e, during_validation=True)
                     raise
+                try:
+                    result = await self._func(action)
+                except NotFoundError as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    if not self._post_validators or self._caller_is_superadmin():
+                        raise
+                    raise self._unresolvable(action) from e
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    raise
                 else:
-                    run_status = ActionRunStatus.success()
-                    return result
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = LookupActionResultMeta(
-                action_id=action_id,
-                status=run_status.status,
-                description=run_status.description,
-                started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
-                error_code=run_status.error_code,
-                entity_id=entity_id,
-            )
-            await self._finalize_monitors(action, meta)
+                    entity_id = result.entity_id()
+                    try:
+                        await self._validate_resolved(action, action_id, started_at, entity_id)
+                    except NotEnoughPermission as e:
+                        run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                        raise self._unresolvable(action) from e
+                    except BaseException as e:
+                        run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                        raise
+                    else:
+                        run_status = ActionRunStatus.success()
+                        return result
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = LookupActionResultMeta(
+                    action_id=action_id,
+                    status=run_status.status,
+                    description=run_status.description,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                    error_code=run_status.error_code,
+                    entity_id=entity_id,
+                )
+                await self._finalize_monitors(action, meta)

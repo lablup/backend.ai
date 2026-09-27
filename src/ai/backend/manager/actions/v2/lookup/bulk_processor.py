@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
@@ -22,10 +22,11 @@ from ai.backend.manager.actions.v2.lookup.bulk_validator import (
     AuthenticatedBulkLookupActionValidator,
     BulkLookupActionValidator,
 )
+from ai.backend.manager.actions.v2.lookup.log_context import with_bulk_lookup_action_context
 
 __all__ = ("BulkLookupActionProcessor",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulkLookupActionResult]:
@@ -62,7 +63,7 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
             try:
                 await monitor.prepare(trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(
         self, trigger_meta: BulkLookupActionTriggerMeta, meta: BulkLookupActionResultMeta
@@ -72,56 +73,56 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
             try:
                 await monitor.done(trigger_meta, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def run(self, action: TAction) -> TResult:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = BulkLookupActionTriggerMeta(
-            action_id=action_id,
-            started_at=started_at,
-            entity_type=action.entity_type(),
-            operation_type=action.operation_type(),
-            action_name=action.action_name(),
-        )
+        with with_bulk_lookup_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = BulkLookupActionTriggerMeta(
+                action_id=action_id,
+                started_at=started_at,
+                entity_type=action.entity_type(),
+                operation_type=action.operation_type(),
+                action_name=action.action_name(),
+            )
 
-        key_results: Sequence[BulkLookupKeyResult] = []
+            key_results: Sequence[BulkLookupKeyResult] = []
 
-        await self._prepare_monitors(trigger_meta)
-        try:
+            await self._prepare_monitors(trigger_meta)
             try:
-                for validator in self._validators:
-                    await validator.validate(trigger_meta)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                key_results = self._same_result_for_every_key(action, run_status)
-                raise
-            try:
-                result = await self._func(action)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                key_results = self._same_result_for_every_key(action, run_status)
-                raise
-            else:
-                key_results = result.key_results()
                 try:
-                    await self._validate_resolved(action, action_id, started_at, key_results)
+                    for validator in self._validators:
+                        await validator.validate(trigger_meta)
                 except BaseException as e:
                     run_status = ActionRunStatus.of_failure(e, during_validation=True)
                     key_results = self._same_result_for_every_key(action, run_status)
                     raise
+                try:
+                    result = await self._func(action)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    key_results = self._same_result_for_every_key(action, run_status)
+                    raise
                 else:
-                    return result
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = BulkLookupActionResultMeta(
-                action_id=action_id,
-                key_results=key_results,
-                started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
-            )
-            await self._finalize_monitors(trigger_meta, meta)
+                    key_results = result.key_results()
+                    try:
+                        await self._validate_resolved(action, action_id, started_at, key_results)
+                    except BaseException as e:
+                        run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                        key_results = self._same_result_for_every_key(action, run_status)
+                        raise
+                    else:
+                        return result
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = BulkLookupActionResultMeta(
+                    action_id=action_id,
+                    key_results=key_results,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                )
+                await self._finalize_monitors(trigger_meta, meta)
 
     async def _validate_resolved(
         self,
