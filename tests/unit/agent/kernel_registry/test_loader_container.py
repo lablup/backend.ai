@@ -196,7 +196,7 @@ class TestLoadKernelRegistry:
         mock_agent.enumerate_containers = AsyncMock(return_value=[(kernel_id, MagicMock())])
         mock_recovery_data = MagicMock()
         mock_kernel = MagicMock()
-        mock_recovery_data.to_docker_kernel.return_value = mock_kernel
+        mock_recovery_data.to_kernel.return_value = mock_kernel
 
         with patch.object(
             loader,

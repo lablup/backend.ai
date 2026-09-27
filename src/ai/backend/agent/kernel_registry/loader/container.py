@@ -70,7 +70,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 continue
             try:
                 recovery_data = await self._load_kernel_recovery_from_scratch(config_path)
-                result[kernel_id] = recovery_data.to_docker_kernel()
+                result[kernel_id] = recovery_data.to_kernel()
             except (KernelRegistryNotFound, KernelRegistryLoadError):
                 log.warning(
                     "Failed to load kernel recovery data for kernel id {} from scratch path {}",

@@ -37,6 +37,7 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
     HookExecutionResult,
     ScheduleCoordinator,
 )
+from ai.backend.manager.sokovan.scheduler.kernel.state_engine import KernelCancellation
 from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -1375,3 +1376,53 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         (finalize,) = records[session_id].phases
         assert finalize.name == "finalize_start"
         assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
+
+
+class TestCancelledSessionRunsItsCleanupHook:
+    """CANCELLED is written where the last kernel is cancelled, not by the promotion pass.
+
+    The hook registry maps it, but `get_hook` is only ever reached with a spec's success status —
+    which is SCHEDULED, PREPARED, RUNNING or TERMINATED, never CANCELLED. So the session's
+    volatile network, created before any kernel started, was never given back.
+    """
+
+    @staticmethod
+    def _coordinator(session_cancelled: bool) -> Any:
+        coordinator = MagicMock()
+        coordinator._kernel_state_engine.mark_kernel_cancelled = AsyncMock(
+            return_value=KernelCancellation(
+                kernel_cancelled=True, session_cancelled=session_cancelled
+            )
+        )
+        coordinator._execute_transition_hooks = AsyncMock()
+        return coordinator
+
+    @staticmethod
+    def _event(session_id: SessionId) -> Any:
+        event = MagicMock()
+        event.kernel_id = KernelId(uuid4())
+        event.session_id = session_id
+        event.reason = "failed-to-start"
+        return event
+
+    async def test_the_hook_runs_when_the_session_is_cancelled_too(self) -> None:
+        session_id = SessionId(uuid4())
+        coordinator = self._coordinator(session_cancelled=True)
+
+        assert await ScheduleCoordinator.handle_kernel_cancelled(
+            coordinator, self._event(session_id)
+        )
+
+        coordinator._execute_transition_hooks.assert_awaited_once()
+        infos, target = coordinator._execute_transition_hooks.await_args.args
+        assert target == SessionStatus.CANCELLED
+        assert [info.session_id for info in infos] == [session_id]
+
+    async def test_no_hook_when_only_the_kernel_was_cancelled(self) -> None:
+        coordinator = self._coordinator(session_cancelled=False)
+
+        assert await ScheduleCoordinator.handle_kernel_cancelled(
+            coordinator, self._event(SessionId(uuid4()))
+        )
+
+        coordinator._execute_transition_hooks.assert_not_awaited()

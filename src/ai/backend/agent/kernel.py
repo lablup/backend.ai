@@ -80,6 +80,16 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # be imported here because that package runs inside the container.
 SERVICE_START_REPLY_TIMEOUT_SEC = 35.0
 
+#: How long one request to the kernel runner may wait for its reply.
+#:
+#: Every such wait needs a bound, because they share ONE budget: `create_kernel` retries the whole
+#: status-then-apps sequence under a single `stop_after_delay`. `feed_and_get_status` had no bound
+#: at all, so a runner that is not serving requests yet -- it does not read its input socket until
+#: every intrinsic service has spawned -- absorbed the entire budget in one attempt. Measured: the
+#: agent waited 50s for `status`, got 10s for `get-apps`, and the retry that was configured for ten
+#: attempts made exactly one before giving up and destroying the kernel.
+KERNEL_REPLY_TIMEOUT_SEC = 10.0
+
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
 # since they are passed as separate status field.)
@@ -747,8 +757,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         await self._create_tasks()
 
     async def _create_sockets(self) -> SocketPair:
-        input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
-        output_sock = RobustSocket(zmq.PULL, await self.get_repl_out_addr())
+        # Logged because a wrong address here is silent: `zmq.connect` accepts an unroutable one
+        # (a port of 0, a host nothing published on) without raising, so every request goes
+        # nowhere and the only symptom is a kernel that times out with the runner up, listening
+        # and answering anyone else who dials it.
+        in_addr = await self.get_repl_in_addr()
+        out_addr = await self.get_repl_out_addr()
+        log.debug("kernel {} repl sockets: in={} out={}", self.kernel_id, in_addr, out_addr)
+        input_sock = RobustSocket(zmq.PUSH, in_addr)
+        output_sock = RobustSocket(zmq.PULL, out_addr)
         return SocketPair(input_sock, output_sock)
 
     async def _get_socket_pair(self) -> SocketPair:
@@ -918,10 +935,16 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"status", b""])
         try:
-            result = await self.status_queue.get()
+            with timeout(KERNEL_REPLY_TIMEOUT_SEC):
+                result = await self.status_queue.get()
             self.status_queue.task_done()
             return cast(dict[str, float] | None, msgpack.unpackb(result))
         except asyncio.CancelledError:
+            return None
+        except TimeoutError:
+            # None, not an exception: the caller discards this value and goes on to ask for the
+            # service apps, which fails in its own way and is retried. Raising here would end the
+            # whole sequence on a runner that is merely slow to start serving.
             return None
 
     async def feed_and_get_completion(
@@ -996,7 +1019,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"",
         ])
         try:
-            with timeout(10):
+            with timeout(KERNEL_REPLY_TIMEOUT_SEC):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
             return cast(dict[str, Any], load_json(result))

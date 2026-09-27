@@ -6,6 +6,7 @@ All database operations go through the repository pattern.
 """
 
 import logging
+from dataclasses import dataclass
 from uuid import UUID
 
 from ai.backend.common.events.event_types.kernel.types import (
@@ -17,6 +18,15 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass(frozen=True)
+class KernelCancellation:
+    """What a kernel cancellation ended up cancelling."""
+
+    kernel_cancelled: bool
+    #: The session went CANCELLED with it, because this was its last kernel.
+    session_cancelled: bool
 
 
 class KernelStateEngine:
@@ -115,7 +125,7 @@ class KernelStateEngine:
         kernel_id: KernelId,
         session_id: SessionId,
         reason: str,
-    ) -> bool:
+    ) -> KernelCancellation:
         """
         Mark a kernel as CANCELLED when it's cancelled before running.
         Also checks if the session should be cancelled when all kernels are cancelled.
@@ -123,17 +133,22 @@ class KernelStateEngine:
         :param kernel_id: The kernel ID
         :param session_id: The session ID (used for session cancellation check)
         :param reason: The reason for cancellation
-        :return: True if the update was successful
+        :return: What was cancelled. The session flag is the caller's signal to run the CANCELLED
+            cleanup: that transition is written here, not by the coordinator's promotion pass, so
+            nothing else would.
         """
         log.debug("Marking kernel {} as CANCELLED: {}", kernel_id, reason)
 
         success = await self._repository.update_kernel_status_cancelled(kernel_id, reason)
 
+        session_cancelled = False
         if success:
             # Check if the session should be cancelled when all kernels are cancelled
-            await self._repository.check_and_cancel_session_if_needed(session_id)
+            session_cancelled = await self._repository.check_and_cancel_session_if_needed(
+                session_id
+            )
 
-        return success
+        return KernelCancellation(kernel_cancelled=success, session_cancelled=session_cancelled)
 
     async def mark_kernel_terminated(
         self,

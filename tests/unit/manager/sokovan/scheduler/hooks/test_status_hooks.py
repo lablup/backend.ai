@@ -15,10 +15,12 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, SessionId
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import StepStatus
+from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry, HookRegistryArgs
 from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedHookDependencies,
     TerminatedTransitionHook,
@@ -252,3 +254,64 @@ class TestTerminatedTransitionHookNetworkCleanup:
         step = next(s for s in cleanup.steps if s.name == "destroy_network")
         assert step.status == StepStatus.FAILED
         assert step.error_code is not None
+
+
+class TestCancelledSessionsCleanUpToo:
+    """A session that ends CANCELLED owes the same network cleanup as one that ends TERMINATED.
+
+    The volatile single-node network is created before any kernel starts, so a session cancelled
+    during start-sessions already has one. Registering the hook only on TERMINATED left every such
+    session's `bai-singlenode-<id>` bridge behind with no containers on it -- and Docker hands out
+    a /16 per network from a pool of roughly fifteen, so the leak feeds itself: once the pool is
+    gone the next session's kernels land on a subnet the host routes to a different bridge, become
+    unreachable to the agent, fail to start, get cancelled, and leak one more. Measured on a live
+    node: three leaked networks, then every multi-kernel session on it failed.
+    """
+
+    @pytest.fixture
+    def registry(self) -> HookRegistry:
+        config_provider = MagicMock()
+        config_provider.config.network.inter_container.default_driver = "overlay"
+        return HookRegistry(
+            HookRegistryArgs(
+                agent_client_pool=MagicMock(),
+                network_plugin_ctx=MagicMock(),
+                config_provider=config_provider,
+            )
+        )
+
+    def test_cancelled_gets_the_same_cleanup_hook_as_terminated(
+        self, registry: HookRegistry
+    ) -> None:
+        terminated = registry.get_hook(SessionStatus.TERMINATED)
+        cancelled = registry.get_hook(SessionStatus.CANCELLED)
+        assert cancelled is not None, (
+            "a cancelled session keeps the volatile network it was given, and the leak is"
+            " self-amplifying"
+        )
+        assert isinstance(cancelled, TerminatedTransitionHook)
+        assert cancelled is terminated, "both ends of a session owe the same cleanup"
+
+    async def test_a_session_that_never_got_an_agent_does_not_block_on_cleanup(self) -> None:
+        """Hooks block the transition they run on. A session cancelled before its kernels were
+        bound has no agent -- and therefore no agent-local network -- so the hook must return
+        rather than raise, or the session never reaches CANCELLED at all."""
+        config_provider = MagicMock()
+        config_provider.config.network.inter_container.default_driver = "overlay"
+        hook = TerminatedTransitionHook(
+            TerminatedHookDependencies(
+                agent_client_pool=MagicMock(),
+                network_plugin_ctx=MagicMock(),
+                config_provider=config_provider,
+            )
+        )
+        session_id = SessionId(uuid4())
+        session = MagicMock()
+        session.session_info.identity.id = session_id
+        session.session_info.network.network_type = NetworkType.VOLATILE
+        session.session_info.network.network_id = "net-123"
+        session.session_info.resource.cluster_mode = ClusterMode.SINGLE_NODE.name
+        session.main_kernel.resource.agent = None
+
+        with SessionRecorderContext.scope("terminate", entity_ids=[session_id]):
+            await hook.execute(session)  # must not raise
