@@ -7,7 +7,6 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Sequence
-from contextlib import suppress
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -537,13 +536,7 @@ class BackgroundTaskManager:
                 last_message = f"Task failed with exception: {e}"
                 raise e
             finally:
-                with suppress(Exception):
-                    await self._valkey_client.finish_subtask(
-                        task_id=task_id,
-                        subkey=subkey,
-                        status=task_status,
-                        last_message=last_message,
-                    )
+                await self._finish_subtask(task_id, subkey, task_status, last_message)
 
     async def _revive_task(
         self, task_name: BgtaskNameBase, task_info: TaskInfo, task_key: BgTaskKey
@@ -572,13 +565,25 @@ class BackgroundTaskManager:
                 last_message = f"Task failed with exception: {e}"
                 raise e
             finally:
-                with suppress(Exception):
-                    await self._valkey_client.finish_subtask(
-                        task_id=task_info.task_id,
-                        subkey=task_key,
-                        status=task_status,
-                        last_message=last_message,
-                    )
+                await self._finish_subtask(task_info.task_id, task_key, task_status, last_message)
+
+    async def _finish_subtask(
+        self, task_id: TaskID, subkey: BgTaskKey, status: TaskStatus, last_message: str
+    ) -> None:
+        try:
+            await self._valkey_client.finish_subtask(
+                task_id=task_id,
+                subkey=subkey,
+                status=status,
+                last_message=last_message,
+            )
+        except Exception as e:
+            log.warning(
+                "background subtask status record failed",
+                exc_info=e,
+                bgtask_id=task_id,
+                subkey=subkey,
+            )
 
     async def do_heartbeat(self) -> None:
         """Publish a heartbeat for ongoing background tasks. One iteration."""
@@ -628,13 +633,12 @@ class BackgroundTaskManager:
             # Mark all ongoing subtasks as failed to prevent infinite retry
             for subkey_info in total_info.task_key_list:
                 if subkey_info.status == TaskStatus.ONGOING:
-                    with suppress(Exception):
-                        await self._valkey_client.finish_subtask(
-                            task_id=task_info.task_id,
-                            subkey=subkey_info.key,
-                            status=TaskStatus.FAILURE,
-                            last_message=f"Task handler not registered: {task_name_str}",
-                        )
+                    await self._finish_subtask(
+                        task_info.task_id,
+                        subkey_info.key,
+                        TaskStatus.FAILURE,
+                        f"Task handler not registered: {task_name_str}",
+                    )
             return
 
         async_tasks: list[asyncio.Task[Any]] = []
@@ -668,3 +672,9 @@ class BackgroundTaskManager:
         if task is not None:
             self._ongoing_tasks[task_info.task_id] = task
         await self._valkey_client.claim_task(task_info.task_id, self._task_set_key)
+        log.info(
+            "background task revived",
+            task_name=task_name_str,
+            bgtask_id=task_info.task_id,
+            subtask_count=len(async_tasks),
+        )

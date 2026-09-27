@@ -12,8 +12,10 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
+from ai.backend.common.asyncio import ConsecutiveFailures
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.types import QueueSentinel
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.repositories.manager_admin.health import report_manager_status
 
 if TYPE_CHECKING:
@@ -29,28 +31,49 @@ from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+_WATCH_MAX_RETRY_DELAY_SEC = 30.0
+
 
 async def _detect_status_update(
     config_provider: ManagerConfigProvider,
     pidx: int,
 ) -> None:
+    loader = config_provider.legacy_etcd_config_loader
+    last_status: ManagerStatus | None = None
+    watch_failures = ConsecutiveFailures(max_delay_sec=_WATCH_MAX_RETRY_DELAY_SEC)
     try:
-        async with aclosing(
-            config_provider.legacy_etcd_config_loader.watch_manager_status()
-        ) as agen:
-            async for ev in agen:
-                if isinstance(ev, QueueSentinel):
-                    continue
-                if ev.event == "put":
-                    config_provider.legacy_etcd_config_loader.get_manager_status.cache_clear()
-                    updated_status = (
-                        await config_provider.legacy_etcd_config_loader.get_manager_status()
-                    )
+        while True:
+            try:
+                async with aclosing(loader.watch_manager_status()) as agen:
+                    async for ev in agen:
+                        if isinstance(ev, QueueSentinel):
+                            continue
+                        if failure_count := watch_failures.record_success():
+                            log.info(
+                                "manager status watch recovered",
+                                pidx=pidx,
+                                failure_count=failure_count,
+                            )
+                        if ev.event == "put":
+                            loader.get_manager_status.cache_clear()
+                            updated_status = await loader.get_manager_status()
+                            if updated_status != last_status:
+                                log.info(
+                                    "manager status changed",
+                                    pidx=pidx,
+                                    manager_status=updated_status,
+                                )
+                                last_status = updated_status
+            except Exception:
+                if watch_failures.record_failure():
+                    log.exception("manager status watch failed", pidx=pidx)
+                else:
                     log.debug(
-                        "manager status update detected",
+                        "manager status watch failed",
                         pidx=pidx,
-                        manager_status=updated_status,
+                        failure_count=watch_failures.count,
                     )
+            await asyncio.sleep(watch_failures.delay_sec())
     except asyncio.CancelledError:
         pass
 

@@ -18,6 +18,7 @@ import yarl
 from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
@@ -295,7 +296,9 @@ class SessionService:
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
-        self._rpc_ptask_group = aiotools.PersistentTaskGroup()
+        self._rpc_ptask_group = aiotools.PersistentTaskGroup(
+            exception_handler=IgnoreTaskExceptionHandler()
+        )
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:

@@ -319,27 +319,65 @@ class ServiceDiscoveryLoop:
                             service_group=service.service_group,
                             service_id=service.id,
                         )
+                        log.info(
+                            "unhealthy service unregistered",
+                            service_group=service.service_group,
+                            service_id=service.id,
+                        )
             except Exception as e:
                 log.warning("unhealthy service sweep failed", exc_info=e)
             await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
 
     async def _run_service_loop(self) -> None:
-        log.info(
-            "service discovery registering",
-            service_display_name=self._metadata.display_name,
-            service_id=self._metadata.id,
-            service_group=self._metadata.service_group,
-        )
-        await self._service_discovery.register(self._metadata)
+        await self._register()
+        try:
+            while not self._closed:
+                try:
+                    await self._service_discovery.heartbeat(
+                        service_meta=self._metadata,
+                    )
+                except Exception as e:
+                    log.warning("service discovery heartbeat failed", exc_info=e)
+                await asyncio.sleep(self._interval_seconds)
+        finally:
+            await self._unregister()
+
+    async def _register(self) -> None:
         while not self._closed:
             try:
-                await self._service_discovery.heartbeat(
-                    service_meta=self._metadata,
+                await self._service_discovery.register(self._metadata)
+            except Exception:
+                log.exception(
+                    "service discovery registration failed",
+                    service_id=self._metadata.id,
+                    service_group=self._metadata.service_group,
                 )
-            except Exception as e:
-                log.warning("service discovery heartbeat failed", exc_info=e)
-            await asyncio.sleep(self._interval_seconds)
-        await self._service_discovery.unregister(
-            service_group=self._metadata.service_group,
+                await asyncio.sleep(self._interval_seconds)
+                continue
+            log.info(
+                "service discovery registered",
+                service_display_name=self._metadata.display_name,
+                service_id=self._metadata.id,
+                service_group=self._metadata.service_group,
+            )
+            return
+
+    async def _unregister(self) -> None:
+        try:
+            await self._service_discovery.unregister(
+                service_group=self._metadata.service_group,
+                service_id=self._metadata.id,
+            )
+        except Exception as e:
+            log.warning(
+                "service discovery unregistration failed",
+                exc_info=e,
+                service_id=self._metadata.id,
+                service_group=self._metadata.service_group,
+            )
+            return
+        log.info(
+            "service discovery unregistered",
             service_id=self._metadata.id,
+            service_group=self._metadata.service_group,
         )

@@ -23,6 +23,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.message_queue.message import MessageId, MQMessage
@@ -350,11 +351,11 @@ class EventDispatcher(EventDispatcherGroup):
         self._metric_observer = event_observer if event_observer is not None else NopEventObserver()
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
-            exception_handler=consumer_exception_handler,
+            exception_handler=consumer_exception_handler or IgnoreTaskExceptionHandler(),
         )
         self._subscriber_taskgroup = PersistentTaskGroup(
             name="subscriber_taskgroup",
-            exception_handler=subscriber_exception_handler,
+            exception_handler=subscriber_exception_handler or IgnoreTaskExceptionHandler(),
         )
         self._consumer_loop_task = None
         self._subscriber_loop_task = None
@@ -492,11 +493,15 @@ class EventDispatcher(EventDispatcherGroup):
         if self._closed:
             return
         event_type = evh.event_cls.event_name()
-        with ExitStack() as stack:
-            stack.enter_context(with_log_context(event_name=event_type, handler_name=evh.name))
-            if metadata:
-                stack.enter_context(metadata.apply_context())
-            await self._handle_in_scope(evh, source, message, post_callbacks)
+        with with_log_context(event_name=event_type, handler_name=evh.name):
+            try:
+                with ExitStack() as stack:
+                    if metadata:
+                        stack.enter_context(metadata.apply_context())
+                    await self._handle_in_scope(evh, source, message, post_callbacks)
+            except Exception:
+                # Nobody awaits this task, so a failure left here would vanish.
+                log.exception("event handling failed", handler_type=evh.handler_type)
 
     async def _handle_in_scope(
         self,
@@ -552,7 +557,7 @@ class EventDispatcher(EventDispatcherGroup):
                 exception=e,
             )
             log.exception("event handler failed", handler_type=evh_type)
-            raise
+            return
         except BaseException as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,

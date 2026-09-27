@@ -204,12 +204,19 @@ class RedisConsumer(AbstractConsumer):
 
         # Note: We acknowledge on the first stream key as the message could be from any stream
         # In practice, msg_id should be unique across streams so this should work
+        last_error: Exception | None = None
         for stream_key in self._stream_keys:
             try:
                 await self._client.done_stream_message(stream_key, self._group_name, msg_id)
-                break
-            except Exception:
-                continue  # Try next stream if this one fails
+                return
+            except Exception as e:
+                last_error = e
+        log.warning(
+            "stream message ack failed",
+            exc_info=last_error,
+            message_id=msg_id.decode(),
+            group_name=self._group_name,
+        )
 
     @override
     async def close(self) -> None:
@@ -375,9 +382,20 @@ class RedisConsumer(AbstractConsumer):
                 continue
             retried = MQMessage(msg_id=msg.msg_id, payload=payload).retry()
             if retried is not None:
+                log.debug(
+                    "stream message redelivered",
+                    message_id=msg.msg_id.decode(),
+                    event_name=payload.name,
+                    retry_count=retried.payload.retry_count,
+                )
                 await self._retry_message(stream_key, retried)
                 continue
-            # Discard the message if retry limit exceeded
+            log.warning(
+                "stream message discarded after retry limit",
+                message_id=msg.msg_id.decode(),
+                event_name=payload.name,
+                retry_count=payload.retry_count,
+            )
             await self._client.done_stream_message(stream_key, self._group_name, msg.msg_id)
 
         return autoclaim_start_id, len(message.messages) > 0

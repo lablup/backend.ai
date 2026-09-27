@@ -32,6 +32,7 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common.api_handlers import PathParam, QueryParam
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
@@ -705,7 +706,9 @@ async def stream_app_ctx(
     app_ctx = priv_ctx
 
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
-    app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup(
+        exception_handler=IgnoreTaskExceptionHandler()
+    )
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_execute_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_proxy_handlers = defaultdict(weakref.WeakSet)
