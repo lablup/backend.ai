@@ -40,6 +40,7 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Callable, Sequence
+from contextlib import ExitStack
 from typing import Any, TypeVar
 
 from callosum.rpc import Peer, RPCMessage
@@ -48,8 +49,9 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors import AgentIdNotFoundError, ResourceError
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.types import AgentId
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
+from .context import with_rpc_context
 from .params import extract_rpc_param_value
 from .types import (
     CallosumHandler,
@@ -59,7 +61,7 @@ from .types import (
     RPCMiddlewareProvider,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 THandler = TypeVar("THandler")
@@ -215,29 +217,33 @@ class AgentRPCRegistry:
         """
 
         async def _dispatch(request: RPCMessage) -> Any:
-            try:
-                raw_req, agent_id = self._parse_request_body(request)
-                target_agent = self._runtime.get_agent(agent_id)
-                method = per_agent_methods[target_agent.id]
-                sig = inspect.signature(method, eval_str=True)
+            with ExitStack() as stack:
+                try:
+                    raw_req, agent_id = self._parse_request_body(request)
+                    target_agent = self._runtime.get_agent(agent_id)
+                    stack.enter_context(with_rpc_context(request, target_agent.id))
+                    method = per_agent_methods[target_agent.id]
+                    sig = inspect.signature(method, eval_str=True)
 
-                call_kwargs: dict[str, Any] = {}
-                for pname, param in sig.parameters.items():
-                    if pname == "self":
-                        continue
-                    call_kwargs[pname] = await extract_rpc_param_value(raw_req, param.annotation)
+                    call_kwargs: dict[str, Any] = {}
+                    for pname, param in sig.parameters.items():
+                        if pname == "self":
+                            continue
+                        call_kwargs[pname] = await extract_rpc_param_value(
+                            raw_req, param.annotation
+                        )
 
-                res = await method(**call_kwargs)
-                return res.model_dump(mode="json")
-            except (TimeoutError, asyncio.CancelledError):
-                raise
-            except (ResourceError, AgentIdNotFoundError):
-                # Expected domain errors — let callosum propagate without
-                # log spam; the manager-side error mapper surfaces them.
-                raise
-            except Exception:
-                log.exception("v3 RPC handler error")
-                raise
+                    res = await method(**call_kwargs)
+                    return res.model_dump(mode="json")
+                except (TimeoutError, asyncio.CancelledError):
+                    raise
+                except (ResourceError, AgentIdNotFoundError):
+                    # Expected domain errors — let callosum propagate without
+                    # log spam; the manager-side error mapper surfaces them.
+                    raise
+                except Exception:
+                    log.exception("rpc handler failed")
+                    raise
 
         return _dispatch
 

@@ -21,15 +21,15 @@ from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernel(AbstractKernel):
@@ -72,7 +72,11 @@ class KubernetesKernel(AbstractKernel):
     ) -> AbstractCodeRunner:
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
-            log.error("Scaling failed! Response body: {0}", scale)
+            log.error(
+                "kernel deployment scale-up failed",
+                deployment_name=self.deployment_name,
+                response_body=str(scale),
+            )
             raise ValueError("Scaling failed!")
 
         if scale.to_dict()["status"]["replicas"] == 0:
@@ -121,7 +125,7 @@ class KubernetesKernel(AbstractKernel):
             except zmq.error.ZMQError:
                 if retries < 4:
                     retries += 1
-                    log.debug("Socket not responding, retrying #{}", retries)
+                    log.debug("kernel runner socket not responding", retry_count=retries)
                     await asyncio.sleep(retries**2)
                 else:
                     raise
@@ -146,8 +150,12 @@ class KubernetesKernel(AbstractKernel):
                     "status": {"replicas": num, "selector": f"run={self.deployment_name}"},
                 },
             )
-        except Exception as e:
-            log.exception("scale failed: {}", e)
+        except Exception:
+            log.exception(
+                "kernel deployment scale failed",
+                deployment_name=self.deployment_name,
+                replica_count=num,
+            )
 
     async def is_scaled(self) -> bool:
         await kube_config.load_kube_config()
@@ -248,7 +256,7 @@ class KubernetesKernel(AbstractKernel):
 
     @override
     async def check_duplicate_commit(self, kernel_id: Any, subdir: Any) -> CommitStatus:
-        log.error("Committing in Kubernetes is not supported yet.")
+        log.error("kernel commit unsupported on kubernetes")
         raise NotImplementedError
 
     @override
@@ -264,12 +272,11 @@ class KubernetesKernel(AbstractKernel):
         # TODO: Implement container commit on Kubernetes kernel.
         if extra_labels is None:
             extra_labels = {}
-        log.error("Committing in Kubernetes is not supported yet.")
+        log.error("kernel commit unsupported on kubernetes")
         raise NotImplementedError
 
     @override
     async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
-        loop = current_loop()
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
         )
@@ -282,7 +289,7 @@ class KubernetesKernel(AbstractKernel):
             host_abspath.write_bytes(filedata)
 
         try:
-            await loop.run_in_executor(None, _write_to_disk)
+            await run_in_executor_with_context(None, _write_to_disk)
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
@@ -311,14 +318,14 @@ class KubernetesKernel(AbstractKernel):
             _preload_content=False,
         ) as stream:
             async for event in stream:
-                log.debug("stream: {}", event)
+                log.debug("exec stream event received", stream_event=str(event))
                 # TODO: retrieve the output stream as a bytes buffer
         return b""
 
     @override
     async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         # TODO: Implement download single file operations with pure Kubernetes API
-        log.error("download_single() in the k8s backend is not supported yet.")
+        log.error("single file download unsupported on kubernetes")
         raise NotImplementedError
 
     @override
@@ -373,7 +380,7 @@ class KubernetesKernel(AbstractKernel):
             _preload_content=False,
         ) as stream:
             async for event in stream:
-                log.debug("stream: {}", event)
+                log.debug("exec stream event received", stream_event=str(event))
                 # TODO: retrieve the output stream as a bytes buffer
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
@@ -447,7 +454,7 @@ async def prepare_krunner_env_impl(
             if item["RepoTags"][0] == extractor_image:
                 break
         else:
-            log.info("preparing the Docker image for krunner extractor...")
+            log.info("krunner extractor image loading")
             extractor_archive = str(
                 files("ai.backend.runner").joinpath(f"krunner-extractor.img.{arch}.tar.xz")
             )
@@ -456,10 +463,14 @@ async def prepare_krunner_env_impl(
                 if await proc.wait() != 0:
                     raise RuntimeError("loading krunner extractor image has failed!")
 
-        log.info("checking krunner-env for {}.{}...", distro, arch)
+        log.debug("krunner environment checking", distro=distro, arch=arch)
 
         if not target_path.exists():
-            log.info("populating {} volume version {}", krunner_folder_name, current_version)
+            log.info(
+                "krunner volume populating",
+                volume_name=krunner_folder_name,
+                krunner_version=current_version,
+            )
             target_path.mkdir(exist_ok=False)
             archive_path = Path(
                 str(
@@ -473,8 +484,8 @@ async def prepare_krunner_env_impl(
             ).resolve()
 
             log.debug(
-                "Executing {}",
-                " ".join([
+                "krunner extractor command executing",
+                command=" ".join([
                     "docker",
                     "run",
                     "--rm",
@@ -511,7 +522,7 @@ async def prepare_krunner_env_impl(
             if await proc.wait() != 0:
                 raise RuntimeError("extracting krunner environment has failed!")
     except Exception:
-        log.exception("unexpected error")
+        log.exception("krunner environment preparation failed", distro=distro, arch=arch)
         return distro, None
     finally:
         await docker.close()
@@ -563,7 +574,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, s
     all_distros: list[tuple[str, str]] = []
     entry_prefix = "backendai_krunner_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
-        log.debug("loading krunner pkg: {}", entrypoint.module)
+        log.debug("krunner package loading", module_name=entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (

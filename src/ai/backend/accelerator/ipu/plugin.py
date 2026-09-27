@@ -30,6 +30,7 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common import config
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -41,7 +42,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import __version__
 from .exception import DockerNetworkError, NoIPUoFConfError
@@ -50,7 +51,7 @@ from .types import IPUDevice
 
 PREFIX = "ipu"
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.ipu"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.ipu"))
 
 
 _config_iv = t.Dict({
@@ -93,7 +94,7 @@ class IPUPlugin(AbstractComputePlugin):
 
         raw_cfg, cfg_src_path = config.read_from_file(None, "ipu")
         self.ipu_config = _config_iv.check(raw_cfg)
-        log.info("Read IPU device configs from {}", cfg_src_path)
+        log.info("device config loaded", plugin_name=self.key, config_path=str(cfg_src_path))
 
         def _read_json() -> dict[str, Any]:
             ipuof_config_path = Path(self.ipu_config["ipuof-config-path"])
@@ -101,26 +102,34 @@ class IPUPlugin(AbstractComputePlugin):
                 return json.loads(fr.read())
 
         try:
-            raw_ipuof_config = await asyncio.get_running_loop().run_in_executor(None, _read_json)
+            raw_ipuof_config = await run_in_executor_with_context(None, _read_json)
             self.ipuof_devices = {
                 f"{d['ip']}:{d['device_id']}": d for d in raw_ipuof_config["devices"]
             }
             self.ipuof_attributes = raw_ipuof_config["attributes"]
         except FileNotFoundError:
-            log.warning("could not find IPUoF configuration file.")
+            log.warning(
+                "accelerator disabled: IPUoF configuration file not found", plugin_name=self.key
+            )
             self.enabled = False
             return
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("IPU acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except (ImportError, NoIPUoFConfError):
-            log.warning("could not find Graphcore IPUs with gc-monitor command.")
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
         try:
             await self.prepare_networks()
         except DockerNetworkError as e:
-            log.warning("error while preparing docker networks: " + e.args[0])
+            log.warning(
+                "accelerator disabled: docker network preparation failed",
+                plugin_name=self.key,
+                exc_info=e,
+            )
             self.enabled = False
 
     async def list_devices(self) -> list[IPUDevice]:
@@ -275,9 +284,7 @@ class IPUPlugin(AbstractComputePlugin):
                                 / Path(self.ipu_config["ipuof-config-path"]).name
                             )
                             ipuof_conf = json.loads(
-                                await asyncio.get_running_loop().run_in_executor(
-                                    None, ipuof_conf_path.read_text
-                                )
+                                await run_in_executor_with_context(None, ipuof_conf_path.read_text)
                             )
                             for device in ipuof_conf["devices"]:
                                 hw_location = device["ip"] + ":" + str(device["device_id"])
@@ -362,7 +369,7 @@ class IPUPlugin(AbstractComputePlugin):
             with generated_ipuof_config_path.open("w") as fw:
                 fw.write(json.dumps(generated_ipuof_config))
 
-        await asyncio.get_running_loop().run_in_executor(None, _write)
+        await run_in_executor_with_context(None, _write)
         return [
             MountInfo(
                 MountTypes.BIND,

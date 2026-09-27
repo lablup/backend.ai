@@ -2,9 +2,9 @@ import logging
 import os
 from pathlib import Path
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # the names of following AWS variables follow boto3 convention.
 s3_access_key = os.environ.get("AWS_ACCESS_KEY_ID", "dummy-access-key")
@@ -14,7 +14,7 @@ s3_bucket = os.environ.get("AWS_S3_BUCKET", "codeonweb")
 s3_bucket_path = os.environ.get("AWS_S3_BUCKET_PATH", "bucket")
 
 if s3_access_key == "dummy-access-key":
-    log.info("Automatic ~/.output file S3 uploads is disabled.")
+    log.info("output file s3 upload disabled")
 
 
 def relpath(path: Path | str, base: Path | str) -> Path:

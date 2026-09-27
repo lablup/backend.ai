@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import ContainerStatus
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.agent.agent import AbstractAgent
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 PORT_USAGE_THRESHOLD = 4
@@ -55,11 +55,10 @@ class HostPortObserver(AbstractObserver):
                 ports_to_release.add(unused_port)
                 del self._port_unused_counts[unused_port]
         if ports_to_release:
-            log.info(
-                "releasing unused ports back to port pool. "
-                "current port-pool length: {}, releasing length: {}",
-                len(port_pool),
-                len(ports_to_release),
+            log.debug(
+                "unused ports released to port pool",
+                port_pool_count=len(port_pool),
+                released_port_count=len(ports_to_release),
             )
             port_pool.release_many(ports_to_release)
 

@@ -38,11 +38,11 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
@@ -55,12 +55,8 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
         if "event loop is closed" in msg or "session is closed" in msg:
             return None
         raise
-    except (DockerError, aiohttp.ClientError) as e:
-        log.error(
-            "cannot read stats (cid:{}): client error: {!r}.",
-            short_cid,
-            e,
-        )
+    except (DockerError, aiohttp.ClientError):
+        log.exception("container stats read failed", container_id=short_cid)
         return None
     else:
         entry = {"read": "0001-01-01"}
@@ -72,11 +68,7 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
                 entry = ret
             case _:
                 # The API may return an empty result upon container termination.
-                log.warning(
-                    "cannot read stats (cid:{}): got an empty result: {}",
-                    short_cid,
-                    ret,
-                )
+                log.debug("container stats result empty", container_id=short_cid)
                 return None
         if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
@@ -141,7 +133,7 @@ class CPUPlugin(AbstractComputePlugin):
     @override
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
-        log.debug("available_slots: {}", devices)
+        log.debug("available slots computed", device_count=len(devices))
         return {
             SlotName("cpu"): Decimal(sum(dev.processing_units for dev in devices)),
         }

@@ -29,7 +29,7 @@ import trafaret as t
 from aiodocker.docker import DockerContainer
 
 from ai.backend.common import identity
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import (
     CgroupController,
     get_cgroup_of_pid,
@@ -39,9 +39,9 @@ from ai.backend.common.cgroup import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
@@ -167,8 +167,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
             f.seek(max(file_size - nbytes, 0), io.SEEK_SET)
             return f.read(nbytes)
 
-    loop = current_loop()
-    return await loop.run_in_executor(None, _read_tail)
+    return await run_in_executor_with_context(None, _read_tail)
 
 
 async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
@@ -197,7 +196,9 @@ async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = "0.0
             addr = fallback_addr
         else:
             local_ipaddrs = [*identity.fetch_local_ipaddrs(subnet)]
-            log.debug("get_subnet_ip(): subnet {} candidates: {}", subnet, local_ipaddrs)
+            log.debug(
+                "subnet ip candidates found", subnet=str(subnet), candidates=str(local_ipaddrs)
+            )
             if local_ipaddrs:
                 addr = str(local_ipaddrs[0])
             else:
@@ -308,7 +309,11 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 container_pids = [x.pid for x in container_procs if x.command == cmd]
 
                 container_pid = ContainerPID(PID(container_pids[process_idx]))
-                log.debug("host pid {} is mapped to container pid {}", host_pid, container_pid)
+                log.debug(
+                    "host pid mapped to container pid",
+                    host_pid=host_pid,
+                    container_pid=container_pid,
+                )
                 return container_pid
             except asyncio.CancelledError:
                 raise
@@ -352,7 +357,11 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
                 host_pids = [x.pid for x in host_procs if x.command == cmd]
 
                 host_pid = HostPID(PID(host_pids[process_idx]))
-                log.debug("container pid {} is mapped to host pid {}", container_pid, host_pid)
+                log.debug(
+                    "container pid mapped to host pid",
+                    container_pid=container_pid,
+                    host_pid=host_pid,
+                )
                 return host_pid
             except asyncio.CancelledError:
                 raise
@@ -428,19 +437,19 @@ def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUl
         # Log if we had to adjust the limits
         if safe_soft != desired_soft or safe_hard != desired_hard:
             log.debug(
-                "Adjusted ulimit {}: desired=({}, {}) -> safe=({}, {}) (system limits: {}, {})",
-                name,
-                desired_soft,
-                desired_hard,
-                safe_soft,
-                safe_hard,
-                current_soft_limit,
-                current_hard_limit,
+                "ulimit adjusted to system limits",
+                ulimit_name=name,
+                desired_soft=desired_soft,
+                desired_hard=desired_hard,
+                safe_soft=safe_soft,
+                safe_hard=safe_hard,
+                system_soft=current_soft_limit,
+                system_hard=current_hard_limit,
             )
 
         return {"Name": name, "Soft": safe_soft, "Hard": safe_hard}
 
     except (OSError, ValueError, AttributeError) as e:
         # If we can't get system limits, log and use desired values
-        log.warning("Could not get system ulimit for {}: {}", name, e)
+        log.warning("system ulimit read failed", ulimit_name=name, error_repr=repr(e))
         return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
