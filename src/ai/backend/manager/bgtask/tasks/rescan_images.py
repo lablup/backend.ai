@@ -10,7 +10,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -23,7 +23,7 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 if TYPE_CHECKING:
     from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RescanImagesTaskResult(BaseBackgroundTaskResult):
@@ -103,7 +103,9 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
             )
 
             for error in action_result.errors:
-                log.error(error)
+                log.trace(
+                    "image rescan failed", registry_name=registry_data.registry_name, reason=error
+                )
 
             errors.extend(action_result.errors)
             rescanned_images.extend(action_result.images)

@@ -27,7 +27,7 @@ from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.errors.auth import OpenIDAuthenticationFailed
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
@@ -42,7 +42,7 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 scope = "openid profile email"
 
@@ -132,7 +132,7 @@ async def create_user_if_not_exists(
     user_data = user_info["user"]
     existing_id = await auth_repository.lookup(UserEmailLookup(user_data["email"]))
     if existing_id is not None:
-        log.info("OPENID.WEBAPP: found existing user ({})", user_data["email"])
+        log.trace("openid existing user found", user_email=user_data["email"])
         return existing_id
 
     domain_name = DomainName(user_data["domain_name"])
@@ -161,7 +161,7 @@ async def create_user_if_not_exists(
         [project_id] if project_id is not None else [],
         keypair_resource_policy=user_info["keypair_resource_policy"],
     )
-    log.info("OPENID.WEBAPP: new user created ({})", creation.user.email)
+    log.trace("openid user created", user_email=creation.user.email)
     return UserID(creation.user.uuid)
 
 
@@ -196,7 +196,7 @@ class JwksRefreshTask(PeriodicTask):
         async with aiohttp.ClientSession() as sess:
             async with sess.get(self._app["openid.jwks_uri"]) as resp:
                 self._app["openid.jwks"] = await resp.json()
-                log.info("Updated JSON Web Key Set")
+                log.debug("openid json web key set updated")
 
 
 class OIDCWebAppPlugin(WebappPlugin):
@@ -329,11 +329,10 @@ class OIDCWebAppPlugin(WebappPlugin):
             )
             claims.validate()
         except Exception as e:
-            log.exception("Failed to handle token: %s", e)
-            log.info("OPENID.WEBAPP: request not authenticated")
+            log.trace("openid request not authenticated")
             raise OpenIDAuthenticationFailed from e
 
-        log.info("OPENID.WEBAPP: authorized ({})", json.dumps(claims))
+        log.trace("openid request authorized", id_token_claims=json.dumps(claims))
         config = config_provider.config
         password_info = PasswordInfo(
             password=generate_random_string(),

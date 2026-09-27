@@ -21,7 +21,7 @@ from ai.backend.common.auth import ManagerAuthHandler
 from ai.backend.common.clients.agent.client import AgentClient
 from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
 
 from .types import AgentPoolSpec
@@ -29,7 +29,7 @@ from .types import AgentPoolSpec
 if TYPE_CHECKING:
     from ai.backend.manager.agent_cache import AgentRPCCache
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Connection-related error types
 CONNECTION_ERRORS = (
@@ -187,9 +187,9 @@ class AgentClientPool:
             # via the existing ``is_healthy=False`` branch in
             # ``_get_or_create`` instead of re-creating peers.
             log.debug(
-                "agent {} connect failed during pool entry creation: {}",
-                agent_id,
-                e,
+                "agent connect failed during pool entry creation",
+                agent_id=agent_id,
+                error=str(e),
             )
             return _CachedEntry(
                 client=client,
@@ -242,9 +242,9 @@ class AgentClientPool:
             if entry.unhealthy_since is None:
                 entry.unhealthy_since = time.perf_counter()
             log.debug(
-                "Agent {} marked unhealthy after {} connection failures",
-                agent_id,
-                entry.failure_count,
+                "agent connection marked unhealthy",
+                agent_id=agent_id,
+                failure_count=entry.failure_count,
             )
 
     def _record_success(self, agent_id: AgentId) -> None:
@@ -288,7 +288,7 @@ class AgentClientPool:
             entry.is_healthy = False
             if entry.unhealthy_since is None:
                 entry.unhealthy_since = time.perf_counter()
-                log.debug("Health check failed for agent {}", agent_id)
+                log.debug("agent connection health check failed", agent_id=agent_id)
 
         # Delete if recovery_timeout exceeded
         if (
@@ -300,8 +300,8 @@ class AgentClientPool:
                 if agent_id in self._entries:
                     await entry.client.close()
                     del self._entries[agent_id]
-            log.info(
-                "Removed unrecoverable connection for agent {} after {}s",
-                agent_id,
-                self._spec.recovery_timeout,
+            log.warning(
+                "agent connection removed after recovery timeout",
+                agent_id=agent_id,
+                recovery_timeout_sec=self._spec.recovery_timeout,
             )

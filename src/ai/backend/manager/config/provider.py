@@ -4,14 +4,14 @@ from collections.abc import Awaitable, Callable
 from typing import Self
 
 from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .loader.legacy_etcd_loader import LegacyEtcdLoader
 from .unified import ManagerUnifiedConfig
 
 SharedConfigChangeCallback = Callable[[ManagerUnifiedConfig], Awaitable[None]]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ManagerConfigProvider:
@@ -61,7 +61,7 @@ class ManagerConfigProvider:
         async for event in self._etcd_watcher.watch():
             raw_config = await self._loader.load()
             self._config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
-            log.debug("config reloaded due to etcd event.")
+            log.info("config reloaded on an etcd change")
 
     async def terminate(self) -> None:
         if self._etcd_watcher_task:

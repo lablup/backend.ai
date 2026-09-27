@@ -25,9 +25,9 @@ import logging
 
 from aiotools import aclosing
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def _detect_status_update(
@@ -47,9 +47,9 @@ async def _detect_status_update(
                         await config_provider.legacy_etcd_config_loader.get_manager_status()
                     )
                     log.debug(
-                        "Process-{0} detected manager status update: {1}",
-                        pidx,
-                        updated_status,
+                        "manager status update detected",
+                        pidx=pidx,
+                        manager_status=updated_status,
                     )
     except asyncio.CancelledError:
         pass
@@ -69,7 +69,7 @@ async def _report_status_bgtask(
             try:
                 await report_manager_status(valkey_stat, db, config_provider)
             except Exception as e:
-                log.exception("Failed to report manager health status (e:{!s})", e)
+                log.warning("failed to report manager health status", exc_info=e)
     except asyncio.CancelledError:
         pass
 

@@ -13,7 +13,7 @@ from ai.backend.common.data.notification import (
     NotificationChannelType,
 )
 from ai.backend.common.data.notification.types import EmailSpec, WebhookSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.errors.notification import (
     InvalidNotificationChannelType,
@@ -25,7 +25,7 @@ from ai.backend.manager.notification.channels.webhook.channel import WebhookChan
 from .channels.base import AbstractNotificationChannel
 from .types import NotificationMessage, ProcessRuleParams, SendResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationCenter",)
 
@@ -172,9 +172,4 @@ class NotificationCenter:
                 **data_dict,  # Allow direct access to data fields
             )
         except jinja2.TemplateError as e:
-            log.error(
-                "Failed to render notification template",
-                template=template_str,
-                error=str(e),
-            )
             raise NotificationTemplateRenderingFailure(f"Failed to render template: {e!s}") from e

@@ -12,7 +12,7 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.cron import PeriodicTask
 from ai.backend.common.plugin.monitor import GAUGE
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.registry import AgentRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _REPORT_INTERVAL: Final[float] = 5.0
 
@@ -101,5 +101,5 @@ class StatsReporterTask(PeriodicTask):
                 query = sa.select(sa.func.count()).select_from(subquery.alias())
                 n = await conn.scalar(query)
                 await self._stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
-        except (sqlalchemy.exc.InterfaceError, ConnectionRefusedError):
-            log.warning("report_stats(): error while connecting to PostgreSQL server")
+        except (sqlalchemy.exc.InterfaceError, ConnectionRefusedError) as e:
+            log.warning("stats report failed to connect to database", exc_info=e)

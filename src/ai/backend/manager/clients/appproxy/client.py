@@ -34,12 +34,12 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.appproxy import AppProxyConnectionError, AppProxyResponseError
 
 from .types import CreateEndpointRequestBody
 
-log: BraceStyleAdapter = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 appproxy_client_resilience = Resilience(
     policies=[
@@ -95,12 +95,10 @@ class AppProxyClient:
                 data = await resp.json()
                 return AppProxyStatusResponse.model_validate(data)
         except aiohttp.ClientConnectorError as e:
-            log.error("Failed to connect to app-proxy at {}: {}", self._address, e)
             raise AppProxyConnectionError(
                 extra_msg=f"Failed to connect to AppProxy at {self._address}"
             ) from e
         except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-            log.error("Failed to parse app-proxy status response from {}: {}", self._address, e)
             raise AppProxyResponseError(
                 extra_msg=f"Invalid response from AppProxy at {self._address}"
             ) from e

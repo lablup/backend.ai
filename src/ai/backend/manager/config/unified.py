@@ -224,8 +224,8 @@ from ai.backend.common.typed_validators import (
     UserID,
     _TimeDurationPydanticAnnotation,
 )
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import (
@@ -236,7 +236,7 @@ from ai.backend.manager.data.secret.types import (
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -1369,9 +1369,7 @@ class ManagerConfig(BaseConfigSchema):
     @classmethod
     def _parse_rpc_auth_manager_keypair(cls, v: str) -> str:
         if not Path(v).exists():
-            log.warning(
-                f'RPC authentication keypair file does not exist: "{v}".',
-            )
+            log.warning("RPC authentication keypair file does not exist", keypair_path=v)
         return v
 
 
