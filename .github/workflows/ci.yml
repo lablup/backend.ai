@@ -63,6 +63,7 @@ jobs:
             - 'tools/*.lock'
             - '.github/workflows/ci*.yml'
             - '.github/actions/pants-caches/**'
+            - '.github/scripts/plan-ci-targets.py'
           models:
             - 'src/ai/backend/manager/models/**'
 
@@ -88,7 +89,10 @@ jobs:
       full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
-  typecheck:
+  # Builds the dependents map once and hands every typecheck and test job its
+  # targets in the `ci-targets` artifact, with the shards that hold a target. A
+  # job with no targets is not started, so each gate below also checks this job.
+  plan-targets:
     needs: detect-changes
     if: |
       always()
@@ -98,24 +102,92 @@ jobs:
         || startsWith(github.ref, 'refs/tags/')
         || needs.detect-changes.outputs.release == 'true'
       )
+    runs-on: ubuntu-latest
+    outputs:
+      typecheck: ${{ steps.plan.outputs.typecheck }}
+      unit-shards: ${{ steps.plan.outputs.unit-shards }}
+      component-shards: ${{ steps.plan.outputs.component-shards }}
+      integration-shards: ${{ steps.plan.outputs.integration-shards }}
+      scenario-shards: ${{ steps.plan.outputs.scenario-shards }}
+    steps:
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
+      env:
+        RESULT: ${{ needs.detect-changes.result }}
+      run: |
+        echo "detect-changes did not succeed: $RESULT"
+        exit 1
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # Depth 2 holds `base-ref`.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> "$GITHUB_ENV"
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Plan the targets and shards
+      id: plan
+      env:
+        # The dependents map holds about 6.5GiB; above the limit pantsd drops it and
+        # the next run of the planner builds it again.
+        PANTS_PANTSD_MAX_MEMORY_USAGE: 10GiB
+        BASE_REF: ${{ needs.detect-changes.outputs.base-ref }}
+        FULL_RUN: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      run: |
+        flags=()
+        if [ "$FULL_RUN" == "true" ]; then flags=(--full-run); fi
+        .github/scripts/plan-ci-targets.py --base-ref "$BASE_REF" "${flags[@]}" \
+          --out dist/ci-targets | tee -a "$GITHUB_OUTPUT"
+    - name: Upload the targets
+      uses: actions/upload-artifact@v5
+      with:
+        name: ci-targets
+        path: dist/ci-targets
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.plan-targets.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  typecheck:
+    needs: plan-targets
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
     uses: ./.github/workflows/ci-typecheck.yml
     with:
-      detect-changes-result: ${{ needs.detect-changes.result }}
-      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
+      targets-artifact: ci-targets
       annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   lint-and-typecheck:
-    needs: [check-build-and-lint, typecheck]
+    needs: [check-build-and-lint, plan-targets, typecheck]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
         lint_result="${{ needs.check-build-and-lint.result }}"
+        plan_result="${{ needs.plan-targets.result }}"
         typecheck_result="${{ needs.typecheck.result }}"
         echo "check-build-and-lint: $lint_result"
+        echo "plan-targets: $plan_result"
         echo "typecheck: $typecheck_result"
-        for r in "$lint_result" "$typecheck_result"; do
+        for r in "$lint_result" "$plan_result" "$typecheck_result"; do
           if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
             echo "FAIL: unexpected result $r"
             exit 1
@@ -150,115 +222,82 @@ jobs:
         fi
 
   test-unit:
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
+    needs: [detect-changes, plan-targets]
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
     with:
       suite: unit
-      shards: '["0/6","1/6","2/6","3/6","4/6","5/6"]'
+      shards: ${{ needs.plan-targets.outputs.unit-shards }}
       runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-      changed-dependents: direct
-      detect-changes-result: ${{ needs.detect-changes.result }}
-      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
-      full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      targets-artifact: ci-targets
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-scenario:
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
+    needs: plan-targets
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
     uses: ./.github/workflows/ci-test-scenario.yml
     with:
-      shards: '["0/3","1/3","2/3"]'
+      shards: ${{ needs.plan-targets.outputs.scenario-shards }}
       runner: ubuntu-latest
-      detect-changes-result: ${{ needs.detect-changes.result }}
-      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
-      full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      targets-artifact: ci-targets
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-component:
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
+    needs: [detect-changes, plan-targets]
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
     with:
       suite: component
-      shards: '["0/6","1/6","2/6","3/6","4/6","5/6"]'
+      shards: ${{ needs.plan-targets.outputs.component-shards }}
       runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-      changed-dependents: direct
       sentinel-hosts: true
-      detect-changes-result: ${{ needs.detect-changes.result }}
-      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
-      full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      targets-artifact: ci-targets
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-integration:
-    needs: detect-changes
-    if: |
-      always()
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
+    needs: [detect-changes, plan-targets]
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
     with:
       suite: integration
-      shards: '["0/2","1/2"]'
+      shards: ${{ needs.plan-targets.outputs.integration-shards }}
       runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
       sentinel-hosts: true
-      detect-changes-result: ${{ needs.detect-changes.result }}
-      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
-      full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      targets-artifact: ci-targets
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-unit-gate:
-    needs: [test-unit]
+    needs: [plan-targets, test-unit]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        r="${{ needs.test-unit.result }}"
-        echo "test-unit: $r"
-        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
-          echo "OK"
-        else
-          echo "FAIL"
-          exit 1
-        fi
+        for name in plan-targets test-unit; do
+          case "$name" in
+            plan-targets) r="${{ needs.plan-targets.result }}" ;;
+            test-unit) r="${{ needs.test-unit.result }}" ;;
+          esac
+          echo "$name: $r"
+          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+            echo "FAIL"
+            exit 1
+          fi
+        done
+        echo "OK"
 
   test-component-gate:
-    needs: [test-component, test-scenario]
+    needs: [plan-targets, test-component, test-scenario]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        for name in component scenario; do
+        for name in plan-targets test-component test-scenario; do
           case "$name" in
-            component) r="${{ needs.test-component.result }}" ;;
-            scenario) r="${{ needs.test-scenario.result }}" ;;
+            plan-targets) r="${{ needs.plan-targets.result }}" ;;
+            test-component) r="${{ needs.test-component.result }}" ;;
+            test-scenario) r="${{ needs.test-scenario.result }}" ;;
           esac
-          echo "test-$name: $r"
+          echo "$name: $r"
           if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
             echo "FAIL"
             exit 1
@@ -267,19 +306,23 @@ jobs:
         echo "OK"
 
   test-integration-gate:
-    needs: [test-integration]
+    needs: [plan-targets, test-integration]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        r="${{ needs.test-integration.result }}"
-        echo "test-integration: $r"
-        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
-          echo "OK"
-        else
-          echo "FAIL"
-          exit 1
-        fi
+        for name in plan-targets test-integration; do
+          case "$name" in
+            plan-targets) r="${{ needs.plan-targets.result }}" ;;
+            test-integration) r="${{ needs.test-integration.result }}" ;;
+          esac
+          echo "$name: $r"
+          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+            echo "FAIL"
+            exit 1
+          fi
+        done
+        echo "OK"
 
   determine-release-grade:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
@@ -328,7 +371,7 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v6
       with:

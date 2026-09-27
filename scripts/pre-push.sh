@@ -15,6 +15,7 @@ trap 'cleanup TERM' SIGTERM
 set -Eeuo pipefail
 
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
+cd "$BASE_PATH"
 if [ -f .pants.rc ]; then
   local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
   mkdir -p "$local_exec_root_dir"
@@ -22,12 +23,23 @@ fi
 CURRENT_COMMIT=$(git rev-parse --short HEAD)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
+# check and test read one target list, so the dependents map is built once.
+check_and_test() {
+  local targets
+  targets=$(scripts/plan-push-targets.sh "$1" .pants.d/push-targets)
+  if [ ! -s "$targets" ]; then
+    echo "No changed targets to check or test."
+    return
+  fi
+  pants --spec-files="$targets" check
+  pants --spec-files="$targets" test
+}
+
 if ! command -v gh &> /dev/null; then
   echo "GitHub CLI (gh) is not installed. Running lint/check/test on HEAD~1."
   pants tailor --check update-build-files --check --changed-since=HEAD~1
   pants lint --changed-since=HEAD~1
-  pants check --changed-since=HEAD~1 --changed-dependents=direct
-  pants test --changed-since=HEAD~1 --changed-dependents=direct
+  check_and_test HEAD~1
 else
   # Get the base branch name from GitHub if we are on a pull request.
   BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null || true)
@@ -57,6 +69,5 @@ else
   fi
   echo "Performing lint/check/test on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
   pants lint --changed-since="${ORIGIN}/${BASE_BRANCH}"
-  pants check --changed-since="${ORIGIN}/${BASE_BRANCH}" --changed-dependents=direct
-  pants test --changed-since="${ORIGIN}/${BASE_BRANCH}" --changed-dependents=direct
+  check_and_test "${ORIGIN}/${BASE_BRANCH}"
 fi
