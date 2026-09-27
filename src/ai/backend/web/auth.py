@@ -9,8 +9,10 @@ from multidict import CIMultiDict
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.jwt.signer import JWTSigner
 from ai.backend.common.jwt.types import JWTUserContext
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.types import AccessKey
 from ai.backend.common.web.session import get_session
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
@@ -108,8 +110,8 @@ def get_client_ip(request: web.Request) -> str | None:
 def build_forwarding_headers(request: web.Request) -> CIMultiDict[str]:
     """Build forwarding headers from the incoming request.
 
-    Returns a ``CIMultiDict`` of ``X-Forwarded-*`` HTTP headers that can be
-    applied to outgoing requests via ``extra_headers`` parameters or
+    Returns a ``CIMultiDict`` of ``X-Forwarded-*`` HTTP headers and the current
+    request ID that can be applied to outgoing requests via ``extra_headers`` parameters or
     :func:`fill_forwarding_hdrs_to_api_session`.
     """
     headers: CIMultiDict[str] = CIMultiDict({
@@ -119,6 +121,9 @@ def build_forwarding_headers(request: web.Request) -> CIMultiDict[str]:
     client_ip = get_client_ip(request)
     if client_ip:
         headers["X-Forwarded-For"] = client_ip
+    request_id = current_request_id()
+    if request_id is not None:
+        headers[REQUEST_ID_HEADER] = request_id
     return headers
 
 
