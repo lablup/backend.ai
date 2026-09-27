@@ -3,8 +3,8 @@ Author: HyeokJin Kim (hyeokjin@lablup.com)
 Status: Implemented
 Created: 2026-07-28
 Created-Version: 26.9.0
-Target-Version: 26.9.0
-Implemented-Version: 26.9.0
+Target-Version: 26.10.0
+Implemented-Version: 26.10.0
 ---
 
 # Structured Logging Across Components
