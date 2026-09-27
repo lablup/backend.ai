@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.notification.types import ProcessRuleParams
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.repositories.notification import NotificationRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationService",)
 
@@ -99,9 +99,9 @@ class NotificationService:
         channel_data = await self._repository.get_channel_by_id(action.channel_id)
         await self._notification_center.validate_channel(channel_data, action.test_message)
         log.debug(
-            "Test notification sent successfully for channel '{}' (ID: {})",
-            channel_data.name,
-            action.channel_id,
+            "test notification sent",
+            channel_name=channel_data.name,
+            notification_channel_id=action.channel_id,
         )
 
         return ValidateChannelActionResult()
@@ -230,9 +230,10 @@ class NotificationService:
             if isinstance(result, BaseException):
                 errors.append(result)
                 log.error(
-                    "Failed to process notification for rule '{}': {}",
-                    match.rule.name,
-                    str(result),
+                    "notification rule processing failed",
+                    rule_name=match.rule.name,
+                    notification_rule_id=match.rule.id,
+                    exc_info=result,
                 )
                 continue
             successes.append(
@@ -243,10 +244,10 @@ class NotificationService:
                 )
             )
             log.debug(
-                "Notification sent successfully for rule '{}' (channel: '{}')",
-                match.rule.name,
-                match.channel.name,
-                rule_id=match.rule.id,
+                "notification sent",
+                rule_name=match.rule.name,
+                channel_name=match.channel.name,
+                notification_rule_id=match.rule.id,
             )
 
         return _ProcessedRulesResult(

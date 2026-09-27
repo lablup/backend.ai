@@ -6,7 +6,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetValueType,
 )
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.runtime_variant_preset.repository import (
@@ -17,7 +17,7 @@ from ai.backend.manager.services.runtime_variant_preset.actions.update import (
     UpdateRuntimeVariantPresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RuntimeVariantPresetService:

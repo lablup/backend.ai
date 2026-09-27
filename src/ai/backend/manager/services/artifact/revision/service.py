@@ -31,7 +31,7 @@ from ai.backend.common.dto.storage.request import (
     ReservoirImportModelsReq,
 )
 from ai.backend.common.types import VFolderID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -124,7 +124,7 @@ from ai.backend.manager.services.artifact.revision.actions.search import (
 _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL: Final[int] = 30  # seconds
 _REMOTE_ARTIFACT_MAX_WAIT_TIME: Final[int] = 3600  # 1 hour
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactRevisionService:
@@ -302,7 +302,7 @@ class ArtifactRevisionService:
                         )
                     except Exception as e:
                         # If remote query fails, return remote status without progress
-                        log.warning("Failed to get remote download progress {}", e)
+                        log.warning("remote download progress fetch failed", exc_info=e)
                         remote_download_progress = ArtifactRevisionDownloadProgress(
                             progress=None,
                             status=remote_status,
@@ -504,10 +504,9 @@ class ArtifactRevisionService:
                                 # Poll until remote status is AVAILABLE
                                 elapsed_time = 0
 
-                                log.info(
-                                    "Waiting for remote artifact to become AVAILABLE. "
-                                    "artifact_revision_id: {}",
-                                    revision_data.id,
+                                log.debug(
+                                    "waiting for remote artifact to become available",
+                                    artifact_revision_id=revision_data.id,
                                 )
 
                                 while elapsed_time < _REMOTE_ARTIFACT_MAX_WAIT_TIME:
@@ -524,20 +523,18 @@ class ArtifactRevisionService:
                                     )
 
                                     if remote_progress.status == ArtifactStatus.AVAILABLE.value:
-                                        log.info(
-                                            "Remote artifact is now AVAILABLE. "
-                                            "artifact_revision_id: {}, elapsed_time: {}s",
-                                            revision_data.id,
-                                            elapsed_time,
+                                        log.debug(
+                                            "remote artifact available",
+                                            artifact_revision_id=revision_data.id,
+                                            elapsed_sec=elapsed_time,
                                         )
                                         break
 
-                                    log.info(
-                                        "Waiting for remote artifact. Status: {}, Elapsed: {}s, "
-                                        "artifact_revision_id: {}",
-                                        remote_progress.status,
-                                        elapsed_time,
-                                        revision_data.id,
+                                    log.debug(
+                                        "waiting for remote artifact",
+                                        artifact_status=str(remote_progress.status),
+                                        elapsed_sec=elapsed_time,
+                                        artifact_revision_id=revision_data.id,
                                     )
                                 else:
                                     # Timeout reached

@@ -22,7 +22,7 @@ from ai.backend.common.types import (
     AgentId,
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -76,7 +76,7 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
 from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AgentService:

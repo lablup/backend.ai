@@ -1,7 +1,7 @@
 import logging
 
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import (
@@ -31,7 +31,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions.update import (
     UpdatePresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PrometheusQueryPresetService:

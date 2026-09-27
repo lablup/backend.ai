@@ -46,7 +46,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -172,7 +172,7 @@ from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import MountOptionModel
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ModelServingService:

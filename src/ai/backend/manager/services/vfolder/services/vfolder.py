@@ -30,7 +30,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -181,7 +181,7 @@ from ai.backend.manager.services.vfolder.types import (
     VFolderUsageInfo,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def _check_vfolder_status(
@@ -407,10 +407,10 @@ class VFolderService:
             )
         except VFolderGone as e:
             # If the vfolder is already gone, just delete it from the repository
-            log.warning("VFolder {} is already gone: {}", vfolder_data.id, e)
+            log.trace("vfolder already gone on storage", vfolder_id=vfolder_data.id, reason=str(e))
         except VFolderNotFound as e:
             # If the vfolder is not found, just delete it from the repository
-            log.warning("VFolder {} not found: {}", vfolder_data.id, e)
+            log.trace("vfolder not found on storage", vfolder_id=vfolder_data.id, reason=str(e))
 
     async def delete_forever(
         self, action: DeleteForeverVFolderAction

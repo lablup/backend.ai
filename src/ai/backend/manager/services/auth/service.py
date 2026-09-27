@@ -27,7 +27,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
@@ -123,7 +123,7 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
 )
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
@@ -486,7 +486,7 @@ class AuthService:
                 user_uuid, domain_name, result, client_ip=await self._recorded_client_ip()
             )
         except Exception:
-            log.warning("Failed to record login history: {} for user {}", result, user_uuid)
+            log.exception("login history record failed", login_result=result, user_id=user_uuid)
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
         params = action.hook_params
@@ -651,10 +651,12 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        log_fmt = "AUTH.UPDATE_PASSWORD(d:{}, email:{})"
-        log_args = (domain_name, email)
         if action.new_password != action.new_password_confirm:
-            log.info(log_fmt + ": new password mismtach", *log_args)
+            log.trace(
+                "password update rejected, new password mismatch",
+                domain_name=domain_name,
+                user_email=email,
+            )
             return UpdatePasswordActionResult(
                 success=False,
                 message="new password mismatch",
@@ -666,7 +668,6 @@ class AuthService:
                 action.old_password,
             )
         except AuthorizationFailed as e:
-            log.info(log_fmt + ": old password mismatch", *log_args)
             raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]

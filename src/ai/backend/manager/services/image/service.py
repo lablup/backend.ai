@@ -6,7 +6,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
@@ -97,7 +97,7 @@ from ai.backend.manager.services.image.actions.update_image_by_id import (
     UpdateImageByIdActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ImageService:

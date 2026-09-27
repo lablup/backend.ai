@@ -1,6 +1,6 @@
 import logging
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -71,7 +71,7 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.update impo
     UpdateReservoirRegistryActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryService:
@@ -95,7 +95,7 @@ class ArtifactRegistryService:
         """
         Create a new huggingface registry.
         """
-        log.info("Creating huggingface registry with data: {}", action.creator)
+        log.trace("huggingface registry creating")
         registry_data = await self._huggingface_registry_repository.create(
             action.creator, action.meta
         )
@@ -107,7 +107,7 @@ class ArtifactRegistryService:
         """
         Update an existing huggingface registry.
         """
-        log.info("Updating huggingface registry with id: {}", action.updater.registry_id)
+        log.trace("huggingface registry updating", artifact_registry_id=action.updater.registry_id)
         registry_data = await self._huggingface_registry_repository.update(
             action.updater, action.meta
         )
@@ -119,7 +119,7 @@ class ArtifactRegistryService:
         """
         Delete an existing huggingface registry.
         """
-        log.info("Deleting huggingface registry with id: {}", action.registry_id)
+        log.trace("huggingface registry deleting", artifact_registry_id=action.registry_id)
         registry_data = await self._huggingface_registry_repository.delete(action.registry_id)
         return DeleteHuggingFaceRegistryActionResult(deleted_registry_id=registry_data)
 
@@ -129,7 +129,7 @@ class ArtifactRegistryService:
         """
         Get an existing huggingface registry by ID.
         """
-        log.info("Getting huggingface registry with id: {}", action.registry_id)
+        log.trace("huggingface registry fetching", artifact_registry_id=action.registry_id)
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
             action.registry_id
         )
@@ -141,7 +141,7 @@ class ArtifactRegistryService:
         """
         Get multiple huggingface registries by IDs in a single batch query.
         """
-        log.info("Getting {} huggingface registries", len(action.registry_ids))
+        log.trace("huggingface registries fetching", registry_count=len(action.registry_ids))
         registry_data_list = await self._huggingface_registry_repository.get_registries_by_ids(
             action.registry_ids
         )
@@ -153,7 +153,7 @@ class ArtifactRegistryService:
         """
         List all huggingface registries.
         """
-        log.info("Listing huggingface registries")
+        log.trace("huggingface registries listing")
         registry_data_list = await self._huggingface_registry_repository.list_registries()
         return ListHuggingFaceRegistryActionResult(data=registry_data_list)
 
@@ -178,7 +178,7 @@ class ArtifactRegistryService:
         """
         Create a new reservoir.
         """
-        log.info("Creating reservoir with data: {}", action.creator)
+        log.trace("reservoir registry creating")
         reservoir_data = await self._reservoir_repository.create(action.creator, action.meta)
         return CreateReservoirActionResult(result=reservoir_data)
 
@@ -188,7 +188,7 @@ class ArtifactRegistryService:
         """
         Update an existing reservoir.
         """
-        log.info("Updating reservoir with id: {}", action.updater.registry_id)
+        log.trace("reservoir registry updating", artifact_registry_id=action.updater.registry_id)
         reservoir_data = await self._reservoir_repository.update(action.updater, action.meta)
         return UpdateReservoirRegistryActionResult(result=reservoir_data)
 
@@ -198,7 +198,7 @@ class ArtifactRegistryService:
         """
         Delete an existing reservoir.
         """
-        log.info("Deleting reservoir with id: {}", action.registry_id)
+        log.trace("reservoir registry deleting", artifact_registry_id=action.registry_id)
         reservoir_data = await self._reservoir_repository.delete(action.registry_id)
         return DeleteReservoirActionResult(deleted_reservoir_id=reservoir_data)
 
@@ -208,7 +208,7 @@ class ArtifactRegistryService:
         """
         Get an existing reservoir by ID.
         """
-        log.info("Getting reservoir with id: {}", action.reservoir_id)
+        log.trace("reservoir registry fetching", artifact_registry_id=action.reservoir_id)
         reservoir_data = await self._reservoir_repository.get_reservoir_registry_data_by_id(
             action.reservoir_id
         )
@@ -220,7 +220,7 @@ class ArtifactRegistryService:
         """
         Get multiple reservoir registries by IDs in a single batch query.
         """
-        log.info("Getting {} reservoir registries", len(action.registry_ids))
+        log.trace("reservoir registries fetching", registry_count=len(action.registry_ids))
         reservoir_data_list = await self._reservoir_repository.get_registries_by_ids(
             action.registry_ids
         )
@@ -232,7 +232,7 @@ class ArtifactRegistryService:
         """
         List all reservoirs.
         """
-        log.info("Listing reservoirs")
+        log.trace("reservoir registries listing")
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
 
@@ -253,7 +253,7 @@ class ArtifactRegistryService:
     async def get_registry_meta(
         self, action: GetArtifactRegistryMetaAction
     ) -> GetArtifactRegistryMetaActionResult:
-        log.info("Getting artifact registry meta with id: {}", action.registry_id)
+        log.trace("artifact registry meta fetching", artifact_registry_id=action.registry_id)
         registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
             action.registry_id
         )
