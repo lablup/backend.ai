@@ -7,7 +7,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
@@ -24,7 +24,7 @@ from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 from .types import GPFSSystemHealthState
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GPFSQuotaModel(BaseQuotaModel):
@@ -84,7 +84,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         )
         custom_defined_quotas = [q for q in quotas if not q.isDefaultQuota]
         if len(custom_defined_quotas) == 0:
-            log.warning("No custom defined quotas found for quota scope {} in GPFS", quota_scope_id)
+            log.warning("no custom quota defined for quota scope")
             return QuotaUsage(-1, -1)
         quota_info = custom_defined_quotas[0]
         # The units are kilobytes (ref: )
@@ -92,11 +92,10 @@ class GPFSQuotaModel(BaseQuotaModel):
         limit_bytes = quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1
         if used_bytes < 0 or limit_bytes < 0:
             log.warning(
-                "Data from GPFS API negative values in used_bytes ({}) or limit_bytes ({}) for quota scope {}: response from GPFS API = {}",
-                used_bytes,
-                limit_bytes,
-                quota_scope_id,
-                quota_info.to_json(),
+                "negative quota usage reported",
+                used_bytes=used_bytes,
+                limit_bytes=limit_bytes,
+                response_body=str(quota_info.to_json()),
             )
         return QuotaUsage(
             used_bytes=used_bytes,

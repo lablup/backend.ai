@@ -10,7 +10,7 @@ from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
 from ai.backend.storage.errors import InvalidVolumeError
 from ai.backend.storage.types import VolumeInfo
@@ -19,7 +19,7 @@ from ai.backend.storage.watcher import WatcherClient
 from .abc import AbstractVolume
 from .noop import init_noop_volume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _parse_volume_id(raw_key: str) -> VolumeID | None:

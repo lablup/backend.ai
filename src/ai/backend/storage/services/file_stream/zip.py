@@ -8,7 +8,6 @@ stream_archive_response helper for writing any StreamReader to an HTTP response.
 
 from __future__ import annotations
 
-import asyncio
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path, PurePosixPath
@@ -17,6 +16,7 @@ from typing import override
 import janus
 import zipstream
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import StreamReader
 from ai.backend.storage.errors import UnsupportedFileTypeError
 from ai.backend.storage.types import SENTINEL, Sentinel
@@ -85,8 +85,7 @@ class ZipArchiveStreamReader(StreamReader):
         # a janus queue (sync producer → async consumer).
         q: janus.Queue[bytes | Sentinel] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
         try:
-            loop = asyncio.get_running_loop()
-            put_chunks = loop.run_in_executor(None, self._produce_chunks, q.sync_q)
+            put_chunks = run_in_executor_with_context(None, self._produce_chunks, q.sync_q)
             while True:
                 item = await q.async_q.get()
                 if isinstance(item, Sentinel):

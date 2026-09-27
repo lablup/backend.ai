@@ -7,7 +7,7 @@ import re
 from typing import Any, override
 
 from ai.backend.common.types import HardwareMetadata
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     MetricNotFoundError,
     PureStorageCommandFailedError,
@@ -30,7 +30,7 @@ from .rapidfiles_v2 import RapidFileToolsv2FSOpModel
 FLASHBLADE_TOOLKIT_V2_VERSION_RE = re.compile(r"version p[a-zA-Z\d]+ \(RapidFile\) (2\..+)")
 FLASHBLADE_TOOLKIT_V1_VERSION_RE = re.compile(r"p[a-zA-Z\d]+ \(RapidFile Toolkit\) (1\..+)")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class FlashBladeVolume(BaseVolume):
@@ -75,12 +75,14 @@ class FlashBladeVolume(BaseVolume):
                 version_line = stdout.decode().splitlines()[0]
                 if FLASHBLADE_TOOLKIT_V2_VERSION_RE.match(version_line):
                     self._toolkit_version = 2
-                    log.info("FlashBlade Toolkit 2 detected")
+                    log.info("FlashBlade Toolkit detected", toolkit_version=2)
                 elif FLASHBLADE_TOOLKIT_V1_VERSION_RE.match(version_line):
                     self._toolkit_version = 1
-                    log.info("FlashBlade Toolkit 1 detected")
+                    log.info("FlashBlade Toolkit detected", toolkit_version=1)
                 else:
-                    log.warning("Unrecogized FlashBlade Toolkit version: {}", version_line)
+                    log.warning(
+                        "unrecognized FlashBlade Toolkit version", version_line=version_line
+                    )
                     self._toolkit_version = -1
         finally:
             await proc.wait()

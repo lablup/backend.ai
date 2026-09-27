@@ -9,6 +9,7 @@ import aiohttp
 import yarl
 from aiohttp import ClientTimeout
 
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,
@@ -18,6 +19,7 @@ from ai.backend.common.exception import (
     PassthroughError,
 )
 from ai.backend.common.json import load_json
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
@@ -147,6 +149,8 @@ class StorageProxyHTTPClient:
         headers = {
             AUTH_TOKEN_HDR: self._secret,
         }
+        if (request_id := current_request_id()) is not None:
+            headers[REQUEST_ID_HEADER] = request_id
         try:
             async with self._client_session.request(
                 method,

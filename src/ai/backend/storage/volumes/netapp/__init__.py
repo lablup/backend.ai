@@ -24,7 +24,7 @@ from tenacity import (
 )
 
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidPathError,
@@ -61,7 +61,7 @@ from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVo
 
 from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 xcp_lic_check_path = Path("/tmp/backend.ai/storage.netapp.xcp-license-check")
 
 
@@ -467,9 +467,8 @@ class NetAppVolume(BaseVolume):
         if await xcp_fsop_model.check_license():
             return xcp_fsop_model
         log.warning(
-            "XCP is not installed ('{}') or its license is not active. "
-            "Falling back to BaseFSOpModel which may be slower.",
-            shlex.join(self.netapp_xcp_cmd),
+            "XCP unavailable, falling back to BaseFSOpModel",
+            xcp_command=shlex.join(self.netapp_xcp_cmd),
         )
         return BaseFSOpModel(
             self.mount_path,

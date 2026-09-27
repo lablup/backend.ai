@@ -7,8 +7,9 @@ from typing import Any, override
 
 import aiofiles.os
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import BinarySize, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import CapacityUsage, QuotaConfig, QuotaUsage, TreeUsage
@@ -21,7 +22,7 @@ from ai.backend.storage.volumes.abc import (
 )
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class CephDirQuotaModel(BaseQuotaModel):
@@ -42,7 +43,6 @@ class CephDirQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
-        loop = asyncio.get_running_loop()
 
         def read_attrs() -> tuple[int, int]:
             used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined,unused-ignore]
@@ -54,23 +54,18 @@ class CephDirQuotaModel(BaseQuotaModel):
                         limit_bytes = 0
                     case _:
                         limit_bytes = -1  # unset
-                log.warning(
-                    "Failed to read ceph.quota.max_bytes for quota scope {}: {}",
-                    quota_scope_id,
-                    e,
-                )
+                log.warning("ceph.quota.max_bytes read failed", exc_info=e)
             if used_bytes < 0 or limit_bytes < 0:
                 log.warning(
-                    "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope {} in CephFS",
-                    used_bytes,
-                    limit_bytes,
-                    quota_scope_id,
+                    "negative quota usage reported",
+                    used_bytes=used_bytes,
+                    limit_bytes=limit_bytes,
                 )
             return used_bytes, limit_bytes
 
         # without type: ignore mypy will raise error when trying to run on macOS
         # because os.getxattr() exists only for linux
-        used_bytes, limit_bytes = await loop.run_in_executor(
+        used_bytes, limit_bytes = await run_in_executor_with_context(
             None,
             read_attrs,
         )
@@ -86,8 +81,7 @@ class CephDirQuotaModel(BaseQuotaModel):
         if not qspath.exists():
             raise QuotaScopeNotFoundError
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
@@ -102,8 +96,7 @@ class CephDirQuotaModel(BaseQuotaModel):
         if not qspath.exists():
             raise QuotaScopeNotFoundError
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
@@ -114,8 +107,7 @@ class CephDirQuotaModel(BaseQuotaModel):
 class CephFSOpModel(BaseFSOpModel):
     @override
     async def scan_tree_usage(self, path: Path) -> TreeUsage:
-        loop = asyncio.get_running_loop()
-        raw_reports = await loop.run_in_executor(
+        raw_reports = await run_in_executor_with_context(
             None,
             lambda: (
                 os.getxattr(path, "ceph.dir.rentries"),  # type: ignore[attr-defined,unused-ignore]
@@ -128,8 +120,7 @@ class CephFSOpModel(BaseFSOpModel):
 
     @override
     async def scan_tree_size(self, path: Path) -> BinarySize:
-        loop = asyncio.get_running_loop()
-        raw_report = await loop.run_in_executor(
+        raw_report = await run_in_executor_with_context(
             None,
             lambda: os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined,unused-ignore]
         )
@@ -167,7 +158,7 @@ class CephFSVolume(BaseVolume):
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:
-        (total, used, _) = await asyncio.get_running_loop().run_in_executor(
+        (total, used, _) = await run_in_executor_with_context(
             None,
             shutil.disk_usage,
             self.mount_path,

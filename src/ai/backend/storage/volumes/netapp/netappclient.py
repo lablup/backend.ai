@@ -72,7 +72,7 @@ from typing import (
 
 import aiohttp
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import NetAppClientError, NetAppQTreeNotFoundError
 from ai.backend.storage.types import QuotaConfig, QuotaUsage
 
@@ -120,7 +120,7 @@ class QTreeInfo(TypedDict):
     statistics: NotRequired[dict[str, Any]]
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class NetAppClient:
@@ -577,13 +577,13 @@ class NetAppClient:
             limit_bytes = records[0]["space"]["hard_limit"]
             if used_bytes < 0 or limit_bytes < 0:
                 log.warning(
-                    "Data from NetApp API negative values in used_bytes({}) or limit_bytes({}) for svm id {}, volume id {}, qtree name {}: response from NetApp API = {}",
-                    used_bytes,
-                    limit_bytes,
-                    svm_id,
-                    volume_id,
-                    qtree_name,
-                    data,
+                    "negative quota usage reported",
+                    used_bytes=used_bytes,
+                    limit_bytes=limit_bytes,
+                    svm_id=str(svm_id),
+                    netapp_volume_id=str(volume_id),
+                    qtree_name=qtree_name,
+                    response_body=str(data),
                 )
             return QuotaUsage(
                 used_bytes=used_bytes,

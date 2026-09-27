@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.observer.types import AbstractObserver
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.metrics.volume_perf import VolumePerfMetricObserver
 from ai.backend.storage.metrics.volume_stats import VolumeStatsMetricObserver
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VolumeStatsObserver(AbstractObserver):
@@ -124,7 +124,7 @@ class VolumeStatsObserver(AbstractObserver):
                 status="failure",
                 duration=duration,
             )
-            log.warning("Timeout observing volume stats for {}", volume_name)
+            log.warning("volume stats observation timed out", volume_name=volume_name)
             return None
         except Exception as e:
             duration = time.monotonic() - start_time
@@ -133,7 +133,7 @@ class VolumeStatsObserver(AbstractObserver):
                 status="failure",
                 duration=duration,
             )
-            log.warning("Failed to observe volume stats for {}: {}", volume_name, e)
+            log.warning("volume stats observation failed", exc_info=e, volume_name=volume_name)
             return None
 
     async def _store_in_cache(self, cached: CachedFSPerfMetricData) -> None:
@@ -145,4 +145,6 @@ class VolumeStatsObserver(AbstractObserver):
                 ttl_seconds=int(self._options.cache_ttl),
             )
         except Exception as e:
-            log.warning("Failed to store volume stats in cache for {}: {}", cached.volume_name, e)
+            log.warning(
+                "volume stats cache store failed", exc_info=e, volume_name=cached.volume_name
+            )

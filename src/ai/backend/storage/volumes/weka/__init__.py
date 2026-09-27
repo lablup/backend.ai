@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
@@ -9,11 +8,12 @@ from typing import Any, override
 
 import aiofiles.os
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import VolumeNotInitializedError
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ai.backend.storage.volumes.abc import (
@@ -29,7 +29,7 @@ from ai.backend.storage.watcher import WatcherClient
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
 from .weka_client import WekaAPIClient
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class WekaQuotaModel(BaseQuotaModel):
@@ -44,8 +44,7 @@ class WekaQuotaModel(BaseQuotaModel):
         self.api_client = api_client
 
     async def _get_inode_id(self, path: Path) -> int:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
+        return await run_in_executor_with_context(
             None,
             lambda: path.stat().st_ino,
         )
@@ -87,11 +86,10 @@ class WekaQuotaModel(BaseQuotaModel):
         limit_bytes = quota.hard_limit if quota.hard_limit is not None else -1
         if used_bytes < 0 or limit_bytes < 0:
             log.warning(
-                "Data from Weka API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from Weka API = {}",
-                used_bytes,
-                limit_bytes,
-                quota_scope_id,
-                quota.to_json(),
+                "negative quota usage reported",
+                used_bytes=used_bytes,
+                limit_bytes=limit_bytes,
+                response_body=str(quota.to_json()),
             )
         return QuotaUsage(
             used_bytes=used_bytes,

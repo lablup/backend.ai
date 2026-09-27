@@ -14,11 +14,11 @@ from aiohttp import web
 
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass

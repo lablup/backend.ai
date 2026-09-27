@@ -16,13 +16,13 @@ from ai.backend.common.dto.storage.response import (
     GetVerificationResultResponse,
     VFSListFilesResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import ReservoirClientConfig, ReservoirConfig
 from ai.backend.storage.errors import RegistryNotFoundError, ReservoirStorageConfigInvalidError
 
 _HASH_TYPE = "sha256"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
